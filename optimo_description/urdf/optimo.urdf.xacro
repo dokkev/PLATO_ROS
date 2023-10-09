@@ -230,6 +230,7 @@
         <child link="link2"/>
         <axis xyz="0 0 1"/>
         <limit lower="${DtR*60}" upper="${DtR*250}" effort="95" velocity="10"/>
+        <!-- <limit lower="0" upper="${DtR*250}" effort="95" velocity="10"/> -->
     </joint>
     <!-- <joint name="joint2" type="revolute">
         <origin xyz="0 0 0" rpy="0 0 ${PI}"/>

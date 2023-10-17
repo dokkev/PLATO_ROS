@@ -209,6 +209,28 @@
         </inertial>
     </link>
 
+
+    <!-- <joint name='jN' type='revolute'>
+      <child>LINK NAME</child>
+      <parent>LINK NAME</parent>
+      <axis>
+        <xyz>AXIS OF ROTATION, IN JOINT FRAME</xyz> 
+        <limit>
+          <lower>RADIANS FOR REVOLUTE/ METERS FOR PRISMATIC</lower> 
+          <upper></upper>
+          <effort></effort>
+          <velocity></velocity>
+        </limit>
+        <dynamics>
+          <damping>VISCOUS DAMPING COEFFICIENT</damping> 
+          <friction>PHYSICAL STATIC FRICTION</friction> 
+          <spring_reference>SPRING REF POSITION FOR THIS JOINT AXIS</spring_reference> 
+          <spring_stiffness>SPRING STIFFNESS FOR THIS JOINT AXIS</spring_stiffness> 
+        </dynamics>
+        <use_parent_model_frame>1</use_parent_model_frame>
+      </axis>
+    </joint> -->
+
     <!-- Joints -->
     <joint name="joint1" type="revolute">
         <origin xyz="0 0 0" rpy="0 0 0"/>

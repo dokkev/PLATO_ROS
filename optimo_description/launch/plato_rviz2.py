@@ -11,10 +11,14 @@ import launch_ros.substitutions
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    urdf_package_path = get_package_share_directory('optimo_description')
+    urdf_file_path = os.path.join(urdf_package_path, 'urdf', 'plato.urdf.xacro')
+    urdf_file_sub = Command(['xacro ', urdf_file_path])
+
 
     optimo_description_package = launch_ros.substitutions.FindPackageShare(package='optimo_description').find('optimo_description')
 
-    rviz_config_file = get_package_share_directory('optimo_description') + '/rviz/optimo.rviz'
+    rviz_config_file = get_package_share_directory('optimo_description') + '/rviz/plato.rviz'
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -22,6 +26,10 @@ def generate_launch_description():
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
 
+
+        LogInfo(msg=[
+            "Loading URDF from '", urdf_file_path, "' as Xacro model..."
+        ]),
         
         # Robot state publisher
         Node(
@@ -31,7 +39,7 @@ def generate_launch_description():
             output='both',
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'robot_description': launch_ros.descriptions.ParameterValue( launch.substitutions.Command(['xacro ',os.path.join(optimo_description_package,'urdf/optimo.urdf.xacro')]), value_type=str)  
+                'robot_description': launch_ros.descriptions.ParameterValue( launch.substitutions.Command(['xacro ',os.path.join(optimo_description_package,'urdf/plato.urdf.xacro')]), value_type=str)  
             }]
           
         ),

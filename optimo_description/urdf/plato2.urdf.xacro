@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Constants for robot dimensions -->
+    <xacro:property name="PI" value="3.1415926535897931"/>
+    <xacro:property name="DtR" value=".01745329251"/>
+
+    <!-- Base Link -->
+    <link name="base_link">
+    </link>
+
+    <!-- Plato Wrist and Palm -->
+    <link name="plato_base">
+
+        <!-- Wrist -->
+        <visual>
+            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
+           
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/wrist.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/wrist.stl"/>
+            </geometry>
+        </collision>
+
+        <!-- Palm -->
+        <visual>
+            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/palm.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/palm.stl"/>
+            </geometry>
+        </collision>
+
+        <!-- Inertia -->
+        <inertial>
+            <origin xyz="1.0117e-05 0.0450 -0.0063" rpy="0 0 0"/>
+            <mass value="0.16837536923491458474" />
+            <inertia ixx="0.00021795637863171517202" ixy="-9.170956020097829733e-08"  ixz="1.7066490307227763118e-08" iyy="0.00011840211573803280072" iyz="-6.6791295602207281096e-06" izz="0.00030048000810285068916" />
+        </inertial>
+    
+    </link>
+
+    <!-- Thumb MCP Roll -->
+    <link name="thumb_roll">
+        <visual>
+            <origin xyz="0.0225 -0.0580 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/thumb_roll.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0.0225 -0.0580 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/thumb_roll.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.007499999999999996253 0.0041255295800873281742 -0.0091272785273523587835" rpy="0 0 0"/>
+            <mass value="0.0044278462620594583737" />
+            <inertia ixx="4.0578009538925160706e-07" ixy="1.2354990484818068308e-37"  ixz="1.4849860146655758327e-38" iyy="6.3776075499538409436e-07" iyz="5.8466444187420424066e-08" izz="3.1579696217173233006e-07" />
+        </inertial>
+    </link>
+
+    <link name="mcp_yaw">
+
+        <visual>    
+            <origin xyz="0 0 -0.0099" rpy="-3.1416 0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.0099" rpy="-3.1416 0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
+            </geometry>
+        </collision>
+
+        <visual>
+            <origin xyz="-0.0149 .0281 -0.0099" rpy="0 1.5708 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="-0.0149 .0281 -0.0099" rpy="0 1.5708 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
+            </geometry>
+        </collision>
+
+        <visual>
+            <origin xyz="0 0 -0.0198" rpy="3.1416 0 -3.1416" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_connect.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.0198" rpy="3.1416 0 -3.1416" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_connect.stl"/>
+            </geometry>
+        </collision>
+
+        <inertial>
+            <origin xyz="-0.0079504685553141805215 0.013983661603934081225 -0.010286902688940165879" rpy="0 0 0"/>
+            <mass value="0.12656081824380863154" />
+            <inertia ixx="3.511716593988192819e-05" ixy="1.305214014147652609e-05"  ixz="-1.9957519826319390454e-07" iyy="1.7537495218030880735e-05" iyz="-4.9180486622856312489e-07" izz="4.2451494821237760241e-05" />
+        </inertial>
+    </link> 
+
+
+
+
+
+
+    <!-- Joint: Base Link to Plato Base -->
+    <joint name="base_link_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="plato_base"/>
+    </joint> 
+
+
+    <!-- Joint: Plato Base to Thumb-->
+    <joint name="thumb_joint" type="fixed">
+        <origin xyz="-0.0225 0.0580 -0.0160" rpy="0 0 0" />
+        <parent link="plato_base" />
+        <child link="thumb_roll" />
+    </joint>
+    
+    <!-- Joint: T -->
+    <joint name="f0_mcp_roll" type="revolute">
+<origin xyz="-0.0074999999999999997224 0.0069999999999999992784 -0.016999999999999994282" rpy="-1.570796326794896558 1.7904316928197674078e-15 -3.1415926535897873428" />
+<parent link="thumb_roll" />
+<child link="mcp_yaw" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" lower="-1.0471975511965976313" upper="0.52359877559829881566"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+
+
+
+
+</robot>

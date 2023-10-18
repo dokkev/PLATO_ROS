@@ -37,6 +37,8 @@ def generate_launch_description():
     # Run the nodes
     return LaunchDescription([
 
+        ##################### Arguments #####################
+        
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
@@ -48,6 +50,9 @@ def generate_launch_description():
             default_value='false',
             description='Use joint_state_publisher_gui'
         ),
+
+
+        ##################### Nodes #####################
 
         # Joint state publisher GUI
         Node(
@@ -81,7 +86,4 @@ def generate_launch_description():
             arguments= ['-d', rviz_config_file]
         ),
 
-
-
-  
     ])

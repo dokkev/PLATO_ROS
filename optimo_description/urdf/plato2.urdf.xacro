@@ -1,170 +1,346 @@
 <?xml version="1.0"?>
 <robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <!-- Constants for robot dimensions -->
-    <xacro:property name="PI" value="3.1415926535897931"/>
-    <xacro:property name="DtR" value=".01745329251"/>
+    <link name="base_link"></link>
 
-    <!-- Base Link -->
-    <link name="base_link">
-    </link>
-
-    <!-- Plato Wrist and Palm -->
-    <link name="plato_base">
-
-        <!-- Wrist -->
-        <visual>
-            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
-           
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/wrist.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/wrist.stl"/>
-            </geometry>
-        </collision>
-
-        <!-- Palm -->
-        <visual>
-            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/palm.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="0 0 -0.0160" rpy="0 0 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/palm.stl"/>
-            </geometry>
-        </collision>
-
-        <!-- Inertia -->
-        <inertial>
-            <origin xyz="1.0117e-05 0.0450 -0.0063" rpy="0 0 0"/>
-            <mass value="0.16837536923491458474" />
-            <inertia ixx="0.00021795637863171517202" ixy="-9.170956020097829733e-08"  ixz="1.7066490307227763118e-08" iyy="0.00011840211573803280072" iyz="-6.6791295602207281096e-06" izz="0.00030048000810285068916" />
-        </inertial>
-    
-    </link>
-
-    <!-- Thumb MCP Roll -->
-    <link name="thumb_roll">
-        <visual>
-            <origin xyz="0.0225 -0.0580 0" rpy="0 0 0"/>
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/thumb_roll.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="0.0225 -0.0580 0" rpy="0 0 0"/>
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/thumb_roll.stl"/>
-            </geometry>
-        </collision>
-        <inertial>
-            <origin xyz="-0.007499999999999996253 0.0041255295800873281742 -0.0091272785273523587835" rpy="0 0 0"/>
-            <mass value="0.0044278462620594583737" />
-            <inertia ixx="4.0578009538925160706e-07" ixy="1.2354990484818068308e-37"  ixz="1.4849860146655758327e-38" iyy="6.3776075499538409436e-07" iyz="5.8466444187420424066e-08" izz="3.1579696217173233006e-07" />
-        </inertial>
-    </link>
-
-    <link name="mcp_yaw">
-
-        <visual>    
-            <origin xyz="0 0 -0.0099" rpy="-3.1416 0 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="0 0 -0.0099" rpy="-3.1416 0 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
-            </geometry>
-        </collision>
-
-        <visual>
-            <origin xyz="-0.0149 .0281 -0.0099" rpy="0 1.5708 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="-0.0149 .0281 -0.0099" rpy="0 1.5708 0" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/motor.stl"/>
-            </geometry>
-        </collision>
-
-        <visual>
-            <origin xyz="0 0 -0.0198" rpy="3.1416 0 -3.1416" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_connect.stl"/>
-            </geometry>
-            <material name="LightGrey">
-                <color rgba="0.999 0.999 0.999 1.0"/>
-            </material>
-        </visual>
-        <collision>
-            <origin xyz="0 0 -0.0198" rpy="3.1416 0 -3.1416" />
-            <geometry>
-                <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_connect.stl"/>
-            </geometry>
-        </collision>
-
-        <inertial>
-            <origin xyz="-0.0079504685553141805215 0.013983661603934081225 -0.010286902688940165879" rpy="0 0 0"/>
-            <mass value="0.12656081824380863154" />
-            <inertia ixx="3.511716593988192819e-05" ixy="1.305214014147652609e-05"  ixz="-1.9957519826319390454e-07" iyy="1.7537495218030880735e-05" iyz="-4.9180486622856312489e-07" izz="4.2451494821237760241e-05" />
-        </inertial>
-    </link> 
-
-
-
-
-
-
-    <!-- Joint: Base Link to Plato Base -->
-    <joint name="base_link_joint" type="fixed">
+    <joint name="base_link_to_base" type="fixed">
         <parent link="base_link"/>
-        <child link="plato_base"/>
-    </joint> 
-
-
-    <!-- Joint: Plato Base to Thumb-->
-    <joint name="thumb_joint" type="fixed">
-        <origin xyz="-0.0225 0.0580 -0.0160" rpy="0 0 0" />
-        <parent link="plato_base" />
-        <child link="thumb_roll" />
+        <child link="base" />
+        <origin rpy="0.0 0 0" xyz="0 0 0"/>
     </joint>
+
+    <!-- Hand Base (Palm) -->
+        <link name="base">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/base_visual.stl"/>
+                </geometry>
+                <material name="base_material">
+                    <color rgba="0.9 0.9 0.9 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/base_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="-0.00075885043291843616662 0.045493179467456464071 -0.0068276731996390034943" rpy="0 0 0"/>
+                <mass value="0.17280321549697408301" />
+                <inertia ixx="0.00022114103876778819007" ixy="2.1184002504335544201e-06"  ixz="-2.4145885068302881161e-06" iyy="0.00012444721671787562921" iyz="-5.2375390643356186732e-06" izz="0.00030593848378724345814" />
+            </inertial>
+        </link>
+
+    <!-- Finger 1 (Middle) -->
+
+        <link name="f1_mcpYaw">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_visual.stl"/>
+                </geometry>
+                <material name="mcp_yaw_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                    <geometry>
+                        <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_collision.stl"/>
+                    </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="-0.0079504685553140486826 0.013983661603933850506 -0.010286902688940493741" rpy="0 0 0"/>
+                <mass value="0.12656081824380860379" />
+                <inertia ixx="3.5117165939881067604e-05" ixy="1.3052140141476160172e-05"  ixz="-1.9957519826346995787e-07" iyy="1.7537495218030348798e-05" iyz="-4.9180486622802441194e-07" izz="4.2451494821236161043e-05" />
+            </inertial>
+        </link>
+
+        <link name="f1_mcpPitch">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_visual.stl"/>
+                </geometry>
+                <material name="mcp_pitch_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="0.0020817714488827704193 3.9659158095891871997e-10 -0.015795112278833130237" rpy="0 0 0"/>
+                <mass value="0.069114549940711839104" />
+                <inertia ixx="5.8883565545032281774e-06" ixy="-9.2074790703006540204e-09"  ixz="-1.1640174651110902034e-06" iyy="9.6829622072775490833e-06" iyz="-9.4322532028210922606e-14" izz="9.2871592762526579331e-06" />
+            </inertial>
+        </link>
+
+        <link name="f1_pipPitch">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_visual.stl"/>
+                </geometry>
+                <material name="pip_material">
+                    <color rgba="0.6 0.6 0.6 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="0.020839063326584510855 -0.00066661768468515611007 -0.0023008505382949269794" rpy="0 0 0"/>
+                <mass value="0.0080671501064400186198" />
+                <inertia ixx="2.1185571765449171129e-07" ixy="3.6426243959714235979e-08"  ixz="-1.3233834119163569586e-10" iyy="1.2852102149793331283e-06" iyz="-3.1084190128041884326e-11" izz="1.3237276294093039861e-06" />
+            </inertial>
+        </link>
+
+        
+
+
+
+    <!-- Finger 2 (Index) -->
+
+        <link name="f2_mcpYaw">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_2_visual.stl"/>
+                </geometry>
+                <material name="mcp_yaw_2_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_2_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="-0.0079504685553139324561 0.013983661603933885201 -0.010286902688940542314" rpy="0 0 0"/>
+                <mass value="0.12656081824380860379" />
+                <inertia ixx="3.5117165939881250564e-05" ixy="1.3052140141475967048e-05"  ixz="-1.9957519826352019751e-07" iyy="1.7537495218030098076e-05" iyz="-4.9180486622795177886e-07" izz="4.245149482123598486e-05" />
+            </inertial>
+        </link>
+
+        <link name="f2_mcpPitch">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_2_visual.stl"/>
+                </geometry>
+                <material name="mcp_pitch_2_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_2_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="0.0020817714488827699856 3.9659159055821743145e-10 -0.015795112278832956765" rpy="0 0 0"/>
+                <mass value="0.069114549940711839104" />
+                <inertia ixx="5.888356554503036748e-06" ixy="-9.2074790702716563769e-09"  ixz="-1.1640174651110770743e-06" iyy="9.6829622072776032934e-06" iyz="-9.4322521019236167663e-14" izz="9.2871592762524715858e-06" />
+            </inertial>
+        </link>
+
+        <link name="f2_pipPitch">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_2_visual.stl"/>
+                </geometry>
+                <material name="pip_2_material">
+                    <color rgba="0.64840281537925470445 0.65618066718706058449 0.66395851899486646452 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_2_collision.stl"/>
+                </geometry>
+                </collision>
+            <inertial>
+                <origin xyz="0.020839063326584552488 -0.0006666176846852195359 -0.0023008505382949716485" rpy="0 0 0"/>
+                <mass value="0.0080671501064400186198" />
+                <inertia ixx="2.118557176544938024e-07" ixy="3.6426243959718457909e-08"  ixz="-1.3233834118829153389e-10" iyy="1.2852102149793371517e-06" iyz="-3.1084190127972918142e-11" izz="1.3237276294093162681e-06" />
+            </inertial>
+        </link>
+
+    <!-- Finger 3 (Thumb) -->
+
+        <link name="f3_mcpYaw">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_3_visual.stl"/>
+                </geometry>
+                <material name="mcp_yaw_3_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_yaw_3_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="-0.0079504685553146679788 0.013983661603934086429 -0.010286902688939794648" rpy="0 0 0"/>
+                <mass value="0.12656081824380860379" />
+                <inertia ixx="3.5117165939881907861e-05" ixy="1.3052140141477240986e-05"  ixz="-1.9957519826280106654e-07" iyy="1.7537495218031388955e-05" iyz="-4.9180486622915350686e-07" izz="4.2451494821238471749e-05" />
+            </inertial>
+        </link>
+
+        <link name="f3_mcpPitch">
+            <visual>
+            <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_3_visual.stl"/>
+                </geometry>
+                <material name="mcp_pitch_3_material">
+                    <color rgba="0.3 0.3 0.3 1.0"/>
+                </material>
+            </visual>
+            <collision>
+            <origin xyz="0 0 0" rpy="0 -0 0" />
+            <geometry>
+                <mesh filename="package://optimo_description/meshes/plato/mcp_pitch_3_collision.stl"/>
+            </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="0.002081771448882772154 3.9659157431013727112e-10 -0.015795112278833216973" rpy="0 0 0"/>
+                <mass value="0.069114549940711839104" />
+                <inertia ixx="5.8883565545031375449e-06" ixy="-9.2074790702974164355e-09"  ixz="-1.1640174651110988854e-06" iyy="9.682962207277515202e-06" iyz="-9.4322530471832987199e-14" izz="9.2871592762525122434e-06" />
+            </inertial>
+        </link>
+
+
+        <link name="f3_pipPitch">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_3_visual.stl"/>
+                </geometry>
+                <material name="pip_3_material">
+                    <color rgba="0.6 0.6 0.6 1.0"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 -0 0" />
+                <geometry>
+                    <mesh filename="package://optimo_description/meshes/plato/pip_3_collision.stl"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="0.020839063326584392893 0.00066661768468522094536 -0.0022991494617051210815" rpy="0 0 0"/>
+                <mass value="0.0080671501064400186198" />
+                <inertia ixx="2.118557176544881114e-07" ixy="-3.642624395971840497e-08"  ixz="1.3233834119257842327e-10" iyy="1.2852102149793138583e-06" iyz="-3.1084190128280151117e-11" izz="1.3237276294092870454e-06" />
+            </inertial>
+        </link>
     
-    <!-- Joint: T -->
-    <joint name="f0_mcp_roll" type="revolute">
-<origin xyz="-0.0074999999999999997224 0.0069999999999999992784 -0.016999999999999994282" rpy="-1.570796326794896558 1.7904316928197674078e-15 -3.1415926535897873428" />
-<parent link="thumb_roll" />
-<child link="mcp_yaw" />
-<axis xyz="0 0 1"/>
-<limit effort="1" velocity="20" lower="-1.0471975511965976313" upper="0.52359877559829881566"/>
-<joint_properties friction="0.0"/>
-</joint>
+
+    <!-- Finger 1 Joints -->
+
+        <joint name="f1_pipPitch_joint" type="revolute">
+            <origin xyz="0.047999999999999973244 -1.3877787807814456755e-17 -0.0073000000000000009326" rpy="3.141592653589793116 -2.5503833841486952406e-17 2.7435318973904602397e-16" />
+            <parent link="f3_mcpPitch" />
+            <child link="f3_pipPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f1_mcpPitch_joint" type="revolute">
+            <origin xyz="-0.0050000000000013471169 0.028150000000000029166 -0.0098999999999988819166" rpy="3.141592653589793116 1.5707963267948910069 0" />
+            <parent link="f3_mcpYaw" />
+            <child link="f3_mcpPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="0.52359877559829881566"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f1_mcpRoll_joint" type="revolute">
+            <origin xyz="-0.029999999999999957256 0.065000000000000182632 -0.033000000000000438705" rpy="-1.5707963267948970021 4.6954520062034008416e-16 -3.141592653589788231" />
+            <parent link="base" />
+            <child link="f3_mcpYaw" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-1.0471975511965976313" upper="0.52359877559829881566"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+
+    <!-- Finger 2 Joints -->
+
+        <joint name="f2_pipPitch_joint" type="revolute">
+            <origin xyz="0.04799999999999918221 -3.2092384305570931247e-17 -0.0026999999999999871325" rpy="2.4576145542817245747e-16 4.3657897964205076266e-17 1.3163231002684877179e-15" />
+            <parent link="f2_mcpPitch" />
+            <child link="f2_pipPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f2_mcpPitch_joint" type="revolute">
+            <origin xyz="-0.0049999999999998448463 0.028149999999999619771 -0.0099000000000004015344" rpy="-1.5707963267948970021 6.6367311923940301942e-16 1.5707963267948890085" />
+            <parent link="f2_mcpYaw" />
+            <child link="f2_mcpPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f2_mcpYaw_joint" type="revolute">
+            <origin xyz="-0.030000000000000043993 0.10000000000000006106 0.0050000000000000200534" rpy="8.8571772416442535421e-16 2.2759370651181079556e-16 -3.013915364651454352e-15" />
+            <parent link="base" />
+            <child link="f2_mcpYaw" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-0.26179938779914940783" upper="0.52359877559829881566"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+
+    <!-- Finger 3 Joints -->
+
+        <joint name="f3_pipPitch_joint" type="revolute">
+            <origin xyz="0.048000000000000347944 -1.1275702593849246114e-17 -0.0026999999999999767242" rpy="2.8550939533778953884e-16 -4.0309184828599726235e-16 1.127824575433151723e-29" />
+            <parent link="f1_mcpPitch" />
+            <child link="f1_pipPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f3_mcpPitch_joint" type="revolute">
+            <origin xyz="-0.005000000000000129341 0.028149999999999480993 -0.0099000000000002922468" rpy="-1.5707963267948970021 -3.5761991658598793546e-16 1.5707963267948823471" />
+            <parent link="f1_mcpYaw" />
+            <child link="f1_mcpPitch" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
+        <joint name="f3_mcpYaw_joint" type="revolute">
+            <origin xyz="0.029999999999999912154 0.10000000000000003331 0.0050000000000003270995" rpy="5.8606965434539231359e-16 1.9351011260415344561e-16 -7.1054273576010255245e-15" />
+            <parent link="base" />
+            <child link="f1_mcpYaw" />
+            <axis xyz="0 0 1"/>
+            <limit effort="1" velocity="20" lower="-0.52359877559829881566" upper="0.26179938779914940783"/>
+            <joint_properties friction="0.0"/>
+        </joint>
+
 
 
 

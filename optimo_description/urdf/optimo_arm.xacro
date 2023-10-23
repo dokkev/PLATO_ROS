@@ -51,7 +51,17 @@
         </inertial>
     </link>
 
-    <link name="link1"/>
+    <link name="link1">
+        <visual>
+            <geometry>
+                <sphere radius="0.01"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+    </link>
+
     <link name="link1_passive">
         <visual>
             <geometry>

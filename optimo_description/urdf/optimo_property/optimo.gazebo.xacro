@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:property name="PI" value="3.1415926535897931"/>
+    <xacro:property name="DtR" value=".01745329251"/>
+
+    <gazebo reference="base_link"/>
+    <gazebo reference="link0"/>
+    <gazebo reference="link1"/>
+    <gazebo reference="link1_passive"/>
+    <gazebo reference="link2"/>
+    <gazebo reference="link2_passive"/>
+    <gazebo reference="link3"/>
+    <gazebo reference="link3_passive"/>
+    <gazebo reference="link4"/>
+    <gazebo reference="link4_passive"/>
+    <gazebo reference="link5"/>
+    <gazebo reference="link5_passive"/>
+    <gazebo reference="link6"/>
+    <gazebo reference="link6_passive"/>
+    <gazebo reference="link7"/>
+    <gazebo reference="link7_passive"/>
+
+
+    <!-- Joint State Publisher -->
+    <gazebo>
+        <plugin name="gazebo_ros_joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
+            <update_rate>1000</update_rate>
+            <joint_name>joint1</joint_name>
+            <joint_name>joint2</joint_name>
+            <joint_name>joint3</joint_name>
+            <joint_name>joint4</joint_name>
+            <joint_name>joint5</joint_name>
+            <joint_name>joint6</joint_name>
+            <joint_name>joint7</joint_name>
+        </plugin>
+    </gazebo>
+
+
+    
+
+ 
+
+
+
+
+</robot>

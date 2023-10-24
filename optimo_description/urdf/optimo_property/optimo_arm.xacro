@@ -32,7 +32,7 @@
     <link name="link0">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link0.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link0.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -40,7 +40,7 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col0.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col0.stl"/>
             </geometry>
     
         </collision>
@@ -65,7 +65,7 @@
     <link name="link1_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link1.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link1.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -73,7 +73,7 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col1.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col1.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -87,7 +87,7 @@
     <link name="link2_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link2.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link2.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -96,7 +96,7 @@
 
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col2.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col2.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -110,7 +110,7 @@
     <link name="link3_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link3.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link3.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -119,7 +119,7 @@
 
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col3.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col3.stl"/>
             </geometry>
         </collision>
         <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
@@ -133,7 +133,7 @@
     <link name="link4_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link4.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link4.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -142,7 +142,7 @@
         
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col4.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col4.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -156,7 +156,7 @@
     <link name="link5_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link5.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link5.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -165,7 +165,7 @@
 
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col5.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col5.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -179,7 +179,7 @@
     <link name="link6_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link6.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link6.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -187,7 +187,7 @@
         </visual>
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col6.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col6.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -201,7 +201,7 @@
     <link name="link7_passive">
         <visual>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/link7.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/link7.stl"/>
             </geometry>
             <material name="LightGrey">
                 <color rgba="0.999 0.999 0.999 1.0"/>
@@ -210,7 +210,7 @@
 
         <collision>
             <geometry>
-                <mesh filename="$(find optimo_description)/meshes/col7.stl"/>
+                <mesh filename="file://$(find optimo_description)/meshes/col7.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -243,16 +243,15 @@
     </joint> -->
 
     <!-- Joints -->
+
     <joint name="joint1" type="revolute">
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <parent link="link0"/>
         <child link="link1"/>
         <axis xyz="0 0 1"/>
-        <!-- <limit lower="${DtR*-164}" upper="${DtR*167}" effort="79" velocity="10"/> -->
-        <limit lower="-2.8624" upper="2.9147" effort="79" velocity="10"/>
-        
-
+        <limit lower="${DtR*-164}" upper="${DtR*167}" effort="79" velocity="10"/>
     </joint>
+    
     <joint name="joint1_passive" type="fixed">
         <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
         <parent link="link1"/>
@@ -265,7 +264,7 @@
         <child link="link2"/>
         <axis xyz="0 0 1"/>
         <limit lower="${DtR*60}" upper="${DtR*250}" effort="95" velocity="10"/>
-        <!-- <limit lower="0" upper="${DtR*250}" effort="95" velocity="10"/> -->
+    
     </joint>
 
     <joint name="joint2_passive" type="fixed">

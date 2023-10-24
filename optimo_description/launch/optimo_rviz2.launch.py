@@ -7,8 +7,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition,UnlessCondition
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution
-
-
 import xacro
 
 
@@ -59,16 +57,16 @@ def generate_launch_description():
             package='joint_state_publisher_gui',
             executable='joint_state_publisher_gui',
             name='joint_state_publisher_gui',
-            condition=IfCondition(use_gui),
+            # condition=IfCondition(use_gui),
         ),
 
-        # Joint state publisher
-        Node(
-            package='joint_state_publisher',
-            executable='joint_state_publisher',
-            name='joint_state_publisher',
-            condition=UnlessCondition(use_gui),
-        ),
+        # # Joint state publisher
+        # Node(
+        #     package='joint_state_publisher',
+        #     executable='joint_state_publisher',
+        #     name='joint_state_publisher',
+        #     condition=UnlessCondition(use_gui),
+        # ),
         
         # Robot state publisher
         Node(

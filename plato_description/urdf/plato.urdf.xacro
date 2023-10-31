@@ -4,5 +4,9 @@
     <xacro:include filename="plato_property/plato_hand.xacro"/>
 
 
+    <!-- define namespace for plato urdf -->
+    <xacro:plato_hand ns="plato"/>
+    
+
     
 </robot>

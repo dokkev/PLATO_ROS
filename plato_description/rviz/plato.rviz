@@ -67,68 +67,68 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base:
+        plato_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        plato_f1_ee_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        plato_f1_mid:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        f1_ee_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        f1_mid:
+        plato_f1_prox:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f1_prox:
+        plato_f1_proxbracket:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f1_proxbracket:
+        plato_f2_ee_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        plato_f2_mid:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f2_ee_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        f2_mid:
+        plato_f2_prox:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f2_prox:
+        plato_f2_proxbracket:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f2_proxbracket:
+        plato_f3_ee_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        plato_f3_mid:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f3_ee_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        f3_mid:
+        plato_f3_prox:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f3_prox:
+        plato_f3_proxbracket:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        f3_proxbracket:
+        plato_palm:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -144,7 +144,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: plato_base_link
     Frame Rate: 30
   Name: root
   Tools:

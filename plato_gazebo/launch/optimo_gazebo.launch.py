@@ -27,7 +27,11 @@ def generate_launch_description():
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
                              arguments=['-topic', 'robot_description',
-                                        '-entity', 'optimo'],
+                                        '-entity', 'optimo',
+                                        '-x', '0.1',
+                                        '-y', '0.1',
+                                        '-z', '0.01'
+                                        ],
                              output='screen')
     # spawning the joint broadcaster
     spawn_broadcaster = Node(
@@ -44,19 +48,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    pkg_name = 'chess_manipulator'  # the package name
-    pkg_share = get_package_share_directory(pkg_name)
-    urdf_path = 'description/manipulator.urdf.xacro'
-    xacro_file = os.path.join(pkg_share, urdf_path)
-    robot_description_content = xacro.process_file(xacro_file).toxml()
-    # robot state publisher node
-    panda_robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        output='screen',
-        parameters=[{'robot_description': robot_description_content}]
-    )
-
+  
     node_rviz =  Node(
         package='rviz2',
         executable='rviz2',

@@ -12,7 +12,7 @@
 <visual>
 <origin xyz="0 0 0" rpy="0 -0 0" />
 <geometry>
-<mesh filename="file://$(find optimo_description)/meshes/plato/base_visual.stl"/>
+<mesh filename="file://$(find plato_description)/meshes/plato/base_visual.stl"/>
 </geometry>
 <material name="base_material">
 <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
@@ -21,7 +21,7 @@
 <collision>
 <origin xyz="0 0 0" rpy="0 -0 0" />
 <geometry>
-<mesh filename="file://$(find optimo_description)/meshes/plato/base_collision.stl"/>
+<mesh filename="file://$(find plato_description)/meshes/plato/base_collision.stl"/>
 </geometry>
 </collision>
 <inertial>
@@ -37,7 +37,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_visual.stl"/>
     </geometry>
     <material name="proxbracket_material">
     <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -46,7 +46,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -60,7 +60,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/prox_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_visual.stl"/>
     </geometry>
     <material name="prox_material">
     <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -69,7 +69,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/prox_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -83,7 +83,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/mid_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_visual.stl"/>
     </geometry>
     <material name="mid_material">
     <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
@@ -92,7 +92,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/mid_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -147,7 +147,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_2_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_2_visual.stl"/>
     </geometry>
     <material name="proxbracket_2_material">
     <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -156,7 +156,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_2_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_2_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -170,7 +170,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/prox_2_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_2_visual.stl"/>
     </geometry>
     <material name="prox_2_material">
     <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -179,7 +179,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/prox_2_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_2_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -193,7 +193,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/mid_2_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_2_visual.stl"/>
     </geometry>
     <material name="mid_2_material">
     <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
@@ -202,7 +202,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/mid_2_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_2_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -255,7 +255,7 @@
     <visual>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_3_visual.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_3_visual.stl"/>
     </geometry>
     <material name="proxbracket_3_material">
     <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -264,7 +264,7 @@
     <collision>
     <origin xyz="0 0 0" rpy="0 -0 0" />
     <geometry>
-    <mesh filename="file://$(find optimo_description)/meshes/plato/proxbracket_3_collision.stl"/>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_3_collision.stl"/>
     </geometry>
     </collision>
     <inertial>
@@ -278,7 +278,7 @@
         <visual>
         <origin xyz="0 0 0" rpy="0 -0 0" />
         <geometry>
-        <mesh filename="file://$(find optimo_description)/meshes/plato/prox_3_visual.stl"/>
+        <mesh filename="file://$(find plato_description)/meshes/plato/prox_3_visual.stl"/>
         </geometry>
         <material name="prox_3_material">
         <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
@@ -287,7 +287,7 @@
         <collision>
         <origin xyz="0 0 0" rpy="0 -0 0" />
         <geometry>
-        <mesh filename="file://$(find optimo_description)/meshes/plato/prox_3_collision.stl"/>
+        <mesh filename="file://$(find plato_description)/meshes/plato/prox_3_collision.stl"/>
         </geometry>
         </collision>
         <inertial>
@@ -301,7 +301,7 @@
         <visual>
         <origin xyz="0 0 0" rpy="0 -0 0" />
         <geometry>
-        <mesh filename="file://$(find optimo_description)/meshes/plato/mid_3_visual.stl"/>
+        <mesh filename="file://$(find plato_description)/meshes/plato/mid_3_visual.stl"/>
         </geometry>
         <material name="mid_3_material">
         <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
@@ -310,7 +310,7 @@
         <collision>
         <origin xyz="0 0 0" rpy="0 -0 0" />
         <geometry>
-        <mesh filename="file://$(find optimo_description)/meshes/plato/mid_3_collision.stl"/>
+        <mesh filename="file://$(find plato_description)/meshes/plato/mid_3_collision.stl"/>
         </geometry>
         </collision>
         <inertial>

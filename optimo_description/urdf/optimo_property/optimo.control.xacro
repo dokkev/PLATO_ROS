@@ -1,4 +1,8 @@
-<gazebo>
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+    <gazebo>
         <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
             <parameters>$(find plato_gazebo)/config/optimo_controller.yaml</parameters>
         </plugin>
@@ -18,7 +22,7 @@
             <state_interface name="position">
                 <param name="initial_value">0.0</param>
             </state_interface>
-            
+
             <state_interface name="velocity" />
             <state_interface name="effort" />
         </joint>
@@ -98,3 +102,5 @@
         </joint>
 
     </ros2_control>
+
+</robot>

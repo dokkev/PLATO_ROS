@@ -7,8 +7,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition,UnlessCondition
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution
-
-
 import xacro
 
 
@@ -19,7 +17,7 @@ def generate_launch_description():
     use_gui = LaunchConfiguration('use_gui')
 
     # getting the package path
-    pkg_name = 'optimo_description'
+    pkg_name = 'plato_description'
     pkg_share= get_package_share_directory(pkg_name)
 
     # URDF file path

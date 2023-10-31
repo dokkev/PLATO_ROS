@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <robot name="optimo" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <xacro:include filename="optimo_property/optimo_arm.xacro"/>
-    <xacro:include filename="optimo_property/optimo.gazebo.xacro" />
-    <xacro:include filename="optimo_property/optimo.control.xacro" />
+    <xacro:include filename="optimo_xacro/optimo_arm.xacro"/>
+    <xacro:include filename="optimo_xacro/optimo.gazebo.xacro" />
+    <xacro:include filename="optimo_xacro/optimo.control.xacro" />
 
     
 

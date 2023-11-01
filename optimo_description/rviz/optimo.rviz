@@ -67,82 +67,79 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
+        optimo_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        link0:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        link1_passive:
+        optimo_link0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        link2_passive:
+        optimo_link1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        link3_passive:
+        optimo_link1_passive:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        link4:
+        optimo_link2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        link4_passive:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        link5_passive:
+        optimo_link2_passive:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        link6:
+        optimo_link3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        link6_passive:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        link7_passive:
+        optimo_link3_passive:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        world:
+        optimo_link4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+        optimo_link4_passive:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        optimo_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        optimo_link5_passive:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        optimo_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        optimo_link6_passive:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        optimo_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        optimo_link7_passive:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
@@ -156,39 +153,37 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        base_link:
+        optimo_base_link:
           Value: true
-        link0:
+        optimo_link0:
           Value: true
-        link1:
+        optimo_link1:
           Value: true
-        link1_passive:
+        optimo_link1_passive:
           Value: true
-        link2:
+        optimo_link2:
           Value: true
-        link2_passive:
+        optimo_link2_passive:
           Value: true
-        link3:
+        optimo_link3:
           Value: true
-        link3_passive:
+        optimo_link3_passive:
           Value: true
-        link4:
+        optimo_link4:
           Value: true
-        link4_passive:
+        optimo_link4_passive:
           Value: true
-        link5:
+        optimo_link5:
           Value: true
-        link5_passive:
+        optimo_link5_passive:
           Value: true
-        link6:
+        optimo_link6:
           Value: true
-        link6_passive:
+        optimo_link6_passive:
           Value: true
-        link7:
+        optimo_link7:
           Value: true
-        link7_passive:
-          Value: true
-        world:
+        optimo_link7_passive:
           Value: true
       Marker Scale: 0.5
       Name: TF
@@ -196,30 +191,29 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        world:
-          base_link:
-            link0:
-              link1:
-                link1_passive:
-                  link2:
-                    link2_passive:
-                      link3:
-                        link3_passive:
-                          link4:
-                            link4_passive:
-                              link5:
-                                link5_passive:
-                                  link6:
-                                    link6_passive:
-                                      link7:
-                                        link7_passive:
-                                          {}
+        optimo_base_link:
+          optimo_link0:
+            optimo_link1:
+              optimo_link1_passive:
+                optimo_link2:
+                  optimo_link2_passive:
+                    optimo_link3:
+                      optimo_link3_passive:
+                        optimo_link4:
+                          optimo_link4_passive:
+                            optimo_link5:
+                              optimo_link5_passive:
+                                optimo_link6:
+                                  optimo_link6_passive:
+                                    optimo_link7:
+                                      optimo_link7_passive:
+                                        {}
       Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: optimo_base_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -299,4 +293,4 @@ Window Geometry:
     collapsed: false
   Width: 1560
   X: 70
-  Y: 469
+  Y: 433

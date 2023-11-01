@@ -5,6 +5,26 @@
     <xacro:include filename="optimo_xacro/optimo.gazebo.xacro" />
     <xacro:include filename="optimo_xacro/optimo.control.xacro" />
 
+
+    <!-- Set Namespace for the Optimo Arm -->
+    <xacro:property name="robot_name" value="optimo" />
+    <xacro:optimo_arm ns = "${robot_name}"/>
     
+
+
+
+    <!-- Put World for Gazebo -->
+    <link name="world"/>
+    <!-- Connect to base_link of Optimo -->
+    <joint name="world_joint" type="fixed">
+        <parent link="world"/>
+        <child link="${robot_name}_base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  
+
+
+
+
 
 </robot>

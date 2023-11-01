@@ -1,7 +1,5 @@
 import os
-
 from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.substitutions import LaunchConfiguration, Command
 from launch.actions import DeclareLaunchArgument
@@ -14,7 +12,6 @@ def generate_launch_description():
     # Check if we're told to use sim time
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_ros2_control = LaunchConfiguration('use_ros2_control')
-
 
     # getting the package path
     pkg_name = 'plato_description'

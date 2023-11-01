@@ -21,10 +21,10 @@ def generate_launch_description():
     pkg_share= get_package_share_directory(pkg_name)
 
     # URDF file path
-    urdf_path = 'urdf/plato.urdf.xacro'
+    urdf_path = 'urdf/plato_manipulator.urdf.xacro'
 
     # RVIZ config file path
-    rviz_config_file = pkg_share + '/rviz/plato.rviz'
+    rviz_config_file = pkg_share + '/rviz/plato_manipulator.rviz'
     
     # extracting the robot deffinition from the xacro file
     xacro_file = os.path.join(pkg_share, urdf_path)

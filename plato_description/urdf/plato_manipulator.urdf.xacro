@@ -26,7 +26,7 @@
     <joint name="hand_arm_joint" type="fixed">
         <parent link="${arm_ns}_link7_passive"/>
         <child link="${hand_ns}_base_link"/>
-        <origin xyz="0 0.15 0" rpy="0 0 1.57"/>
+        <origin xyz="0 0.16 0" rpy="1.5707 0 1.5707"/>
     </joint>
     
 </robot>

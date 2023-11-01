@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Include Plato Hand Xacro  -->
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.xacro"/>
+
+    <!-- Set Namespace for the PLATO Hand -->
+    <xacro:property name="hand_name" value="plato" />
+    <xacro:plato_hand ns = "${hand_name}"/>
+
+
+    
+</robot>

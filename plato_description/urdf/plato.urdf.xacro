@@ -1,12 +1,32 @@
 <?xml version="1.0"?>
 <robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <xacro:include filename="plato_property/plato_hand.xacro"/>
+    <!-- Include Optimo Arm and PLATO Hand Xacro -->
+    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo_arm.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.xacro"/>
 
+    <!-- Set Namespace for the Optimo Arm -->
+    <xacro:property name="arm_ns" value="optimo" />
+    <xacro:optimo_arm ns = "${arm_ns}"/>
 
-    <!-- define namespace for plato urdf -->
-    <xacro:plato_hand ns="plato"/>
-    
+    <!-- Set Namespace for the PLATO Hand -->
+    <xacro:property name="hand_ns" value="plato" />
+    <xacro:plato_hand ns = "${hand_ns}"/>
 
+    <!-- Set World Frame for Gazebo -->
+    <link name="world"/>
+    <!-- Connect the Optimo to the World-->
+    <joint name="world_joint" type="fixed">
+        <parent link="world"/>
+        <child link="${arm_ns}_base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  
+    <!-- Connect PLATO Hand to Optimo Arm -->
+    <joint name="hand_arm_joint" type="fixed">
+        <parent link="${arm_ns}_link7_passive"/>
+        <child link="${hand_ns}_base_link"/>
+        <origin xyz="0 0.15 0" rpy="0 0 1.57"/>
+    </joint>
     
 </robot>

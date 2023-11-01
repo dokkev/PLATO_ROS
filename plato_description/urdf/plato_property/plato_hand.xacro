@@ -113,7 +113,7 @@
             <parent link="${ns}_f1_prox" />
             <child link="${ns}_f1_mid" />
             <axis xyz="0 0 1"/>
-            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+            <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 
@@ -222,11 +222,11 @@
             <parent link="${ns}_f2_prox" />
             <child link="${ns}_f2_mid" />
             <axis xyz="0 0 1"/>
-            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+            <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="f2_mcp_pitch" type="revolute">
+        <joint name="${ns}_f2_mcp_pitch" type="revolute">
             <origin xyz="-0.0024999999999990307753 -0.028150000000000355294 -0.0099000000000003564316" rpy="-1.570796326794896558 6.9017807609091964755e-16 -1.5707963267948907848" />
             <parent link="${ns}_f2_proxbracket" />
             <child link="${ns}_f2_prox" />
@@ -330,7 +330,7 @@
             <parent link="${ns}_f3_prox" />
             <child link="${ns}_f3_mid" />
             <axis xyz="0 0 1"/>
-            <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+            <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 

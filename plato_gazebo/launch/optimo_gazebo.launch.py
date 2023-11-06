@@ -30,7 +30,7 @@ def generate_launch_description():
                                         '-entity', 'optimo',
                                         '-x', '0.1',
                                         '-y', '0.1',
-                                        '-z', '0.01'
+                                        '-z', '1.01'
                                         ],
                              output='screen')
     # spawning the joint broadcaster
@@ -76,7 +76,6 @@ def generate_launch_description():
     return LaunchDescription([
         # SetEnvironmentVariable(name='GAZEBO_MODEL_PATH', value=model_path),
         rsp_launch,
-        # panda_robot_state_publisher,
         gazebo_launch,
         spawn_broadcaster,
         spawn_controller,

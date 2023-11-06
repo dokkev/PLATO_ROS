@@ -76,8 +76,8 @@ def generate_launch_description():
         # SetEnvironmentVariable(name='GAZEBO_MODEL_PATH', value=model_path),
         rsp_launch,
         gazebo_launch,
-        # spawn_broadcaster,
-        # spawn_controller,
+        spawn_broadcaster,
+        spawn_controller,
         spawn_entity_node,
         # node_rviz
  

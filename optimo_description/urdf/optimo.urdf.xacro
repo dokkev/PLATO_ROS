@@ -24,7 +24,7 @@
 
     <!-- Include ros2_control -->
     <xacro:include filename="optimo_xacro/optimo.control.xacro" />
-    <xacro:optimo_ros2_control ns="${arm_ns}"/>
+    <!-- <xacro:optimo_ros2_control ns="${arm_ns}"/> -->
 
 
   

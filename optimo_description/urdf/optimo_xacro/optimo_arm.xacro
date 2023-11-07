@@ -79,7 +79,8 @@
             <inertial>
                 <origin xyz="0 -0.01635 0.01549" />
                 <mass value="4.152"/>
-                <inertia ixx="0.01" ixy="0.000017" ixz="-.00001" iyy="0.007494" iyz="0.0000213" izz="0.009939"/>
+                <!-- <inertia ixx="0.01" ixy="0.000017" ixz="-.00001" iyy="0.007494" iyz="0.0000213" izz="0.009939"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
             </inertial>
         </link>
 
@@ -102,9 +103,9 @@
             <inertial>
                 <origin xyz="0 -0.05063 0.05677"  rpy="0 0 ${180*DtR}"/>
                 <mass value="1.72"/>
-                 <!-- <inertia ixx="0.005902" ixy="0" ixz="-0.001353" iyy="0.005694" iyz="0" izz="0.002415"/> -->
-                 <!-- <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="0.001353" izz="0.002415"/> -->
-                  <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/>
+
+                  <!-- <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/> -->
+                  <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
                  
             </inertial>
         </link>
@@ -128,7 +129,8 @@
             <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
                 <origin xyz="-0.000039 .098 0"/>
                 <mass value="4.310"/>
-                <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/>
+                <!-- <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
             </inertial>
         </link>
 
@@ -153,7 +155,8 @@
                 <origin xyz="-.00001 0.048852 0.0688" rpy="0 0 0"/>
                 <mass value="1.09"/>
                  <!-- <inertia ixx="0.007" ixy="-3.989e-7" ixz="0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
-                <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/>
+                <!-- <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
 
 
 
@@ -179,7 +182,8 @@
             <inertial>
                 <origin xyz=".001262 0.085 0.008" />
                 <mass value="2.23"/>
-                <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.000733"/>
+                <!-- <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.000733"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
             </inertial>
         </link>
 
@@ -201,7 +205,8 @@
             <inertial>
                 <origin xyz="0 -0.00007 0.010855" />
                 <mass value="1.138"/>
-                <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.0007325"/>
+                <!-- <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.0007325"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
             </inertial>
         </link>
 
@@ -224,7 +229,8 @@
             <inertial>
                 <origin xyz="0 0 0" />
                 <mass value="1"/>
-                <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/>
+                <!-- <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/> -->
+                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
       
             </inertial>
         </link>

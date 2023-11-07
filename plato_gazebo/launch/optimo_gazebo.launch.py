@@ -30,7 +30,7 @@ def generate_launch_description():
                                         '-entity', 'optimo',
                                         '-x', '0.1',
                                         '-y', '0.1',
-                                        '-z', '1.01'
+                                        '-z', '0.01'
                                         ],
                              output='screen')
     # spawning the joint broadcaster
@@ -63,16 +63,11 @@ def generate_launch_description():
                 )]), launch_arguments={'use_sim_time': 'true', 'use_ros2_control': 'true'}.items()
     )
 
-
-
-
     gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py'])
         launch_arguments={'world': os.path.join(get_package_share_directory('plato_gazebo'), 'worlds', 'optimo.world')}.items()
     )
 
-
-    
     return LaunchDescription([
         # SetEnvironmentVariable(name='GAZEBO_MODEL_PATH', value=model_path),
         rsp_launch,

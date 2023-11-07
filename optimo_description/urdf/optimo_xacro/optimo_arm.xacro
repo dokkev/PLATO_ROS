@@ -5,6 +5,16 @@
     <xacro:property name="PI" value="3.1415926535897931"/>
     <xacro:property name="DtR" value=".01745329251"/>
 
+    <xacro:property name="mass_link0" value="3.06357" />
+    <xacro:property name="mass_link1" value="2.34471" />
+    <xacro:property name="mass_link2" value="2.36414" />
+    <xacro:property name="mass_link3" value="2.38050" />
+    <xacro:property name="mass_link4" value="2.42754" />
+    <xacro:property name="mass_link5" value="3.49611" />
+    <xacro:property name="mass_link6" value="1.46736" />
+    <xacro:property name="mass_link7" value="0.45606" />
+    <xacro:property name="mass_link8" value="0.001" />
+
 
     <xacro:macro name="optimo_arm" params="ns:='optimo'">
 
@@ -90,9 +100,12 @@
                 </geometry>
             </collision>
             <inertial>
-                <origin xyz="0 -0.05063 0.05677" />
+                <origin xyz="0 -0.05063 0.05677"  rpy="0 0 ${180*DtR}"/>
                 <mass value="1.72"/>
-                <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="0.001353" izz="0.002415"/>
+                 <!-- <inertia ixx="0.005902" ixy="0" ixz="-0.001353" iyy="0.005694" iyz="0" izz="0.002415"/> -->
+                 <!-- <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="0.001353" izz="0.002415"/> -->
+                  <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/>
+                 
             </inertial>
         </link>
 
@@ -113,7 +126,7 @@
                 </geometry>
             </collision>
             <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
-                <origin xyz="-0.000039 .098 0" />
+                <origin xyz="-0.000039 .098 0"/>
                 <mass value="4.310"/>
                 <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/>
             </inertial>
@@ -121,6 +134,7 @@
 
         <link name="${ns}_link4"/>
         <link name="${ns}_link4_passive">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <visual>
                 <geometry>
                     <mesh filename="file://$(find optimo_description)/meshes/link4.stl"/>
@@ -136,9 +150,13 @@
                 </geometry>
             </collision>
             <inertial>
-                <origin xyz="-.00001 0.048852 0.0688" />
+                <origin xyz="-.00001 0.048852 0.0688" rpy="0 0 0"/>
                 <mass value="1.09"/>
-                <inertia ixx="0.033673" ixy="-.00046473" ixz="0" iyy="0.001089" iyz="0.000095" izz="0.033877"/>
+                 <!-- <inertia ixx="0.007" ixy="-3.989e-7" ixz="0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
+                <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/>
+
+
+
             </inertial>
         </link>
 
@@ -204,9 +222,10 @@
                 </geometry>
             </collision>
             <inertial>
-                <origin xyz="-.015 0 0.14" />
+                <origin xyz="0 0 0" />
                 <mass value="1"/>
                 <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/>
+      
             </inertial>
         </link>
 

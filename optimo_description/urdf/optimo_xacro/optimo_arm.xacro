@@ -15,7 +15,7 @@
     <xacro:property name="mass_link7" value="0.45606" />
     <xacro:property name="mass_link8" value="0.001" />
 
-
+    
     <xacro:macro name="optimo_arm" params="ns:='optimo'">
 
         <link name="${ns}_base_link">
@@ -354,7 +354,7 @@
             <child link="${ns}_link7_passive"/>
         </joint>
 
-     </xacro:macro>
+    </xacro:macro>
 
 </robot>
 

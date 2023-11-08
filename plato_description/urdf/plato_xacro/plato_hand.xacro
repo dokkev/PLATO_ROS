@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+
+
 <xacro:macro name="plato_hand" params="ns:='plato'">
 
     <link name="${ns}_base_link"></link>
@@ -360,5 +362,7 @@
         </joint>
 
     </xacro:macro>
+
+
 
 </robot>

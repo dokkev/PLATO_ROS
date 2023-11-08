@@ -15,346 +15,344 @@
     <xacro:property name="mass_link7" value="0.45606" />
     <xacro:property name="mass_link8" value="0.001" />
 
+
+
+    <link name="optimo_base_link">
+    </link>
+
+    <joint name="optimo_base_joint" type="fixed">
+        <parent link="optimo_base_link"/>
+        <child link="optimo_link0"/>
+        <origin xyz="0 0 0.27" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Robot Links -->
+
+    <link name="optimo_link0">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link0.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col0.stl"/>
+            </geometry>
     
-    <xacro:macro name="optimo_arm" params="ns:='optimo'">
+        </collision>
+        <inertial>            <!-- Doesn't matter, just placeholder values -->
+            <origin xyz="0 0 0" />
+            <mass value="1"/>
+            <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
+        </inertial>
+    </link>
 
-        <link name="${ns}_base_link">
-        </link>
+    <link name="optimo_link1">
+        <visual>
+            <geometry>
+                <sphere radius="0.01"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+    </link>
 
-        <joint name="${ns}_base_joint" type="fixed">
-            <parent link="${ns}_base_link"/>
-            <child link="${ns}_link0"/>
-            <origin xyz="0 0 0.27" rpy="0 0 0"/>
-        </joint>
+    <link name="optimo_link1_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link1.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col1.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0 -0.01635 0.01549" />
+            <mass value="4.152"/>
+            <inertia ixx="0.01" ixy="0.000017" ixz="-.00001" iyy="0.007494" iyz="0.0000213" izz="0.009939"/>
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+        </inertial>
+    </link>
 
-        <!-- Robot Links -->
+    <link name="optimo_link2"/>
+    <link name="optimo_link2_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link2.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
 
-        <link name="${ns}_link0">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link0.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col0.stl"/>
-                </geometry>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col2.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0 -0.05063 0.05677"  rpy="0 0 ${180*DtR}"/>
+            <mass value="1.72"/>
+
+                <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/>
+                <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+                
+        </inertial>
+    </link>
+
+    <link name="optimo_link3"/>
+    <link name="optimo_link3_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link3.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col3.stl"/>
+            </geometry>
+        </collision>
+        <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
+            <origin xyz="-0.000039 .098 0"/>
+            <mass value="4.310"/>
+            <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/>
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+        </inertial>
+    </link>
+
+    <link name="optimo_link4"/>
+    <link name="optimo_link4_passive">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link4.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
         
-            </collision>
-            <inertial>            <!-- Doesn't matter, just placeholder values -->
-                <origin xyz="0 0 0" />
-                <mass value="1"/>
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-            </inertial>
-        </link>
-
-        <link name="${ns}_link1">
-            <visual>
-                <geometry>
-                    <sphere radius="0.01"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-        </link>
-
-        <link name="${ns}_link1_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link1.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col1.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz="0 -0.01635 0.01549" />
-                <mass value="4.152"/>
-                <!-- <inertia ixx="0.01" ixy="0.000017" ixz="-.00001" iyy="0.007494" iyz="0.0000213" izz="0.009939"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-            </inertial>
-        </link>
-
-        <link name="${ns}_link2"/>
-        <link name="${ns}_link2_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link2.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col2.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz="0 -0.05063 0.05677"  rpy="0 0 ${180*DtR}"/>
-                <mass value="1.72"/>
-
-                  <!-- <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/> -->
-                  <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-                 
-            </inertial>
-        </link>
-
-        <link name="${ns}_link3"/>
-        <link name="${ns}_link3_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link3.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col3.stl"/>
-                </geometry>
-            </collision>
-            <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
-                <origin xyz="-0.000039 .098 0"/>
-                <mass value="4.310"/>
-                <!-- <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-            </inertial>
-        </link>
-
-        <link name="${ns}_link4"/>
-        <link name="${ns}_link4_passive">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link4.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-            
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col4.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz="-.00001 0.048852 0.0688" rpy="0 0 0"/>
-                <mass value="1.09"/>
-                 <!-- <inertia ixx="0.007" ixy="-3.989e-7" ixz="0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
-                <!-- <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col4.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-.00001 0.048852 0.0688" rpy="0 0 0"/>
+            <mass value="1.09"/>
+                <inertia ixx="0.007" ixy="-3.989e-7" ixz="0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/>
+            <!-- <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
 
 
 
-            </inertial>
-        </link>
+        </inertial>
+    </link>
 
-        <link name="${ns}_link5"/>
-        <link name="${ns}_link5_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link5.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
+    <link name="optimo_link5"/>
+    <link name="optimo_link5_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link5.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
 
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col5.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz=".001262 0.085 0.008" />
-                <mass value="2.23"/>
-                <!-- <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.000733"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-            </inertial>
-        </link>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col5.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz=".001262 0.085 0.008" />
+            <mass value="2.23"/>
+            <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.000733"/>
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+        </inertial>
+    </link>
 
-        <link name="${ns}_link6"/>
-        <link name="${ns}_link6_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link6.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col6.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz="0 -0.00007 0.010855" />
-                <mass value="1.138"/>
-                <!-- <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.0007325"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-            </inertial>
-        </link>
+    <link name="optimo_link6"/>
+    <link name="optimo_link6_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link6.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col6.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0 -0.00007 0.010855" />
+            <mass value="1.138"/>
+            <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.0007325"/>
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+        </inertial>
+    </link>
 
-        <link name="${ns}_link7"/>
-        <link name="${ns}_link7_passive">
-            <visual>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/link7.stl"/>
-                </geometry>
-                <material name="LightGrey">
-                    <color rgba="0.999 0.999 0.999 1.0"/>
-                </material>
-            </visual>
+    <link name="optimo_link7"/>
+    <link name="optimo_link7_passive">
+        <visual>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/link7.stl"/>
+            </geometry>
+            <material name="LightGrey">
+                <color rgba="0.999 0.999 0.999 1.0"/>
+            </material>
+        </visual>
 
-            <collision>
-                <geometry>
-                    <mesh filename="file://$(find optimo_description)/meshes/col7.stl"/>
-                </geometry>
-            </collision>
-            <inertial>
-                <origin xyz="0 0 0" />
-                <mass value="1"/>
-                <!-- <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/> -->
-                <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/>
-      
-            </inertial>
-        </link>
-
-
-        <!-- <joint name='jN' type='revolute'>
-        <child>LINK NAME</child>
-        <parent>LINK NAME</parent>
-        <axis>
-            <xyz>AXIS OF ROTATION, IN JOINT FRAME</xyz> 
-            <limit>
-            <lower>RADIANS FOR REVOLUTE/ METERS FOR PRISMATIC</lower> 
-            <upper></upper>
-            <effort></effort>
-            <velocity></velocity>
-            </limit>
-            <dynamics>
-            <damping>VISCOUS DAMPING COEFFICIENT</damping> 
-            <friction>PHYSICAL STATIC FRICTION</friction> 
-            <spring_reference>SPRING REF POSITION FOR THIS JOINT AXIS</spring_reference> 
-            <spring_stiffness>SPRING STIFFNESS FOR THIS JOINT AXIS</spring_stiffness> 
-            </dynamics>
-            <use_parent_model_frame>1</use_parent_model_frame>
-        </axis>
-        </joint> -->
-
-        <!-- Joints -->
-
-        <joint name="${ns}_joint1" type="revolute">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${ns}_link0"/>
-            <child link="${ns}_link1"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-164}" upper="${DtR*167}" effort="79" velocity="10"/>
-        </joint>
-        
-        <joint name="${ns}_joint1_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-            <parent link="${ns}_link1"/>
-            <child link="${ns}_link1_passive"/>
-        </joint>
-
-        <joint name="${ns}_joint2" type="revolute">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${ns}_link1_passive"/>
-            <child link="${ns}_link2"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*60}" upper="${DtR*250}" effort="95" velocity="10"/>
-        
-        </joint>
-
-        <joint name="${ns}_joint2_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-            <parent link="${ns}_link2"/>
-            <child link="${ns}_link2_passive"/>
-        </joint>
-
-        <joint name="${ns}_joint3" type="revolute">
-            <origin xyz="0 0 0.4" rpy="0 0 0"/>
-            <parent link="${ns}_link2_passive"/>
-            <child link="${ns}_link3"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-167}" upper="${DtR*163}" effort="32" velocity="10"/>
-        </joint>
-        <joint name="${ns}_joint3_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="-${PI/2} 0 0"/>
-            <parent link="${ns}_link3"/>
-            <child link="${ns}_link3_passive"/>
-        </joint>
-
-        <joint name="${ns}_joint4" type="revolute">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${ns}_link3_passive"/>
-            <child link="${ns}_link4"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-145}" upper="${DtR*145}" effort="40" velocity="10"/>
-        </joint>
-        <joint name="${ns}_joint4_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-            <parent link="${ns}_link4"/>
-            <child link="${ns}_link4_passive"/>
-        </joint>
-
-        <joint name="${ns}_joint5" type="revolute">
-            <origin xyz="0 0 0.4" rpy="0 0 0"/>
-            <parent link="${ns}_link4_passive"/>
-            <child link="${ns}_link5"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-170}" upper="${DtR*170}" effort="15" velocity="10"/>
-        </joint>
-        <joint name="${ns}_joint5_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="-${PI/2} 0 0"/>
-            <parent link="${ns}_link5"/>
-            <child link="${ns}_link5_passive"/>
-        </joint>
+        <collision>
+            <geometry>
+                <mesh filename="file://$(find optimo_description)/meshes/col7.stl"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0 0 0" />
+            <mass value="1"/>
+            <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/>
+            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+    
+        </inertial>
+    </link>
 
 
-        <joint name="${ns}_joint6" type="revolute">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${ns}_link5_passive"/>
-            <child link="${ns}_link6"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-120}" upper="${DtR*120}" effort="15" velocity="10"/>
-        </joint>
-        <joint name="${ns}_joint6_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-            <parent link="${ns}_link6"/>
-            <child link="${ns}_link6_passive"/>
-        </joint>
+    <!-- <joint name='jN' type='revolute'>
+    <child>LINK NAME</child>
+    <parent>LINK NAME</parent>
+    <axis>
+        <xyz>AXIS OF ROTATION, IN JOINT FRAME</xyz> 
+        <limit>
+        <lower>RADIANS FOR REVOLUTE/ METERS FOR PRISMATIC</lower> 
+        <upper></upper>
+        <effort></effort>
+        <velocity></velocity>
+        </limit>
+        <dynamics>
+        <damping>VISCOUS DAMPING COEFFICIENT</damping> 
+        <friction>PHYSICAL STATIC FRICTION</friction> 
+        <spring_reference>SPRING REF POSITION FOR THIS JOINT AXIS</spring_reference> 
+        <spring_stiffness>SPRING STIFFNESS FOR THIS JOINT AXIS</spring_stiffness> 
+        </dynamics>
+        <use_parent_model_frame>1</use_parent_model_frame>
+    </axis>
+    </joint> -->
 
-        <joint name="${ns}_joint7" type="revolute">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${ns}_link6_passive"/>
-            <child link="${ns}_link7"/>
-            <axis xyz="0 0 1"/>
-            <limit lower="${DtR*-152}" upper="${DtR*188}" effort="15" velocity="10"/>
-        </joint>
-        <joint name="${ns}_joint7_passive" type="fixed">
-            <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-            <parent link="${ns}_link7"/>
-            <child link="${ns}_link7_passive"/>
-        </joint>
+    <!-- Joints -->
 
-    </xacro:macro>
+    <joint name="optimo_joint1" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="optimo_link0"/>
+        <child link="optimo_link1"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-164}" upper="${DtR*167}" effort="79" velocity="10"/>
+    </joint>
+    
+    <joint name="optimo_joint1_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <parent link="optimo_link1"/>
+        <child link="optimo_link1_passive"/>
+    </joint>
+
+    <joint name="optimo_joint2" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="optimo_link1_passive"/>
+        <child link="optimo_link2"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*60}" upper="${DtR*250}" effort="95" velocity="10"/>
+    
+    </joint>
+
+    <joint name="optimo_joint2_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <parent link="optimo_link2"/>
+        <child link="optimo_link2_passive"/>
+    </joint>
+
+    <joint name="optimo_joint3" type="revolute">
+        <origin xyz="0 0 0.4" rpy="0 0 0"/>
+        <parent link="optimo_link2_passive"/>
+        <child link="optimo_link3"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-167}" upper="${DtR*163}" effort="32" velocity="10"/>
+    </joint>
+    <joint name="optimo_joint3_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="-${PI/2} 0 0"/>
+        <parent link="optimo_link3"/>
+        <child link="optimo_link3_passive"/>
+    </joint>
+
+    <joint name="optimo_joint4" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="optimo_link3_passive"/>
+        <child link="optimo_link4"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-145}" upper="${DtR*145}" effort="40" velocity="10"/>
+    </joint>
+    <joint name="optimo_joint4_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <parent link="optimo_link4"/>
+        <child link="optimo_link4_passive"/>
+    </joint>
+
+    <joint name="optimo_joint5" type="revolute">
+        <origin xyz="0 0 0.4" rpy="0 0 0"/>
+        <parent link="optimo_link4_passive"/>
+        <child link="optimo_link5"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-170}" upper="${DtR*170}" effort="15" velocity="10"/>
+    </joint>
+    <joint name="optimo_joint5_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="-${PI/2} 0 0"/>
+        <parent link="optimo_link5"/>
+        <child link="optimo_link5_passive"/>
+    </joint>
+
+
+    <joint name="optimo_joint6" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="optimo_link5_passive"/>
+        <child link="optimo_link6"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-120}" upper="${DtR*120}" effort="15" velocity="10"/>
+    </joint>
+    <joint name="optimo_joint6_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <parent link="optimo_link6"/>
+        <child link="optimo_link6_passive"/>
+    </joint>
+
+    <joint name="optimo_joint7" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="optimo_link6_passive"/>
+        <child link="optimo_link7"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="${DtR*-152}" upper="${DtR*188}" effort="15" velocity="10"/>
+    </joint>
+    <joint name="optimo_joint7_passive" type="fixed">
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <parent link="optimo_link7"/>
+        <child link="optimo_link7_passive"/>
+    </joint>
+
 
 </robot>
 

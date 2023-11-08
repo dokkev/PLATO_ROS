@@ -2,29 +2,26 @@
 <robot name="optimo" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
 
+   
     <!-- Bring xacro files -->
     <xacro:include filename="optimo_xacro/optimo_arm.xacro"/>
 
-
-    <!-- Set Namespace for the Optimo Arm -->
-    <xacro:property name="arm_ns" value="optimo" />
-    <xacro:optimo_arm ns ="${arm_ns}"/>
-    
-
-    <!-- Put World for Gazebo -->
     <link name="world"/>
     <joint name="world_joint" type="fixed">
         <parent link="world"/>
-        <child link="${arm_ns}_base_link"/>
+        <child link="optimo_base_link"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
-    
+
+
+  
+ 
     <!-- Include Physics Parameters in Gazebo -->
     <xacro:include filename="optimo_xacro/optimo.gazebo.xacro" />
 
     <!-- Include ros2_control -->
     <xacro:include filename="optimo_xacro/optimo.control.xacro" />
-    <xacro:optimo_ros2_control ns="${arm_ns}"/>
+    <xacro:optimo_ros2_control name="OptimoGazebo"/>
 
 
   

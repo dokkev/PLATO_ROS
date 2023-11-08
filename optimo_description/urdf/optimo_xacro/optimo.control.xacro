@@ -10,8 +10,8 @@
     </gazebo>
 
 
-    <xacro:macro name="optimo_ros2_control" params="ns">
-        <ros2_control name="OptimoGazebo" type="system">
+    <xacro:macro name="optimo_ros2_control" params="name">
+        <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>gazebo_ros2_control/GazeboSystem</plugin>
             </hardware>
@@ -32,13 +32,13 @@
                 </joint>
             </xacro:macro>
 
-            <xacro:configure_joint joint_name="${ns}_joint1" initial_position="0.0"/>
-            <xacro:configure_joint joint_name="${ns}_joint2" initial_position="${160*DtR}"/>
-            <xacro:configure_joint joint_name="${ns}_joint3" initial_position="0.0"/>
-            <xacro:configure_joint joint_name="${ns}_joint4" initial_position="${-60*DtR}"/>
-            <xacro:configure_joint joint_name="${ns}_joint5" initial_position="0.0"/>
-            <xacro:configure_joint joint_name="${ns}_joint6" initial_position="${-30*DtR}"/>
-            <xacro:configure_joint joint_name="${ns}_joint7" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint1" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint2" initial_position="${160*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint3" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint4" initial_position="${-60*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint5" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint6" initial_position="${-30*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint7" initial_position="0.0"/>
         </ros2_control>
         
   </xacro:macro>

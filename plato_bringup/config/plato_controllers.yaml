@@ -1,16 +1,42 @@
 controller_manager:
   ros__parameters:
     update_rate: 1000
-
-
+    
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-
-    joint_trajectory_controller:
+    optimo_joint_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-joint_trajectory_controller:
+    plato_joint_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    
+    # TODO: Add effort controller
+    # plato_effort_controller:
+    #   type: effort_controllers/GroupEffortController
+
+optimo_joint_controller:
+  ros__parameters:
+
+    action_monitor_rate: 20.0
+
+    joints:
+      - optimo_joint1
+      - optimo_joint2
+      - optimo_joint3
+      - optimo_joint4
+      - optimo_joint5
+      - optimo_joint6
+      - optimo_joint7
+
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+
+
+plato_joint_controller:
   ros__parameters:
 
     action_monitor_rate: 20.0
@@ -20,13 +46,12 @@ joint_trajectory_controller:
       - plato_f1_mcp_pitch
       - plato_f1_pip_pitch
       - plato_f2_mcp_yaw
-      - plato_f2_mcp_pitch
+      - plato_f2_mcp_pitch  
       - plato_f2_pip_pitch
       - plato_f3_mcp_yaw
       - plato_f3_mcp_pitch
       - plato_f3_pip_pitch
-
-
+    
     command_interfaces:
       - position
     state_interfaces:

@@ -1,45 +1,38 @@
 <?xml version="1.0"?>
 <robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <!-- Set Property -->
-    <xacro:property name="hand_ns" default="plato"/>
-    <xacro:property name="arm_ns" default="optimo"/>
-
-
+  
     <!-- Include Optimo Arm and PLATO Hand Xacro -->
     <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo_arm.xacro"/>
-        <xacro:optimo_arm ns = "${arm_ns}"/>
-
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.xacro"/>
-        <xacro:plato_hand ns = "${hand_ns}"/>
 
-    <!-- Include Gazebo Physics Parameters -->
-    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo.gazebo.xacro"/>
+    <!-- Connect PLATO Hand to Optimo Arm -->
+    <joint name="hand_arm_joint" type="fixed">
+        <parent link="optimo_link7_passive"/>
+        <child link="plato_base_link"/>
+        <origin xyz="0 0.16 0" rpy="1.5707 0 1.5707"/>
+    </joint>
+
 
     <!-- Set World Frame for Gazebo -->
     <link name="world"/>
     <!-- Connect the Optimo to the World-->
     <joint name="world_joint" type="fixed">
         <parent link="world"/>
-        <child link="${arm_ns}_base_link"/>
+        <child link="optimo_base_link"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
   
-    <!-- Connect PLATO Hand to Optimo Arm -->
-    <joint name="hand_arm_joint" type="fixed">
-        <parent link="${arm_ns}_link7_passive"/>
-        <child link="${hand_ns}_base_link"/>
-        <origin xyz="0 0.16 0" rpy="1.5707 0 1.5707"/>
-    </joint>
+
+    <!-- Include Gazebo Physics Parameters -->
+    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo.gazebo.xacro"/>
 
     <!-- Make sure to include the controllers after all joints are defined -->
-    <!-- Optimo Gazebo Parameters and ros2_controller --> 
+    <!-- Optimo + Plato ros2_controller --> 
     
-    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo.control.xacro"/>
-         <xacro:optimo_ros2_control ns="${arm_ns}"/>
-        
-    <!-- <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.control.xacro"/> -->
-         <!-- <xacro:plato_ros2_control ns="${hand_ns}"/> -->
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_manipulator.control.xacro"/>
+         <xacro:plato_ros2_control name="PlatoGazebo"/>
+         <xacro:optimo_ros2_control name="OptimoGazebo"/>
 
 
 

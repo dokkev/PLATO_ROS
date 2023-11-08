@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+    <!-- Optimo ROS 2 Controller -->
+    <gazebo>
+        <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+            <parameters>$(find plato_bringup)/config/plato_controllers.yaml</parameters>
+        </plugin>
+    </gazebo>
+
+    <xacro:macro name="configure_joint" params="joint_name initial_position">
+        <joint name="${joint_name}">
+            
+            <command_interface name="position"/>
+
+            <state_interface name="position">
+                <param name="initial_value">${initial_position}</param>
+            </state_interface>
+            
+            <state_interface name="velocity"/>
+    
+        </joint>
+    </xacro:macro>
+
+
+    <xacro:macro name="plato_ros2_control" params="name">
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+            </hardware>
+
+            <xacro:configure_joint joint_name="plato_f1_mcp_roll"   initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f1_mcp_pitch"  initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f1_pip_pitch"  initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f2_mcp_yaw"    initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f2_mcp_pitch"  initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f2_pip_pitch"  initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f3_mcp_yaw"    initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f3_mcp_pitch"  initial_position="0.0"/>
+            <xacro:configure_joint joint_name="plato_f3_pip_pitch"  initial_position="0.0"/>
+
+        </ros2_control>
+  </xacro:macro>
+
+  <xacro:macro name="optimo_ros2_control" params="name">
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+            </hardware>
+
+            <xacro:configure_joint joint_name="optimo_joint1" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint2" initial_position="${160*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint3" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint4" initial_position="${-60*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint5" initial_position="0.0"/>
+            <xacro:configure_joint joint_name="optimo_joint6" initial_position="${-30*DtR}"/>
+            <xacro:configure_joint joint_name="optimo_joint7" initial_position="0.0"/>
+        </ros2_control>
+        
+  </xacro:macro>
+
+  
+
+
+        
+
+
+</robot>

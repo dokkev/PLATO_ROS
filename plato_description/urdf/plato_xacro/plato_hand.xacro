@@ -1,19 +1,15 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <link name="plato_base_link"></link>
 
-
-<xacro:macro name="plato_hand" params="ns:='plato'">
-
-    <link name="${ns}_base_link"></link>
-
-    <joint name="${ns}_base_link_to_palm" type="fixed">
-        <parent link="${ns}_base_link"/>
-        <child link="${ns}_palm" />
+    <joint name="plato_base_link_to_palm" type="fixed">
+        <parent link="plato_base_link"/>
+        <child link="plato_palm" />
         <origin rpy="0.0 0 0" xyz="0 0 0"/>
     </joint>
 
-    <link name="${ns}_palm">
+    <link name="plato_palm">
         <visual>
         <origin xyz="0 0 0" rpy="0 -0 0" />
         <geometry>
@@ -38,7 +34,7 @@
 
     <!-- Finger 1 (Thumb) -->
 
-        <link name="${ns}_f1_proxbracket">
+        <link name="plato_f1_proxbracket">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -61,7 +57,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f1_prox">
+        <link name="plato_f1_prox">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -84,7 +80,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f1_mid">
+        <link name="plato_f1_mid">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -107,48 +103,48 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f1_ee_frame">
+        <link name="plato_f1_ee_frame">
         </link>
         
 
-        <joint name="${ns}_f1_pip_pitch" type="revolute">
+        <joint name="plato_f1_pip_pitch" type="revolute">
             <origin xyz="0.048000000000000028755 6.9388939039072283776e-18 -0.0026999999999999871325" rpy="6.6672023420374162248e-16 1.5291665303066472343e-16 3.3306690741059185714e-16" />
-            <parent link="${ns}_f1_prox" />
-            <child link="${ns}_f1_mid" />
+            <parent link="plato_f1_prox" />
+            <child link="plato_f1_mid" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f1_mcp_pitch" type="revolute">
+        <joint name="plato_f1_mcp_pitch" type="revolute">
             <origin xyz="-0.0049999999999999697464 -0.028150000000000133249 -0.0098999999999999366285" rpy="-2.8657554781383847745e-16 -1.5707963267948961139 0" />
-            <parent link="${ns}_f1_proxbracket" />
-            <child link="${ns}_f1_prox" />
+            <parent link="plato_f1_proxbracket" />
+            <child link="plato_f1_prox" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="0.52359877559829881566"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f1_mcp_roll" type="revolute">
+        <joint name="plato_f1_mcp_roll" type="revolute">
             <origin xyz="0.084500000000000047296 0.029999999999999988481 -0.033000000000000008493" rpy="1.5707963267948958919 -2.5535129566378612263e-15 1.5707963267948938935" />
-            <parent link="${ns}_palm" />
-            <child link="${ns}_f1_proxbracket" />
+            <parent link="plato_palm" />
+            <child link="plato_f1_proxbracket" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-0.52359877559829881566" upper="1.0471975511965976313"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f1_ee_joint" type="fixed">
+        <joint name="plato_f1_ee_joint" type="fixed">
             <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="${ns}_f1_mid"/>
-            <child link="${ns}_f1_ee_frame"/>
+            <parent link="plato_f1_mid"/>
+            <child link="plato_f1_ee_frame"/>
         </joint>
 
 
 
     <!-- Finger 2 (Index) -->
 
-        <link name="${ns}_f2_proxbracket">
+        <link name="plato_f2_proxbracket">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -171,7 +167,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f2_prox">
+        <link name="plato_f2_prox">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -194,7 +190,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f2_mid">
+        <link name="plato_f2_mid">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -217,46 +213,46 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f2_ee_frame">
+        <link name="plato_f2_ee_frame">
         </link>
 
-        <joint name="${ns}_f2_pip_pitch" type="revolute">
+        <joint name="plato_f2_pip_pitch" type="revolute">
             <origin xyz="0.047999999999999792832 0 0.0047999999999999813649" rpy="8.673617379890070258e-17 5.7824115865889863811e-17 -1.5021026917775434348e-15" />
-            <parent link="${ns}_f2_prox" />
-            <child link="${ns}_f2_mid" />
+            <parent link="plato_f2_prox" />
+            <child link="plato_f2_mid" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f2_mcp_pitch" type="revolute">
+        <joint name="plato_f2_mcp_pitch" type="revolute">
             <origin xyz="-0.0024999999999990307753 -0.028150000000000355294 -0.0099000000000003564316" rpy="-1.570796326794896558 6.9017807609091964755e-16 -1.5707963267948907848" />
-            <parent link="${ns}_f2_proxbracket" />
-            <child link="${ns}_f2_prox" />
+            <parent link="plato_f2_proxbracket" />
+            <child link="plato_f2_prox" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="0.785398163397448279"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f2_mcp_yaw" type="revolute">
+        <joint name="plato_f2_mcp_yaw" type="revolute">
             <origin xyz="0.1000000000000001027 0.029999999999999974604 -0.015000000000000013323" rpy="3.141592653589793116 -1.1714553645825245089e-15 -1.5707963267948998887" />
-            <parent link="${ns}_palm" />
-            <child link="${ns}_f2_proxbracket" />
+            <parent link="plato_palm" />
+            <child link="plato_f2_proxbracket" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="0.26179938779914940783"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f2_ee_joint" type="fixed">
+        <joint name="plato_f2_ee_joint" type="fixed">
             <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="${ns}_f2_mid"/>
-            <child link="${ns}_f2_ee_frame"/>
+            <parent link="plato_f2_mid"/>
+            <child link="plato_f2_ee_frame"/>
         </joint>
 
 
     <!-- Finger 3: Middle -->
 
-        <link name="${ns}_f3_proxbracket">
+        <link name="plato_f3_proxbracket">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -279,7 +275,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f3_prox">
+        <link name="plato_f3_prox">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -302,7 +298,7 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f3_mid">
+        <link name="plato_f3_mid">
             <visual>
             <origin xyz="0 0 0" rpy="0 -0 0" />
             <geometry>
@@ -325,43 +321,42 @@
             </inertial>
         </link>
 
-        <link name="${ns}_f3_ee_frame">
+        <link name="plato_f3_ee_frame">
         </link>
 
-        <joint name="${ns}_f3_pip_pitch" type="revolute">
+        <joint name="plato_f3_pip_pitch" type="revolute">
             <origin xyz="0.047999999999998654854 2.0122792321330962295e-16 0.0047999999999999917732" rpy="-1.9081958235950694314e-16 5.7824115816011125546e-17 1.7763568393717672612e-15" />
-            <parent link="${ns}_f3_prox" />
-            <child link="${ns}_f3_mid" />
+            <parent link="plato_f3_prox" />
+            <child link="plato_f3_mid" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-2.0944" upper="2.0944"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f3_mcp_pitch" type="revolute">
+        <joint name="plato_f3_mcp_pitch" type="revolute">
             <origin xyz="-0.002500000000000099365 -0.028150000000000077738 -0.0099000000000001291828" rpy="-1.570796326794896558 -3.7816971775725042188e-15 -1.5707963267948943376" />
-            <parent link="${ns}_f3_proxbracket" />
-            <child link="${ns}_f3_prox" />
+            <parent link="plato_f3_proxbracket" />
+            <child link="plato_f3_prox" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="0.785398163397448279"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f3_mcp_yaw" type="revolute">
+        <joint name="plato_f3_mcp_yaw" type="revolute">
             <origin xyz="0.10000000000000000555 -0.029999999999999964195 -0.015000000000000048017" rpy="-3.1415926535897926719 1.1057720720235713428e-16 -1.5707963267948983344" />
-            <parent link="${ns}_palm" />
-            <child link="${ns}_f3_proxbracket" />
+            <parent link="plato_palm" />
+            <child link="plato_f3_proxbracket" />
             <axis xyz="0 0 1"/>
             <limit effort="1" velocity="20" lower="-0.26179938779914940783" upper="0.785398163397448279"/>
             <joint_properties friction="0.0"/>
         </joint>
 
-        <joint name="${ns}_f3_ee_joint" type="fixed">
+        <joint name="plato_f3_ee_joint" type="fixed">
             <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="${ns}_f3_mid"/>
-            <child link="${ns}_f3_ee_frame"/>
+            <parent link="plato_f3_mid"/>
+            <child link="plato_f3_ee_frame"/>
         </joint>
 
-    </xacro:macro>
 
 
 

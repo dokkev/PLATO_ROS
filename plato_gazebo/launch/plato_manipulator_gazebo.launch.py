@@ -2,7 +2,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, Shutdown
+from launch.actions import IncludeLaunchDescription, Shutdown, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import SetEnvironmentVariable
 from ament_index_python.packages import get_package_share_directory
@@ -24,11 +24,9 @@ def generate_launch_description():
     rviz_config_file = get_package_share_directory('plato_description') + '/rviz/plato.rviz'
 
 
-
-    controller_config = os.path.join(get_package_share_directory("plato_bringup"),'config','optimo_controllers.yaml')
-
     plato_xacro = os.path.join(get_package_share_directory('plato_description'), 'urdf', 'plato_manipulator.urdf.xacro')
-    robot_description_content =   xacro.process_file(plato_xacro).toxml()
+    robot_description_content = xacro.process_file(plato_xacro).toxml()
+
 
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
@@ -43,22 +41,12 @@ def generate_launch_description():
     node_robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        output='screen',
-        parameters=[{'robot_description': robot_description_content}]
+        # output='screen',
+        parameters=[{'robot_description': robot_description_content}],
 
     )
 
 
-    # controller_manager
-    controller_manager_node = Node(
-        package='controller_manager',
-        executable='ros2_control_node',
-        parameters=[robot_description_content,controller_config],
-        # namespace='optimo',
-        output='screen',
-        on_exit=Shutdown(),
-    )
-    
     # spawning the joint broadcaster
     spawn_broadcaster = Node(
         # namespace="optimo",
@@ -68,11 +56,19 @@ def generate_launch_description():
         output="screen",
     )
 
-    spawn_controller = Node(
+    spawn_optimo_controller = Node(
         # namespace="optimo",
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_trajectory_controller"],
+        arguments=["optimo_joint_controller"],
+        output="screen",
+    )
+
+    spawn_plato_controller = Node(
+        # namespace="optimo",
+        package="controller_manager",
+        executable="spawner",
+        arguments=["plato_joint_controller"],
         output="screen",
     )
 
@@ -100,15 +96,14 @@ def generate_launch_description():
 
     
     return LaunchDescription([
-        # SetEnvironmentVariable(name='GAZEBO_MODEL_PATH', value=model_path),
-        rsp_launch,
         node_robot_state_publisher,
         gazebo_launch,
-        # controller_manager_node,
         spawn_broadcaster,
-        spawn_controller,
+        spawn_optimo_controller,
+        spawn_plato_controller,
         spawn_entity_node,
         # node_rviz
+    
  
         
   

@@ -44,7 +44,7 @@ def generate_launch_description():
     spawn_controller = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_trajectory_controller"],
+        arguments=["optimo_joint_controller"],
         output="screen",
     )
 

@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: optimo_description
+    relative_path: urdf/optimo.urdf
+  srdf:
+    relative_path: config/optimo.srdf
+  package_settings:
+    author_name: dk
+    author_email: dongho@utexas.edu
+    generated_timestamp: 1699582056
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

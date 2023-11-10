@@ -1,25 +1,22 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <xacro:property name="PI" value="3.1415926535897931"/>
-    <xacro:property name="DtR" value=".01745329251"/>
 
-    <gazebo reference="base_link"/>
-    <gazebo reference="optimo_link0"/>
+    <!-- <material name="Grey">
+        <color rgba="0.8 0.8 0.8 1"/>
+    </material> -->
+
+    <gazebo reference="optimo_base_link">
+        <material>Gazebo/Grey</material>
+    </gazebo>
     <gazebo reference="optimo_link1"/>
-    <gazebo reference="optimo_link1_passive"/>
     <gazebo reference="optimo_link2"/>
-    <gazebo reference="optimo_link2_passive"/>
     <gazebo reference="optimo_link3"/>
-    <gazebo reference="optimo_link3_passive"/>
     <gazebo reference="optimo_link4"/>
-    <gazebo reference="optimo_link4_passive"/>
     <gazebo reference="optimo_link5"/>
-    <gazebo reference="optimo_link5_passive"/>
     <gazebo reference="optimo_link6"/>
-    <gazebo reference="optimo_link6_passive"/>
     <gazebo reference="optimo_link7"/>
-    <gazebo reference="optimo_link7_passive"/>
+
 
 
     <!-- Joint State Publisher -->

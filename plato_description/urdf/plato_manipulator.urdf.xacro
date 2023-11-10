@@ -26,6 +26,7 @@
 
     <!-- Include Gazebo Physics Parameters -->
     <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo.gazebo.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.gazebo.xacro"/>
 
     <!-- Make sure to include the controllers after all joints are defined -->
     <!-- Optimo + Plato ros2_controller --> 

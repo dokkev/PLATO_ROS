@@ -5,17 +5,6 @@
     <xacro:property name="PI" value="3.1415926535897931"/>
     <xacro:property name="DtR" value=".01745329251"/>
 
-    <xacro:property name="mass_link0" value="3.06357" />
-    <xacro:property name="mass_link1" value="2.34471" />
-    <xacro:property name="mass_link2" value="2.36414" />
-    <xacro:property name="mass_link3" value="2.38050" />
-    <xacro:property name="mass_link4" value="2.42754" />
-    <xacro:property name="mass_link5" value="3.49611" />
-    <xacro:property name="mass_link6" value="1.46736" />
-    <xacro:property name="mass_link7" value="0.45606" />
-    <xacro:property name="mass_link8" value="0.001" />
-
-
 
     <link name="optimo_base_link">
     </link>
@@ -235,28 +224,7 @@
     </link>
 
 
-    <!-- <joint name='jN' type='revolute'>
-    <child>LINK NAME</child>
-    <parent>LINK NAME</parent>
-    <axis>
-        <xyz>AXIS OF ROTATION, IN JOINT FRAME</xyz> 
-        <limit>
-        <lower>RADIANS FOR REVOLUTE/ METERS FOR PRISMATIC</lower> 
-        <upper></upper>
-        <effort></effort>
-        <velocity></velocity>
-        </limit>
-        <dynamics>
-        <damping>VISCOUS DAMPING COEFFICIENT</damping> 
-        <friction>PHYSICAL STATIC FRICTION</friction> 
-        <spring_reference>SPRING REF POSITION FOR THIS JOINT AXIS</spring_reference> 
-        <spring_stiffness>SPRING STIFFNESS FOR THIS JOINT AXIS</spring_stiffness> 
-        </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
-    </axis>
-    </joint> -->
-
-    <!-- Joints -->
+    <!-- Robot Joints -->
 
     <joint name="optimo_joint1" type="revolute">
         <origin xyz="0 0 0" rpy="0 0 0"/>

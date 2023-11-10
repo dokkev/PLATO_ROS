@@ -1,0 +1,12 @@
+# Default initial positions for plato's ros2_control fake system
+
+initial_positions:
+  plato_f1_mcp_pitch: 0
+  plato_f1_mcp_roll: 0
+  plato_f1_pip_pitch: 0
+  plato_f2_mcp_pitch: 0
+  plato_f2_mcp_yaw: 0
+  plato_f2_pip_pitch: 0
+  plato_f3_mcp_pitch: 0
+  plato_f3_mcp_yaw: 0
+  plato_f3_pip_pitch: 0

@@ -3,7 +3,7 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
 
     <!-- Import plato urdf file -->
-    <xacro:include filename="$(find plato_description)/urdf/plato_hand.urdf" />
+    <xacro:include filename="$(find plato_description)/urdf/plato_manipulator.urdf" />
 
     <!-- Import control_xacro -->
     <xacro:include filename="plato.ros2_control.xacro" />

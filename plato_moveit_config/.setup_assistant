@@ -1,13 +1,13 @@
 moveit_setup_assistant_config:
   urdf:
     package: plato_description
-    relative_path: urdf/plato_hand.urdf
+    relative_path: urdf/plato_manipulator.urdf
   srdf:
     relative_path: config/plato.srdf
   package_settings:
     author_name: dk
     author_email: dongho@utexas.edu
-    generated_timestamp: 1699734400
+    generated_timestamp: 1699748363
   control_xacro:
     command:
       - position

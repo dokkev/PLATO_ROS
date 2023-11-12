@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /MotionPlanning1
-        - /MotionPlanning1/Scene Robot1
         - /MotionPlanning1/Planning Metrics1
         - /MotionPlanning1/Planned Path1
       Splitter Ratio: 0.5
@@ -142,6 +141,72 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
+          plato_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f1_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f1_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f1_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f1_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f2_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f3_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_palm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
         Loop Animation: false
         Robot Alpha: 0.5
         Robot Color: 150; 50; 150
@@ -151,7 +216,7 @@ Visualization Manager:
         State Display Time: 0.05 s
         Trail Step Size: 1
         Trajectory Topic: display_planned_path
-        Use Sim Time: false
+        Use Sim Time: true
       Planning Metrics:
         Payload: 1
         Show Joint Torques: false
@@ -161,7 +226,7 @@ Visualization Manager:
         TextHeight: 0.07999999821186066
       Planning Request:
         Colliding Link Color: 255; 0; 0
-        Goal State Alpha: 1
+        Goal State Alpha: 0.5
         Goal State Color: 250; 128; 0
         Interactive Marker Size: 0
         Joint Violation Color: 255; 0; 255
@@ -261,7 +326,73 @@ Visualization Manager:
             Show Axes: false
             Show Trail: false
             Value: true
-        Robot Alpha: 0.5
+          plato_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f1_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f1_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f1_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f1_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f2_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f2_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_ee_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          plato_f3_mid:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_prox:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_f3_proxbracket:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          plato_palm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+        Robot Alpha: 1
         Show Robot Collision: false
         Show Robot Visual: true
       Value: true
@@ -284,25 +415,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.42136287689209
+      Distance: 2.791201591491699
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.35986313223838806
-        Y: 0.4460487961769104
-        Z: 0.21770726144313812
+        X: -0.12506185472011566
+        Y: 0.4167310893535614
+        Z: 0.45697420835494995
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5399999022483826
+      Pitch: 0.6650000214576721
       Target Frame: optimo_base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 0.12701092660427094
+      Yaw: 0.7519989013671875
     Saved: ~
 Window Geometry:
   Displays:

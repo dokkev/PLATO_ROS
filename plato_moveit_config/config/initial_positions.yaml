@@ -2,11 +2,11 @@
 
 initial_positions:
   optimo_joint1: 0
-  optimo_joint2: 3.14
+  optimo_joint2: 2.79253
   optimo_joint3: 0
-  optimo_joint4: 0
+  optimo_joint4: -1.0472
   optimo_joint5: 0
-  optimo_joint6: 0
+  optimo_joint6: -0.523599
   optimo_joint7: 0
   plato_f1_mcp_pitch: 0
   plato_f1_mcp_roll: 0

@@ -19,6 +19,8 @@ moveit_simple_controller_manager:
       - optimo_joint5
       - optimo_joint6
       - optimo_joint7
+    action_ns: follow_joint_trajectory
+    default: true
   plato_hand_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
@@ -33,3 +35,5 @@ moveit_simple_controller_manager:
       - plato_f3_mcp_yaw
       - plato_f3_mcp_pitch
       - plato_f3_pip_pitch
+    action_ns: follow_joint_trajectory
+    default: true

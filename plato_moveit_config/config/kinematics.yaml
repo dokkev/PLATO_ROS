@@ -3,14 +3,14 @@ optimo_arm:
   kinematics_solver_search_resolution: 0.0050000000000000001
   kinematics_solver_timeout: 0.0050000000000000001
 plato_f1:
-  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver: pick_ik/PickIkPlugin
   kinematics_solver_search_resolution: 0.0050000000000000001
   kinematics_solver_timeout: 0.0050000000000000001
 plato_f2:
-  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver: pick_ik/PickIkPlugin
   kinematics_solver_search_resolution: 0.0050000000000000001
   kinematics_solver_timeout: 0.0050000000000000001
 plato_f3:
-  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver: pick_ik/PickIkPlugin
   kinematics_solver_search_resolution: 0.0050000000000000001
   kinematics_solver_timeout: 0.0050000000000000001

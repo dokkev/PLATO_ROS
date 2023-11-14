@@ -46,6 +46,11 @@
         <joint name="plato_f3_pip_pitch"/>
         <joint name="plato_f3_ee_joint"/>
     </group>
+    <group name="plato_hand">
+        <group name="plato_f1"/>
+        <group name="plato_f2"/>
+        <group name="plato_f3"/>
+    </group>
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="optimo_link0" link2="optimo_link1_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link0" link2="optimo_link2_passive" reason="Never"/>
@@ -54,7 +59,6 @@
     <disable_collisions link1="optimo_link1_passive" link2="optimo_link2_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link1_passive" link2="optimo_link3_passive" reason="Never"/>
     <disable_collisions link1="optimo_link1_passive" link2="optimo_link4_passive" reason="Never"/>
-    <disable_collisions link1="optimo_link1_passive" link2="optimo_link5_passive" reason="Never"/>
     <disable_collisions link1="optimo_link2_passive" link2="optimo_link3_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link2_passive" link2="optimo_link4_passive" reason="Never"/>
     <disable_collisions link1="optimo_link2_passive" link2="optimo_link5_passive" reason="Never"/>

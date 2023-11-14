@@ -21,6 +21,8 @@ moveit_simple_controller_manager:
       - optimo_joint5
       - optimo_joint6
       - optimo_joint7
+    action_ns: follow_joint_trajectory
+    default: true
   plato_f1_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
@@ -29,6 +31,8 @@ moveit_simple_controller_manager:
       - plato_f1_mcp_roll
       - plato_f1_mcp_pitch
       - plato_f1_pip_pitch
+    action_ns: follow_joint_trajectory
+    default: true
   plato_f2_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
@@ -37,6 +41,8 @@ moveit_simple_controller_manager:
       - plato_f2_mcp_yaw
       - plato_f2_mcp_pitch
       - plato_f2_pip_pitch
+    action_ns: follow_joint_trajectory
+    default: true
   plato_f3_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
@@ -45,3 +51,5 @@ moveit_simple_controller_manager:
       - plato_f3_mcp_yaw
       - plato_f3_mcp_pitch
       - plato_f3_pip_pitch
+    action_ns: follow_joint_trajectory
+    default: true

@@ -51,6 +51,10 @@
         <group name="plato_f2"/>
         <group name="plato_f3"/>
     </group>
+    <group name="whole_body">
+        <group name="optimo_arm"/>
+        <group name="plato_hand"/>
+    </group>
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="optimo_link0" link2="optimo_link1_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link0" link2="optimo_link2_passive" reason="Never"/>

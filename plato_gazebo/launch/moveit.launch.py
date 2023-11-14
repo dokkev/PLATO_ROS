@@ -94,19 +94,32 @@ def generate_launch_description():
     )
 
     spawn_controller = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/spawn_controller.launch.py'])
-   
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/spawn_controllers.launch.py']))
+    
+
+    plato_rsp = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/rsp.launch.py'])
     )
+    
+    move_group = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/move_group.launch.py']))
+    
+    rviz = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/moveit_rviz.launch.py']))
+    
 
     
     return LaunchDescription([
-        node_robot_state_publisher,
+        # node_robot_state_publisher,
         gazebo_launch,
-        # spawn_broadcaster,
-        # spawn_optimo_controller,
-        # spawn_plato_controller,
+        plato_rsp,
         spawn_entity_node,
-        # node_rviz
+        spawn_controller,
+        move_group,
+        rviz,
+        
+        
+
     
  
         

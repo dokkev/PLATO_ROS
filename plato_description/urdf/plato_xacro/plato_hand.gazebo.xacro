@@ -38,6 +38,7 @@
             <joint_name>plato_f3_mcp_yaw</joint_name>
             <joint_name>plato_f3_mcp_pitch</joint_name>
             <joint_name>plato_f3_pip_pitch</joint_name>
+
         </plugin>
     </gazebo>
 

@@ -10,88 +10,81 @@ default_acceleration_scaling_factor: 0.1
 joint_limits:
   optimo_joint1:
     has_velocity_limits: true
-    max_velocity: 2.1750
-    has_acceleration_limits: true
-    max_acceleration: 3.75
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint2:
     has_velocity_limits: true
-    max_velocity: 2.1750
-    has_acceleration_limits: true
-    max_acceleration: 1.875
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint3:
     has_velocity_limits: true
-    max_velocity: 2.1750
-    has_acceleration_limits: true
-    max_acceleration: 2.5
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint4:
     has_velocity_limits: true
-    max_velocity: 2.1750
-    has_acceleration_limits: true
-    max_acceleration: 3.125
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint5:
     has_velocity_limits: true
-    max_velocity: 2.6100
-    has_acceleration_limits: true
-    max_acceleration: 3.75
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint6:
     has_velocity_limits: true
-    max_velocity: 2.6100
-    has_acceleration_limits: true
-    max_acceleration: 5.0
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   optimo_joint7:
     has_velocity_limits: true
-    max_velocity: 2.6100
-    has_acceleration_limits: true
-    max_acceleration: 5.0
-    has_jerk_limits: false
+    max_velocity: 10
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f1_mcp_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f1_mcp_roll:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f1_pip_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f2_mcp_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f2_mcp_yaw:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f2_pip_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f3_mcp_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f3_mcp_yaw:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0
   plato_f3_pip_pitch:
     has_velocity_limits: true
-    max_velocity: 5.0
-    has_acceleration_limits: true
-    max_acceleration: 1.0
+    max_velocity: 5
+    has_acceleration_limits: false
+    max_acceleration: 0

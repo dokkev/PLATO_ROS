@@ -5,11 +5,12 @@ from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription, Shutdown, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import SetEnvironmentVariable
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution, FindExecutable
 from launch_ros.substitutions import FindPackageShare
+from moveit_configs_utils.launches import generate_static_virtual_joint_tfs_launch
+from moveit_configs_utils import MoveItConfigsBuilder
 import xacro
 
 
@@ -87,6 +88,9 @@ def generate_launch_description():
                 )]), launch_arguments={'use_sim_time': 'true', 'use_ros2_control': 'true'}.items()
     )
 
+    ###### Moveit #####
+
+    moveit_config = MoveItConfigsBuilder("plato", package_name="plato_moveit_config").to_moveit_configs()
 
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
@@ -107,6 +111,8 @@ def generate_launch_description():
     rviz = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/moveit_rviz.launch.py']))
     
+
+
 
     
     return LaunchDescription([

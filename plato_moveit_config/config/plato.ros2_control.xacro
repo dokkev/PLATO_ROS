@@ -1,11 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="plato_ros2_control" params="name initial_positions_file sim_type">
+    <xacro:macro name="plato_ros2_control" params="name initial_positions_file hardware_type">
         <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
-        
 
-        <!-- if Simulation is in Gazebo Classic, use gazebo_ros2_control -->
-        <xacro:if value="${sim_type == 'gazebo'}">
+        <!-- Gazebo ros2_control -->
+        <xacro:if value="${hardware_type == 'gazebo'}">
           <gazebo>
               <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
                   <parameters>$(find plato_moveit_config)/config/ros2_controllers.yaml</parameters>
@@ -13,19 +12,16 @@
           </gazebo>
         </xacro:if>
 
+
+    
         <ros2_control name="${name}" type="system">
             <hardware>
- 
-                <!-- Gazebo System -->
-                <xacro:if value="${sim_type == 'gazebo'}">
+                <xacro:if value="${hardware_type == 'gazebo'}">
                   <plugin>gazebo_ros2_control/GazeboSystem</plugin>
                 </xacro:if>
-
-                <!-- Fake System -->
-                <xacro:if value="${sim_type == 'fake'}">
-                  <plugin>fake_components/FakeSystem</plugin>
+                <xacro:if value="${hardware_type == 'mock'}">
+                  <plugin>mock_components/GenericSystem</plugin>
                 </xacro:if>
-
             </hardware>
             <joint name="optimo_joint1">
                 <command_interface name="position"/>

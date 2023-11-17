@@ -7,15 +7,7 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
 
 
-    plato_f1_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
-    plato_f2_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
-    plato_f3_controller:
+    plato_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 
@@ -37,31 +29,15 @@ optimo_arm_controller:
     state_interfaces:
       - position
       - velocity
-plato_f1_controller:
+plato_hand_controller:
   ros__parameters:
     joints:
       - plato_f1_mcp_roll
       - plato_f1_mcp_pitch
       - plato_f1_pip_pitch
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-plato_f2_controller:
-  ros__parameters:
-    joints:
       - plato_f2_mcp_yaw
       - plato_f2_mcp_pitch
       - plato_f2_pip_pitch
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-plato_f3_controller:
-  ros__parameters:
-    joints:
       - plato_f3_mcp_yaw
       - plato_f3_mcp_pitch
       - plato_f3_pip_pitch

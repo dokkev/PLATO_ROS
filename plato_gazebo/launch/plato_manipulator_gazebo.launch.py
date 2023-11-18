@@ -24,7 +24,7 @@ def generate_launch_description():
     rviz_config_file = get_package_share_directory('plato_description') + '/rviz/plato.rviz'
 
 
-    plato_xacro = os.path.join(get_package_share_directory('plato_description'), 'urdf', 'plato_manipulator.urdf.xacro')
+    plato_xacro = os.path.join(get_package_share_directory('plato_moveit_config'), 'config', 'plato.urdf.xacro')
     robot_description_content = xacro.process_file(plato_xacro).toxml()
 
 
@@ -49,7 +49,7 @@ def generate_launch_description():
 
     # spawning the joint broadcaster
     spawn_broadcaster = Node(
-        # namespace="optimo",
+
         package="controller_manager",
         executable="spawner",
         arguments=["joint_state_broadcaster"],
@@ -57,18 +57,16 @@ def generate_launch_description():
     )
 
     spawn_optimo_controller = Node(
-        # namespace="optimo",
         package="controller_manager",
         executable="spawner",
-        arguments=["optimo_joint_controller"],
+        arguments=["optimo_arm_controller"],
         output="screen",
     )
 
     spawn_plato_controller = Node(
-        # namespace="optimo",
         package="controller_manager",
         executable="spawner",
-        arguments=["plato_joint_controller"],
+        arguments=["plato_hand_controller"],
         output="screen",
     )
 
@@ -93,18 +91,15 @@ def generate_launch_description():
         launch_arguments={'world': os.path.join(get_package_share_directory('plato_gazebo'), 'worlds', 'optimo.world')}.items()
     )
 
-    spawn_controller = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_moveit_config'), 'launch'), '/spawn_controller.launch.py'])
    
-    )
 
     
     return LaunchDescription([
         node_robot_state_publisher,
         gazebo_launch,
-        # spawn_broadcaster,
-        # spawn_optimo_controller,
-        # spawn_plato_controller,
+        spawn_broadcaster,
+        spawn_optimo_controller,
+        spawn_plato_controller,
         spawn_entity_node,
         # node_rviz
     

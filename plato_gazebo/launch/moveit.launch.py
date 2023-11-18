@@ -19,7 +19,7 @@ def generate_launch_description():
    # Check if we're told to use sim time
   
 
-    models_path = os.path.join(get_package_share_directory('plato_gazebo'), 'models')
+    pkg_path = os.path.join(get_package_share_directory('plato_gazebo'))
 
     # RVIZ config file path
     rviz_config_file = get_package_share_directory('plato_description') + '/rviz/plato.rviz'
@@ -28,6 +28,13 @@ def generate_launch_description():
     plato_xacro = os.path.join(get_package_share_directory('plato_description'), 'urdf', 'plato_manipulator.urdf.xacro')
     robot_description_content = xacro.process_file(plato_xacro).toxml()
 
+
+    if 'GAZEBO_MODEL_PATH' in os.environ:
+        model_path = os.environ['GAZEBO_MODEL_PATH'] + ':' + 'models'+ pkg_path
+    else:
+        model_path = 'models'+ pkg_path
+
+    world_path = os.path.join(pkg_path, 'worlds', 'plato.world')
 
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
@@ -94,7 +101,7 @@ def generate_launch_description():
 
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-        launch_arguments={'world': os.path.join(get_package_share_directory('plato_gazebo'), 'worlds', 'optimo.world')}.items()
+        launch_arguments={'world': world_path}.items()
     )
 
     spawn_controller = IncludeLaunchDescription(
@@ -116,6 +123,7 @@ def generate_launch_description():
 
     
     return LaunchDescription([
+        SetEnvironmentVariable(name='GAZEBO_MODEL_PATH', value=model_path),
         # node_robot_state_publisher,
         gazebo_launch,
         plato_rsp,

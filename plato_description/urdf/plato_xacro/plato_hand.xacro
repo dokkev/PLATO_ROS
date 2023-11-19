@@ -9,353 +9,320 @@
         <origin rpy="0.0 0 0" xyz="0 0 0"/>
     </joint>
 
+
     <link name="plato_palm">
-        <visual>
-        <origin xyz="0 0 0" rpy="0 -0 0" />
-        <geometry>
-        <mesh filename="file://$(find plato_description)/meshes/plato/base_visual.stl"/>
-        </geometry>
-        <material name="base_material">
-        <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
-        </material>
-        </visual>
-        <collision>
-        <origin xyz="0 0 0" rpy="0 -0 0" />
-        <geometry>
-        <mesh filename="file://$(find plato_description)/meshes/plato/base_collision.stl"/>
-        </geometry>
-        </collision>
-        <inertial>
-        <origin xyz="0.045493179467456464071 0.00075885043291842098779 -0.00682767319963901477" rpy="0 0 0"/>
-        <mass value="0.17280321549697399974" />
-        <inertia ixx="0.000124447216717875575" ixy="-2.1184002504334913161e-06"  ixz="-5.2375390643355526047e-06" iyy="0.00022114103876778816297" iyz="2.4145885068302643992e-06" izz="0.00030593848378724351235" />
-        </inertial>
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/palm_base_visual.stl"/>
+    </geometry>
+    <material name="palm_base_material">
+    <color rgba="0.89434939315870753962 0.90231091668853768972 0.90708783080643595742 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/palm_base_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.036555833539703194712 0.0011801276395731980038 -0.0074763677784814627086" rpy="0 0 0"/>
+    <mass value="0.109050126671160999" />
+    <inertia ixx="5.4469734898495237912e-05" ixy="-3.6265481622280300922e-06"  ixz="1.3649749374167378479e-05" iyy="0.0001127554543439485184" iyz="2.001674249379790844e-06" izz="0.00013888451418923584741" />
+    </inertial>
     </link>
 
-    <!-- Finger 1 (Thumb) -->
+    <link name="plato_f1_proxbracket">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_visual.stl"/>
+    </geometry>
+    <material name="proxbracket_material">
+    <color rgba="0.29588156155479988785 0.31447294875599390851 0.33306433595718792917 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="-0.0079504685553139827631 -0.013983661603934091633 -0.009513097311059658806" rpy="0 0 0"/>
+    <mass value="0.12656081824380860379" />
+    <inertia ixx="3.5117165939881880756e-05" ixy="-1.3052140141476202523e-05"  ixz="1.9957519826333962067e-07" iyy="1.7537495218030352186e-05" iyz="-4.9180486622829863885e-07" izz="4.2451494821237279126e-05" />
+    </inertial>
+    </link>
 
-        <link name="plato_f1_proxbracket">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_visual.stl"/>
-            </geometry>
-            <material name="proxbracket_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="-0.0079504685553139688853 -0.013983661603934150613 -0.0095130973110596206421" rpy="0 0 0"/>
-            <mass value="0.12656081824380860379" />
-            <inertia ixx="3.5117165939882084044e-05" ixy="-1.3052140141476243181e-05"  ixz="1.9957519826334250588e-07" iyy="1.7537495218030365739e-05" iyz="-4.9180486622828042765e-07" izz="4.2451494821237482414e-05" />
-            </inertial>
-        </link>
+    <link name="plato_f1_prox">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_visual.stl"/>
+    </geometry>
+    <material name="prox_material">
+    <color rgba="0.34704230174571787382 0.36406434108829477392 0.38108638043087167402 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.0020817714488827435311 3.965915895651011827e-10 -0.015795112278832946356" rpy="0 0 0"/>
+    <mass value="0.069114549940711839104" />
+    <inertia ixx="5.8883565545029147752e-06" ixy="-9.2074790702886135794e-09"  ixz="-1.1640174651112401282e-06" iyy="9.6829622072771526719e-06" iyz="-9.4322462295980984731e-14" izz="9.2871592762520683981e-06" />
+    </inertial>
+    </link>
 
-        <link name="plato_f1_prox">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_visual.stl"/>
-            </geometry>
-            <material name="prox_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.0020817714488827496026 3.9659156972864230043e-10 -0.015795112278833203096" rpy="0 0 0"/>
-            <mass value="0.069114549940711839104" />
-            <inertia ixx="5.8883565545031638029e-06" ixy="-9.2074790702963013961e-09"  ixz="-1.1640174651110935915e-06" iyy="9.6829622072775541655e-06" iyz="-9.4322537406537712947e-14" izz="9.2871592762525393485e-06" />
-            </inertial>
-        </link>
+    <link name="plato_f1_mid">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_visual.stl"/>
+    </geometry>
+    <material name="mid_material">
+    <color rgba="0.64840281537925459343 0.65618066718706036244 0.66395851899486624248 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.020839063326584396363 -0.00066661768468523384737 -0.0023008505382949191731" rpy="0 0 0"/>
+    <mass value="0.0080671501064400220893" />
+    <inertia ixx="2.1185571765448744966e-07" ixy="3.642624395971806748e-08"  ixz="-1.3233834119174677071e-10" iyy="1.2852102149793159759e-06" iyz="-3.1084190127864512246e-11" izz="1.3237276294092874689e-06" />
+    </inertial>
+    </link>
 
-        <link name="plato_f1_mid">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_visual.stl"/>
-            </geometry>
-            <material name="mid_material">
-            <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.02083906332658447616 -0.00066661768468519438241 -0.0023008505382949022595" rpy="0 0 0"/>
-            <mass value="0.0080671501064400220893" />
-            <inertia ixx="2.1185571765449022898e-07" ixy="3.6426243959716221213e-08"  ixz="-1.3233834119316724662e-10" iyy="1.2852102149793263521e-06" iyz="-3.1084190127067859768e-11" izz="1.3237276294092989039e-06" />
-            </inertial>
-        </link>
+    <joint name="plato_f1_pip_pitch" type="revolute">
+    <origin xyz="0.04799999999999918221 -9.0205620750793968909e-17 -0.0027000000000017426727" rpy="1.4510048615606310042e-14 5.8508294492153127183e-14 2.0389673619751796744e-14" />
+    <parent link="plato_f1_prox" />
+    <child link="plato_f1_mid" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+    <joint_properties friction="0.0"/>
+    </joint>
 
-        <link name="plato_f1_ee_frame">
-        </link>
-        
+    <joint name="plato_f1_mcp_pitch" type="revolute">
+    <origin xyz="-0.0050000000000000009714 -0.028150000000000004879 -0.0098999999999999921396" rpy="-4.3545121968198811335e-28 -1.5707963267948379382 0" />
+    <parent link="plato_f1_proxbracket" />
+    <child link="plato_f1_prox" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="0.52359877559829881566"/>
+    <joint_properties friction="0.0"/>
+    </joint>
 
-        <joint name="plato_f1_pip_pitch" type="revolute">
-            <origin xyz="0.048000000000000028755 6.9388939039072283776e-18 -0.0026999999999999871325" rpy="6.6672023420374162248e-16 1.5291665303066472343e-16 3.3306690741059185714e-16" />
-            <parent link="plato_f1_prox" />
-            <child link="plato_f1_mid" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-2.0944" upper="2.0944"/>
-            <joint_properties friction="0.0"/>
-        </joint>
+    <joint name="plato_f1_mcp_roll" type="revolute">
+    <origin xyz="0.084000000000000282774 0.029000000000000022288 -0.031000000000000020595" rpy="1.5707963267948970021 -4.0301095793892904738e-14 1.57079632679489678" />
+    <parent link="plato_palm" />
+    <child link="plato_f1_proxbracket" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-0.52359877559829881566" upper="1.0471975511965976313"/>
+    <joint_properties friction="0.0"/>
+    </joint>
 
-        <joint name="plato_f1_mcp_pitch" type="revolute">
-            <origin xyz="-0.0049999999999999697464 -0.028150000000000133249 -0.0098999999999999366285" rpy="-2.8657554781383847745e-16 -1.5707963267948961139 0" />
-            <parent link="plato_f1_proxbracket" />
-            <child link="plato_f1_prox" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-2.0943951023931952626" upper="0.52359877559829881566"/>
-            <joint_properties friction="0.0"/>
-        </joint>
+    <link name="plato_f2_proxbracket">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_visual.stl"/>
+    </geometry>
+    <material name="proxbracket_2_material">
+    <color rgba="0.29588156155479988785 0.31447294875599390851 0.33306433595718792917 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="-0.0079504685553140105186 0.013983661603934131532 -0.010286902688940289044" rpy="0 0 0"/>
+    <mass value="0.12656081824380860379" />
+    <inertia ixx="3.5117165939882111149e-05" ixy="1.3052140141476246569e-05"  ixz="-1.9957519826321841555e-07" iyy="1.7537495218030470771e-05" iyz="-4.9180486622837211896e-07" izz="4.2451494821237570506e-05" />
+    </inertial>
+    </link>
 
-        <joint name="plato_f1_mcp_roll" type="revolute">
-            <origin xyz="0.084500000000000047296 0.029999999999999988481 -0.033000000000000008493" rpy="1.5707963267948958919 -2.5535129566378612263e-15 1.5707963267948938935" />
-            <parent link="plato_palm" />
-            <child link="plato_f1_proxbracket" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-0.52359877559829881566" upper="1.0471975511965976313"/>
-            <joint_properties friction="0.0"/>
-        </joint>
+    <link name="plato_f2_prox">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_visual.stl"/>
+    </geometry>
+    <material name="prox_2_material">
+    <color rgba="0.34704230174571787382 0.36406434108829477392 0.38108638043087167402 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.0020817714488827417964 3.9659157291736121308e-10 -0.015795112278833307179" rpy="0 0 0"/>
+    <mass value="0.069114549940711839104" />
+    <inertia ixx="5.8883565545029122341e-06" ixy="-9.2074790702581021954e-09"  ixz="-1.1640174651111492839e-06" iyy="9.6829622072771933295e-06" iyz="-9.4322568667141826467e-14" izz="9.2871592762523411428e-06" />
+    </inertial>
+    </link>
 
-        <joint name="plato_f1_ee_joint" type="fixed">
-            <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="plato_f1_mid"/>
-            <child link="plato_f1_ee_frame"/>
-        </joint>
+    <link name="plato_f2_mid">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_visual.stl"/>
+    </geometry>
+    <material name="mid_2_material">
+    <color rgba="0.64840281537925459343 0.65618066718706036244 0.66395851899486624248 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.020839063326584444935 0.00066661768468522322219 -0.0020991494617050806583" rpy="0 0 0"/>
+    <mass value="0.0080671501064400220893" />
+    <inertia ixx="2.1185571765449258479e-07" ixy="-3.6426243959719185828e-08"  ixz="1.3233834119170331788e-10" iyy="1.285210214979324658e-06" iyz="-3.1084190128049283715e-11" izz="1.3237276294093054684e-06" />
+    </inertial>
+    </link>
+
+    <joint name="plato_f2_pip_pitch" type="revolute">
+    <origin xyz="0.047999999999999015676 -1.2466969730867694111e-16 -0.0029000000000008532841" rpy="-4.0671354566700709832e-16 2.6865084231293684478e-14 -1.4048086893915747396e-14" />
+    <parent link="plato_f2_prox" />
+    <child link="plato_f2_mid" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+    <joint_properties friction="0.0"/>
+    </joint>
+
+    <joint name="plato_f2_mcp_pitch" type="revolute">
+    <origin xyz="-0.0049999999999999766853 0.028150000000000091616 -0.0098999999999997492783" rpy="-1.5707963267949098807 1.0921682003593975385e-14 1.5707963267949234254" />
+    <parent link="plato_f2_proxbracket" />
+    <child link="plato_f2_prox" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+    <joint_properties friction="0.0"/>
+    </joint>
+
+    <joint name="plato_f2_mcp_yaw" type="revolute">
+    <origin xyz="0.083000000000000281886 0.029000000000000029227 -0.01000000000000002276" rpy="-3.141592653589793116 1.0230539864584981437e-29 1.570796326794896558" />
+    <parent link="plato_palm" />
+    <child link="plato_f2_proxbracket" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-0.26179938779914940783" upper="0.26179938779914940783"/>
+    <joint_properties friction="0.0"/>
+    </joint>
+
+    <link name="plato_f3_proxbracket">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_visual.stl"/>
+    </geometry>
+    <material name="proxbracket_3_material">
+    <color rgba="0.29588156155479988785 0.31447294875599390851 0.33306433595718792917 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="-0.0079504685553140747034 0.013983661603934166226 -0.010286902688940469455" rpy="0 0 0"/>
+    <mass value="0.12656081824380860379" />
+    <inertia ixx="3.5117165939882565159e-05" ixy="1.3052140141476470186e-05"  ixz="-1.9957519826336886978e-07" iyy="1.7537495218030592744e-05" iyz="-4.9180486622808359836e-07" izz="4.2451494821237563729e-05" />
+    </inertial>
+    </link>
+
+    <link name="plato_f3_prox">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_visual.stl"/>
+    </geometry>
+    <material name="prox_3_material">
+    <color rgba="0.34704230174571787382 0.36406434108829477392 0.38108638043087167402 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/prox_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.0020817714488827825624 3.9659157688662775917e-10 -0.015795112278832960234" rpy="0 0 0"/>
+    <mass value="0.069114549940711839104" />
+    <inertia ixx="5.8883565545032417299e-06" ixy="-9.207479070301439842e-09"  ixz="-1.1640174651110984619e-06" iyy="9.6829622072774609919e-06" iyz="-9.4322494822392619432e-14" izz="9.2871592762528764676e-06" />
+    </inertial>
+    </link>
+
+    <link name="plato_f3_mid">
+    <visual>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_visual.stl"/>
+    </geometry>
+    <material name="mid_3_material">
+    <color rgba="0.64840281537925470445 0.65618066718706047347 0.6639585189948663535 1.0"/>
+    </material>
+    </visual>
+    <collision>
+    <origin xyz="0 0 0" rpy="0 -0 0" />
+    <geometry>
+    <mesh filename="file://$(find plato_description)/meshes/plato/mid_collision.stl"/>
+    </geometry>
+    </collision>
+    <inertial>
+    <origin xyz="0.020839063326584389424 0.00066661768468522213799 -0.0022991494617050777134" rpy="0 0 0"/>
+    <mass value="0.0080671501064400203546" />
+    <inertia ixx="2.1185571765448813787e-07" ixy="-3.6426243959717974836e-08"  ixz="1.323383411917876903e-10" iyy="1.2852102149793155524e-06" iyz="-3.1084190127996770671e-11" izz="1.3237276294092878925e-06" />
+    </inertial>
+    </link>
+
+    <joint name="plato_f3_pip_pitch" type="revolute">
+    <origin xyz="0.0480000000000005006 -3.0154372922253092071e-17 -0.0027000000000001606049" rpy="1.0555934094656443565e-14 1.1663634173758079516e-14 -9.1420758338107152744e-15" />
+    <parent link="plato_f3_prox" />
+    <child link="plato_f3_mid" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-2.0943951023931952626" upper="2.0943951023931952626"/>
+    <joint_properties friction="0.0"/>
+    </joint>
+
+    <joint name="plato_f3_mcp_pitch" type="revolute">
+    <origin xyz="-0.0049999999999998240297 0.028150000000000161005 -0.0099000000000001205092" rpy="-1.5707963267949085484 6.1550351739900040327e-15 1.5707963267948936714" />
+    <parent link="plato_f3_proxbracket" />
+    <child link="plato_f3_prox" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-1.570796326794896558" upper="1.570796326794896558"/>
+    <joint_properties friction="0.0"/>
+    </joint>
+
+    <joint name="plato_f3_mcp_yaw" type="revolute">
+    <origin xyz="0.083000000000000268008 -0.029000000000000109024 -0.01000000000000002276" rpy="3.1415926535897891192 -1.7461186382788093093e-14 1.5707963267949038855" />
+    <parent link="plato_palm" />
+    <child link="plato_f3_proxbracket" />
+    <axis xyz="0 0 1"/>
+    <limit effort="1" velocity="20" lower="-0.26179938779914940783" upper="0.26179938779914940783"/>
+    <joint_properties friction="0.0"/>
+    </joint>
 
 
-
-    <!-- Finger 2 (Index) -->
-
-        <link name="plato_f2_proxbracket">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_2_visual.stl"/>
-            </geometry>
-            <material name="proxbracket_2_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_2_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="-0.0079504685553134692849 -0.01398366160393426337 -0.0095130973110598305437" rpy="0 0 0"/>
-            <mass value="0.12656081824380860379" />
-            <inertia ixx="3.5117165939882477067e-05" ixy="-1.305214014147555539e-05"  ixz="1.9957519826318953702e-07" iyy="1.7537495218029413674e-05" iyz="-4.9180486622862919346e-07" izz="4.2451494821237075838e-05" />
-            </inertial>
-        </link>
-
-        <link name="plato_f2_prox">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_2_visual.stl"/>
-            </geometry>
-            <material name="prox_2_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_2_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.0020817714488827318217 -3.9659157728695655077e-10 0.013295112278833310163" rpy="0 0 0"/>
-            <mass value="0.069114549940711839104" />
-            <inertia ixx="5.8883565545030553827e-06" ixy="9.2074790702970640566e-09"  ixz="1.164017465111112438e-06" iyy="9.6829622072775270604e-06" iyz="-9.4322531718453391682e-14" izz="9.2871592762523818003e-06" />
-            </inertial>
-        </link>
-
-        <link name="plato_f2_mid">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_2_visual.stl"/>
-            </geometry>
-            <material name="mid_2_material">
-            <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_2_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.020839063326584340852 0.00066661768468522192115 -0.0022991494617051059027" rpy="0 0 0"/>
-            <mass value="0.0080671501064400220893" />
-            <inertia ixx="2.1185571765448480268e-07" ixy="-3.6426243959717557937e-08"  ixz="1.3233834119313656339e-10" iyy="1.2852102149793043292e-06" iyz="-3.1084190128060967641e-11" izz="1.3237276294092734929e-06" />
-            </inertial>
-        </link>
-
-        <link name="plato_f2_ee_frame">
-        </link>
-
-        <joint name="plato_f2_pip_pitch" type="revolute">
-            <origin xyz="0.047999999999999792832 0 0.0047999999999999813649" rpy="8.673617379890070258e-17 5.7824115865889863811e-17 -1.5021026917775434348e-15" />
-            <parent link="plato_f2_prox" />
-            <child link="plato_f2_mid" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-2.0944" upper="2.0944"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f2_mcp_pitch" type="revolute">
-            <origin xyz="-0.0024999999999990307753 -0.028150000000000355294 -0.0099000000000003564316" rpy="-1.570796326794896558 6.9017807609091964755e-16 -1.5707963267948907848" />
-            <parent link="plato_f2_proxbracket" />
-            <child link="plato_f2_prox" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-1.570796326794896558" upper="0.785398163397448279"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f2_mcp_yaw" type="revolute">
-            <origin xyz="0.1000000000000001027 0.029999999999999974604 -0.015000000000000013323" rpy="3.141592653589793116 -1.1714553645825245089e-15 -1.5707963267948998887" />
-            <parent link="plato_palm" />
-            <child link="plato_f2_proxbracket" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-1.570796326794896558" upper="0.26179938779914940783"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f2_ee_joint" type="fixed">
-            <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="plato_f2_mid"/>
-            <child link="plato_f2_ee_frame"/>
-        </joint>
-
-
-    <!-- Finger 3: Middle -->
-
-        <link name="plato_f3_proxbracket">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_3_visual.stl"/>
-            </geometry>
-            <material name="proxbracket_3_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/proxbracket_3_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="-0.0079504685553140486826 -0.013983661603934124593 -0.0095130973110597195214" rpy="0 0 0"/>
-            <mass value="0.12656081824380860379" />
-            <inertia ixx="3.5117165939882016281e-05" ixy="-1.3052140141476346519e-05"  ixz="1.9957519826327045514e-07" iyy="1.7537495218030480935e-05" iyz="-4.9180486622843035248e-07" izz="4.2451494821237509519e-05" />
-            </inertial>
-        </link>
-
-        <link name="plato_f3_prox">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_3_visual.stl"/>
-            </geometry>
-            <material name="prox_3_material">
-            <color rgba="0.9000000000000000222 0.9000000000000000222 0.9000000000000000222 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/prox_3_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.0020817714488827331228 -3.9659157098710811182e-10 0.013295112278833216488" rpy="0 0 0"/>
-            <mass value="0.069114549940711839104" />
-            <inertia ixx="5.8883565545029046108e-06" ixy="9.2074790703146002856e-09"  ixz="1.1640174651110802507e-06" iyy="9.6829622072771458956e-06" iyz="-9.4322525854387518435e-14" izz="9.2871592762523953529e-06" />
-            </inertial>
-        </link>
-
-        <link name="plato_f3_mid">
-            <visual>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_3_visual.stl"/>
-            </geometry>
-            <material name="mid_3_material">
-            <color rgba="0.89999999999999991118 0.89999999999999991118 0.89999999999999991118 1.0"/>
-            </material>
-            </visual>
-            <collision>
-            <origin xyz="0 0 0" rpy="0 -0 0" />
-            <geometry>
-            <mesh filename="file://$(find plato_description)/meshes/plato/mid_3_collision.stl"/>
-            </geometry>
-            </collision>
-            <inertial>
-            <origin xyz="0.020839063326584514324 0.00066661768468518982876 -0.0022991494617050798818" rpy="0 0 0"/>
-            <mass value="0.0080671501064400220893" />
-            <inertia ixx="2.1185571765449242598e-07" ixy="-3.6426243959717088098e-08"  ixz="1.3233834119147816966e-10" iyy="1.2852102149793367282e-06" iyz="-3.1084190127996925767e-11" izz="1.3237276294093048331e-06" />
-            </inertial>
-        </link>
-
-        <link name="plato_f3_ee_frame">
-        </link>
-
-        <joint name="plato_f3_pip_pitch" type="revolute">
-            <origin xyz="0.047999999999998654854 2.0122792321330962295e-16 0.0047999999999999917732" rpy="-1.9081958235950694314e-16 5.7824115816011125546e-17 1.7763568393717672612e-15" />
-            <parent link="plato_f3_prox" />
-            <child link="plato_f3_mid" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-2.0944" upper="2.0944"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f3_mcp_pitch" type="revolute">
-            <origin xyz="-0.002500000000000099365 -0.028150000000000077738 -0.0099000000000001291828" rpy="-1.570796326794896558 -3.7816971775725042188e-15 -1.5707963267948943376" />
-            <parent link="plato_f3_proxbracket" />
-            <child link="plato_f3_prox" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-1.570796326794896558" upper="0.785398163397448279"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f3_mcp_yaw" type="revolute">
-            <origin xyz="0.10000000000000000555 -0.029999999999999964195 -0.015000000000000048017" rpy="-3.1415926535897926719 1.1057720720235713428e-16 -1.5707963267948983344" />
-            <parent link="plato_palm" />
-            <child link="plato_f3_proxbracket" />
-            <axis xyz="0 0 1"/>
-            <limit effort="0.04" velocity="5" lower="-0.26179938779914940783" upper="0.785398163397448279"/>
-            <joint_properties friction="0.0"/>
-        </joint>
-
-        <joint name="plato_f3_ee_joint" type="fixed">
-            <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-            <parent link="plato_f3_mid"/>
-            <child link="plato_f3_ee_frame"/>
-        </joint>
+</robot>
 
 
 

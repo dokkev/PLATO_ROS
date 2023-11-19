@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="plato">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
-    <xacro:arg name="hardware_type" default="gazebo" /> <!-- gazebo | mock -->
+    <xacro:arg name="hardware_type" default="mock" /> <!-- gazebo | mock -->
 
     <!-- Import plato urdf file -->
-    <xacro:include filename="$(find plato_description)/urdf/plato_manipulator.urdf" />
+    <xacro:include filename="$(find plato_description)/urdf/plato_manipulator.urdf.xacro" />
 
     <!-- Import control_xacro -->
     <xacro:include filename="plato.ros2_control.xacro" />
@@ -12,12 +12,6 @@
 
     <xacro:plato_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)" hardware_type="$(arg hardware_type)"/>
 
-    <!-- put world -->
-    <link name="world"/>
-    <joint name="world_joint" type="fixed">
-        <parent link="world"/>
-        <child link="optimo_base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-    </joint>
+
     
 </robot>

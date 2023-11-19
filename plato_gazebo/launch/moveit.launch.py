@@ -12,7 +12,7 @@ def generate_launch_description():
 
     ###### Include #####
     plato_manipulator_gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_gazebo'), 'launch'), '/plato_manipulator.launch.py']), 
+        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('plato_gazebo'), 'launch'), '/plato_manipulator_gazebo.launch.py']), 
     )
 
     move_group = IncludeLaunchDescription(

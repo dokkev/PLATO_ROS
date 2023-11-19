@@ -104,7 +104,7 @@
         </inertial>
     </link>
 
-    <link name="plato_f1_ee"/>
+    <link name="plato_f1_ee_frame"/>
 
     <joint name="plato_f1_mcp_roll" type="revolute">
         <origin xyz="0.084000000000000282774 0.029000000000000022288 -0.031000000000000020595" rpy="1.5707963267948970021 -4.0301095793892904738e-14 1.57079632679489678" />

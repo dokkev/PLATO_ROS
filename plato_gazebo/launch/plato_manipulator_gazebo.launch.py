@@ -20,14 +20,18 @@ def generate_launch_description():
 
     ##### Parameters #####
     pkg_path = os.path.join(get_package_share_directory('plato_gazebo'))
-    if 'GAZEBO_MODEL_PATH' in os.environ:
-        model_path = os.environ['GAZEBO_MODEL_PATH'] + ':' + 'models'+ pkg_path
-    else:
-        model_path = 'models'+ pkg_path
+    models_path = os.path.join(get_package_share_directory('plato_gazebo'), 'models')
     world_path = os.path.join(pkg_path, 'worlds', 'plato.world')
     plato_xacro = os.path.join(get_package_share_directory('plato_moveit_config'), 'config', 'plato.urdf.xacro')
     robot_description_content = xacro.process_file(plato_xacro, mappings={"hardware_type": "gazebo"}).toxml()
 
+    ##### Gazebo Path #####
+    if 'GAZEBO_MODEL_PATH' in os.environ:
+        model_path = os.environ['GAZEBO_MODEL_PATH'] + ':' + models_path
+    else:
+        model_path = models_path
+
+   
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
                              arguments=['-topic', 'robot_description',
@@ -69,10 +73,7 @@ def generate_launch_description():
     )
 
     
-
-
     ###### Include #####
-
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
         launch_arguments={'world': world_path}.items()

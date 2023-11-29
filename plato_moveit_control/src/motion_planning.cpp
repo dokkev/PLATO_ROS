@@ -41,13 +41,10 @@ int main(int argc, char * argv[]){
     // Get current pose of plato_base_link (EE of Optimo)
     geometry_msgs::msg::PoseStamped current_pose = move_group_interface.getCurrentPose("plato_base_link");
 
-    // geometry_msgs::msg::Pose current_pose =
-    // move_group_interface.getCurrentPose("plato_base_link");
-
     // Print the current pose of the end effector
-    // RCLCPP_INFO(logger, " Current Pose: Point [ %f %f %f ]  Quaternion [ %f %f %f %f ]", 
-    // current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z,
-    // current_pose.pose.orientation.x, current_pose.pose.orientation.y, current_pose.pose.orientation.z,current_pose.pose.orientation.w );
+    RCLCPP_INFO(logger, " Current Pose: Point [ %f %f %f ]  Quaternion [ %f %f %f %f ]", 
+    current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z,
+    current_pose.pose.orientation.x, current_pose.pose.orientation.y, current_pose.pose.orientation.z,current_pose.pose.orientation.w );
 
     
     // Option 1: Set a target pose for the end effector

@@ -63,7 +63,6 @@ int main(int argc, char** argv){
   executor.add_node(move_group_node);
   executor.spin();
 
-
   rclcpp::shutdown();
   return 0;
 }

@@ -5,31 +5,71 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_srvs REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(tf2 REQUIRED)
 find_package(moveit_common REQUIRED)
-find_package(moveit_ros_planning_interface REQUIRED)
-find_package(moveit_core REQUIRED)
-find_package(moveit_ros_planning REQUIRED)
+moveit_package()
 
+# find dependencies
+set(THIS_PACKAGE_INCLUDE_DEPENDS
+  ament_cmake
+  Boost
+  control_msgs
+  Eigen3
+  interactive_markers
+  moveit_core
+  moveit_msgs
+  moveit_ros_planning
+  moveit_ros_planning_interface
+  moveit_servo
+  moveit_task_constructor_core
+  moveit_visual_tools
+  pluginlib
+  rclcpp
+  rclcpp_action
+  rviz_visual_tools
+  tf2_geometry_msgs
+  tf2_geometry_msgs
+  tf2_ros
+)
+
+foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
+  find_package(${Dependency} REQUIRED)
+endforeach()
+
+include_directories(${THIS_PACKAGE_INCLUDE_DIRS})
 
 add_executable(moveit_control src/moveit_control.cpp)
+add_executable(state_and_model src/state_and_model.cpp)
+add_executable(motion_planning src/motion_planning.cpp)
 
 
+target_include_directories(state_and_model
+    PUBLIC include)
+target_include_directories(motion_planning
+    PUBLIC include)
 
 ament_target_dependencies(moveit_control rclcpp std_msgs moveit_ros_planning_interface moveit_core moveit_ros_planning)
 install(TARGETS moveit_control DESTINATION lib/${PROJECT_NAME})
+ament_target_dependencies(state_and_model
+    ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
+ament_target_dependencies(motion_planning
+    ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
+
+
+
+install(TARGETS state_and_model 
+    DESTINATION lib/${PROJECT_NAME}
+)
+install(TARGETS motion_planning
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
 )
+
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -42,6 +82,12 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_dependencies(
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+ament_export_include_directories(include)
 
 
 ament_package()

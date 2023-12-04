@@ -4,23 +4,9 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
-    - optimo_arm_controller
     - plato_hand_controller
+    - optimo_arm_controller
 
-  plato_arm_controller:
-    type: FollowJointTrajectory
-    action_ns: follow_joint_trajectory
-    default: true
-    joints:
-      - optimo_joint1
-      - optimo_joint2
-      - optimo_joint3
-      - optimo_joint4
-      - optimo_joint5
-      - optimo_joint6
-      - optimo_joint7
-    action_ns: follow_joint_trajectory
-    default: true
   plato_hand_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
@@ -37,3 +23,15 @@ moveit_simple_controller_manager:
       - plato_f3_pip_pitch
     action_ns: follow_joint_trajectory
     default: true
+  optimo_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - optimo_joint1
+      - optimo_joint2
+      - optimo_joint3
+      - optimo_joint4
+      - optimo_joint5
+      - optimo_joint6
+      - optimo_joint7

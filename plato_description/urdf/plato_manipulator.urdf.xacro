@@ -9,7 +9,7 @@
     <joint name="hand_arm_joint" type="fixed">
         <parent link="optimo_link7_passive"/>
         <child link="plato_base_link"/>
-        <origin xyz="0 0.16 0" rpy="1.5707 0 1.5707"/>
+        <origin xyz="0 0.15 0" rpy="1.5707 0 1.5707"/>
     </joint>
 
     <!-- Set World Frame for Gazebo -->

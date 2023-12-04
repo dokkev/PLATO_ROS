@@ -20,6 +20,14 @@
                         <size>0.025 0.075 0.015</size>
                     </box>
                 </geometry>
+                <surface>
+                    <friction>
+                        <ode>
+                            <mu>99999.0</mu> <!-- Coefficient of friction -->
+                            <mu2>99999.0</mu2> <!-- Coefficient of friction in the second direction -->
+                        </ode>
+                    </friction>
+                </surface>
             </collision>
             <visual name="visual">
                 <geometry>

@@ -284,203 +284,11 @@
       </link>
       <pose>1.67213 -0.018211 0 0 -0 0</pose>
     </model>
-    <model name='wood_block_10_2_1cm'>
-      <link name='link'>
-        <pose>0 0 0.005 0 -0 0</pose>
-        <inertial>
-          <mass>0.0125</mass>
-          <inertia>
-            <ixx>7.55208e-07</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>1.05208e-05</iyy>
-            <iyz>0</iyz>
-            <izz>1.10677e-05</izz>
-          </inertia>
-          <pose>0 0 0 0 -0 0</pose>
-        </inertial>
-        <collision name='collision'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <surface>
-            <contact>
-              <poissons_ratio>0.347</poissons_ratio>
-              <elastic_modulus>8.8e+09</elastic_modulus>
-              <ode>
-                <kp>100000</kp>
-                <kd>1</kd>
-                <max_vel>1</max_vel>
-                <min_depth>0.001</min_depth>
-              </ode>
-            </contact>
-            <friction>
-              <torsional>
-                <coefficient>1</coefficient>
-                <use_patch_radius>0</use_patch_radius>
-                <surface_radius>0.05</surface_radius>
-                <ode/>
-              </torsional>
-              <ode/>
-            </friction>
-            <bounce/>
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name='visual'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-      <pose>0.987268 -0.339696 0 0 -0 0</pose>
-    </model>
-    <model name='wood_block_10_2_1cm_0'>
-      <link name='link'>
-        <pose>0 0 0.005 0 -0 0</pose>
-        <inertial>
-          <mass>0.0125</mass>
-          <inertia>
-            <ixx>7.55208e-07</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>1.05208e-05</iyy>
-            <iyz>0</iyz>
-            <izz>1.10677e-05</izz>
-          </inertia>
-          <pose>0 0 0 0 -0 0</pose>
-        </inertial>
-        <collision name='collision'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <surface>
-            <contact>
-              <poissons_ratio>0.347</poissons_ratio>
-              <elastic_modulus>8.8e+09</elastic_modulus>
-              <ode>
-                <kp>100000</kp>
-                <kd>1</kd>
-                <max_vel>1</max_vel>
-                <min_depth>0.001</min_depth>
-              </ode>
-            </contact>
-            <friction>
-              <torsional>
-                <coefficient>1</coefficient>
-                <use_patch_radius>0</use_patch_radius>
-                <surface_radius>0.05</surface_radius>
-                <ode/>
-              </torsional>
-              <ode/>
-            </friction>
-            <bounce/>
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name='visual'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-      <pose>0.98661 -0.314789 0 0 -0 0</pose>
-    </model>
-    <model name='wood_block_10_2_1cm_1'>
-      <link name='link'>
-        <pose>0 0 0.005 0 -0 0</pose>
-        <inertial>
-          <mass>0.0125</mass>
-          <inertia>
-            <ixx>7.55208e-07</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>1.05208e-05</iyy>
-            <iyz>0</iyz>
-            <izz>1.10677e-05</izz>
-          </inertia>
-          <pose>0 0 0 0 -0 0</pose>
-        </inertial>
-        <collision name='collision'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <surface>
-            <contact>
-              <poissons_ratio>0.347</poissons_ratio>
-              <elastic_modulus>8.8e+09</elastic_modulus>
-              <ode>
-                <kp>100000</kp>
-                <kd>1</kd>
-                <max_vel>1</max_vel>
-                <min_depth>0.001</min_depth>
-              </ode>
-            </contact>
-            <friction>
-              <torsional>
-                <coefficient>1</coefficient>
-                <use_patch_radius>0</use_patch_radius>
-                <surface_radius>0.05</surface_radius>
-                <ode/>
-              </torsional>
-              <ode/>
-            </friction>
-            <bounce/>
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name='visual'>
-          <geometry>
-            <box>
-              <size>0.1 0.025 0.01</size>
-            </box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-      <pose>0.988163 -0.288583 0 0 -0 0</pose>
-    </model>
     <state world_name='default'>
-      <sim_time>1040 483000000</sim_time>
-      <real_time>1042 715974687</real_time>
-      <wall_time>1700253457 976161246</wall_time>
-      <iterations>1040483</iterations>
+      <sim_time>4028 479000000</sim_time>
+      <real_time>2992 341276856</real_time>
+      <wall_time>1701388043 882944684</wall_time>
+      <iterations>2987996</iterations>
       <model name='ground_plane'>
         <pose>0 0 0 0 -0 0</pose>
         <scale>1 1 1</scale>
@@ -491,43 +299,103 @@
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
-      <model name='table'>
-        <pose>0.78269 0.042911 -0.729187 0 -0 1.54981</pose>
+      <model name='jenga_block'>
+        <pose>0.744637 -0.011076 0.288346 0 6e-06 -0.122605</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>0.78269 0.042911 -0.729187 0 -0 1.54981</pose>
+          <pose>0.744637 -0.011076 0.288346 0 6e-06 -0.122605</pose>
+          <velocity>-0.000937 -0.000556 0.005232 0.074107 -0.124972 6e-06</velocity>
+          <acceleration>-0.987386 -1.5513 10.3074 -0.008623 -0.214925 1.34514</acceleration>
+          <wrench>-0.098739 -0.15513 1.03074 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_0'>
+        <pose>0.718563 -0.006373 0.288346 0 -0 -0.132505</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.718563 -0.006373 0.288346 0 -0 -0.132505</pose>
+          <velocity>0.000344 -0.000242 0.004819 0.032259 0.045813 -1e-06</velocity>
+          <acceleration>3.46343 -1.50064 11.2331 1.79018 1.40113 -1.84786</acceleration>
+          <wrench>0.346343 -0.150064 1.12331 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_1'>
+        <pose>0.717913 -0.005249 0.318347 0.000103 -0 -0.156886</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.717913 -0.005249 0.318347 0.000103 -0 -0.156886</pose>
+          <velocity>0.002828 0.000926 0.005406 -0.066971 0.059174 0.006848</velocity>
+          <acceleration>3.61766 0.176073 6.21854 1.58514 -0.910432 -3.13222</acceleration>
+          <wrench>0.361766 0.017607 0.621854 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_2'>
+        <pose>0.69397 -0.001546 0.288346 3.14159 1.4e-05 3.00932</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.69397 -0.001546 0.288346 3.14159 1.4e-05 3.00932</pose>
+          <velocity>0.001889 -0.000269 0.003322 0.03531 0.255028 -0.00059</velocity>
+          <acceleration>3.56805 -0.50863 6.19978 -0.310888 -1.48199 -1.78733</acceleration>
+          <wrench>0.356805 -0.050863 0.619978 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_3'>
+        <pose>0.687033 -0.00398 0.318346 0.000348 -0.000178 -0.097093</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.687033 -0.00398 0.318346 0.000348 -0.000178 -0.097093</pose>
+          <velocity>0.001468 -0.000541 0.015129 0.01529 -0.089922 0.022057</velocity>
+          <acceleration>0.465446 4.90088 28.8751 0.49283 1.37642 1.49551</acceleration>
+          <wrench>0.046545 0.490087 2.88751 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_4'>
+        <pose>0.749194 -0.006201 0.31834 -3.14153 -6.3e-05 2.98652</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.749194 -0.006201 0.31834 -3.14153 -6.3e-05 2.98652</pose>
+          <velocity>-0.000797 0.001539 -0.002214 -0.047695 0.108025 -0.008066</velocity>
+          <acceleration>-0.73382 0.246541 -2.54303 0.150526 1.53868 0.737218</acceleration>
+          <wrench>-0.073382 0.024654 -0.254303 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_5'>
+        <pose>0.712137 -0.004769 0.303346 -3.14143 -1.6e-05 -1.72207</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.712137 -0.004769 0.303346 -3.14143 -1.6e-05 -1.72207</pose>
+          <velocity>0.002606 0.000216 0.006352 -0.063194 -0.078782 0.041815</velocity>
+          <acceleration>4.21371 -0.52989 7.81798 1.05615 0.000378 0.9699</acceleration>
+          <wrench>0.421371 -0.052989 0.781798 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_6'>
+        <pose>0.713055 -0.033493 0.303336 -3.14146 -4.2e-05 -1.71329</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.713055 -0.033493 0.303336 -3.14146 -4.2e-05 -1.71329</pose>
+          <velocity>-0.002531 0.000527 -0.007022 -0.047749 0.107786 0.007446</velocity>
+          <acceleration>0.73382 -0.246541 -17.057 1.98659 -1.07436 1.26024</acceleration>
+          <wrench>0.073382 -0.024654 -1.7057 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='jenga_block_7'>
+        <pose>0.721592 0.025526 0.303333 0.000321 0.000118 1.37022</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.721592 0.025526 0.303333 0.000321 0.000118 1.37022</pose>
+          <velocity>-0.00195 0.001025 -0.011172 -0.068699 0.196302 -0.001296</velocity>
+          <acceleration>0 0 -9.8 0.000636 0.000185 0.015213</acceleration>
+          <wrench>0 0 -0.98 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='table'>
+        <pose>0.943376 0.010614 -0.734154 0 -0 1.54981</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.943376 0.010614 -0.734154 0 -0 1.54981</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
-          <wrench>0 0 0 0 -0 0</wrench>
-        </link>
-      </model>
-      <model name='wood_block_10_2_1cm'>
-        <pose>0.74481 0.057768 0.284813 -1e-06 -0 0.006633</pose>
-        <scale>1 1 1</scale>
-        <link name='link'>
-          <pose>0.74481 0.057768 0.289813 -1e-06 -0 0.006633</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>5e-06 -4.5e-05 -2.9e-05 0.008978 0.000981 -1e-06</acceleration>
-          <wrench>0 -1e-06 -0 0 -0 0</wrench>
-        </link>
-      </model>
-      <model name='wood_block_10_2_1cm_0'>
-        <pose>0.745299 0.082705 0.284813 -1e-06 -0 0.006375</pose>
-        <scale>1 1 1</scale>
-        <link name='link'>
-          <pose>0.745299 0.082705 0.289813 -1e-06 -0 0.006375</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>3e-06 1e-05 6e-05 -0.002298 0.000655 -6e-06</acceleration>
-          <wrench>0 0 1e-06 0 -0 0</wrench>
-        </link>
-      </model>
-      <model name='wood_block_10_2_1cm_1'>
-        <pose>0.745491 0.110549 0.284813 0 0 -0.054986</pose>
-        <scale>1 1 1</scale>
-        <link name='link'>
-          <pose>0.745491 0.110549 0.289813 0 0 -0.054986</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>2e-06 1e-06 0 -0.00062 0.000394 -6e-06</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
@@ -537,10 +405,487 @@
     </state>
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>1.63052 0.678862 0.923811 -0 0.447642 -2.66701</pose>
+        <pose>0.508901 -1.6727 1.0711 0 0.449799 1.45137</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
     </gui>
+    <model name='jenga_block'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.40016 -0.662176 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_0'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.35273 -0.669592 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_1'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>0.839339 0.066905 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_2'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>0.912248 0.068826 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_3'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>0.977563 0.071706 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_4'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.04659 0.071243 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_5'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.09955 0.06945 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_6'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.15801 0.072582 0 0 -0 0</pose>
+    </model>
+    <model name='jenga_block_7'>
+      <static>0</static>
+      <link name='link'>
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>0.00026042</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.00010417</iyy>
+            <iyz>0</iyz>
+            <izz>0.00039063</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.025 0.075 0.015</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.76 0.6 0.42 1</ambient>
+            <diffuse>0.76 0.6 0.42 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <pose>1.22101 0.076518 0 0 -0 0</pose>
+    </model>
   </world>
 </sdf>

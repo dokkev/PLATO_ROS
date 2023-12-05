@@ -3,17 +3,32 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-    plato_hand_controller:
+    optimo_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 
-    optimo_arm_controller:
+    plato_hand_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+optimo_arm_controller:
+  ros__parameters:
+    joints:
+      - optimo_joint1
+      - optimo_joint2
+      - optimo_joint3
+      - optimo_joint4
+      - optimo_joint5
+      - optimo_joint6
+      - optimo_joint7
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
 plato_hand_controller:
   ros__parameters:
     joints:
@@ -26,21 +41,6 @@ plato_hand_controller:
       - plato_f3_mcp_yaw
       - plato_f3_mcp_pitch
       - plato_f3_pip_pitch
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-optimo_arm_controller:
-  ros__parameters:
-    joints:
-      - optimo_joint1
-      - optimo_joint2
-      - optimo_joint3
-      - optimo_joint4
-      - optimo_joint5
-      - optimo_joint6
-      - optimo_joint7
     command_interfaces:
       - position
     state_interfaces:

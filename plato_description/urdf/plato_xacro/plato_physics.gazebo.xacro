@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Bumper Sensor -->
+
+
+    <gazebo reference="plato_f1_mid">
+        <mu1>1000</mu1>
+        <mu2>1000</mu2>
+        <kp>1000000.0</kp>
+        <kd>100000.0</kd>
+        <slip1>0</slip1>
+        <slip2>0</slip2>
+        <minDepth>0.00001</minDepth>
+        <maxVel>0</maxVel>
+        <torsional>
+            <ode>
+                <coefficient>9999</coefficient>
+                <slip>0</slip>
+            </ode>
+        </torsional>
+
+        <selfCollide>true</selfCollide>
+
+    </gazebo>
+
+        <gazebo reference="plato_f2_mid">
+        <mu1>1000</mu1>
+        <mu2>1000</mu2>
+        <kp>1000000.0</kp>
+        <kd>100000.0</kd>
+        <slip1>0</slip1>
+        <slip2>0</slip2>
+        <minDepth>0.00001</minDepth>
+        <maxVel>0</maxVel>
+        <torsional>
+            <ode>
+                <coefficient>9999</coefficient>
+                <slip>0</slip>
+            </ode>
+        </torsional>
+         <selfCollide>true</selfCollide>
+
+    </gazebo>
+
+        <gazebo reference="plato_f3_mid">
+        <mu1>1000</mu1>
+        <mu2>1000</mu2>
+        <kp>1000000.0</kp>
+        <kd>100000.0</kd>
+        <slip1>0</slip1>
+        <slip2>0</slip2>
+        <minDepth>0.00001</minDepth>
+        <maxVel>0</maxVel>
+        <torsional>
+            <ode>
+                <coefficient>9999</coefficient>
+                <slip>0</slip>
+            </ode>
+        </torsional>
+         <selfCollide>true</selfCollide>
+
+    </gazebo>
+
+
+
+
+
+</robot>

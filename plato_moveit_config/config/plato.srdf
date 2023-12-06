@@ -28,6 +28,20 @@
         <joint name="hand_arm_joint"/>
         <joint name="plato_base_link_to_palm"/>
     </group>
+    <group name="plato_hand">
+        <joint name="plato_f1_mcp_roll"/>
+        <joint name="plato_f1_mcp_pitch"/>
+        <joint name="plato_f1_pip_pitch"/>
+        <joint name="plato_f1_ee_joint"/>
+        <joint name="plato_f2_mcp_yaw"/>
+        <joint name="plato_f2_mcp_pitch"/>
+        <joint name="plato_f2_pip_pitch"/>
+        <joint name="plato_f2_ee_joint"/>
+        <joint name="plato_f3_mcp_yaw"/>
+        <joint name="plato_f3_mcp_pitch"/>
+        <joint name="plato_f3_pip_pitch"/>
+        <joint name="plato_f3_ee_joint"/>
+    </group>
     <group name="plato_f1">
         <joint name="plato_f1_mcp_roll"/>
         <joint name="plato_f1_mcp_pitch"/>
@@ -46,13 +60,37 @@
         <joint name="plato_f3_pip_pitch"/>
         <joint name="plato_f3_ee_joint"/>
     </group>
-    <group name="plato_hand">
-        <group name="plato_f1"/>
-        <group name="plato_f2"/>
-        <group name="plato_f3"/>
-    </group> 
-    <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
-    <virtual_joint name="world_joint" type="fixed" parent_frame="world" child_link="optimo_base_link"/>
+    <group name="plato_manipulator">
+        <group name="optimo_arm"/>
+        <group name="plato_hand"/>
+    </group>
+    <!--GROUPS: Representation of a set of joints and links. This can be useful for specifying DOF to plan for, defining arms, end effectors, etc-->
+    <!--LINKS: When a link is specified, the parent joint of that link (if it exists) is automatically included-->
+    <!--JOINTS: When a joint is specified, the child link of that joint (which will always exist) is automatically included-->
+    <!--CHAINS: When a chain is specified, all the links along the chain (including endpoints) are included in the group. Additionally, all the joints that are parents to included links are also included. This means that joints along the chain and the parent joint of the base link are included in the group-->
+    <!--SUBGROUPS: Groups can also be formed by referencing to already defined group names-->
+    <group_state name="pinch_close" group="plato_hand">
+        <joint name="plato_f1_mcp_pitch" value="-0.2748"/>
+        <joint name="plato_f1_mcp_roll" value="0"/>
+        <joint name="plato_f1_pip_pitch" value="0.349"/>
+        <joint name="plato_f2_mcp_pitch" value="-0.2169"/>
+        <joint name="plato_f2_mcp_yaw" value="0"/>
+        <joint name="plato_f2_pip_pitch" value="-1.1995"/>
+        <joint name="plato_f3_mcp_pitch" value="-0.8418"/>
+        <joint name="plato_f3_mcp_yaw" value="0"/>
+        <joint name="plato_f3_pip_pitch" value="-1.5707"/>
+    </group_state>
+    <group_state name="pinch_open" group="plato_hand">
+        <joint name="plato_f1_mcp_pitch" value="-0.2748"/>
+        <joint name="plato_f1_mcp_roll" value="0"/>
+        <joint name="plato_f1_pip_pitch" value="0.349"/>
+        <joint name="plato_f2_mcp_pitch" value="0.6856"/>
+        <joint name="plato_f2_mcp_yaw" value="0"/>
+        <joint name="plato_f2_pip_pitch" value="-1.5707"/>
+        <joint name="plato_f3_mcp_pitch" value="-0.8418"/>
+        <joint name="plato_f3_mcp_yaw" value="0"/>
+        <joint name="plato_f3_pip_pitch" value="-1.5707"/>
+    </group_state>
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="optimo_link0" link2="optimo_link1_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link0" link2="optimo_link2_passive" reason="Never"/>
@@ -69,6 +107,8 @@
     <disable_collisions link1="optimo_link3_passive" link2="optimo_link5_passive" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="optimo_link6_passive" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="optimo_link7_passive" reason="Never"/>
+    <disable_collisions link1="optimo_link3_passive" link2="palm_base" reason="Never"/>
+    <disable_collisions link1="optimo_link3_passive" link2="plato_f1_prox" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="plato_f1_proxbracket" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="plato_f2_mid" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="plato_f2_prox" reason="Never"/>
@@ -76,10 +116,10 @@
     <disable_collisions link1="optimo_link3_passive" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="optimo_link3_passive" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="optimo_link3_passive" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="optimo_link5_passive" reason="Adjacent"/>
     <disable_collisions link1="optimo_link4_passive" link2="optimo_link6_passive" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="optimo_link7_passive" reason="Never"/>
+    <disable_collisions link1="optimo_link4_passive" link2="palm_base" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="plato_f1_mid" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="plato_f1_prox" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="plato_f1_proxbracket" reason="Never"/>
@@ -89,8 +129,8 @@
     <disable_collisions link1="optimo_link4_passive" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="optimo_link4_passive" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="optimo_link4_passive" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="optimo_link6_passive" reason="Adjacent"/>
+    <disable_collisions link1="optimo_link5_passive" link2="palm_base" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="plato_f1_mid" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="plato_f1_prox" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="plato_f1_proxbracket" reason="Never"/>
@@ -100,8 +140,8 @@
     <disable_collisions link1="optimo_link5_passive" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="optimo_link5_passive" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="optimo_link5_passive" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="optimo_link7_passive" reason="Adjacent"/>
+    <disable_collisions link1="optimo_link6_passive" link2="palm_base" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="plato_f1_mid" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="plato_f1_prox" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="plato_f1_proxbracket" reason="Never"/>
@@ -111,7 +151,7 @@
     <disable_collisions link1="optimo_link6_passive" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="optimo_link6_passive" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="optimo_link6_passive" link2="plato_palm" reason="Never"/>
+    <disable_collisions link1="optimo_link7_passive" link2="palm_base" reason="Adjacent"/>
     <disable_collisions link1="optimo_link7_passive" link2="plato_f1_mid" reason="Never"/>
     <disable_collisions link1="optimo_link7_passive" link2="plato_f1_prox" reason="Never"/>
     <disable_collisions link1="optimo_link7_passive" link2="plato_f1_proxbracket" reason="Never"/>
@@ -121,39 +161,38 @@
     <disable_collisions link1="optimo_link7_passive" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="optimo_link7_passive" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="optimo_link7_passive" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="optimo_link7_passive" link2="plato_palm" reason="Adjacent"/>
+    <disable_collisions link1="palm_base" link2="plato_f1_prox" reason="Never"/>
+    <disable_collisions link1="palm_base" link2="plato_f1_proxbracket" reason="Adjacent"/>
+    <disable_collisions link1="palm_base" link2="plato_f2_mid" reason="Never"/>
+    <disable_collisions link1="palm_base" link2="plato_f2_prox" reason="Never"/>
+    <disable_collisions link1="palm_base" link2="plato_f2_proxbracket" reason="Adjacent"/>
+    <disable_collisions link1="palm_base" link2="plato_f3_mid" reason="Never"/>
+    <disable_collisions link1="palm_base" link2="plato_f3_prox" reason="Never"/>
+    <disable_collisions link1="palm_base" link2="plato_f3_proxbracket" reason="Adjacent"/>
     <disable_collisions link1="plato_f1_mid" link2="plato_f1_prox" reason="Adjacent"/>
-    <disable_collisions link1="plato_f1_mid" link2="plato_f3_mid" reason="Never"/>
-    <disable_collisions link1="plato_f1_mid" link2="plato_f3_prox" reason="Never"/>
+    <disable_collisions link1="plato_f1_mid" link2="plato_f1_proxbracket" reason="Never"/>
+    <disable_collisions link1="plato_f1_mid" link2="plato_f3_proxbracket" reason="Never"/>
     <disable_collisions link1="plato_f1_prox" link2="plato_f1_proxbracket" reason="Adjacent"/>
     <disable_collisions link1="plato_f1_prox" link2="plato_f2_proxbracket" reason="Never"/>
     <disable_collisions link1="plato_f1_prox" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="plato_f1_prox" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="plato_f1_prox" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="plato_f1_prox" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="plato_f1_proxbracket" link2="plato_f2_prox" reason="Never"/>
     <disable_collisions link1="plato_f1_proxbracket" link2="plato_f2_proxbracket" reason="Never"/>
     <disable_collisions link1="plato_f1_proxbracket" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="plato_f1_proxbracket" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="plato_f1_proxbracket" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="plato_f1_proxbracket" link2="plato_palm" reason="Adjacent"/>
     <disable_collisions link1="plato_f2_mid" link2="plato_f2_prox" reason="Adjacent"/>
     <disable_collisions link1="plato_f2_mid" link2="plato_f2_proxbracket" reason="Never"/>
     <disable_collisions link1="plato_f2_mid" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="plato_f2_mid" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="plato_f2_mid" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="plato_f2_prox" link2="plato_f2_proxbracket" reason="Adjacent"/>
     <disable_collisions link1="plato_f2_prox" link2="plato_f3_mid" reason="Never"/>
     <disable_collisions link1="plato_f2_prox" link2="plato_f3_prox" reason="Never"/>
-    <disable_collisions link1="plato_f2_prox" link2="plato_palm" reason="Never"/>
+    <disable_collisions link1="plato_f2_prox" link2="plato_f3_proxbracket" reason="Never"/>
     <disable_collisions link1="plato_f2_proxbracket" link2="plato_f3_mid" reason="Never"/>
-    <disable_collisions link1="plato_f2_proxbracket" link2="plato_f3_prox" reason="Never"/>
     <disable_collisions link1="plato_f2_proxbracket" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="plato_f2_proxbracket" link2="plato_palm" reason="Adjacent"/>
     <disable_collisions link1="plato_f3_mid" link2="plato_f3_prox" reason="Adjacent"/>
     <disable_collisions link1="plato_f3_mid" link2="plato_f3_proxbracket" reason="Never"/>
-    <disable_collisions link1="plato_f3_mid" link2="plato_palm" reason="Never"/>
     <disable_collisions link1="plato_f3_prox" link2="plato_f3_proxbracket" reason="Adjacent"/>
-    <disable_collisions link1="plato_f3_prox" link2="plato_palm" reason="Never"/>
-    <disable_collisions link1="plato_f3_proxbracket" link2="plato_palm" reason="Adjacent"/>
 </robot>

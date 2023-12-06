@@ -62,6 +62,111 @@
 
     </gazebo>
 
+    <!-- Finger 1 -->
+    <transmission name="plato_f1_mcp_roll">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f1_mcp_roll">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor1">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <transmission name="plato_f1_mcp_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f1_mcp_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor2">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <transmission name="plato_f1_pip_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f1_pip_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor3">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <!-- Finger 2 -->
+        <transmission name="plato_f2_mcp_yaw">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f2_mcp_yaw">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor4">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <transmission name="plato_f2_mcp_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f2_mcp_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor5">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <transmission name="plato_f2_pip_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f2_pip_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor6">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+        <!-- Finger 3 -->
+        <transmission name="plato_f3_mcp_yaw">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f3_mcp_yaw">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor7">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+
+    <transmission name="plato_f3_mcp_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f3_mcp_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor8">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+    <transmission name="plato_f3_pip_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="plato_f3_pip_pitch">
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="motor9">
+        <mechanicalReduction>1</mechanicalReduction>
+            <hardwareInterface>EffortJointInterface</hardwareInterface>
+        </actuator>
+    </transmission>
+
+
+
 
 
 

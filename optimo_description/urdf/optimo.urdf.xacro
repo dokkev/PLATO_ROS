@@ -1,22 +1,8 @@
 <?xml version="1.0"?>
 <robot name="optimo" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <!-- Include the URDF of the base -->
+    <!-- Include the URDF of the robot arm -->
     <xacro:include filename="optimo_xacro/optimo_arm.xacro" />
-
-
-    <!-- Include Physics Parameters in Gazebo -->
-    <xacro:include filename="optimo_xacro/optimo.gazebo.xacro" />
-
-    <!-- Include ros2_control -->
-    <xacro:include filename="optimo_xacro/optimo.control.xacro" />
-    <xacro:optimo_ros2_control name="OptimoGazebo"/>
-
-
-  
-
-
-
 
 
 </robot>

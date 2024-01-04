@@ -344,7 +344,7 @@
         <!-- Joint state publisher -->
         <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
             <!-- need to make $(find optimo_sim) work again...-->
-            <parameters>$(find optimo_sim)/config/control.yaml</parameters>
+            <parameters>$(find plato_bringup)/config/optimo_effort_controllers.yaml</parameters>
         </plugin>
         <plugin filename="MechanicalStop" name="optimo::MechanicalStop">
             <init_pos>0 3.3 0 -2.36 0 -1.13 1.57</init_pos>

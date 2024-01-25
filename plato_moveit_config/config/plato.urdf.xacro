@@ -9,7 +9,6 @@
     <!-- Import control_xacro -->
     <xacro:include filename="plato.ros2_control.xacro" />
 
-
     <xacro:plato_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)" hardware_type="$(arg hardware_type)"/>
 
 

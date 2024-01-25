@@ -52,7 +52,7 @@
             <geometry>
                 <mesh filename="file://$(find optimo_description)/meshes/link1.stl"/>
             </geometry>
-            <material name="white">
+            <material name="white"/>
         </visual>
         <collision>
             <geometry>

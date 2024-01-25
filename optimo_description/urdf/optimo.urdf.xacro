@@ -4,5 +4,8 @@
     <!-- Include the URDF of the robot arm -->
     <xacro:include filename="optimo_xacro/optimo_arm.xacro" />
 
+    <!-- Include gz configuration -->
+    <!-- <xacro:include filename="optimo_xacro/optimo.gz.xacro" /> -->
+
 
 </robot>

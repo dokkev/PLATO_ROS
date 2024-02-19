@@ -1,9 +1,15 @@
 <?xml version="1.0"?>
-<robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot name="plato_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <!-- Include Plato Hand Xacro  -->
-    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.xacro"/>
+    <!-- Set World Frame -->
+    <link name="world"/>
 
-  
+    <!-- Include Xacro -->
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
+
+    <!-- Plato Hand -->
+    <xacro:plato_description connector_link="world"/>
+
+
 
 </robot>

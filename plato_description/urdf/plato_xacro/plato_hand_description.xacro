@@ -1,4 +1,13 @@
-<robot name="plato">
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
+<xacro:macro name="plato_description" params="connector_link">
+    
+    <!-- Connector Joint -->
+    <joint name="plato_connector_joint" type="fixed">
+        <parent link="${connector_link}"/>
+        <child link="plato_base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
 
     <!-- Base Link -->
     <link name="plato_base_link">
@@ -341,5 +350,5 @@
         <joint_properties friction="0.0"/>
     </joint>
 
-
+</xacro:macro>
 </robot>

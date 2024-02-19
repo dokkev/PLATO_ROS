@@ -203,7 +203,7 @@
     </link>
 
 
-    <!-- Optimo Robot Joints -->
+    <!-- Optimo Arm Joints -->
     <joint name="optimo_joint1" type="revolute">
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <parent link="optimo_link0"/>
@@ -303,6 +303,16 @@
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <parent link="optimo_link7"/>
         <child link="optimo_link7_passive"/>
+    </joint>
+
+    <!-- End Effector -->
+    <link name="optimo_ee_link">
+    </link>
+
+    <joint name="optimo_ee_joint" type="fixed">
+        <parent link="optimo_link7_passive"/>
+        <child link="optimo_ee_link"/>
+        <origin xyz="0 0 0.15" rpy="0 -1.5707 3.14"/>
     </joint>
 
 </xacro:macro>

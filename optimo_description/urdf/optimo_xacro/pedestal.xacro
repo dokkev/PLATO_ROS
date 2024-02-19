@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
-<xacro:macro name="pedestal" params="connector_link">
+<xacro:macro name="pedestal_description" params="connector_link">
 
     
     <link name="stand_link">
@@ -25,8 +25,6 @@
         <child link="stand_link"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
-
-
 
 </xacro:macro>
 </robot>

@@ -10,7 +10,7 @@
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
 
     <!-- Pedestal -->
-    <xacro:pedestal connector_link="world" />
+    <xacro:pedestal_description connector_link="world" />
     <!-- Optimo Arm -->
     <xacro:optimo_description connector_link="stand_link"/>
     <!-- Plato Hand -->

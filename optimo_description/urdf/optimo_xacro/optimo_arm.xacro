@@ -63,7 +63,6 @@
             <origin xyz="0 -0.01635 0.01549" />
             <mass value="4.152"/>
             <inertia ixx="0.01" ixy="0.000017" ixz="-.00001" iyy="0.007494" iyz="0.0000213" izz="0.009939"/>
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
         </inertial>
     </link>
 
@@ -81,12 +80,9 @@
             </geometry>
         </collision>
         <inertial>
-            <origin xyz="0 -0.05063 0.05677"  rpy="0 0 ${180*DtR}"/>
+            <origin xyz="0 -0.05063 0.05677"/>
             <mass value="1.72"/>
-
-                <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/>
-                <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
-                
+            <inertia ixx="0.005694" ixy="0" ixz="0" iyy="0.005902" iyz="-0.001353" izz="0.002415"/> 
         </inertial>
     </link>
 
@@ -104,11 +100,10 @@
                 <mesh filename="file://$(find optimo_description)/meshes/col3.stl"/>
             </geometry>
         </collision>
-        <inertial>            <!-- Inertia values taken from yaml, but these seem like they cannot be accurate...-->
+        <inertial>            
             <origin xyz="-0.000039 .098 0"/>
             <mass value="4.310"/>
             <inertia ixx="0.012989" ixy="-0.000015" ixz="-.000003" iyy="0.002584" iyz="0.000632" izz="0.01305"/>
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
         </inertial>
     </link>
 
@@ -130,12 +125,7 @@
         <inertial>
             <origin xyz="-.00001 0.048852 0.0688" rpy="0 0 0"/>
             <mass value="1.09"/>
-                <inertia ixx="0.007" ixy="-3.989e-7" ixz="0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/>
-            <!-- <inertia ixx="0.007" ixy="3.989e-7" ixz="-0.002" iyy="0.007" iyz="-1.061e-6" izz="0.002"/> -->
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
-
-
-
+            <inertia ixx="0.004297" ixy="0" ixz="0" iyy="0.004366" iyz="0.0008" izz="0.000988" />
         </inertial>
     </link>
 
@@ -156,8 +146,7 @@
         <inertial>
             <origin xyz=".001262 0.085 0.008" />
             <mass value="2.23"/>
-            <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.000733"/>
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+             <inertia ixx="0.005744" ixy="-0.00021" ixz="-0.000027" iyy="0.0018" iyz="0.001278" izz="0.005457" />
         </inertial>
     </link>
 
@@ -177,8 +166,8 @@
         <inertial>
             <origin xyz="0 -0.00007 0.010855" />
             <mass value="1.138"/>
-            <inertia ixx="0.000932" ixy="0" ixz="0" iyy="0.000802" iyz="-0.000030" izz="0.0007325"/>
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+            <inertia ixx="0.000634" ixy="0" ixz="0" iyy="0.000629" iyz="0" izz="0.000546" />
+
         </inertial>
     </link>
 
@@ -196,10 +185,10 @@
             </geometry>
         </collision>
         <inertial>
-            <origin xyz="0 0 0" />
-            <mass value="1"/>
+            <origin xyz="0 0 0.2" />
+            <mass value="1.246"/>
             <inertia ixx="0.005541" ixy=".000045" ixz="0.000077" iyy="0.004779" iyz="0.000043" izz="0.001723"/>
-            <!-- <inertia ixx="0" ixy="0.0" ixz="0.0" iyy="0" iyz="0.0" izz="0"/> -->
+
     
         </inertial>
     </link>
@@ -303,7 +292,7 @@
         <dynamics damping="1" friction="0.1"/>
     </joint>
     <joint name="optimo_joint7_passive" type="fixed">
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <parent link="optimo_link7"/>
         <child link="optimo_link7_passive"/>
     </joint>

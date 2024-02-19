@@ -1,25 +1,28 @@
 <?xml version="1.0"?>
 <robot name="plato" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <!-- Set World Frame -->
+    <link name="world"/>
+
     <!-- Include Optimo Arm and PLATO Hand Xacro -->
-    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo_arm.xacro"/>
+    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/pedestal.xacro" />
+    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/optimo_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand.xacro"/>
+
+    <!-- Pedestal -->
+    <xacro:pedestal connector_link="world" />
+    <!-- Optimo Arm -->
+    <xacro:optimo_description connector_link="stand_link"/>
 
     <!-- Connect PLATO Hand to Optimo Arm -->
     <joint name="hand_arm_joint" type="fixed">
         <parent link="optimo_link7_passive"/>
         <child link="plato_base_link"/>
-        <origin xyz="0 0.15 0" rpy="1.5707 0 1.5707"/>
+        <origin xyz="0 0 0.15" rpy="0 -1.5707 3.14"/>
     </joint>
 
-    <!-- Set World Frame for Gazebo -->
-    <link name="world"/>
-    <!-- Connect the Optimo to the World-->
-    <joint name="world_joint" type="fixed">
-        <parent link="world"/>
-        <child link="optimo_base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-    </joint>
+
+
   
 
 

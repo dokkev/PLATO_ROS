@@ -13,7 +13,8 @@
     <material name="blue">
         <color rgba="0.5 0.5 1 1.0"/>
     </material>
-    
+
+
     <!-- Optimo Robot Arm Links -->
 
     <link name="optimo_base_link">

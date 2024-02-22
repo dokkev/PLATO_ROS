@@ -1,3 +1,8 @@
 plato_moveit_control/plato_moveit_control/__pycache__/__init__.cpython-310.pyc
 plato_moveit_control/plato_moveit_control/__pycache__/control.cpython-310.pyc
 .vscode
+plato_hardware_interface/log/COLCON_IGNORE
+plato_hardware_interface/log/latest
+plato_hardware_interface/log/list_2024-02-15_18-48-17/logger_all.log
+plato_hardware_interface/log/latest_list
+.vscode/c_cpp_properties.json

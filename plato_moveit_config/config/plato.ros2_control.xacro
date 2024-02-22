@@ -72,69 +72,6 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="plato_f1_mcp_roll">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f1_mcp_roll']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f1_mcp_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f1_mcp_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f1_pip_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f1_pip_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f2_mcp_yaw">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f2_mcp_yaw']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f2_mcp_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f2_mcp_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f2_pip_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f2_pip_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f3_mcp_yaw">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f3_mcp_yaw']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f3_mcp_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f3_mcp_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-            <joint name="plato_f3_pip_pitch">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['plato_f3_pip_pitch']}</param>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
 
         </ros2_control>
     </xacro:macro>

@@ -125,7 +125,6 @@ public:
         rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
         // set all command effort to 0
 
-
         RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully deactivated!");
       }
 

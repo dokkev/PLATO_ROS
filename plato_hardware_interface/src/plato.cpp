@@ -70,9 +70,12 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
 {
 
 
-  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Publisher and Subscriber for Socket CAN initialized!");
 
 
+  PLATOHardware::set_zero_joint_states(joint_position_states_);
+  PLATOHardware::set_zero_joint_states(joint_velocity_states_);
+  PLATOHardware::set_zero_joint_states(joint_effort_states_);
+  
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
   
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -167,8 +170,9 @@ hardware_interface::return_type PLATOHardware::read(
 {
 
   // Get unadjusted motor encoder angles from CAN bus
-  // socket_can_.receive_can_rx_msg(motor_position_states_);
-  // motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
+  socket_can_.receive_can_rx_msg(motor_position_states_);
+  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
 
   //print motor_position_states_
   // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Motor Position States: {}", motor_position_states_);
@@ -181,10 +185,7 @@ hardware_interface::return_type PLATOHardware::read(
   // }
 
 
-  PLATOHardware::set_zero_joint_states(joint_position_states_);
-  PLATOHardware::set_zero_joint_states(joint_velocity_states_);
-  PLATOHardware::set_zero_joint_states(joint_effort_states_);
-  
+
 
   // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joints successfully read!");
   // END: This part here is for exemplary purposes - Please do not copy to your production code

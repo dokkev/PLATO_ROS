@@ -76,7 +76,9 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "__nullptr": "cpp",
-        "__node_handle": "cpp"
+        "__node_handle": "cpp",
+        "__locale": "cpp",
+        "locale": "cpp"
     },
     "ros.distro": "iron",
     "python.autoComplete.extraPaths": [

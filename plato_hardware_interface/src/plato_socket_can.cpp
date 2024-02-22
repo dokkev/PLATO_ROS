@@ -37,6 +37,17 @@ void PlatoSocketCAN::init() {
         close(socket_); // Clean up socket on failure
         return; // Early return on failure
     }
+
+    // Timeout
+    struct timeval tv;
+    tv.tv_sec = 0; // 5 second timeout
+    tv.tv_usec = 10; // 0 microseconds
+    if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+        perror("Setting socket timeout failed");
+        return; // Early return on failure
+    }
+
+    RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "SocketCAN initialized!");
 }
     
     
@@ -52,23 +63,63 @@ void PlatoSocketCAN::setup_can_ids() {
 
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
     if (motor_effort_commands.size() > can_tx_id_.size()) {
-        std::cerr << "Error: More commands than available TX IDs.\n";
+        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Motor command size exceeds CAN ID size!");
         return;
     }
 
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
         write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
+        RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
     
     }
 }
 
 
 void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states) {
-   for (size_t i = 0; i < motor_position_states.size(); ++i) {
-        double rx_msg = read_can(socket_, can_rx_id_[i]);
-        if (i < motor_position_states.size()){
-            motor_position_states[i] = rx_msg;
-        }         
+ 
+
+    auto rx_data = read_can(socket_);
+    if (!rx_data.has_value()) {
+        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
+        return;
+    }
+
+    auto [id, data] = rx_data.value();
+
+    // TODO: I could change to unordered_map to make it more efficient
+    switch (id){
+    
+    case MOTOR_0_CAN_RX_ID:
+        motor_position_states[0] = data;
+        break;
+    case MOTOR_1_CAN_RX_ID:
+        motor_position_states[1] = data;
+        break;
+    case MOTOR_2_CAN_RX_ID:
+        motor_position_states[2] = data;
+        break;
+    case MOTOR_3_CAN_RX_ID:
+        motor_position_states[3] = data;
+        break;
+    case MOTOR_4_CAN_RX_ID:
+        motor_position_states[4] = data;
+        break;
+    case MOTOR_5_CAN_RX_ID:
+        motor_position_states[5] = data;
+        break;
+    case MOTOR_6_CAN_RX_ID:
+        motor_position_states[6] = data;
+        break;
+    case MOTOR_7_CAN_RX_ID:
+        motor_position_states[7] = data;
+        break;
+    case MOTOR_8_CAN_RX_ID:
+        motor_position_states[8] = data;
+        break;
+
+    default:
+        RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN"), "Unhandled CAN ID");      
+        break;
     }
 }
 
@@ -84,22 +135,24 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
 }
 
-double PlatoSocketCAN::read_can(int socket, int id) {
-    struct can_frame frame;
-    int nbytes = read(socket, &frame, sizeof(frame));
-    if (nbytes > 0) {
-        if (frame.can_dlc == 8 && frame.can_id == static_cast<canid_t>(id)) {
+std::optional<std::tuple<int, double>> PlatoSocketCAN::read_can(int socket) {
+
+        struct can_frame frame;
+        int nbytes = read(socket, &frame, sizeof(frame));
+
+        if (nbytes > 0 && frame.can_dlc == 8) {
+            // Successfully read a frame with expected DLC
+            int id = frame.can_id;
             double data;
             std::memcpy(&data, frame.data, sizeof(double));
-            return data;
+            return {{id, data}}; // Successfully received data within the timeout
         }
-    } else {
-        perror("Failed to read CAN frame");
-    }
+   
+    // Log timeout or error only if no valid data received
+    RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Timeout or error reading CAN frame, returning std::nullopt");
+    
+    return std::nullopt; // Indicate failure to read valid data within the timeout
 
-    return 0.0; // Return a default or indicate error/missing data differently
-
-
-}  
+}
 
 }// namespace plato_socket_can

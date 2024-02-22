@@ -13,6 +13,7 @@
 #include <linux/can/raw.h>
 #include <time.h>
 #include <vector>
+#include <chrono>
 
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
@@ -55,7 +56,8 @@ private:
     std::vector<double> can_rx_msg_;
 
     void write_can(int socket, int id, double data);
-    double read_can(int socket ,int id);
+    std::optional<std::tuple<int, double>> read_can(int socket);
+
 
 
     

@@ -22,8 +22,6 @@
 #include <cmath>
 #include <limits>
 
-
-
 #include <hardware_interface/handle.hpp>
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
@@ -85,6 +83,17 @@ public:
     hardware_interface::return_type write(
       const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void set_zero_command(std::vector<double>& command);
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void set_zero_states(std::vector<double>& joint_states);
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void stop();
+
+
+
 
     private:
       /// The size of this vector is (standard_interfaces_.size() x nr_joints)
@@ -107,29 +116,8 @@ public:
 
      
 
-      // Set either command or joint_states to all 0 for test
-      void set_zero_command(std::vector<double>& command){
-        for (size_t i = 0; i < command.size(); ++i) {
-          command[i] = 0.0;
-        }
-      }
-      void set_zero_joint_states(std::vector<double>& joint_states){
-        for (size_t i = 0; i < joint_states.size(); ++i) {
-          joint_states[i] = 0.0;
-        }
-      }
 
-      void stop(){
-        set_zero_command(motor_effort_commands_);
-        RCLCPP_INFO(
-        rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
-        // set all command effort to 0
-
-        RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully deactivated!");
-      }
-
-
-
+ 
       
 
 

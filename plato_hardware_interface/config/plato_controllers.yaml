@@ -13,6 +13,7 @@ plato:
         type: joint_trajectory_controller/JointTrajectoryController
 
 
+
   plato_effort_controller:
     ros__parameters:
       joints:

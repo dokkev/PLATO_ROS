@@ -13,6 +13,7 @@
     <xacro:plato_description connector_link="world"/>
     <!-- Plato Hand Ros2 Control -->
     <xacro:plato_ros2_control name="plato_hand_controller" />
+    
 
 
 

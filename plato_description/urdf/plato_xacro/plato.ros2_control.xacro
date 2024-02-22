@@ -1,11 +1,35 @@
 <?xml version="1.0.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="plato_ros2_control" params="name">
+  <xacro:macro name="plato_ros2_control" params="
+                                                name
+                                                use_mock_hardware:=^|false
+                                                gazebo_classic:=^|true
+                                                gazebo:=^|false
+                                                plato_hardware:=^|false"
+                                                >
+                                                
+  
 
     <ros2_control name="${name}" type="system">
         <hardware>
-            <plugin>plato_hardware_interface/PLATOHardware</plugin>
+
+            <xacro:if value="${use_mock_hardware}">
+                <plugin>mock_componets/GenericSystem</plugin>
+            </xacro:if>
+
+            <xacro:if value="${gazebo_classic}">
+                <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+            </xacro:if>
+
+            <xacro:if value="${gazebo}">
+                <plugin>ign_ros2_control/IgnitionSystem</plugin>
+            </xacro:if>
+
+            <xacro:if value="${plato_hardware}">
+                <plugin>plato_hardware_interface/PLATOHardware</plugin>
+            </xacro:if>
+
         </hardware>
 
         <joint name="plato_joint0">

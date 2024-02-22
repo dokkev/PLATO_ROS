@@ -20,9 +20,10 @@ def generate_launch_description():
     ##### Parameters #####
     pkg_path = os.path.join(get_package_share_directory('plato_gazebo'))
     models_path = os.path.join(get_package_share_directory('plato_gazebo'), 'models')
-    world_path = os.path.join(pkg_path, 'worlds', 'plato.world')
-    plato_xacro = os.path.join(get_package_share_directory('plato_moveit_config'), 'config', 'plato.urdf.xacro')
-    robot_description_content = xacro.process_file(plato_xacro, mappings={"hardware_type": "gazebo"}).toxml()
+    # world_path = os.path.join(pkg_path, 'worlds', 'plato.world')
+    plato_xacro = os.path.join(get_package_share_directory('plato_description'), 'urdf', 'plato_hand.urdf.xacro')
+    robot_description_content = xacro.process_file(plato_xacro).toxml()
+    robot_description = {"robot_description": robot_description_content}
 
     ##### Gazebo Path #####
     if 'GAZEBO_MODEL_PATH' in os.environ:
@@ -33,10 +34,10 @@ def generate_launch_description():
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
                              arguments=['-topic', 'robot_description',
-                                        '-entity', 'plato_manipulator',
+                                        '-entity', 'plato_hand',
                                         '-x', '0.1',
                                         '-y', '0.1',
-                                        '-z', '1.0'
+                                        '-z', '0.01'
                                         ],
                              output='screen')
     
@@ -47,6 +48,20 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}, {'robot_description': robot_description_content}]
     )
 
+    robot_controllers = PathJoinSubstitution(
+        [
+            FindPackageShare("plato_hardware_interface"),
+            "config",
+            "plato_controllers2.yaml",
+        ]
+    )
+    control_node = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[robot_description, robot_controllers],
+        output="both",
+    )
+
     # spawning the joint broadcaster
     spawn_broadcaster = Node(
         package="controller_manager",
@@ -55,24 +70,17 @@ def generate_launch_description():
         output="screen",
     )
 
-    spawn_optimo_controller = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["optimo_arm_controller"],
-        output="screen",
-    )
-
     spawn_plato_controller = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["plato_hand_controller"],
+        arguments=["plato_joint_controller"],
         output="screen",
     )
 
     ###### Include #####
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-        launch_arguments={'world': world_path}.items()
+        # launch_arguments={'world': world_path}.items()
     )
 
     return LaunchDescription([
@@ -84,7 +92,7 @@ def generate_launch_description():
         node_robot_state_publisher,
         gazebo_launch,
         spawn_broadcaster,
-        spawn_optimo_controller,
         spawn_plato_controller,
-        spawn_entity_node,   
+        spawn_entity_node,
+        control_node,   
     ])

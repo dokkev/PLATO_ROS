@@ -69,7 +69,9 @@ void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_com
 
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
         write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
-        RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
+        #ifdef DEBUG_MODE
+            RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
+        #endif
     
     }
 }
@@ -86,11 +88,15 @@ void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_stat
 
     auto [id, data] = rx_data.value();
 
+    #ifdef DEBUG_MODE
+        RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
+    #endif
+
     // TODO: I could change to unordered_map to make it more efficient
     switch (id){
-    
     case MOTOR_0_CAN_RX_ID:
         motor_position_states[0] = data;
+
         break;
     case MOTOR_1_CAN_RX_ID:
         motor_position_states[1] = data;
@@ -117,8 +123,7 @@ void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_stat
         motor_position_states[8] = data;
         break;
 
-    default:
-        RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN"), "Unhandled CAN ID");      
+    default:   
         break;
     }
 }
@@ -126,6 +131,20 @@ void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_stat
 void PlatoSocketCAN::write_can(int socket, int id, double data) {
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(frame)); // Clear the frame
+
+    // if data is NaN send 0.0
+    if (std::isnan(data)) {
+        data = 0.0;
+        RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN::write_can"), "NaN data detected, sending 0.0 Effort instead");    
+    }
+
+    // Current Limiting 
+    data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
+    // through warning if data is clamped
+    if (data != std::clamp(data, -MAX_CURRENT, MAX_CURRENT)) {
+        RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN::write_can"), "Current clamped to %f", data);
+    }
+
 
     frame.can_id = id;
     frame.can_dlc = 8; // Explicitly set to 8 bytes for clarity

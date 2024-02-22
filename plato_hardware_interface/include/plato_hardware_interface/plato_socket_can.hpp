@@ -28,7 +28,7 @@
 
 namespace plato_socket_can{
 
-static constexpr double MAX_EFFORT = 1.5;
+static constexpr double MAX_CURRENT = 1.0;
 
 
 class PlatoSocketCAN{

@@ -62,19 +62,6 @@ def generate_launch_description():
     xacro_file = os.path.join(pkg_share, urdf_path)
 
     robot_description_content = xacro.process_file(xacro_file).toxml()
-    # robot_description_content = Command(
-    #     [
-    #         PathJoinSubstitution([FindExecutable(name="xacro")]),
-    #         " ",
-    #         PathJoinSubstitution(
-    #             [
-    #                 FindPackageShare("plato_description"),
-    #                 "urdf",
-    #                 "plato_hand.urdf.xacro",
-    #             ]
-    #         ),
-    #     ]
-    # )
     robot_description = {"robot_description": robot_description_content}
 
     robot_controllers = PathJoinSubstitution(

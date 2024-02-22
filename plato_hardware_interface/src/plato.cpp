@@ -21,9 +21,32 @@
 
 #include "plato_hardware_interface/plato.hpp"
 
+
 namespace plato_hardware_interface
 {
 
+
+
+void PLATOHardware::set_zero_command(std::vector<double>& command){
+  for (size_t i = 0; i < command.size(); ++i) {
+    command[i] = 0.0;
+  }
+}
+
+void PLATOHardware::set_zero_states(std::vector<double>& joint_states){
+  for (size_t i = 0; i < joint_states.size(); ++i) {
+    joint_states[i] = 0.0;
+  }
+}
+
+void PLATOHardware::stop(){
+  set_zero_command(motor_effort_commands_);
+  RCLCPP_INFO(
+  rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
+  // set all command effort to 0
+
+  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
+}
 
 
 hardware_interface::CallbackReturn PLATOHardware::on_init(
@@ -51,14 +74,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   // init CAN
   socket_can_.init();
 
-  // make commands and states all zero for testing
-  // for (size_t i = 0; i < joint_effort_commands_.size(); ++i){
-  //   joint_effort_commands_[i] = 0.0;
-  //   joint_effort_states_[i] = 0.0;
-  //   joint_position_commands_[i] = 0.0;
-  //   joint_velocity_states_[i] = 0.0;
-  // }
-
 
   rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
 
@@ -69,15 +84,14 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
 
+  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Configuring ...setting all joint state to 0..");
+  PLATOHardware::set_zero_states(joint_position_states_);
+  PLATOHardware::set_zero_states(joint_velocity_states_);
+  PLATOHardware::set_zero_states(joint_effort_states_);
 
-
-
-  PLATOHardware::set_zero_joint_states(joint_position_states_);
-  PLATOHardware::set_zero_joint_states(joint_velocity_states_);
-  PLATOHardware::set_zero_joint_states(joint_effort_states_);
+  PLATOHardware::set_zero_command(joint_position_commands_);
   
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
-  
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -125,16 +139,18 @@ PLATOHardware::export_command_interfaces()
 hardware_interface::CallbackReturn PLATOHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+
   RCLCPP_INFO(
     rclcpp::get_logger("PLATOHardware"), "Activating ...please wait...");
 
 
 
-    // joint_effort_commands_ = joint_effort_states_;
 
 
     // TODO: Add Gravity Compensation
+
+    // send the zero effort command to the motor
+    PLATOHardware::set_zero_command(joint_effort_commands_);
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
@@ -169,26 +185,12 @@ hardware_interface::return_type PLATOHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
-  // Get unadjusted motor encoder angles from CAN bus
 
+  // Read the motor position over CAN
   socket_can_.receive_can_rx_msg(motor_position_states_);
+  // Adjust the motor position with Offset and Direction
   motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
 
-  //print motor_position_states_
-  // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Motor Position States: {}", motor_position_states_);
-  // Adjust motor encoder angles with offset and direction
-  // motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
-
-  // print joint states
-  // for (size_t i = 0; i < joint_position_states_.size(); ++i) {
-  //     RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Moint %zu position: %f", i, motor_position_states_[i]);
-  // }
-
-
-
-
-  // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joints successfully read!");
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   return hardware_interface::return_type::OK;
 }
@@ -197,7 +199,10 @@ hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
-  PLATOHardware::set_zero_joint_states(joint_effort_commands_);
+  // Convert the joint effort (torque) commands to motor effort (current) commands with direction
+  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
+  // Send the motor effort commands over CAN
+  socket_can_.send_can_tx_msg(motor_effort_commands_);
 
 
   return hardware_interface::return_type::OK;

@@ -18,6 +18,11 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <chrono>
+#include <cmath>
+#include <limits>
+
+
 
 #include <hardware_interface/handle.hpp>
 #include <hardware_interface/hardware_info.hpp>
@@ -27,15 +32,21 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
+#include <pluginlib/class_list_macros.hpp>
+#include "rclcpp/rclcpp.hpp"
 
 #include <sensor_msgs/msg/joint_state.h>
+
+#include "plato_hardware_interface/plato_common.hpp"
+#include "plato_hardware_interface/plato_motor_direction.hpp"
+#include "plato_hardware_interface/plato_socket_can.hpp"
 
 #include "plato_hardware_interface/visibility_control.h"
 
 namespace plato_hardware_interface
 {
 
-class PLATOHardware : public hardware_interface::SystemInterface
+class PLATOHardware : public hardware_interface::SystemInterface 
 {
 public:
     RCLCPP_SHARED_PTR_DEFINITIONS(PLATOHardware);
@@ -59,6 +70,10 @@ public:
       const rclcpp_lifecycle::State & previous_state) override;
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
+    hardware_interface::CallbackReturn on_shutdown(
+      const rclcpp_lifecycle::State & previous_state) override;
+    
+    PLATO_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::CallbackReturn on_deactivate(
       const rclcpp_lifecycle::State & previous_state) override;
 
@@ -73,27 +88,52 @@ public:
 
     private:
       /// The size of this vector is (standard_interfaces_.size() x nr_joints)
-      std::vector<double> joint_position_command_;
-      std::vector<double> joint_effort_command_;
+      std::vector<double> motor_effort_commands_;
+      std::vector<double> motor_position_states_;
+
+      std::vector<double> joint_position_commands_;
+      std::vector<double> joint_effort_commands_;
       
-      std::vector<double> joint_position_;
-      std::vector<double> joint_velocity_;
-      std::vector<double> joint_effort_;
-      std::vector<double> ft_states_;
+      std::vector<double> joint_position_states_;
+      std::vector<double> joint_velocity_states_;
+      std::vector<double> joint_effort_states_;
+      std::vector<double> ft_sensor_states_;
 
-      // CAN Subscriber
-      rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
-      // rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr ft_state_sub_; //TODO: Read Force Torque Sensor Data
-      // CAN publisher
-      rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_command_pub_;
-      rclcpp::Node::SharedPtr node_;
-      sensor_msgs::msg::JointState latest_joint_state_;
+      std::vector<std::string> effort_command_interface_names_;
 
-      /// Use standard interfaces for joints because they are relevant for dynamic behavior
-      std::array<std::string, 4> standard_interfaces_ = { hardware_interface::HW_IF_POSITION,
-                                                          hardware_interface::HW_IF_VELOCITY,
-                                                          hardware_interface::HW_IF_ACCELERATION,
-                                                          hardware_interface::HW_IF_EFFORT };
+      plato_socket_can::PlatoSocketCAN socket_can_;
+
+      plato_motor_direction::PlatoMotorDirection motor_direction_;
+
+     
+
+      // Set either command or joint_states to all 0 for test
+      void set_zero_command(std::vector<double>& command){
+        for (size_t i = 0; i < command.size(); ++i) {
+          command[i] = 0.0;
+        }
+      }
+      void set_zero_joint_states(std::vector<double>& joint_states){
+        for (size_t i = 0; i < joint_states.size(); ++i) {
+          joint_states[i] = 0.0;
+        }
+      }
+
+      void stop(){
+        set_zero_command(motor_effort_commands_);
+        RCLCPP_INFO(
+        rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
+        // set all command effort to 0
+
+
+        RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully deactivated!");
+      }
+
+
+
+      
+
+
 
 
 };

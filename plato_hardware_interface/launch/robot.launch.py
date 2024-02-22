@@ -22,6 +22,16 @@ from launch.substitutions import Command, FindExecutable, LaunchConfiguration, P
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.conditions import IfCondition,UnlessCondition
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution
+import xacro
+
 
 def generate_launch_description():
     # Declare arguments
@@ -38,30 +48,44 @@ def generate_launch_description():
     gui = LaunchConfiguration("gui")
 
     # Get URDF via xacro
-    robot_description_content = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]),
-            " ",
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("plato_hardware_interface"),
-                    "urdf",
-                    "rrbot.urdf.xacro",
-                ]
-            ),
-        ]
-    )
+    # getting the package path
+    pkg_name = 'plato_description'
+    pkg_share= get_package_share_directory(pkg_name)
+
+    # URDF file path
+    urdf_path = 'urdf/plato_hand.urdf.xacro'
+
+    # RVIZ config file path
+    rviz_config_file = pkg_share + '/rviz/plato.rviz'
+    
+    # extracting the robot deffinition from the xacro file
+    xacro_file = os.path.join(pkg_share, urdf_path)
+
+    robot_description_content = xacro.process_file(xacro_file).toxml()
+    # robot_description_content = Command(
+    #     [
+    #         PathJoinSubstitution([FindExecutable(name="xacro")]),
+    #         " ",
+    #         PathJoinSubstitution(
+    #             [
+    #                 FindPackageShare("plato_description"),
+    #                 "urdf",
+    #                 "plato_hand.urdf.xacro",
+    #             ]
+    #         ),
+    #     ]
+    # )
     robot_description = {"robot_description": robot_description_content}
 
     robot_controllers = PathJoinSubstitution(
         [
             FindPackageShare("plato_hardware_interface"),
             "config",
-            "rrbot_controllers.yaml",
+            "plato_controllers.yaml",
         ]
     )
     rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("plato_hardware_interface"), "rviz", "rrbot.rviz"]
+        [FindPackageShare("plato_description"), "rviz", "plato.rviz"]
     )
 
     control_node = Node(
@@ -88,13 +112,13 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        arguments=["plato_joint_state_broadcaster", "--controller-manager", "/controller_manager"],
     )
 
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["forward_position_controller", "--controller-manager", "/controller_manager"],
+        arguments=["plato_effort_controller", "--controller-manager", "/controller_manager"],
     )
 
     # Delay rviz start after `joint_state_broadcaster`

@@ -133,7 +133,7 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.1745329251994329478" upper="0.785398163397448279"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.1745329251994329478" upper="0.785398163397448279"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -142,7 +142,7 @@
         <parent link="plato_bracket_1" />
         <child link="plato_proximal_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -151,7 +151,7 @@
         <parent link="plato_proximal_1" />
         <child link="plato_distal_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.34906585039886589561" upper="1.570796326794896558"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.34906585039886589561" upper="1.570796326794896558"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -230,7 +230,7 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -239,7 +239,7 @@
         <parent link="plato_bracket_2" />
         <child link="plato_proximal_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -248,7 +248,7 @@
         <parent link="plato_proximal_2" />
         <child link="plato_distal_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -328,7 +328,7 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -337,7 +337,7 @@
         <parent link="plato_bracket_3" />
         <child link="plato_proximal_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
         <joint_properties friction="0.0"/>
     </joint>
 
@@ -346,7 +346,7 @@
         <parent link="plato_proximal_3" />
         <child link="plato_distal_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="1.5" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <limit effort="0.09" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
         <joint_properties friction="0.0"/>
     </joint>
 

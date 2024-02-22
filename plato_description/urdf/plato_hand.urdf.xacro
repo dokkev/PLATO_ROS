@@ -6,9 +6,13 @@
 
     <!-- Include Xacro -->
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
 
     <!-- Plato Hand -->
     <xacro:plato_description connector_link="world"/>
+    <!-- Plato Hand Ros2 Control -->
+    <xacro:plato_ros2_control name="plato_hand_controller" />
 
 
 

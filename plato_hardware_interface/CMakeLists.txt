@@ -26,6 +26,8 @@ add_library(
   plato_hardware_interface
   SHARED
   src/plato.cpp
+  src/plato_socket_can.cpp
+  src/plato_motor_direction.cpp
 )
 target_compile_features(plato_hardware_interface PUBLIC cxx_std_17)
 target_include_directories(plato_hardware_interface PUBLIC

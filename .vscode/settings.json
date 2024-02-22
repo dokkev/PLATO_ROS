@@ -75,7 +75,8 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "__node_handle": "cpp"
     },
     "ros.distro": "iron",
     "python.autoComplete.extraPaths": [
@@ -91,5 +92,6 @@
         "/home/dk/ws_moveit/install/moveit_msgs/lib/python3.10/site-packages",
         "/home/dk/ws_moveit/install/moveit_configs_utils/lib/python3.10/site-packages",
         "/opt/ros/iron/lib/python3.10/site-packages"
-    ]
+    ],
+    "C_Cpp.errorSquiggles": "disabled"
 }

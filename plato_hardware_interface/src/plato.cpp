@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plato_hardware_interface/plato.hpp"
 
-#include <chrono>
-#include <cmath>
-#include <limits>
-#include <memory>
-#include <vector>
+
+
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include <pluginlib/class_list_macros.hpp>
+
+#include "plato_hardware_interface/plato.hpp"
 
 namespace plato_hardware_interface
 {
 
-static constexpr std::size_t POSITION_INTERFACE_INDEX = 0;
-static constexpr std::size_t VELOCITY_INTERFACE_INDEX = 1;
-// JointState doesn't contain an acceleration field, so right now it's not used
-static constexpr std::size_t EFFORT_INTERFACE_INDEX = 3;
+
+
 hardware_interface::CallbackReturn PLATOHardware::on_init(
   const hardware_interface::HardwareInfo & info)
 {
@@ -40,8 +36,31 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  // Initialize all Joint Vectors
+  joint_position_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+
+  joint_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_velocity_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_effort_states_.resize(info_.joints.size(),   std::numeric_limits<double>::quiet_NaN());
+
+  // Initialize all Motor Vectors
+  motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+
+  // init CAN
+  socket_can_.init();
+
+  // make commands and states all zero for testing
+  // for (size_t i = 0; i < joint_effort_commands_.size(); ++i){
+  //   joint_effort_commands_[i] = 0.0;
+  //   joint_effort_states_[i] = 0.0;
+  //   joint_position_commands_[i] = 0.0;
+  //   joint_velocity_states_[i] = 0.0;
+  // }
 
 
+  rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -49,28 +68,13 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
 hardware_interface::CallbackReturn PLATOHardware::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(
-    rclcpp::get_logger("PLATOHardware"), "Configuring ...please wait...");
 
-  for (int i = 0; i < hw_start_sec_; i++)
-  {
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    RCLCPP_INFO(
-      rclcpp::get_logger("PLATOHardware"), "%.1f seconds left...",
-      hw_start_sec_ - i);
-  }
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
-  // reset values always when configuring hardware
-  for (uint i = 0; i < hw_states_.size(); i++)
-  {
-    hw_states_[i] = 0;
-    hw_commands_[i] = 0;
-  }
+  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Publisher and Subscriber for Socket CAN initialized!");
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
-
+  
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -78,11 +82,20 @@ std::vector<hardware_interface::StateInterface>
 PLATOHardware::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> state_interfaces;
-  for (uint i = 0; i < info_.joints.size(); i++)
-  {
-    state_interfaces.emplace_back(hardware_interface::StateInterface(
-      info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_states_[i]));
+
+  state_interfaces.reserve(info_.joints.size() * 3);
+  for (size_t i = 0; i < info_.joints.size(); ++i) {
+    state_interfaces.emplace_back(
+      hardware_interface::StateInterface(
+        info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_position_states_[i]));
+    state_interfaces.emplace_back(
+      hardware_interface::StateInterface(
+        info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_position_states_[i]));
+    state_interfaces.emplace_back(
+      hardware_interface::StateInterface(
+        info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_states_[i]));
   }
+
 
   return state_interfaces;
 }
@@ -91,11 +104,17 @@ std::vector<hardware_interface::CommandInterface>
 PLATOHardware::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-  for (uint i = 0; i < info_.joints.size(); i++)
-  {
+  command_interfaces.reserve(info_.joints.size());
+  effort_command_interface_names_.reserve(info_.joints.size());
+
+  for (size_t i=0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
-      info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_commands_[i]));
+    info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_commands_[i]));
+    effort_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
+
+  
+
 
   return command_interfaces;
 }
@@ -107,20 +126,13 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
   RCLCPP_INFO(
     rclcpp::get_logger("PLATOHardware"), "Activating ...please wait...");
 
-  for (int i = 0; i < hw_start_sec_; i++)
-  {
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    RCLCPP_INFO(
-      rclcpp::get_logger("PLATOHardware"), "%.1f seconds left...",
-      hw_start_sec_ - i);
-  }
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
-  // command and state should be equal when starting
-  for (uint i = 0; i < hw_states_.size(); i++)
-  {
-    hw_commands_[i] = hw_states_[i];
-  }
+
+    // joint_effort_commands_ = joint_effort_states_;
+
+
+    // TODO: Add Gravity Compensation
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 
@@ -130,39 +142,51 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
 hardware_interface::CallbackReturn PLATOHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+
   RCLCPP_INFO(
-    rclcpp::get_logger("PLATOHardware"), "Deactivating ...please wait...");
+    rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
 
-  for (int i = 0; i < hw_stop_sec_; i++)
-  {
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    RCLCPP_INFO(
-      rclcpp::get_logger("PLATOHardware"), "%.1f seconds left...",
-      hw_stop_sec_ - i);
-  }
 
-  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully deactivated!");
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
+    RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully deactivated!");
+
 
   return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn PLATOHardware::on_shutdown(
+  const rclcpp_lifecycle::State & /*previous_state*/) 
+{
+  rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
+
+  return CallbackReturn::SUCCESS;
+
 }
 
 hardware_interface::return_type PLATOHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Reading...");
 
-  for (uint i = 0; i < hw_states_.size(); i++)
-  {
-    // Simulate RRBot's movement
-    hw_states_[i] = hw_states_[i] + (hw_commands_[i] - hw_states_[i]) / hw_slowdown_;
-    RCLCPP_INFO(
-      rclcpp::get_logger("PLATOHardware"), "Got state %.5f for joint %d!",
-      hw_states_[i], i);
-  }
-  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joints successfully read!");
+  // Get unadjusted motor encoder angles from CAN bus
+  // socket_can_.receive_can_rx_msg(motor_position_states_);
+  // motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
+  //print motor_position_states_
+  // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Motor Position States: {}", motor_position_states_);
+  // Adjust motor encoder angles with offset and direction
+  // motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
+  // print joint states
+  // for (size_t i = 0; i < joint_position_states_.size(); ++i) {
+  //     RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Moint %zu position: %f", i, motor_position_states_[i]);
+  // }
+
+
+  PLATOHardware::set_zero_joint_states(joint_position_states_);
+  PLATOHardware::set_zero_joint_states(joint_velocity_states_);
+  PLATOHardware::set_zero_joint_states(joint_effort_states_);
+  
+
+  // RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joints successfully read!");
   // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   return hardware_interface::return_type::OK;
@@ -171,19 +195,9 @@ hardware_interface::return_type PLATOHardware::read(
 hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Writing...");
 
-  for (uint i = 0; i < hw_commands_.size(); i++)
-  {
-    // Simulate sending commands to the hardware
-    RCLCPP_INFO(
-      rclcpp::get_logger("PLATOHardware"), "Got command %.5f for joint %d!",
-      hw_commands_[i], i);
-  }
-  RCLCPP_INFO(
-    rclcpp::get_logger("PLATOHardware"), "Joints successfully written!");
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
+  PLATOHardware::set_zero_joint_states(joint_effort_commands_);
+
 
   return hardware_interface::return_type::OK;
 }
@@ -192,5 +206,4 @@ hardware_interface::return_type PLATOHardware::write(
 
 #include "pluginlib/class_list_macros.hpp"
 
-PLUGINLIB_EXPORT_CLASS(
-  plato_hardware_interface::PLATOHardware, hardware_interface::SystemInterface)
+PLUGINLIB_EXPORT_CLASS(plato_hardware_interface::PLATOHardware, hardware_interface::SystemInterface)

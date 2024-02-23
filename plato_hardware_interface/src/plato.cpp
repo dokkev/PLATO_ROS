@@ -27,7 +27,6 @@ namespace plato_hardware_interface
 {
 
 
-
 void PLATOHardware::set_zero_command(std::vector<double>& command){
   for (size_t i = 0; i < command.size(); ++i) {
     command[i] = 0.0;
@@ -61,8 +60,6 @@ void PLATOHardware::stop(){
   rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
   // set all command effort to 0
 
-
-
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
 }
 
@@ -70,6 +67,7 @@ void PLATOHardware::can_frame_callback(const can_msgs::msg::Frame::SharedPtr msg
   // convert the can frame to motor position with thread safety
   if (rx_to_joint_.find(msg->id) != rx_to_joint_.end()){
     motor_position_states_[rx_to_joint_[msg->id]] = *reinterpret_cast<double*>(msg->data.data());
+    
   }
 }
 
@@ -98,10 +96,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
 
   // Initialize the Joint (Motor) to CAN ID mapping
   PLATOHardware::set_can_id_map();
-
-  // Node
-  rclcpp::NodeOptions options;
-  options.arguments({"--ros-args", "-r", "__node:=plato_hardware_interface"+ info_.name});
 
 
   // Node
@@ -135,8 +129,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
 
-    // init CAN
-  // socket_can_.init();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -186,9 +178,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
     rclcpp::get_logger("PLATOHardware"), "Activating ...please wait...");
 
 
-
-
-
     // TODO: Add Gravity Compensation
 
     // send the zero effort command to the motor
@@ -230,14 +219,6 @@ hardware_interface::return_type PLATOHardware::read(
   if (rclcpp::ok()){
     rclcpp::spin_some(node_);
   }
-
-  // thread safe method to convert motor position to joint position
-
-
-
-  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
-
-
 
   return hardware_interface::return_type::OK;
 }

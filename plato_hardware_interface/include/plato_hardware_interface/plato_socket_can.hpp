@@ -1,8 +1,6 @@
 #ifndef PLATO_HARDWARE_INTERFACE__PLATO_SOCKET_CAN_HPP_
 #define PLATO_HARDWARE_INTERFACE__PLATO_SOCKET_CAN_HPP_
 
-
-
 #include <iostream>
 #include <string.h>
 #include <unistd.h>

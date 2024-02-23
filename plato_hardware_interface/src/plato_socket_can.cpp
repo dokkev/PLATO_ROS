@@ -1,5 +1,4 @@
 #include "plato_hardware_interface/plato_socket_can.hpp"
-#include "plato_hardware_interface/socket_can.hpp"
 #include <fcntl.h>
 #include <iostream>
 
@@ -60,9 +59,8 @@ void PlatoSocketCAN::setup_can_ids() {
                   MOTOR_3_CAN_RX_ID, MOTOR_4_CAN_RX_ID, MOTOR_5_CAN_RX_ID, 
                   MOTOR_6_CAN_RX_ID, MOTOR_7_CAN_RX_ID, MOTOR_8_CAN_RX_ID};
 
-    can_id_to_joint_id_={ {MOTOR_0_CAN_RX_ID, 0}, {MOTOR_1_CAN_RX_ID, 1}, {MOTOR_2_CAN_RX_ID, 2}, 
-                          {MOTOR_3_CAN_RX_ID, 3}, {MOTOR_4_CAN_RX_ID, 4}, {MOTOR_5_CAN_RX_ID, 5}, 
-                          {MOTOR_6_CAN_RX_ID, 6}, {MOTOR_7_CAN_RX_ID, 7}, {MOTOR_8_CAN_RX_ID, 8} };
+ 
+
 }
 
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
@@ -71,13 +69,21 @@ void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_com
         return;
     }
 
+    // for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
+    //     write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
+    //     #ifdef DEBUG_MODE
+    //         // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
+    //     #endif
+
+    //use the joint_id_to_can_tx_id mapping
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
-        write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
+        // write_can(socket_, joint_id_to_can_tx_id_[i], motor_effort_commands[i]);
         #ifdef DEBUG_MODE
             // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
         #endif
-    
     }
+    
+    // }
 }
 
 

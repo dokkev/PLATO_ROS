@@ -57,27 +57,33 @@ void read_can(int s) {
 
 
 void write_can(int s) {
-    struct can_frame frame;
-    frame.can_id = 0x123;
-    frame.can_dlc = 2;
-    frame.data[0] = 0x11;
-    frame.data[1] = 0x22;
+    
+
 
     while (true) {
         {
             std::lock_guard<std::mutex> lock(can_mutex);
-            int nbytes = write(s, &frame, sizeof(struct can_frame));
-            if (nbytes > 0) {
-                std::cout << "TX CAN ID: 0x" << std::uppercase << std::setfill('0') << std::setw(3) << 
-                std::hex <<frame.can_id  << " [" << static_cast<int16_t>(frame.can_dlc) << "] "<<std::flush;
+            struct can_frame frame;
+            for (int i = 0x0A; i < 0x13; i++) {
+                
+            
+                double data = 1.0;
+                memcpy(frame.data, &data, sizeof(double));
+                frame.can_id = i;
+                frame.can_dlc = sizeof(double);
+                int nbytes = write(s, &frame, sizeof(struct can_frame));
+                
+                std::cout << "TX CAN ID Sent: 0x" << std::uppercase << std::setfill('0') << std::setw(3) <<
+                std::hex << frame.can_id << " [" << static_cast<int16_t>(frame.can_dlc) << "] "<<std::flush;
+                std::cout << "Sent CAN ID " << frame.can_id << " message: " << data << std::endl;
 
-                for (int i = 0; i < frame.can_dlc; i++) {
-                    std::cout << std::hex << std::uppercase << std::setfill('0') << std::setw(2) 
-                    << static_cast<int>(frame.data[i]) << ' ';
-                }
-                std::cout << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            }   
+                sleep(0.01);
+                
+
+
+
+            }
+         
 
             
         }
@@ -99,10 +105,10 @@ int main() {
     bind(s, (struct sockaddr *)&addr, sizeof(addr));
 
     std::thread read_thread(read_can, s);
-    // std::thread write_thread(write_can, s);
+    std::thread write_thread(write_can, s);
 
     read_thread.join();
-    // write_thread.join();
+    write_thread.join();
 
     close(s);
     return 0;

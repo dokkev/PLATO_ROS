@@ -32,6 +32,7 @@
 #include <rclcpp/subscription.hpp>
 #include <pluginlib/class_list_macros.hpp>
 #include "rclcpp/rclcpp.hpp"
+#include <unordered_map>
 
 #include <sensor_msgs/msg/joint_state.h>
 #include <can_msgs/msg/frame.hpp>
@@ -39,7 +40,7 @@
 #include "plato_hardware_interface/plato_common.hpp"
 #include "plato_hardware_interface/plato_motor_direction.hpp"
 #include "plato_hardware_interface/plato_socket_can.hpp"
-#include "plato_hardware_interface/socket_can.hpp"
+
 
 #include "plato_hardware_interface/visibility_control.h"
 
@@ -94,9 +95,13 @@ public:
     void set_zero_states(std::vector<double>& joint_states);
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
+    void set_can_id_map();
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
     void stop();
 
-
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void can_frame_callback(const can_msgs::msg::Frame::SharedPtr msg);
 
 
     private:
@@ -112,11 +117,13 @@ public:
       std::vector<double> joint_effort_states_;
       std::vector<double> ft_sensor_states_;
 
+      std::unordered_map<int,int> rx_to_joint_;
+      std::unordered_map<int,int> joint_to_tx_;
+
       std::vector<std::string> effort_command_interface_names_;
 
       // plato_socket_can::PlatoSocketCAN socket_can_;
 
-      SocketCanIntf can_intf_ = SocketCanIntf();
 
       plato_motor_direction::PlatoMotorDirection motor_direction_;
 

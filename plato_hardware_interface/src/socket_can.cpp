@@ -1,4 +1,4 @@
-#include "socket_can.hpp"
+#include "plato_hardware_interface/socket_can.hpp"
 #include <unistd.h>
 #include <cstring>
 #include <iostream>

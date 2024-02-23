@@ -46,7 +46,7 @@
 #define MOTOR_8_DIRECTION false
 
 // DEBUG MODE
-// #define DEBUG_MODE
+#define DEBUG_MODE
 
 
 #endif  // PLATO_HARDWARE_INTERFACE__PLATO_COMMON_HPP_

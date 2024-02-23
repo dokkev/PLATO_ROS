@@ -59,7 +59,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /robot_description
+        Value: /plato/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -71,68 +71,68 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        plato_f1_ee_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        plato_f1_mid:
+          Value: true
+        plato_bracket_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f1_prox:
+        plato_bracket_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f1_proxbracket:
+        plato_bracket_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f2_ee_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        plato_f2_mid:
+        plato_distal_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f2_prox:
+        plato_distal_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f2_proxbracket:
+        plato_distal_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        plato_f3_ee_frame:
+        plato_end_effector_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        plato_f3_mid:
+        plato_end_effector_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
-        plato_f3_prox:
+        plato_end_effector_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
-        plato_f3_proxbracket:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        plato_palm:
+        plato_proximal_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
+        plato_proximal_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        plato_proximal_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
       Mass Properties:
         Inertia: false
         Mass: false
@@ -187,7 +187,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.7926285266876221
+      Distance: 0.574644923210144
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -202,10 +202,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.2903984487056732
+      Pitch: 0.3253985047340393
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.3903983235359192
+      Yaw: 0.385398268699646
     Saved: ~
 Window Geometry:
   Displays:
@@ -223,5 +223,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 70
-  Y: 263
+  X: 306
+  Y: 240

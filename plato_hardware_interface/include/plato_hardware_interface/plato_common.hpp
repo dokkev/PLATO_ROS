@@ -35,15 +35,15 @@
 #define MOTOR_8_ANGLE_OFFSET 1.735
 
 // JOINT DIRECTION IS CW
-#define MOTOR_0_DIRECTION false
-#define MOTOR_1_DIRECTION true
-#define MOTOR_2_DIRECTION false
+#define MOTOR_0_DIRECTION true
+#define MOTOR_1_DIRECTION false
+#define MOTOR_2_DIRECTION true
 #define MOTOR_3_DIRECTION false
-#define MOTOR_4_DIRECTION true
-#define MOTOR_5_DIRECTION false
+#define MOTOR_4_DIRECTION false
+#define MOTOR_5_DIRECTION true
 #define MOTOR_6_DIRECTION false
-#define MOTOR_7_DIRECTION true
-#define MOTOR_8_DIRECTION false
+#define MOTOR_7_DIRECTION false
+#define MOTOR_8_DIRECTION true
 
 // DEBUG MODE
 #define DEBUG_MODE

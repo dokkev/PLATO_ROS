@@ -1,11 +1,11 @@
 #include "plato_hardware_interface/plato_socket_can.hpp"
-
+#include "plato_hardware_interface/socket_can.hpp"
+#include <fcntl.h>
 #include <iostream>
 
 namespace plato_socket_can{
 
 PlatoSocketCAN::PlatoSocketCAN() : CAN_CHANNEL("can0") {
-    
 }
 
 
@@ -15,39 +15,39 @@ void PlatoSocketCAN::init() {
 
     // Create a socket
     socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-    if (socket_ < 0) {
-        perror("Socket creation failed");
-        return; // Early return on failure
-    }
-
     // Specify the CAN interface
-    std::strcpy(ifr_.ifr_name, CAN_CHANNEL.c_str());
-    if (ioctl(socket_, SIOCGIFINDEX, &ifr_) < 0) {
-        perror("Getting IF index failed");
-        close(socket_); // Clean up socket on failure
-        return; // Early return on failure
-    }
-
-    // Bind the socket to the CAN interface
-    std::memset(&addr_, 0, sizeof(addr_));
+    std::strcpy(ifr_.ifr_name, "can0");
+    ioctl(socket_, SIOCGIFINDEX, &ifr_); 
     addr_.can_family = AF_CAN;
     addr_.can_ifindex = ifr_.ifr_ifindex;
-    if (bind(socket_, (struct sockaddr *)&addr_, sizeof(addr_)) < 0) {
-        perror("Socket bind failed");
-        close(socket_); // Clean up socket on failure
-        return; // Early return on failure
-    }
+
+    // Buffer size
+    // int rcvbuf_size = 524288; // Example size, adjust based on your needs
+    // if (setsockopt(socket_, SOL_SOCKET, SO_RCVBUF, &rcvbuf_size, sizeof(rcvbuf_size)) < 0) {
+    //     perror("Setting receive buffer size failed");
+    //     // Handle error
+
+    // Non-blocking
+    // int flags = fcntl(socket_, F_GETFL, 0);
+    // fcntl(socket_, F_SETFL, flags | O_NONBLOCK);
+
+
+
+    bind(socket_, (struct sockaddr *)&addr_, sizeof(addr_));
+
+    // close(socket_);
+
 
     // Timeout
-    struct timeval tv;
-    tv.tv_sec = 0; // 5 second timeout
-    tv.tv_usec = 10; // 0 microseconds
-    if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-        perror("Setting socket timeout failed");
-        return; // Early return on failure
-    }
+    // struct timeval tv;
+    // tv.tv_sec = 0; // 5 second timeout
+    // tv.tv_usec = 10; // 0 microseconds
+    // if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+    //     perror("Setting socket timeout failed");
+    //     return; // Early return on failure
 
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "SocketCAN initialized!");
+
 }
     
     
@@ -59,6 +59,10 @@ void PlatoSocketCAN::setup_can_ids() {
     can_rx_id_ = {MOTOR_0_CAN_RX_ID, MOTOR_1_CAN_RX_ID, MOTOR_2_CAN_RX_ID, 
                   MOTOR_3_CAN_RX_ID, MOTOR_4_CAN_RX_ID, MOTOR_5_CAN_RX_ID, 
                   MOTOR_6_CAN_RX_ID, MOTOR_7_CAN_RX_ID, MOTOR_8_CAN_RX_ID};
+
+    can_id_to_joint_id_={ {MOTOR_0_CAN_RX_ID, 0}, {MOTOR_1_CAN_RX_ID, 1}, {MOTOR_2_CAN_RX_ID, 2}, 
+                          {MOTOR_3_CAN_RX_ID, 3}, {MOTOR_4_CAN_RX_ID, 4}, {MOTOR_5_CAN_RX_ID, 5}, 
+                          {MOTOR_6_CAN_RX_ID, 6}, {MOTOR_7_CAN_RX_ID, 7}, {MOTOR_8_CAN_RX_ID, 8} };
 }
 
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
@@ -70,7 +74,7 @@ void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_com
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
         write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
         #ifdef DEBUG_MODE
-            RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
+            // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
         #endif
     
     }
@@ -79,53 +83,47 @@ void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_com
 
 void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states) {
  
+    // auto rx_data = read_can(socket_);
+    // if (!rx_data.has_value()) {
+    //     RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
+    //     return;
+    // }
+    // auto [id, data] = rx_data.value();
 
-    auto rx_data = read_can(socket_);
-    if (!rx_data.has_value()) {
-        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
-        return;
-    }
+    // #ifdef DEBUG_MODE
+    //     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
+    // #endif
 
-    auto [id, data] = rx_data.value();
-
-    #ifdef DEBUG_MODE
-        RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
-    #endif
-
+    // for (size_t i = 0; i < can_rx_id_.size(); ++i) {
+    //     if (id == can_rx_id_[i]) {
+    //         motor_position_states[i] = data;
+    //         return;
+    //     }
+    // }
     // TODO: I could change to unordered_map to make it more efficient
-    switch (id){
-    case MOTOR_0_CAN_RX_ID:
-        motor_position_states[0] = data;
 
-        break;
-    case MOTOR_1_CAN_RX_ID:
-        motor_position_states[1] = data;
-        break;
-    case MOTOR_2_CAN_RX_ID:
-        motor_position_states[2] = data;
-        break;
-    case MOTOR_3_CAN_RX_ID:
-        motor_position_states[3] = data;
-        break;
-    case MOTOR_4_CAN_RX_ID:
-        motor_position_states[4] = data;
-        break;
-    case MOTOR_5_CAN_RX_ID:
-        motor_position_states[5] = data;
-        break;
-    case MOTOR_6_CAN_RX_ID:
-        motor_position_states[6] = data;
-        break;
-    case MOTOR_7_CAN_RX_ID:
-        motor_position_states[7] = data;
-        break;
-    case MOTOR_8_CAN_RX_ID:
-        motor_position_states[8] = data;
-        break;
+    int nbytes = read(socket_, &frame_, sizeof(frame_));
 
-    default:   
-        break;
+    
+    if (nbytes > 0) {
+        // Successfully read a frame with expected DLC
+        int id = frame_.can_id & CAN_SFF_MASK;
+        // double data;
+        // std::memcpy(&data, frame_.data, sizeof(double));
+
+        // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
+
+        auto search = can_id_to_joint_id_.find(id);
+        if (search != can_id_to_joint_id_.end()) {
+
+
+            RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d", id);
+        }
+        motor_position_states[can_id_to_joint_id_[id]] = 0;
+        
+
     }
+
 }
 
 void PlatoSocketCAN::write_can(int socket, int id, double data) {
@@ -173,5 +171,7 @@ std::optional<std::tuple<int, double>> PlatoSocketCAN::read_can(int socket) {
     return std::nullopt; // Indicate failure to read valid data within the timeout
 
 }
+
+
 
 }// namespace plato_socket_can

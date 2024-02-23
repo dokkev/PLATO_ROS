@@ -15,6 +15,9 @@
 #include <vector>
 #include <chrono>
 
+#include <map>
+#include <unordered_map>
+
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
@@ -53,10 +56,14 @@ private:
     std::vector<int> can_tx_id_;
     std::vector<int> can_rx_id_;
 
+    std::unordered_map<int, int> can_id_to_joint_id_;
+
     std::vector<double> can_rx_msg_;
 
     void write_can(int socket, int id, double data);
     std::optional<std::tuple<int, double>> read_can(int socket);
+
+    struct can_frame frame_;
 
 
 

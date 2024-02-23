@@ -34,12 +34,16 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include <sensor_msgs/msg/joint_state.h>
+#include <can_msgs/msg/frame.hpp>
 
 #include "plato_hardware_interface/plato_common.hpp"
 #include "plato_hardware_interface/plato_motor_direction.hpp"
 #include "plato_hardware_interface/plato_socket_can.hpp"
+#include "plato_hardware_interface/socket_can.hpp"
 
 #include "plato_hardware_interface/visibility_control.h"
+
+
 
 namespace plato_hardware_interface
 {
@@ -47,7 +51,7 @@ namespace plato_hardware_interface
 class PLATOHardware : public hardware_interface::SystemInterface 
 {
 public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(PLATOHardware);
+
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::CallbackReturn on_init(
@@ -110,9 +114,17 @@ public:
 
       std::vector<std::string> effort_command_interface_names_;
 
-      plato_socket_can::PlatoSocketCAN socket_can_;
+      // plato_socket_can::PlatoSocketCAN socket_can_;
+
+      SocketCanIntf can_intf_ = SocketCanIntf();
 
       plato_motor_direction::PlatoMotorDirection motor_direction_;
+
+      rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_subscriber_;
+      rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_publisher_;
+      rclcpp::Node::SharedPtr node_;
+
+      can_msgs::msg::Frame can_rx_msg_;
 
      
 

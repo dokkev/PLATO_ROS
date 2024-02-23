@@ -99,6 +99,9 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   // Initialize the Joint (Motor) to CAN ID mapping
   PLATOHardware::set_can_id_map();
 
+  // Node
+  rclcpp::NodeOptions options;
+  options.arguments({"--ros-args", "-r", "__node:=plato_hardware_interface"+ info_.name});
 
 
   // Node

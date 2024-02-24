@@ -108,6 +108,8 @@ public:
       std::vector<double> joint_effort_states_;
       std::vector<double> ft_sensor_states_;
 
+      std::vector<bool> can_error_;
+
       std::vector<std::string> effort_command_interface_names_;
 
       plato_socket_can::PlatoSocketCAN socket_can_;

@@ -71,6 +71,8 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
+  can_error_.resize(info_.joints.size(), false);
+
   // init CAN
   socket_can_.init();
 
@@ -186,10 +188,12 @@ hardware_interface::return_type PLATOHardware::read(
 {
 
 
-  // Read the motor position over CAN
-  socket_can_.receive_can_rx_msg(motor_position_states_);
-  // Adjust the motor position with Offset and Direction
-  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+  for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
+    // Read the motor position over CAN
+    socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
+    // Adjust the motor position with Offset and Direction
+    motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+  }
 
 
   return hardware_interface::return_type::OK;

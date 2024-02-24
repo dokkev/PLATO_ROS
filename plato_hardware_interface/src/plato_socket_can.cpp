@@ -39,13 +39,13 @@ void PlatoSocketCAN::init() {
     }
 
     // Timeout
-    struct timeval tv;
-    tv.tv_sec = 0; // 5 second timeout
-    tv.tv_usec = 10; // 0 microseconds
-    if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-        perror("Setting socket timeout failed");
-        return; // Early return on failure
-    }
+    // struct timeval tv;
+    // tv.tv_sec = 0; // 5 second timeout
+    // tv.tv_usec = 10; // 0 microseconds
+    // if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+    //     perror("Setting socket timeout failed");
+    //     return; // Early return on failure
+    // }
 
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "SocketCAN initialized!");
 }
@@ -63,64 +63,72 @@ void PlatoSocketCAN::setup_can_ids() {
 
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
     if (motor_effort_commands.size() > can_tx_id_.size()) {
-        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Motor command size exceeds CAN ID size!");
+        // RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Motor command size exceeds CAN ID size!");
         return;
     }
 
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
         write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
         #ifdef DEBUG_MODE
-            RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
+            // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN message: %f", motor_effort_commands[i]);
         #endif
     
     }
 }
 
 
-void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states) {
+void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states,
+                                        std::vector<bool> &can_error) {
  
 
     auto rx_data = read_can(socket_);
     if (!rx_data.has_value()) {
-        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
+        // RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
         return;
     }
 
-    auto [id, data] = rx_data.value();
+    auto [id, data, b_err, b_rtr] = rx_data.value();
 
     #ifdef DEBUG_MODE
-        RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
+        // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
     #endif
 
     // TODO: I could change to unordered_map to make it more efficient
     switch (id){
     case MOTOR_0_CAN_RX_ID:
         motor_position_states[0] = data;
-
+        can_error[0] = b_err;
         break;
     case MOTOR_1_CAN_RX_ID:
         motor_position_states[1] = data;
+        can_error[1] = b_err;
         break;
     case MOTOR_2_CAN_RX_ID:
         motor_position_states[2] = data;
         break;
     case MOTOR_3_CAN_RX_ID:
         motor_position_states[3] = data;
+        can_error[3] = b_err;
         break;
     case MOTOR_4_CAN_RX_ID:
         motor_position_states[4] = data;
+        can_error[4] = b_err;
         break;
     case MOTOR_5_CAN_RX_ID:
         motor_position_states[5] = data;
+        can_error[5] = b_err;
         break;
     case MOTOR_6_CAN_RX_ID:
         motor_position_states[6] = data;
+        can_error[6] = b_err;
         break;
     case MOTOR_7_CAN_RX_ID:
         motor_position_states[7] = data;
+        can_error[7] = b_err;
         break;
     case MOTOR_8_CAN_RX_ID:
         motor_position_states[8] = data;
+        can_error[8] = b_err;
         break;
 
     default:   
@@ -154,7 +162,7 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
 }
 
-std::optional<std::tuple<int, double>> PlatoSocketCAN::read_can(int socket) {
+std::optional<std::tuple<int, double, bool, bool>> PlatoSocketCAN::read_can(int socket) {
 
         struct can_frame frame;
         int nbytes = read(socket, &frame, sizeof(frame));
@@ -163,8 +171,10 @@ std::optional<std::tuple<int, double>> PlatoSocketCAN::read_can(int socket) {
             // Successfully read a frame with expected DLC
             int id = frame.can_id;
             double data;
+            bool b_err = data || 0x10000000;
+            bool b_rtr = data || 0x20000000;
             std::memcpy(&data, frame.data, sizeof(double));
-            return {{id, data}}; // Successfully received data within the timeout
+            return {{id, data, b_err, b_rtr}}; // Successfully received data within the timeout
         }
    
     // Log timeout or error only if no valid data received

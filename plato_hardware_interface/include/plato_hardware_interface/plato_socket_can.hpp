@@ -38,7 +38,8 @@ public:
     void init();
 
     void send_can_tx_msg(const std::vector<double>& motor_effort_commands);
-    void receive_can_rx_msg(std::vector<double>& motor_position_states);
+    void receive_can_rx_msg(std::vector<double>& motor_position_states,
+                            std::vector<bool>& can_error);
 
 
 private:
@@ -53,10 +54,12 @@ private:
     std::vector<int> can_tx_id_;
     std::vector<int> can_rx_id_;
 
+
+
     std::vector<double> can_rx_msg_;
 
     void write_can(int socket, int id, double data);
-    std::optional<std::tuple<int, double>> read_can(int socket);
+    std::optional<std::tuple<int, double, bool, bool>> read_can(int socket);
 
 
 

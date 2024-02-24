@@ -124,7 +124,6 @@ void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_stat
 
 void PlatoSocketCAN::write_can(int socket, int id, double data) {
     struct can_frame frame;
-    std::memset(&frame, 0, sizeof(frame)); // Clear the frame
 
     // if data is NaN send 0.0
     if (std::isnan(data)) {
@@ -138,8 +137,13 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
 
     frame.can_id = id;
     frame.can_dlc = 8; // Explicitly set to 8 bytes for clarity
+
     std::memcpy(frame.data, &data, sizeof(double));
-    write(socket, &frame, sizeof(frame));
+    if (write(socket, &frame, sizeof(frame)) != sizeof(frame)) {
+        RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to send CAN frame");
+    }
+    
+    
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
 
 }

@@ -6,10 +6,10 @@ ros2 topic pub /plato_arm_controller/joint_trajectory trajectory_msgs/msg/JointT
       positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
       velocities: [],
       accelerations: [],
-      effort: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      effort: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
       time_from_start: {sec: 2, nanosec: 0}
     }
   ]
-}"
 
-ros2 topic pub /plato/plato_effort_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.05, 0.0, 0.0, 0.05, 0.0, 0.0, -0.05]}"
+  ros2 topic pub /plato/plato_effort_controller/command std_msgs/msg/Float64MultiArray "{
+  data: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.1, 0.01]}"

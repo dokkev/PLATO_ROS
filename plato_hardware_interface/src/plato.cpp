@@ -104,9 +104,9 @@ PLATOHardware::export_state_interfaces()
       hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_position_states_[i]));
     state_interfaces.emplace_back(
-      // hardware_interface::StateInterface(
-        // info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_position_states_[i]));
-    // state_interfaces.emplace_back(
+      hardware_interface::StateInterface(
+        info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_states_[i]));
+    state_interfaces.emplace_back(
       hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_states_[i]));
   }
@@ -178,11 +178,12 @@ hardware_interface::return_type PLATOHardware::read(
   for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
-    // Adjust the motor position with Offset and Direction
+      // Adjust the motor position with Offset and Direction
+    motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+    
     
   }
-  
-  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
 
   return hardware_interface::return_type::OK;
 }
@@ -190,6 +191,10 @@ hardware_interface::return_type PLATOHardware::read(
 hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+
+  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
+    joint_effort_commands_[i] = 0.01;
+  }
 
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);

@@ -56,49 +56,19 @@ void PlatoSocketCAN::setup_can_ids() {
                   MOTOR_3_CAN_RX_ID, MOTOR_4_CAN_RX_ID, MOTOR_5_CAN_RX_ID, 
                   MOTOR_6_CAN_RX_ID, MOTOR_7_CAN_RX_ID, MOTOR_8_CAN_RX_ID};
 
- 
-
 }
 
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
-    if (motor_effort_commands.size() > can_tx_id_.size()) {
-        // RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Motor command size exceeds CAN ID size!");
-        return;
-    }
-
-
-    //use the joint_id_to_can_tx_id mapping
+ 
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
-        write_can(socket_, joint_id_to_can_tx_id_[i], motor_effort_commands[i]);
-       
+        write_can(socket_, can_rx_id_[i], motor_effort_commands[i]);
     }
-    
-    // }
 }
 
 
 void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states,
                                         std::vector<bool> &can_error) {
  
-    // auto rx_data = read_can(socket_);
-    // if (!rx_data.has_value()) {
-    //     RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
-    //     return;
-    // }
-    // auto [id, data] = rx_data.value();
-
-    // #ifdef DEBUG_MODE
-    //     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
-    // #endif
-
-    // for (size_t i = 0; i < can_rx_id_.size(); ++i) {
-    //     if (id == can_rx_id_[i]) {
-    //         motor_position_states[i] = data;
-    //         return;
-    //     }
-    // }
-    // TODO: I could change to unordered_map to make it more efficient
-
     auto rx_data = read_can(socket_);
     if (!rx_data.has_value()) {
         // RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to read CAN frame");
@@ -107,9 +77,6 @@ void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_stat
 
     auto [id, data, b_err, b_rtr] = rx_data.value();
 
-    #ifdef DEBUG_MODE
-        // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::receive_can_rx_msg"), "Received CAN ID %d message: %f", id, data);
-    #endif
 
     // TODO: I could change to unordered_map to make it more efficient
     switch (id){
@@ -166,19 +133,15 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
 
     // Current Limiting 
-    data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
+    // data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
     // through warning if data is clamped
-    if (data != std::clamp(data, -MAX_CURRENT, MAX_CURRENT)) {
-        RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN::write_can"), "Current clamped to %f", data);
-    }
-
 
     frame.can_id = id;
     frame.can_dlc = 8; // Explicitly set to 8 bytes for clarity
     std::memcpy(frame.data, &data, sizeof(double));
-    if (write(socket, &frame, sizeof(frame)) != sizeof(frame)) {
-        perror("CAN Frame write failed");
-    }
+    write(socket, &frame, sizeof(frame));
+    RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
+
 }
 
 std::optional<std::tuple<int, double, bool, bool>> PlatoSocketCAN::read_can(int socket) {
@@ -190,8 +153,8 @@ std::optional<std::tuple<int, double, bool, bool>> PlatoSocketCAN::read_can(int 
             // Successfully read a frame with expected DLC
             int id = frame.can_id;
             double data;
-            bool b_err = data || 0x10000000;
-            bool b_rtr = data || 0x20000000;
+            bool b_err = (data || 0x10000000) == 0x10000000;
+            bool b_rtr = (data || 0x20000000) == 0x20000000;
             std::memcpy(&data, frame.data, sizeof(double));
             return {{id, data, b_err, b_rtr}}; // Successfully received data within the timeout
         }

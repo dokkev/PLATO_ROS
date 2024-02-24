@@ -12,4 +12,4 @@ ros2 topic pub /plato_arm_controller/joint_trajectory trajectory_msgs/msg/JointT
   ]
 }"
 
-ros2 topic pub /plato/plato_effort_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
+ros2 topic pub /plato/plato_effort_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.05, 0.0, 0.0, 0.05, 0.0, 0.0, -0.05]}"

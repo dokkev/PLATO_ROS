@@ -13,9 +13,6 @@
 // limitations under the License.
 
 
-
-
-
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include <pluginlib/class_list_macros.hpp>
 
@@ -24,8 +21,6 @@
 
 namespace plato_hardware_interface
 {
-
-
 
 void PLATOHardware::set_zero_command(std::vector<double>& command){
   for (size_t i = 0; i < command.size(); ++i) {
@@ -40,11 +35,13 @@ void PLATOHardware::set_zero_states(std::vector<double>& joint_states){
 }
 
 void PLATOHardware::stop(){
-  set_zero_command(motor_effort_commands_);
+  
   RCLCPP_INFO(
   rclcpp::get_logger("PLATOHardware"), "Deactivating ...Setting all commands to zero...");
   // set all command effort to 0
-
+  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
+    set_zero_command(motor_effort_commands_); // send it multiple times to bypass the CAN zero filter in ESP32
+  }
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
 }
 
@@ -71,12 +68,11 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
-  can_error_.resize(info_.joints.size(), false);
-
   // init CAN
   socket_can_.init();
+  can_error_.resize(info_.joints.size(), false);
 
-
+  // Shutdown protocol
   rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -108,13 +104,12 @@ PLATOHardware::export_state_interfaces()
       hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_position_states_[i]));
     state_interfaces.emplace_back(
-      hardware_interface::StateInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_position_states_[i]));
-    state_interfaces.emplace_back(
+      // hardware_interface::StateInterface(
+        // info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_position_states_[i]));
+    // state_interfaces.emplace_back(
       hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_states_[i]));
   }
-
 
   return state_interfaces;
 }
@@ -132,9 +127,6 @@ PLATOHardware::export_command_interfaces()
     effort_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
 
-  
-
-
   return command_interfaces;
 }
 
@@ -144,10 +136,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
 
   RCLCPP_INFO(
     rclcpp::get_logger("PLATOHardware"), "Activating ...please wait...");
-
-
-
-
 
     // TODO: Add Gravity Compensation
 
@@ -187,7 +175,6 @@ hardware_interface::return_type PLATOHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
-
   for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
@@ -196,7 +183,6 @@ hardware_interface::return_type PLATOHardware::read(
   }
   
   motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
-
 
   return hardware_interface::return_type::OK;
 }
@@ -209,7 +195,6 @@ hardware_interface::return_type PLATOHardware::write(
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
   socket_can_.send_can_tx_msg(motor_effort_commands_);
-
 
   return hardware_interface::return_type::OK;
 }

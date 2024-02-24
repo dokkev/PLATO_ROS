@@ -40,8 +40,6 @@
 #include "plato_hardware_interface/plato_common.hpp"
 #include "plato_hardware_interface/plato_motor_direction.hpp"
 #include "plato_hardware_interface/plato_socket_can.hpp"
-#include "plato_hardware_interface/socket_can.hpp"
-
 
 #include "plato_hardware_interface/visibility_control.h"
 
@@ -135,13 +133,7 @@ public:
 
       can_msgs::msg::Frame can_rx_msg_;
 
-     
-
-
- 
-      
-
-
+    
 
 
 };

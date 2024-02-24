@@ -6,6 +6,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
   add_compile_options(-Wall -Wextra)
 endif()
 
+# if (NOT TARGET sockcanpp)
+#     add_subdirectory(libsockcanpp ${CMAKE_CURRENT_BUILD_DIR}/libsockcanpp)
+# endif()
+
+# target_link_libraries(
+
+#     sockcanpp
+# )
+
 # find dependencies
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   hardware_interface
@@ -13,6 +22,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
   rclcpp_lifecycle
   sensor_msgs
+  can_msgs
 )
 
 # find dependencies
@@ -28,6 +38,8 @@ add_library(
   src/plato.cpp
   src/plato_socket_can.cpp
   src/plato_motor_direction.cpp
+  src/socket_can.cpp
+  src/epoll_event_loop.cpp
 )
 target_compile_features(plato_hardware_interface PUBLIC cxx_std_17)
 target_include_directories(plato_hardware_interface PUBLIC

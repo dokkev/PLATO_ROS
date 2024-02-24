@@ -1,8 +1,6 @@
 #ifndef PLATO_HARDWARE_INTERFACE__PLATO_SOCKET_CAN_HPP_
 #define PLATO_HARDWARE_INTERFACE__PLATO_SOCKET_CAN_HPP_
 
-
-
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
@@ -14,6 +12,9 @@
 #include <time.h>
 #include <vector>
 #include <chrono>
+
+#include <map>
+#include <unordered_map>
 
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
@@ -42,6 +43,8 @@ public:
                             std::vector<bool>& can_error);
 
 
+
+
 private:
     void setup_can_ids();
     
@@ -55,11 +58,12 @@ private:
     std::vector<int> can_rx_id_;
 
 
-
     std::vector<double> can_rx_msg_;
 
     void write_can(int socket, int id, double data);
     std::optional<std::tuple<int, double, bool, bool>> read_can(int socket);
+
+    struct can_frame frame_;
 
 
 

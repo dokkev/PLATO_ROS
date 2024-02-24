@@ -118,8 +118,9 @@ public:
       std::vector<double> joint_effort_states_;
       std::vector<double> ft_sensor_states_;
 
-      std::unordered_map<int,int> rx_to_joint_;
-      std::unordered_map<int,int> joint_to_tx_;
+
+      std::vector<bool> can_error_;
+
 
       std::vector<std::string> effort_command_interface_names_;
 

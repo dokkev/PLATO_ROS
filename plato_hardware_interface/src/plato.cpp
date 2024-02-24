@@ -94,21 +94,12 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
-  // Initialize the Joint (Motor) to CAN ID mapping
-  PLATOHardware::set_can_id_map();
 
+  can_error_.resize(info_.joints.size(), false);
 
-  // Node
-  rclcpp::NodeOptions options;
-  options.arguments({"--ros-args", "-r", "__node:=plato_hardware_interface"+ info_.name});
+  // init CAN
+  socket_can_.init();
 
-  node_ = rclcpp::Node::make_shared("_", options);
-
-  can_publisher_ = node_->create_publisher<can_msgs::msg::Frame>("to_can_bus", rclcpp::QoS(10));
-
-  can_subscriber_ = node_->create_subscription<can_msgs::msg::Frame>(
-    "from_can_bus", rclcpp::QoS(10),
-    std::bind(&PLATOHardware::can_frame_callback, this, std::placeholders::_1));
 
 
   rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
@@ -216,9 +207,18 @@ hardware_interface::return_type PLATOHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
-  if (rclcpp::ok()){
-    rclcpp::spin_some(node_);
+
+
+  for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
+    // Read the motor position over CAN
+    socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
+    // Adjust the motor position with Offset and Direction
+    
   }
+  
+  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
+
 
   return hardware_interface::return_type::OK;
 }

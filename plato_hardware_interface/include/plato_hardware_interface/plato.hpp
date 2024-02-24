@@ -122,7 +122,7 @@ public:
 
       std::vector<std::string> effort_command_interface_names_;
 
-      // plato_socket_can::PlatoSocketCAN socket_can_;
+      plato_socket_can::PlatoSocketCAN socket_can_;
 
 
       plato_motor_direction::PlatoMotorDirection motor_direction_;

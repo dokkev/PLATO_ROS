@@ -192,8 +192,10 @@ hardware_interface::return_type PLATOHardware::read(
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
     // Adjust the motor position with Offset and Direction
-    motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+    
   }
+  
+  motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
 
 
   return hardware_interface::return_type::OK;

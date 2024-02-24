@@ -61,7 +61,7 @@ void PlatoSocketCAN::setup_can_ids() {
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
  
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
-        write_can(socket_, can_rx_id_[i], motor_effort_commands[i]);
+        write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
     }
 }
 
@@ -144,7 +144,7 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
     
     
-    RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
+    // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
 
 }
 

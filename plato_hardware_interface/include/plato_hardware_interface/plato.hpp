@@ -94,6 +94,9 @@ public:
     void set_zero_states(std::vector<double>& joint_states);
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
+    void compute_velocity(const rclcpp::Duration & period);
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
     void set_can_id_map();
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
@@ -112,6 +115,7 @@ public:
       std::vector<double> joint_effort_commands_;
       
       std::vector<double> joint_position_states_;
+      std::vector<double> joint_position_states_prev_;
       std::vector<double> joint_velocity_states_;
       std::vector<double> joint_effort_states_;
       std::vector<double> ft_sensor_states_;

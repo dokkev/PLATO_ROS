@@ -46,6 +46,14 @@ void PLATOHardware::stop(){
 }
 
 
+void PLATOHardware::compute_velocity(const rclcpp::Duration &period){
+  for (size_t i = 0; i < joint_position_states_.size(); ++i) {
+    joint_velocity_states_[i] = (joint_position_states_[i] - joint_position_states_prev_[i]) / period.seconds();
+    joint_position_states_prev_[i] = joint_position_states_[i];
+  }
+
+}
+
 hardware_interface::CallbackReturn PLATOHardware::on_init(
   const hardware_interface::HardwareInfo & info)
 {
@@ -61,6 +69,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   joint_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
   joint_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_position_states_prev_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_velocity_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_effort_states_.resize(info_.joints.size(),   std::numeric_limits<double>::quiet_NaN());
 
@@ -68,9 +77,6 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
-  // init CAN
-  socket_can_.init();
-  can_error_.resize(info_.joints.size(), false);
 
   // Shutdown protocol
   rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
@@ -88,6 +94,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   PLATOHardware::set_zero_states(joint_effort_states_);
 
   PLATOHardware::set_zero_command(joint_position_commands_);
+  PLATOHardware::set_zero_command(joint_effort_commands_);
   
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -142,6 +149,10 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
     // send the zero effort command to the motor
     PLATOHardware::set_zero_command(joint_effort_commands_);
 
+    // init CAN
+    socket_can_.init();
+    can_error_.resize(info_.joints.size(), false);
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 
@@ -172,15 +183,22 @@ hardware_interface::CallbackReturn PLATOHardware::on_shutdown(
 }
 
 hardware_interface::return_type PLATOHardware::read(
-  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+  const rclcpp::Time & /*time*/, const rclcpp::Duration &period)
 {
+
+
+  // command effort is read from the joint effort commands
+  joint_effort_states_ = joint_effort_commands_;
+  PLATOHardware::compute_velocity(period);
 
   for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
-      // Adjust the motor position with Offset and Direction
+    // Adjust the motor position with Offset and Direction
     motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
     
+
     
   }
 
@@ -191,10 +209,6 @@ hardware_interface::return_type PLATOHardware::read(
 hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-
-  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
-    joint_effort_commands_[i] = 0.01;
-  }
 
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);

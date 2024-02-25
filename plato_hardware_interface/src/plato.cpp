@@ -24,7 +24,7 @@ namespace plato_hardware_interface
 
 void PLATOHardware::set_zero_command(std::vector<double>& command){
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 1e-6;
+    command[i] = 1e-4;
   }
 }
 
@@ -198,6 +198,8 @@ hardware_interface::return_type PLATOHardware::read(
   joint_effort_states_ = joint_effort_commands_;
   PLATOHardware::compute_velocity(period);
 
+
+  
   for (unsigned int i = 0; i < info_.joints.size(); ++i) {
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);  
@@ -223,9 +225,9 @@ hardware_interface::return_type PLATOHardware::write(
 
 
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
-  // motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
+  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
-  // socket_can_.set_can_tx_msg(motor_effort_commands_);
+  socket_can_.set_can_tx_msg(motor_effort_commands_);
 
 
 

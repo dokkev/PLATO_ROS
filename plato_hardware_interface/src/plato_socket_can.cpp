@@ -46,7 +46,7 @@ void PlatoSocketCAN::init() {
 
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "SocketCAN initialized!");
     
-    // begin_send_thread();
+    begin_send_thread();
 
 }
     
@@ -105,12 +105,12 @@ void PlatoSocketCAN::send_can_tx_msg() {
             // Assuming write_can is your method to send CAN messages
             // and can_tx_id_[i] is the CAN ID for the ith motor
             write_can(socket_, can_tx_id_[i], msg[i]);
-            std::this_thread::sleep_for(std::chrono::nanoseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
         // Optionally, use condition variable to control rate
         // For example, to send messages every 10 milliseconds
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
         
     }
 }

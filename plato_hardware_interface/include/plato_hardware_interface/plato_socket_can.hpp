@@ -33,7 +33,7 @@
 namespace plato_socket_can{
 
 static constexpr double MAX_CURRENT = 1.0;
-static constexpr double ZERO_CURRENT = 0.01; //0.00006 Nm
+static constexpr double ZERO_CURRENT = 0.0001; 
 
 
 

@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>plato_hardware_interface</name>
-  <version>0.0.0</version>
+  <version>1.0.0</version>
   <description>Hardware Interface for PLATO Hand with ros2_control</description>
   <maintainer email="dongho@utexas.edu">dk</maintainer>
   <license>Apache-2.0</license>

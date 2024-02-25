@@ -66,10 +66,6 @@ install(
 
 
 install(DIRECTORY 
-  description/ros2_control
-  description/urdf
-  rviz
-  config
   launch 
   DESTINATION share/${PROJECT_NAME}
 )

@@ -24,7 +24,7 @@ namespace plato_hardware_interface
 
 void PLATOHardware::set_zero_command(std::vector<double>& command){
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 1e-4;
+    command[i] = 0.0;
   }
 }
 
@@ -81,6 +81,8 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
+  
+
 
   // Shutdown protocol
   rclcpp::on_shutdown(std::bind(&PLATOHardware::stop, this));
@@ -98,6 +100,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   PLATOHardware::set_zero_states(joint_effort_states_);
 
   PLATOHardware::set_zero_command(joint_position_commands_);
+  PLATOHardware::set_zero_command(joint_position_commands_prev_);
   PLATOHardware::set_zero_command(joint_effort_commands_);
   PLATOHardware::set_zero_command(joint_effort_commands_prev_);
   

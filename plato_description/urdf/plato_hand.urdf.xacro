@@ -1,6 +1,13 @@
 <?xml version="1.0"?>
 <robot name="plato_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <!-- Arguments -->
+    <xacro:arg name="mock_hardware" default="false" />
+    <xacro:arg name="gazebo_classic" default="false" />
+    <xacro:arg name="gazebo" default="true" />
+
+
+
     <!-- Set World Frame -->
     <link name="world"/>
 
@@ -8,12 +15,13 @@
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
+    
 
     <!-- Plato Hand -->
     <xacro:plato_description connector_link="world"/>
     <!-- Plato Hand Ros2 Control -->
     <xacro:plato_ros2_control name="plato_hand_controller" />
-    
+
 
 
 

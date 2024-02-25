@@ -113,6 +113,7 @@ public:
       std::vector<double> motor_position_states_;
 
       std::vector<double> joint_position_commands_;
+      std::vector<double> joint_position_commands_prev_;
       std::vector<double> joint_effort_commands_;
       std::vector<double> joint_effort_commands_prev_;
       

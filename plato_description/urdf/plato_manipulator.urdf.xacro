@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot name="plato_manipulator" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+
     <!-- Set World Frame -->
     <link name="world"/>
 

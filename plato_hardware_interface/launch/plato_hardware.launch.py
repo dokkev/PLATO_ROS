@@ -28,18 +28,12 @@ def generate_launch_description():
             description="Start RViz2 automatically with this launch file.",
         )
     )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "namespace",
-            default_value="plato",
-            description="Namespace to use",
-        )
-    )
 
-    
+
+
     # Initialize Arguments
     gui = LaunchConfiguration("gui")
-    plato_ns = LaunchConfiguration("plato_ns")
+    plato_ns = "plato"
 
     # Get URDF via xacro
     pkg_name = 'plato_description'

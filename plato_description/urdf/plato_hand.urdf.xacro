@@ -5,7 +5,6 @@
     <xacro:arg name="mock_hardware" default="false" />
     <xacro:arg name="gazebo_classic" default="false" />
     <xacro:arg name="gazebo" default="true" />
-    <xacro:arg name="simulation_controllers" default="" />
 
 
 
@@ -16,15 +15,12 @@
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
+    
 
     <!-- Plato Hand -->
     <xacro:plato_description connector_link="world"/>
     <!-- Plato Hand Ros2 Control -->
-    <xacro:plato_ros2_control name="plato_hand_controller"
-                              mock_hardware="$(arg mock_hardware)"
-                              gazebo_classic="$(arg gazebo_classic)"
-                              gazebo ="$(arg gazebo)"/>
-
+    <xacro:plato_ros2_control name="plato_hand_controller" />
 
 
 

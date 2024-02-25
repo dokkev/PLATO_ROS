@@ -28,10 +28,18 @@ def generate_launch_description():
             description="Start RViz2 automatically with this launch file.",
         )
     )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "namespace",
+            default_value="plato",
+            description="Namespace to use",
+        )
+    )
 
-    plato_ns = 'plato'
+    
     # Initialize Arguments
     gui = LaunchConfiguration("gui")
+    plato_ns = LaunchConfiguration("plato_ns")
 
     # Get URDF via xacro
     pkg_name = 'plato_description'
@@ -45,9 +53,9 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-            FindPackageShare("plato_hardware_interface"),
+            FindPackageShare("plato_bringup"),
             "config",
-            "plato_controllers.yaml",
+            "plato_hard_controllers.yaml",
         ]
     )
     rviz_config_file = PathJoinSubstitution(

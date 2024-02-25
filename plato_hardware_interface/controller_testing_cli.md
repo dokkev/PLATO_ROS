@@ -30,5 +30,4 @@ ros2 topic pub /plato_arm_controller/joint_trajectory trajectory_msgs/msg/JointT
   ]
 }"
 
-ros2 topic pub /joint_jog control_msgs/msg/JointJog "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, joint_names: ['joint1', 'joint2'], displacements: [0.1, 0.2], duration: 2.0}"
 

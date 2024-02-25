@@ -9,7 +9,7 @@ plato:
       plato_effort_controller:
         type: effort_controllers/JointGroupEffortController
 
-      plato_joint_controller:
+      plato_position_controller:
         type: joint_trajectory_controller/JointTrajectoryController
 
 
@@ -27,7 +27,7 @@ plato:
         - plato_joint7
         - plato_joint8
 
-  plato_joint_controller:
+  plato_position_controller:
     ros__parameters:
 
       action_monitor_rate: 20.0

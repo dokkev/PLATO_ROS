@@ -1,12 +1,11 @@
-<?xml version="1.0.0"?>
+<?xml version="0.06.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="plato_ros2_control" params="
                                                 name
-                                                use_mock_hardware:=^|false
+                                                mock_hardware:=^|false
                                                 gazebo_classic:=^|false
-                                                gazebo:=^|false
-                                                plato_hardware:=^|true"
+                                                gazebo:=^|false"
                                                 >
                                                 
   
@@ -14,37 +13,44 @@
     <ros2_control name="${name}" type="system">
         <hardware>
 
-            <xacro:if value="${use_mock_hardware}">
+            <xacro:if value="${mock_hardware}">
                 <plugin>mock_componets/GenericSystem</plugin>
             </xacro:if>
 
             <xacro:if value="${gazebo_classic}">
                 <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+                <gazebo>
+                    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+                        <parameters>$(find plato_bringup)/config/plato_hand_controllers.yaml</parameters>
+                    </plugin>
+                </gazebo>
             </xacro:if>
 
             <xacro:if value="${gazebo}">
                 <plugin>ign_ros2_control/IgnitionSystem</plugin>
             </xacro:if>
 
-            <xacro:if value="${plato_hardware}">
+            <xacro:unless value="${mock_hardware or gazebo_classic or gazebo}">
                 <plugin>plato_hardware_interface/PLATOHardware</plugin>
-            </xacro:if>
+            </xacro:unless>
 
         </hardware>
 
         <joint name="plato_joint0">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
+            <command_interface name="position"/>
+
             <state_interface name="position"/>
             <state_interface name="velocity" />
             <state_interface name="effort" />
         </joint>
         <joint name="plato_joint1">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -52,8 +58,8 @@
         </joint>
         <joint name="plato_joint2">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position">
             </state_interface>
@@ -62,8 +68,8 @@
         </joint>
         <joint name="plato_joint3">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -71,8 +77,8 @@
         </joint>
         <joint name="plato_joint4">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -80,8 +86,8 @@
         </joint>
         <joint name="plato_joint5">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -89,8 +95,8 @@
         </joint>
         <joint name="plato_joint6">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -98,8 +104,8 @@
         </joint>
         <joint name="plato_joint7">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />
@@ -107,8 +113,8 @@
         </joint>
         <joint name="plato_joint8">
             <command_interface name="effort">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <param name="min">-0.06</param>
+                <param name="max">0.06</param>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity" />

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <limits>
 
+
 #include <hardware_interface/handle.hpp>
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
@@ -31,9 +32,11 @@
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
 #include <pluginlib/class_list_macros.hpp>
-#include "rclcpp/rclcpp.hpp"
 
 #include <sensor_msgs/msg/joint_state.h>
+#include <can_msgs/msg/frame.hpp>
+
+#include "rclcpp/rclcpp.hpp"
 
 #include "plato_hardware_interface/plato_common.hpp"
 #include "plato_hardware_interface/plato_motor_direction.hpp"
@@ -41,13 +44,15 @@
 
 #include "plato_hardware_interface/visibility_control.h"
 
+
+
 namespace plato_hardware_interface
 {
 
 class PLATOHardware : public hardware_interface::SystemInterface 
 {
 public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(PLATOHardware);
+
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::CallbackReturn on_init(
@@ -90,9 +95,16 @@ public:
     void set_zero_states(std::vector<double>& joint_states);
 
     PLATO_HARDWARE_INTERFACE_PUBLIC
+    void compute_velocity(const rclcpp::Duration & period);
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void set_can_id_map();
+
+    PLATO_HARDWARE_INTERFACE_PUBLIC
     void stop();
 
-
+    PLATO_HARDWARE_INTERFACE_PUBLIC
+    void can_frame_callback(const can_msgs::msg::Frame::SharedPtr msg);
 
 
     private:
@@ -102,25 +114,34 @@ public:
 
       std::vector<double> joint_position_commands_;
       std::vector<double> joint_effort_commands_;
+      std::vector<double> joint_effort_commands_prev_;
       
       std::vector<double> joint_position_states_;
+      std::vector<double> joint_position_states_prev_;
       std::vector<double> joint_velocity_states_;
       std::vector<double> joint_effort_states_;
       std::vector<double> ft_sensor_states_;
+
+
+      std::vector<bool> can_error_;
+
+      int send_counter_ = 0;
+
 
       std::vector<std::string> effort_command_interface_names_;
 
       plato_socket_can::PlatoSocketCAN socket_can_;
 
+
       plato_motor_direction::PlatoMotorDirection motor_direction_;
 
-     
+      rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_subscriber_;
+      rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_publisher_;
+      rclcpp::Node::SharedPtr node_;
 
+      can_msgs::msg::Frame can_rx_msg_;
 
- 
-      
-
-
+    
 
 
 };

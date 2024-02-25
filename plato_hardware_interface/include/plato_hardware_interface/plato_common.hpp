@@ -25,7 +25,7 @@
 
 // MOTOR ANGLE OFFSET
 #define MOTOR_0_ANGLE_OFFSET 3.80
-#define MOTOR_1_ANGLE_OFFSET -0.50
+#define MOTOR_1_ANGLE_OFFSET 5.81
 #define MOTOR_2_ANGLE_OFFSET 0.22
 #define MOTOR_3_ANGLE_OFFSET 2.26
 #define MOTOR_4_ANGLE_OFFSET 1.53
@@ -35,18 +35,35 @@
 #define MOTOR_8_ANGLE_OFFSET 1.735
 
 // JOINT DIRECTION IS CW
-#define MOTOR_0_DIRECTION false
-#define MOTOR_1_DIRECTION true
-#define MOTOR_2_DIRECTION false
+#define MOTOR_0_DIRECTION true
+#define MOTOR_1_DIRECTION false
+#define MOTOR_2_DIRECTION true
 #define MOTOR_3_DIRECTION false
-#define MOTOR_4_DIRECTION true
-#define MOTOR_5_DIRECTION false
+#define MOTOR_4_DIRECTION false
+#define MOTOR_5_DIRECTION true
 #define MOTOR_6_DIRECTION false
-#define MOTOR_7_DIRECTION true
-#define MOTOR_8_DIRECTION false
+#define MOTOR_7_DIRECTION false
+#define MOTOR_8_DIRECTION true
 
 // DEBUG MODE
 // #define DEBUG_MODE
 
+constexpr bool almost_equal(double d1, double d2, double epsilon=1.0e-3)
+{
+    if (((d1 - d2) < epsilon) && ((d1 - d2) > -epsilon)){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+constexpr bool almost_zero(double d, double epsilon=1.0e-3)
+{
+    if ((d < epsilon) && (d > -epsilon)){
+        return true;
+    }else{
+        return false;
+    }
+}
 
 #endif  // PLATO_HARDWARE_INTERFACE__PLATO_COMMON_HPP_

@@ -7,7 +7,28 @@ ros2 topic pub /plato_arm_controller/joint_trajectory trajectory_msgs/msg/JointT
       velocities: [],
       accelerations: [],
       effort: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-      time_from_start: {sec: 2, nanosec: 0}
+      time_from_start: {sec: 5, nanosec: 0}
     }
   ]
 }"
+
+  ros2 topic pub /plato/plato_effort_controller/commands std_msgs/msg/Float64MultiArray "{
+  data: [0.00, 0.00, 0.01, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]}"
+
+
+  ros2 topic pub /servo_node/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
+  header: {stamp: {sec: 0, nanosec: 0}},
+  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7'],
+  points: [
+    {
+      positions: [0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      velocities: [],
+      accelerations: [],
+      effort: [],
+      time_from_start: {sec: 5, nanosec: 0}
+    }
+  ]
+}"
+
+ros2 topic pub /joint_jog control_msgs/msg/JointJog "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, joint_names: ['joint1', 'joint2'], displacements: [0.1, 0.2], duration: 2.0}"
+

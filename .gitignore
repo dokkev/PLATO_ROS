@@ -6,3 +6,4 @@ plato_hardware_interface/log/latest
 plato_hardware_interface/log/list_2024-02-15_18-48-17/logger_all.log
 plato_hardware_interface/log/latest_list
 .vscode/c_cpp_properties.json
+ros2_socketcan

@@ -4,9 +4,9 @@
   <xacro:macro name="plato_ros2_control" params="
                                                 name
                                                 use_mock_hardware:=^|false
-                                                gazebo_classic:=^|true
+                                                gazebo_classic:=^|false
                                                 gazebo:=^|false
-                                                plato_hardware:=^|false"
+                                                plato_hardware:=^|true"
                                                 >
                                                 
   

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <limits>
 
+
 #include <hardware_interface/handle.hpp>
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
@@ -31,11 +32,11 @@
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
 #include <pluginlib/class_list_macros.hpp>
-#include "rclcpp/rclcpp.hpp"
-#include <unordered_map>
 
 #include <sensor_msgs/msg/joint_state.h>
 #include <can_msgs/msg/frame.hpp>
+
+#include "rclcpp/rclcpp.hpp"
 
 #include "plato_hardware_interface/plato_common.hpp"
 #include "plato_hardware_interface/plato_motor_direction.hpp"
@@ -113,6 +114,7 @@ public:
 
       std::vector<double> joint_position_commands_;
       std::vector<double> joint_effort_commands_;
+      std::vector<double> joint_effort_commands_prev_;
       
       std::vector<double> joint_position_states_;
       std::vector<double> joint_position_states_prev_;
@@ -122,6 +124,8 @@ public:
 
 
       std::vector<bool> can_error_;
+
+      int send_counter_ = 0;
 
 
       std::vector<std::string> effort_command_interface_names_;

@@ -24,7 +24,7 @@ namespace plato_hardware_interface
 
 void PLATOHardware::set_zero_command(std::vector<double>& command){
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 0.0;
+    command[i] = 1e-6;
   }
 }
 
@@ -67,6 +67,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   // Initialize all Joint Vectors
   joint_position_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_effort_commands_prev_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
   joint_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_position_states_prev_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -95,6 +96,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
 
   PLATOHardware::set_zero_command(joint_position_commands_);
   PLATOHardware::set_zero_command(joint_effort_commands_);
+  PLATOHardware::set_zero_command(joint_effort_commands_prev_);
   
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -191,11 +193,15 @@ hardware_interface::return_type PLATOHardware::read(
   joint_effort_states_ = joint_effort_commands_;
   PLATOHardware::compute_velocity(period);
 
-  for (unsigned int i = 0; i < joint_position_states_.size(); i++) {    
+  for (unsigned int i = 0; i < info_.joints.size(); ++i) {
     // Read the motor position over CAN
-    socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
+    socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);  
+
+
     // Adjust the motor position with Offset and Direction
     motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
+
+    // PLATOHardware::set_zero_states(joint_position_states_);
 
     
 
@@ -210,10 +216,26 @@ hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
+
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
   socket_can_.send_can_tx_msg(motor_effort_commands_);
+
+
+  // socket_can_.write_can(socket_can_.socket_, socket_can_.can_tx_id_[1], motor_effort_commands_[1]);
+
+  // socket_can_.send_can_tx_msg(motor_effort_commands_);
+
+  //update the previous joint effort commands
+  joint_effort_commands_prev_ = joint_effort_commands_;
+  
+
+
+  
+  
+
+
 
   return hardware_interface::return_type::OK;
 }

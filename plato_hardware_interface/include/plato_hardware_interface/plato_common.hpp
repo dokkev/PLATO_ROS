@@ -48,5 +48,22 @@
 // DEBUG MODE
 // #define DEBUG_MODE
 
+constexpr bool almost_equal(double d1, double d2, double epsilon=1.0e-3)
+{
+    if (((d1 - d2) < epsilon) && ((d1 - d2) > -epsilon)){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+constexpr bool almost_zero(double d, double epsilon=1.0e-3)
+{
+    if ((d < epsilon) && (d > -epsilon)){
+        return true;
+    }else{
+        return false;
+    }
+}
 
 #endif  // PLATO_HARDWARE_INTERFACE__PLATO_COMMON_HPP_

@@ -12,9 +12,12 @@
 #include <time.h>
 #include <vector>
 #include <chrono>
-
-#include <map>
 #include <unordered_map>
+// #include <thread>
+#include <mutex>
+#include <vector>
+#include <condition_variable>
+
 
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
@@ -30,6 +33,8 @@
 namespace plato_socket_can{
 
 static constexpr double MAX_CURRENT = 1.0;
+static constexpr double ZERO_CURRENT = 0.01; //0.00006 Nm
+
 
 
 class PlatoSocketCAN{
@@ -42,16 +47,26 @@ public:
     void receive_can_rx_msg(std::vector<double>& motor_position_states,
                             std::vector<bool>& can_error);
 
-
+    void begin_send_thread();
+    void stop_receive_thread(); 
 
 
 private:
     void setup_can_ids();
     
+    // SocketCAN
     int socket_;
     struct ifreq ifr_;
     struct sockaddr_can addr_;
     const std::string CAN_CHANNEL;
+
+    int send_timer;
+
+    // Multithreading
+    // std::thread send_thread;
+    // bool send_thread_active = false;
+    // std::mutex mtx;
+    // std::condition_variable cv;
     
 
     std::vector<int> can_tx_id_;
@@ -62,6 +77,8 @@ private:
 
     void write_can(int socket, int id, double data);
     std::optional<std::tuple<int, double, bool, bool>> read_can(int socket);
+
+
 
     struct can_frame frame_;
 

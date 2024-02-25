@@ -8,6 +8,8 @@ PlatoSocketCAN::PlatoSocketCAN() : CAN_CHANNEL("can0") {
 }
 
 
+
+
 void PlatoSocketCAN::init() {
     // Setup ID mappings for Motor and CAN IDs
     setup_can_ids();
@@ -58,11 +60,25 @@ void PlatoSocketCAN::setup_can_ids() {
 
 }
 
+// void PlatoSocketCAN::begin_send_thread() {
+//     send_thread_active = true;
+//     send_thread = std::thread(&PlatoSocketCAN::send_can_tx_msg, this);
+// }
+
+// void PlatoSocketCAN::stop_receive_thread() {
+//     send_thread_active = false;
+//     if (send_thread.joinable()) {
+//         send_thread.join();
+//     }
+// }
+
 void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
  
     for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
+    
         write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
     }
+    
 }
 
 
@@ -127,13 +143,17 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
 
     // if data is NaN send 0.0
     if (std::isnan(data)) {
-        data = 0.0;
+        data = ZERO_CURRENT;
         RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN::write_can"), "NaN data detected, sending 0.0 Effort instead");    
     }
 
     // Current Limiting 
-    // data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
-    // through warning if data is clamped
+    data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
+
+    if (almost_zero(data)) {
+        data = ZERO_CURRENT;
+    }
+
 
     frame.can_id = id;
     frame.can_dlc = 8; // Explicitly set to 8 bytes for clarity
@@ -143,7 +163,9 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
         RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to send CAN frame");
     }
     
-    
+    //sleep for 1 us
+    usleep(10);
+
     // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
 
 }

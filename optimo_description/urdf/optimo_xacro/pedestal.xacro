@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
+<xacro:macro name="pedestal_description" params="connector_link">
+
+    
+    <link name="stand_link">
+        <visual>
+            <origin xyz="0 0 -0.5" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.3 0.3 1"/>
+            </geometry>
+            <material name="white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.5" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.3 0.3 1"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Connector Joint -->
+    <joint name="pedestal_connector_joint" type="fixed">
+        <parent link="${connector_link}"/>
+        <child link="stand_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+</xacro:macro>
+</robot>

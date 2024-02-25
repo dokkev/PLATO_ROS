@@ -33,15 +33,15 @@ plato_joint_controller:
       - velocity
 
     gains:
-      plato_joint0: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint1: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint2: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint3: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint4: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint5: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint6: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint7: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-      plato_joint8: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
+      plato_joint0: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint1: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint2: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint3: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint4: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint5: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint6: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint7: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint8: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
 
 
 

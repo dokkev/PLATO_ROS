@@ -36,7 +36,7 @@ def generate_launch_description():
                                         '-entity', 'plato_manipulator',
                                         '-x', '0.1',
                                         '-y', '0.1',
-                                        '-z', '0.01'
+                                        '-z', '1.01'
                                         
                                         ],
                              output='screen')

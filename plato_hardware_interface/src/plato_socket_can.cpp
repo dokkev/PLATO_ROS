@@ -45,6 +45,8 @@ void PlatoSocketCAN::init() {
 
 
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "SocketCAN initialized!");
+    
+    // begin_send_thread();
 
 }
     
@@ -60,27 +62,58 @@ void PlatoSocketCAN::setup_can_ids() {
 
 }
 
-// void PlatoSocketCAN::begin_send_thread() {
-//     send_thread_active = true;
-//     send_thread = std::thread(&PlatoSocketCAN::send_can_tx_msg, this);
-// }
-
-// void PlatoSocketCAN::stop_receive_thread() {
-//     send_thread_active = false;
-//     if (send_thread.joinable()) {
-//         send_thread.join();
-//     }
-// }
-
-void PlatoSocketCAN::send_can_tx_msg(const std::vector<double>& motor_effort_commands) {
- 
-    for (size_t i = 0; i < motor_effort_commands.size(); ++i) {
-    
-        write_can(socket_, can_tx_id_[i], motor_effort_commands[i]);
-    }
-    
+void PlatoSocketCAN::begin_send_thread() {
+    send_thread_active = true;
+    send_thread = std::thread(&PlatoSocketCAN::send_can_tx_msg, this);
 }
 
+void PlatoSocketCAN::stop_send_thread() {
+    send_thread_active = false;
+    if (send_thread.joinable()) {
+        send_thread.join();
+    }
+}
+
+void PlatoSocketCAN::set_can_tx_msg(std::vector<double>& msg) {
+    std::unique_lock<std::mutex> lock(mtx);
+    can_tx_msg_ = msg;
+    lock.unlock();
+    cv.notify_one();
+}
+
+void PlatoSocketCAN::send_can_tx_msg() {
+    while (send_thread_active) {
+        std::unique_lock<std::mutex> lock(mtx);
+        // Wait for either send_thread_active to become false or a notification from another thread
+        cv.wait(lock, [this]{
+            // This condition ensures that the thread only proceeds if send_thread_active is true
+            // or if it's been notified via cv.notify_one()/cv.notify_all().
+            return !send_thread_active || !can_tx_msg_.empty();
+        });
+
+        if (!send_thread_active) {
+            // If send_thread_active has been set to false, exit the loop
+            break;
+        }
+
+        // Copy shared data to local variable to minimize time spent under lock
+        std::vector<double> msg = can_tx_msg_;
+        lock.unlock(); // Unlock as soon as the shared data is copied
+
+        // Send logic using local copy of data
+        for (size_t i = 0; i < msg.size(); ++i) {
+            // Assuming write_can is your method to send CAN messages
+            // and can_tx_id_[i] is the CAN ID for the ith motor
+            write_can(socket_, can_tx_id_[i], msg[i]);
+            std::this_thread::sleep_for(std::chrono::nanoseconds(1));
+        }
+
+        // Optionally, use condition variable to control rate
+        // For example, to send messages every 10 milliseconds
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        
+    }
+}
 
 void PlatoSocketCAN::receive_can_rx_msg(std::vector<double>& motor_position_states,
                                         std::vector<bool> &can_error) {
@@ -164,7 +197,7 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
     
     //sleep for 1 us
-    usleep(10);
+    // usleep(10);
 
     // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
 

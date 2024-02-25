@@ -41,7 +41,10 @@ void PLATOHardware::stop(){
   // set all command effort to 0
   for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
     set_zero_command(motor_effort_commands_); // send it multiple times to bypass the CAN zero filter in ESP32
+
   }
+
+  socket_can_.stop_send_thread();
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
 }
 
@@ -155,6 +158,8 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
     socket_can_.init();
     can_error_.resize(info_.joints.size(), false);
 
+    
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 
@@ -218,9 +223,10 @@ hardware_interface::return_type PLATOHardware::write(
 
 
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
-  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
+  // motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
-  socket_can_.send_can_tx_msg(motor_effort_commands_);
+  // socket_can_.set_can_tx_msg(motor_effort_commands_);
+
 
 
   // socket_can_.write_can(socket_can_.socket_, socket_can_.can_tx_id_[1], motor_effort_commands_[1]);

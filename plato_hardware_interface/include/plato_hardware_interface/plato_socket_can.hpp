@@ -13,7 +13,7 @@
 #include <vector>
 #include <chrono>
 #include <unordered_map>
-// #include <thread>
+#include <thread>
 #include <mutex>
 #include <vector>
 #include <condition_variable>
@@ -43,12 +43,14 @@ public:
 
     void init();
 
-    void send_can_tx_msg(const std::vector<double>& motor_effort_commands);
+    void send_can_tx_msg();
     void receive_can_rx_msg(std::vector<double>& motor_position_states,
                             std::vector<bool>& can_error);
+    
+    void set_can_tx_msg(std::vector<double>& msg);
 
     void begin_send_thread();
-    void stop_receive_thread(); 
+    void stop_send_thread(); 
 
 
 private:
@@ -63,10 +65,10 @@ private:
     int send_timer;
 
     // Multithreading
-    // std::thread send_thread;
-    // bool send_thread_active = false;
-    // std::mutex mtx;
-    // std::condition_variable cv;
+    std::thread send_thread;
+    bool send_thread_active = false;
+    std::mutex mtx;
+    std::condition_variable cv;
     
 
     std::vector<int> can_tx_id_;
@@ -74,6 +76,8 @@ private:
 
 
     std::vector<double> can_rx_msg_;
+    std::vector<double> can_tx_msg_;
+
 
     void write_can(int socket, int id, double data);
     std::optional<std::tuple<int, double, bool, bool>> read_can(int socket);

@@ -1,7 +1,11 @@
 plato:
   controller_manager:
     ros__parameters:
+<<<<<<< Updated upstream:plato_bringup/config/plato_hand_controllers.yaml
       update_rate: 100 # Hz
+=======
+      update_rate: 200  # Hz
+>>>>>>> Stashed changes:plato_hardware_interface/config/plato_controllers.yaml
 
       plato_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster

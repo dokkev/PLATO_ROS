@@ -2,42 +2,60 @@ controller_manager:
   ros__parameters:
     update_rate: 100 # Hz
 
-    plato_joint_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-    
-    joint_state_broadcaster:
+    plato_joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-  plato_joint_controller:
-    ros__parameters:
+    plato_effort_controller:
+      type: effort_controllers/JointGroupEffortController
 
-      joints:
-        - plato_joint0
-        - plato_joint1
-        - plato_joint2
-        - plato_joint3
-        - plato_joint4
-        - plato_joint5
-        - plato_joint6
-        - plato_joint7
-        - plato_joint8
+    plato_joint_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
 
-      command_interfaces:
-        - effort
-      state_interfaces:
-        - position
-        - velocity
+plato_effort_controller:
+  ros__parameters:
+    joints:
+      - plato_joint0
+      - plato_joint1
+      - plato_joint2
+      - plato_joint3
+      - plato_joint4
+      - plato_joint5
+      - plato_joint6
+      - plato_joint7
+      - plato_joint8
 
-      gains:
-        plato_joint0: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint1: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint2: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint3: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint4: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint5: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint6: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint7: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
-        plato_joint8: {p: 0.5, i: 0.1, d: 0.1, i_clamp: 1.0}
+plato_joint_controller:
+  ros__parameters:
+
+    action_monitor_rate: 20.0
+
+    joints:
+      - plato_joint0
+      - plato_joint1
+      - plato_joint2
+      - plato_joint3
+      - plato_joint4
+      - plato_joint5
+      - plato_joint6
+      - plato_joint7
+      - plato_joint8
+
+    command_interfaces:
+      - effort
+    state_interfaces:
+      - position
+      - velocity
+
+    gains:
+      plato_joint0: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint1: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint2: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint3: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint4: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint5: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint6: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint7: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
+      plato_joint8: {p: 1.0, i: 0.1, d: 0.1, i_clamp: 1.0}
 
 
 

@@ -8,23 +8,47 @@
                                             >
         <xacro:if value="${gazebo_classic}">
 
-        
+            <xacro:property name="damping" value="0.5"/>
+            <xacro:property name="friction" value="10.0"/>
+            <xacro:property name="spring_reference" value="0.0"/>
+            <xacro:property name="spring_stiffness" value="0.5"/>
 
             <!-- Joint Dynamics -->
+            <gazebo reference="plato_joint0">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint1">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint2">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint3">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint4">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint5">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint6">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint7">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            <gazebo reference="plato_joint8">
+                <dynamics damping="${damping}" friction="${friction}" spring_reference="${spring_reference}" spring_stiffness="${spring_stiffness}"/>
+            </gazebo>
+            
 
-            <!-- <joint name="plato_joint0">
-                <dynamics>
-                    <damping>0.0</damping>
-                    <friction>0.0</friction>
-                    <spring_reference>0.0</spring_reference>
-                    <spring_stiffness>0.0</spring_stiffness>
-                </dynamics>
-            </joint>     -->
 
 
 
 
 
+       
 
 
         </xacro:if>

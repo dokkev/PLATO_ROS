@@ -27,9 +27,9 @@
         name="plato_hand_gazebo_controller"
         gazebo_classic="$(arg gazebo_classic)"/>
 
-    <!-- <xacro:plato_gazebo 
+    <xacro:plato_gazebo 
         name="plato_gazebo"
-        gazebo_classic="$(arg gazebo_classic)"/> -->
+        gazebo_classic="$(arg gazebo_classic)"/>
 
 
 

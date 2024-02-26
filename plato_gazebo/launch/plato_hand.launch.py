@@ -33,7 +33,7 @@ def generate_launch_description():
     ###### Nodes #####
     spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py',
                              arguments=['-topic', 'robot_description',
-                                        '-entity', 'plato_manipulator',
+                                        '-entity', 'plato_habd',
                                         '-x', '0.1',
                                         '-y', '0.1',
                                         '-z', '1.01'
@@ -52,10 +52,9 @@ def generate_launch_description():
     spawn_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster"],
+        arguments=["plato_joint_state_broadcaster"],
         output="screen",
     )
-
 
     spawn_plato_controller = Node(
         package="controller_manager",

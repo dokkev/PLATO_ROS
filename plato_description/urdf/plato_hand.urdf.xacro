@@ -4,8 +4,6 @@
     <!-- Arguments -->
     <xacro:arg name="mock_hardware" default="false" />
     <xacro:arg name="gazebo_classic" default="false" />
-    <xacro:arg name="gazebo" default="true" />
-
 
 
     <!-- Set World Frame -->
@@ -15,14 +13,23 @@
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.gazebo.xacro"/>
     <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/pedestal.xacro"/>
     
     <!-- Pedestal -->
     <xacro:pedestal_description connector_link="world"/>
     <!-- Plato Hand -->
     <xacro:plato_description connector_link="stand_link" xyz="0.15 0 0.0" />
+    
+    
     <!-- Plato Hand Ros2 Control -->
-    <xacro:plato_ros2_control name="plato_hand_controller" />
+    <xacro:plato_ros2_control 
+        name="plato_hand_gazebo_controller"
+        gazebo_classic="$(arg gazebo_classic)"/>
+
+    <!-- <xacro:plato_gazebo 
+        name="plato_gazebo"
+        gazebo_classic="$(arg gazebo_classic)"/> -->
 
 
 

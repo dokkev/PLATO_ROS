@@ -1,11 +1,7 @@
 plato:
   controller_manager:
     ros__parameters:
-<<<<<<< Updated upstream:plato_bringup/config/plato_hand_controllers.yaml
-      update_rate: 100 # Hz
-=======
       update_rate: 200  # Hz
->>>>>>> Stashed changes:plato_hardware_interface/config/plato_controllers.yaml
 
       plato_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster
@@ -52,15 +48,8 @@ plato:
         - velocity
   
       gains:
-        plato_joint0: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint1: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint2: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint3: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint4: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint5: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint6: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint7: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
-        plato_joint8: {p: 1.0, i: 0.1, d: 0.01, i_clamp: 1.0}
+        
+
 
   
 

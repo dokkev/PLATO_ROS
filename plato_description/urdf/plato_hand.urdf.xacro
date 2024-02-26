@@ -14,7 +14,7 @@
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.gazebo.xacro"/>
-    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/pedestal.xacro"/>
+    <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/pedestal.xacro"/>
     
     <!-- Pedestal -->
     <xacro:pedestal_description connector_link="world"/>

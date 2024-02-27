@@ -3,5 +3,5 @@ from moveit_configs_utils.launches import generate_spawn_controllers_launch
 
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder("plato_manipulator", package_name="plato_moveit_config").to_moveit_configs()
+    moveit_config = MoveItConfigsBuilder("plato_hand", package_name="plato_moveit_config").to_moveit_configs()
     return generate_spawn_controllers_launch(moveit_config)

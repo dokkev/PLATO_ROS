@@ -2,7 +2,7 @@
 <robot name="plato_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <!-- Arguments -->
-    <xacro:arg name="mock_hardware" default="false" />
+    <xacro:arg name="mock_hardware" default="true" />
     <xacro:arg name="gazebo_classic" default="false" />
 
 
@@ -25,8 +25,9 @@
     
     <!-- Plato Hand Ros2 Control -->
     <xacro:plato_ros2_control 
-        name="plato_hand_gazebo_controller"
-        gazebo_classic="$(arg gazebo_classic)"/>
+        name="plato_ros2_controller"
+        gazebo_classic="$(arg gazebo_classic)"
+        mock_hardware="$(arg mock_hardware)"/>
 
     <xacro:plato_gazebo 
         name="plato_gazebo"

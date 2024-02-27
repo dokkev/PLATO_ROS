@@ -234,8 +234,6 @@ hardware_interface::return_type PLATOHardware::write(
 
   socket_can_.set_can_tx_msg(motor_effort_commands_);
 
-  // socket_can_.write_can(socket_can_.socket_, socket_can_.can_tx_id_[1], motor_effort_commands_[1]);
-  // socket_can_.send_can_tx_msg(motor_effort_commands_);
 
   //update the previous joint effort commands
   joint_effort_commands_prev_ = joint_effort_commands_;

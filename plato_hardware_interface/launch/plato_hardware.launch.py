@@ -99,7 +99,7 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
 
-    connector_node = Node(
+    optimo_plato_transform_broadcaster = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
@@ -130,7 +130,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         # delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        connector_node,
+        optimo_plato_transform_broadcaster,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

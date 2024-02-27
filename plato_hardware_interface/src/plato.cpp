@@ -136,12 +136,23 @@ PLATOHardware::export_command_interfaces()
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(info_.joints.size());
   effort_command_interface_names_.reserve(info_.joints.size());
+  position_command_interface_names_.reserve(info_.joints.size());
 
+
+  // Effort Command Interface
+  // for (size_t i=0; i < info_.joints.size(); ++i) {
+  //   command_interfaces.emplace_back(hardware_interface::CommandInterface(
+  //   info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_commands_[i]));
+  //   effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+  // }
+
+  // Position Command Interface
   for (size_t i=0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &joint_effort_commands_[i]));
-    effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+    info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_position_commands_[i]));
+    position_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
+
 
   return command_interfaces;
 }
@@ -156,7 +167,10 @@ hardware_interface::CallbackReturn PLATOHardware::on_activate(
     // TODO: Add Gravity Compensation
 
     // send the zero effort command to the motor
-    PLATOHardware::set_zero_command(joint_effort_commands_);
+    // PLATOHardware::set_zero_command(joint_effort_commands_);
+
+    // send the zero position command to the motor
+    PLATOHardware::set_zero_command(joint_position_commands_);
 
     // init CAN
     socket_can_.init();
@@ -220,24 +234,43 @@ hardware_interface::return_type PLATOHardware::read(
 hardware_interface::return_type PLATOHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/){
 
+  
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+  //////////// Effort Command Interface///////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
-  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
+  // motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
 
   // push 0 into motor_effort_commands_ except joint 2:
-  for (size_t i = 0; i < motor_effort_commands_.size(); ++i) {
-    if (i==0 || i == 1 || i ==2) {
-      continue;
-    }
-    motor_effort_commands_[i] = 0.0;
-  }
+  // for (size_t i = 0; i < motor_effort_commands_.size(); ++i) {
+  //   if (i==0 || i == 1 || i ==2) {
+  //     continue;
+  //   }
+  //   motor_effort_commands_[i] = 0.0;
+  // }
 
-  socket_can_.set_can_tx_msg(motor_effort_commands_);
+  // socket_can_.set_can_tx_msg(motor_effort_commands_);
 
 
   //update the previous joint effort commands
-  joint_effort_commands_prev_ = joint_effort_commands_;
-  
+  // joint_effort_commands_prev_ = joint_effort_commands_;
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+  // convert the joint position commands to motor position commands with direction
+  motor_direction_.convert_joint_to_motor_position(joint_position_commands_, motor_position_commands_);
+
+  // push 0 into motor_effort_commands_ except joint 2:
+  for (size_t i = 0; i < motor_position_commands_.size(); ++i) {
+    if (i==0 || i == 1 || i ==2) {
+      continue;
+    }
+    motor_position_commands_[i] = 0.0;
+  }
+
+  // Send the motor position commands over CAN
+  socket_can_.set_can_tx_msg(motor_position_commands_);
 
 
   return hardware_interface::return_type::OK;

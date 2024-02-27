@@ -110,6 +110,8 @@ public:
     private:
       /// The size of this vector is (standard_interfaces_.size() x nr_joints)
       std::vector<double> motor_effort_commands_;
+      std::vector<double> motor_position_commands_;
+
       std::vector<double> motor_position_states_;
       std::vector<double> motor_position_states_prev_;
 
@@ -131,6 +133,7 @@ public:
 
 
       std::vector<std::string> effort_command_interface_names_;
+      std::vector<std::string> position_command_interface_names_;
 
       plato_socket_can::PlatoSocketCAN socket_can_;
 

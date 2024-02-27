@@ -181,7 +181,7 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
     }
 
     // Current Limiting 
-    data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT);
+    // data = std::clamp(data, -MAX_CURRENT, MAX_CURRENT); //disable for position
 
     if (almost_zero(data)) {
         data = ZERO_CURRENT;
@@ -196,8 +196,7 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
         RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN"), "Failed to send CAN frame");
     }
     
-    //sleep for 1 us
-    // usleep(10);
+
 
     // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"), "Sent CAN frame with ID: %d and Data: %f", id, data);
 

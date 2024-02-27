@@ -7,11 +7,11 @@
     
 
     <!-- Connector Joint -->
-    <!-- <joint name="plato_connector_joint" type="fixed">
-        <parent link="base_link"/>
+    <joint name="plato_connector_joint" type="fixed">
+        <parent link="${connector_link}"/>
         <child link="plato_base_link"/>
         <origin xyz="${xyz}" rpy="${rpy}"/>
-    </joint> -->
+    </joint>
 
     <!-- Base Link -->
     <link name="plato_base_link">

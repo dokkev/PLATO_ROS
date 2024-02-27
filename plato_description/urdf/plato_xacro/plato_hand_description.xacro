@@ -2,12 +2,16 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
 <xacro:macro name="plato_description" params="connector_link  xyz:='0 0 0'  rpy:='0 0 0' ">
     
+
+    <!-- if connector_link is defined -->
+    
+
     <!-- Connector Joint -->
-    <joint name="plato_connector_joint" type="fixed">
-        <parent link="${connector_link}"/>
+    <!-- <joint name="plato_connector_joint" type="fixed">
+        <parent link="base_link"/>
         <child link="plato_base_link"/>
         <origin xyz="${xyz}" rpy="${rpy}"/>
-    </joint>
+    </joint> -->
 
     <!-- Base Link -->
     <link name="plato_base_link">
@@ -40,19 +44,19 @@
 
     <joint name="plato_ee_joint1" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_1"/>
+        <parent link="plato_distal_1"/>
         <child link="plato_end_effector_1"/>
     </joint>
 
     <joint name="plato_ee_joint2" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_2"/>
+        <parent link="plato_distal_2"/>
         <child link="plato_end_effector_2"/>
     </joint>
 
     <joint name="plato_ee_joint3" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_3"/>
+        <parent link="plato_distal_3"/>
         <child link="plato_end_effector_3"/>
     </joint>
 

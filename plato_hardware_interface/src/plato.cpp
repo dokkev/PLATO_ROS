@@ -80,6 +80,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_init(
   // Initialize all Motor Vectors
   motor_effort_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  motor_position_states_prev_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
   
 
@@ -196,46 +197,44 @@ hardware_interface::return_type PLATOHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration &period)
 {
 
-
   // command effort is read from the joint effort commands
   joint_effort_states_ = joint_effort_commands_;
-  PLATOHardware::compute_velocity(period);
-
-
   
   for (unsigned int i = 0; i < info_.joints.size(); ++i) {
     // Read the motor position over CAN
     socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);  
 
-
     // Adjust the motor position with Offset and Direction
-    motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_);
 
-    // PLATOHardware::set_zero_states(joint_position_states_);
+    motor_direction_.convert_motor_to_joint_position(motor_position_states_, joint_position_states_, motor_position_states_prev_);
 
-    
-
-    
+    PLATOHardware::compute_velocity(period);
+  
+    // update the previous joint position states
+    motor_position_states_prev_ = motor_position_states_;
+    joint_position_states_prev_ = joint_position_states_;
   }
-
-
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type PLATOHardware::write(
-  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
-{
-
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/){
 
   // Convert the joint effort (torque) commands to motor effort (current) commands with direction
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_, motor_effort_commands_);
   // Send the motor effort commands over CAN
+
+  // push 0 into motor_effort_commands_ except joint 2:
+  for (size_t i = 0; i < motor_effort_commands_.size(); ++i) {
+    if (i==0 || i == 2 || i ==3) {
+      continue;
+    }
+    motor_effort_commands_[i] = 0.0;
+  }
+
   socket_can_.set_can_tx_msg(motor_effort_commands_);
 
-
-
   // socket_can_.write_can(socket_can_.socket_, socket_can_.can_tx_id_[1], motor_effort_commands_[1]);
-
   // socket_can_.send_can_tx_msg(motor_effort_commands_);
 
   //update the previous joint effort commands
@@ -243,13 +242,9 @@ hardware_interface::return_type PLATOHardware::write(
   
 
 
-  
-  
-
-
-
   return hardware_interface::return_type::OK;
 }
+
 
 }  // namespace plato_hardware_interface
 

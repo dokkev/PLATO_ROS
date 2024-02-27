@@ -111,6 +111,7 @@ public:
       /// The size of this vector is (standard_interfaces_.size() x nr_joints)
       std::vector<double> motor_effort_commands_;
       std::vector<double> motor_position_states_;
+      std::vector<double> motor_position_states_prev_;
 
       std::vector<double> joint_position_commands_;
       std::vector<double> joint_position_commands_prev_;

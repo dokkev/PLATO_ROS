@@ -99,6 +99,13 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
 
+    connector_node = Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='static_tf_broadcaster',
+            arguments=['0', '0', '0', '0.707388', '0.0005629', '0.706825', '0.0005633', 'ee', 'plato_base_link'],
+        )  
+
     # Event handlers remain unchanged
     delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
@@ -114,12 +121,16 @@ def generate_launch_description():
         )
     )
 
+
+ 
+
     nodes = [
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
-        delay_rviz_after_joint_state_broadcaster_spawner,
+        # delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        connector_node,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

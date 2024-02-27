@@ -42,11 +42,11 @@ void PlatoMotorDirection::convert_motor_to_joint_position(
 
 
         // Apply low pass filter to the motor position
-        float alpha = 0.1;
-        double filtered_motor_position = alpha * motor_position_states[i] + (1 - alpha) * motor_position_states_prev[i];
+        // float alpha = 0.01;
+        // double filtered_motor_position = alpha * motor_position_states[i] + (1 - alpha) * motor_position_states_prev[i];
 
         // First, subtract the angle offset to normalize the position
-        double normalized_position = filtered_motor_position - motor_config_[i].angle_offset;
+        double normalized_position = motor_position_states[i] - motor_config_[i].angle_offset;
 
         // Then, adjust the normalized position based on the motor's direction
         double adjusted_position = motor_config_[i].is_cw ? normalized_position : -normalized_position;

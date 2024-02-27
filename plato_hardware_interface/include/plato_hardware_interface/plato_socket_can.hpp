@@ -28,14 +28,10 @@
 #include "plato_hardware_interface/plato_common.hpp"
 
 
-
-
 namespace plato_socket_can{
 
 static constexpr double MAX_CURRENT = 0.8;
 static constexpr double ZERO_CURRENT = 0.0001; 
-
-
 
 class PlatoSocketCAN{
 public:

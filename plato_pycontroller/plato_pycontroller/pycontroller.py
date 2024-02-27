@@ -5,8 +5,12 @@ from rclpy.node import Node
 from rclpy.clock import Clock
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
+from std_msgs.msg import Float64MultiArray
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import pinocchio as pin
 import numpy as np
+import tf2_ros
+import tf_transformations
 
 class PlatoController(Node):
     def __init__(self):
@@ -22,22 +26,29 @@ class PlatoController(Node):
             self.joint_trajectory_callback,
             10)
         self.torque_publisher = self.create_publisher(
-            JointState,
+            Float64MultiArray,
             'plato/plato_effort_controller/commands',
             10)
+    
+        # TF2 listener for obtaining transforms
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.urdf_path = "/path/to/your/robot.urdf"  # Update this path
+        self.urdf_path = '/home/optimo/workspaces/plato_ws/src/PLATO_ROS/plato_description/urdf/plato.urdf'  # Update this path
         self.model = pin.buildModelFromUrdf(self.urdf_path)
         self.data = self.model.createData()
 
         # PD Controller Gains
-        self.kp = np.array([1.0] * 9)  # Proportional gains
-        self.kd = np.array([0.1] * 9)  # Derivative gains
+        self.kp = np.array([0.01, 0.0001, 0.0001, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
+        self.kd = np.array([0.00, 0.001, 0.001, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
+        self.ki = np.array([0.01, 0.00 ,0.00, 0.01, 0.00, 0.00, 0.01, 0.00, 0.00])
 
         # Initialize joint states
         self.q = np.zeros(9)  # Current positions
         self.q_prev = np.zeros(9)  # Previous positions
         self.v = np.zeros(9)  # Estimated velocities
+
+        self.q = np.array([0, -0.9, 0.9, 0, 0.44, 0.44, 0, 0.44, 0.44])
 
         # Time management
         self.prev_time = self.get_clock().now()
@@ -59,7 +70,17 @@ class PlatoController(Node):
         self.prev_time = current_time
 
         # Compute gravity compensation
+        # adjust gravity vector based on the current orientation of the robot
+        adjusted_gravity = self.get_gravity_vector_in_base_frame()
+        self.model.gravity = pin.Motion(adjusted_gravity, np.array([0, 0, 0]))
         self.tau_gravity = pin.rnea(self.model, self.data, self.q, self.v, np.zeros(9))
+
+        command_msg = Float64MultiArray()
+        command_msg.data = self.tau_gravity.tolist()
+
+        self.torque_publisher.publish(command_msg)
+
+        
 
     def joint_trajectory_callback(self, msg):
         # Assuming the first point in the trajectory is the target
@@ -76,10 +97,39 @@ class PlatoController(Node):
         tau_total = tau_pd + self.tau_gravity
 
         # Publish the total torque as a command
-        command_msg = JointState()
-        command_msg.header.stamp = self.get_clock().now().to_msg()
-        command_msg.effort = tau_total.tolist()
+        command_msg = Float64MultiArray()
+        command_msg.data = tau_total.tolist()
+
         self.torque_publisher.publish(command_msg)
+
+
+
+    def get_gravity_vector_in_base_frame(self):
+        try:
+            # Look up the transform from 'world' frame to 'plato_base_link' of the robot
+            transform = self.tf_buffer.lookup_transform('world', 'plato_base_link', rclpy.time.Time())
+            
+            # Extract the rotation from the transform and convert it to a rotation matrix
+            quaternion = (
+                transform.transform.rotation.x,
+                transform.transform.rotation.y,
+                transform.transform.rotation.z,
+                transform.transform.rotation.w
+            )
+            rotation_matrix = tf_transformations.quaternion_matrix(quaternion)[:3, :3]
+            
+            # Define the gravity vector in the 'world' frame
+            gravity_world = np.array([0, 0, -9.8])
+            
+            # Adjust the gravity vector based on the rotation from 'world' to 'base_link'
+            gravity_base = np.dot(rotation_matrix, gravity_world)
+            
+            return gravity_base
+
+        except Exception as e:
+            self.get_logger().error('Failed to adjust gravity vector: %s' % str(e))
+            return np.array([0, 0, -10.00])  # Fallback to standard gravity if the transformation fails
+
 
 def main(args=None):
     rclpy.init(args=args)

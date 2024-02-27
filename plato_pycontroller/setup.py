@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'plato_controller = plato_pycontroller.comp:main',
+            'pycontroller = plato_pycontroller.pycontroller:main',
+            'pyjoint = plato_pycontroller.pyjoint:main',
         ],
     },
 )

@@ -43,9 +43,12 @@
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>0.0</initial_value>
+                </state_interface>
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
+                
             </joint>
 
             <joint name="plato_joint1">
@@ -56,6 +59,8 @@
                 <!-- <command_interface name="position"/> -->
 
                 <state_interface name="position"/>
+                    <initial_value>-0.9</initial_value>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>
@@ -68,6 +73,7 @@
                 <!-- <command_interface name="position"/> -->
 
                 <state_interface name="position">
+                    <initial_value>0.9</initial_value>
                 </state_interface>
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
@@ -80,7 +86,10 @@
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>0.0</initial_value>
+                </state_interface>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>
@@ -92,19 +101,25 @@
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>-0.44</initial_value>
+                </state_interface>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>
 
             <joint name="plato_joint5">
-                <command_interface name="effort">
+              <command_interface name="effort">
                     <param name="min">-0.06</param>
                     <param name="max">0.06</param>
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>-0.44</initial_value>
+                </state_interface>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>
@@ -122,13 +137,16 @@
             </joint>
 
             <joint name="plato_joint7">
-                <command_interface name="effort">
+               <command_interface name="effort">
                     <param name="min">-0.06</param>
                     <param name="max">0.06</param>
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>0.0</initial_value>
+                </state_interface>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>
@@ -140,7 +158,10 @@
                 </command_interface>
                 <!-- <command_interface name="position"/> -->
 
-                <state_interface name="position"/>
+                <state_interface name="position">
+                    <initial_value>-0.44</initial_value>
+                </state_interface>
+
                 <state_interface name="velocity" />
                 <state_interface name="effort" />
             </joint>

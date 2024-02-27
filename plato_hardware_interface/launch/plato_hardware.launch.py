@@ -103,7 +103,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0', '0.707388', '0.0005629', '0.706825', '0.0005633', 'ee', 'plato_base_link'],
+            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
         )  
 
     # Event handlers remain unchanged
@@ -122,7 +122,14 @@ def generate_launch_description():
     )
 
 
- 
+    rqt_joint_trajectory_controller = Node(
+        package="rqt_joint_trajectory_controller",
+        executable="rqt_joint_trajectory_controller",
+        name="rqt_joint_trajectory_controller",
+        output="screen",
+        namespace=plato_ns,  
+    )
+
 
     nodes = [
         control_node,
@@ -131,6 +138,7 @@ def generate_launch_description():
         # delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
         optimo_plato_transform_broadcaster,
+        rqt_joint_trajectory_controller
     ]
 
     return LaunchDescription(declared_arguments + nodes)

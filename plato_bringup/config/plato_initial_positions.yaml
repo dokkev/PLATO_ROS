@@ -2,8 +2,8 @@
 
 initial_positions:
   plato_joint0: 0.0
-  plato_joint1: 0.0
-  plato_joint2: 0.0
+  plato_joint1: -0.9
+  plato_joint2: 0.9
   plato_joint3: 0.0
   plato_joint4: 0.0
   plato_joint5: 0.0

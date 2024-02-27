@@ -31,6 +31,18 @@ void PlatoMotorDirection::convert_joint_to_motor_effort(const std::vector<double
     }
 }
 
+void PlatoMotorDirection::convert_joint_to_motor_position(const std::vector<double>& joint_position_commands, std::vector<double>& motor_position_commands) {
+    // Ensure the output vector is correctly sized
+    motor_position_commands.resize(joint_position_commands.size());
+    
+    for (std::size_t i = 0; i < joint_position_commands.size(); ++i) {
+        // Adjust the direction based on the motor's configuration
+        motor_position_commands[i] = motor_config_[i].is_cw ? joint_position_commands[i] : -joint_position_commands[i];
+        // Add the offset to the position
+        motor_position_commands[i] += motor_config_[i].angle_offset;
+    }
+}
+
 void PlatoMotorDirection::convert_motor_to_joint_position(
     const std::vector<double>& motor_position_states, 
     std::vector<double>& joint_position_states, 
@@ -42,11 +54,11 @@ void PlatoMotorDirection::convert_motor_to_joint_position(
 
 
         // Apply low pass filter to the motor position
-        // float alpha = 0.01;
-        // double filtered_motor_position = alpha * motor_position_states[i] + (1 - alpha) * motor_position_states_prev[i];
+        float alpha = 0.01;
+        double filtered_motor_position = alpha * motor_position_states[i] + (1 - alpha) * motor_position_states_prev[i];
 
         // First, subtract the angle offset to normalize the position
-        double normalized_position = motor_position_states[i] - motor_config_[i].angle_offset;
+        double normalized_position = filtered_motor_position - motor_config_[i].angle_offset;
 
         // Then, adjust the normalized position based on the motor's direction
         double adjusted_position = motor_config_[i].is_cw ? normalized_position : -normalized_position;

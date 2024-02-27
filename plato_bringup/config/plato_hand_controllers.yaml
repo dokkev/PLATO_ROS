@@ -28,7 +28,7 @@ plato:
   plato_joint_controller:
     ros__parameters:
 
-      action_monitor_rate: 20.0
+      action_monitor_rate: 100.0
 
       joints:
         - plato_joint0
@@ -49,23 +49,23 @@ plato:
 
       gains:
         plato_joint0:
-          p: 0.
-          i: 0.
-          d: 0.
-          i_clamp: 0.0
+          p: 0.005
+          i: 0.0
+          d: 0.0
+          i_clamp: 1.0
           ff_velocity_scale: 0.0
         plato_joint1:
-          p: 0.00
-          i: 0.
+          p: 0.000
+          i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
-        plato_joint2:
+        plato_joint2: # 
           p: 0.01
-          i: 0.00
-          d: 0.03
+          i: 0.5
+          d: 0.001
           i_clamp: 0.0
-          ff_velocity_scale: 0.0
+          ff_velocity_scale: 10.0
         plato_joint3:
           p: 0.01
           i: 0.0
@@ -111,7 +111,7 @@ plato:
         plato_joint2:
           goal: 0.01
         plato_joint3:
-          goal: 0.01
+          goal: 0.005
         plato_joint4:
           goal: 0.01
         plato_joint5:

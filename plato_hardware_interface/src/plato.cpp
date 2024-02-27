@@ -226,7 +226,7 @@ hardware_interface::return_type PLATOHardware::write(
 
   // push 0 into motor_effort_commands_ except joint 2:
   for (size_t i = 0; i < motor_effort_commands_.size(); ++i) {
-    if (i==0 || i == 2 || i ==3) {
+    if (i==0 || i == 1 || i ==2) {
       continue;
     }
     motor_effort_commands_[i] = 0.0;

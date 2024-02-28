@@ -23,16 +23,16 @@
 #define MOTOR_7_CAN_RX_ID 0x11
 #define MOTOR_8_CAN_RX_ID 0x12
 
-// MOTOR ANGLE OFFSET
-#define MOTOR_0_ANGLE_OFFSET 3.80
-#define MOTOR_1_ANGLE_OFFSET -0.64
-#define MOTOR_2_ANGLE_OFFSET 0.22
-#define MOTOR_3_ANGLE_OFFSET 2.26
-#define MOTOR_4_ANGLE_OFFSET 1.53
+// MOTOR ANGLE OFFSET (if thehta > pi, thetha = 2pi - theta)
+#define MOTOR_0_ANGLE_OFFSET -2.42
+#define MOTOR_1_ANGLE_OFFSET -0.66
+#define MOTOR_2_ANGLE_OFFSET 0.38
+#define MOTOR_3_ANGLE_OFFSET 2.35
+#define MOTOR_4_ANGLE_OFFSET 1.73
 #define MOTOR_5_ANGLE_OFFSET 0.442
-#define MOTOR_6_ANGLE_OFFSET 4.97
-#define MOTOR_7_ANGLE_OFFSET 1.000
-#define MOTOR_8_ANGLE_OFFSET 1.735
+#define MOTOR_6_ANGLE_OFFSET -1.34
+#define MOTOR_7_ANGLE_OFFSET 1.14
+#define MOTOR_8_ANGLE_OFFSET 1.592
 
 // JOINT DIRECTION IS CW
 #define MOTOR_0_DIRECTION true
@@ -48,22 +48,20 @@
 // DEBUG MODE
 // #define DEBUG_MODE
 
-constexpr bool almost_equal(double d1, double d2, double epsilon=1.0e-3)
-{
-    if (((d1 - d2) < epsilon) && ((d1 - d2) > -epsilon)){
-        return true;
-    }else{
-        return false;
-    }
+constexpr bool almost_equal(double d1, double d2, double epsilon = 1.0e-3) {
+  if (((d1 - d2) < epsilon) && ((d1 - d2) > -epsilon)) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-constexpr bool almost_zero(double d, double epsilon=1.0e-3)
-{
-    if ((d < epsilon) && (d > -epsilon)){
-        return true;
-    }else{
-        return false;
-    }
+constexpr bool almost_zero(double d, double epsilon = 1.0e-3) {
+  if ((d < epsilon) && (d > -epsilon)) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-#endif  // PLATO_HARDWARE_INTERFACE__PLATO_COMMON_HPP_
+#endif // PLATO_HARDWARE_INTERFACE__PLATO_COMMON_HPP_

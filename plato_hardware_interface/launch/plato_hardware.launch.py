@@ -95,7 +95,7 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["plato_joint_controller", "--controller-manager", "/plato/controller_manager"],
+        arguments=["plato_position_controller", "--controller-manager", "/plato/controller_manager"],
         namespace=plato_ns,  
     )
 

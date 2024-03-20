@@ -167,7 +167,11 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
   if (std::isnan(data)) {
     data = 200.0;
     RCLCPP_WARN(rclcpp::get_logger("PlatoSocketCAN::write_can"),
-                "NaN data detected, sending 0.0 Effort instead");
+                "NaN data detected, sending 200.0 Effort instead");
+  }
+
+  if (data < -100.0){
+    data = 200.0;
   }
 
   frame.can_id = id;
@@ -179,8 +183,8 @@ void PlatoSocketCAN::write_can(int socket, int id, double data) {
                  "Failed to send CAN frame");
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"),
-              "Sent CAN frame with ID: %d and Data: %f", id, data);
+  // RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN"),
+              // "Sent CAN frame with ID: %d and Data: %f", id, data);
 }
 
 std::optional<std::tuple<int, double, bool, bool>>

@@ -43,8 +43,8 @@ void PLATOHardware::stop() {
               "Deactivating ...Setting all commands to zero...");
   // set all command effort to 0
   for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
-    set_zero_torque_command(
-        motor_position_commands_); // send it multiple times to bypass the CAN
+    set_zero_torque_command(motor_position_commands_);
+    socket_can_.set_can_tx_msg(motor_position_commands_); // send it multiple times to bypass the CAN
                                    // zero filter in ESP32
   }
 
@@ -144,13 +144,6 @@ PLATOHardware::export_command_interfaces() {
   effort_command_interface_names_.reserve(info_.joints.size());
   position_command_interface_names_.reserve(info_.joints.size());
 
-  // Effort Command Interface
-  // for (size_t i=0; i < info_.joints.size(); ++i) {
-  //   command_interfaces.emplace_back(hardware_interface::CommandInterface(
-  //   info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-  //   &joint_effort_commands_[i]));
-  //   effort_command_interface_names_.push_back(command_interfaces.back().get_name());
-  // }
 
   // Position Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
@@ -237,13 +230,14 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
 
   // convert the joint position commands to motor position commands with
   // direction
+
+
+  /////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////
   motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
-                                                   motor_position_commands_);
-
-
-
-  // Send the motor position commands over CAN
+                                                   motor_position_commands_)
   socket_can_.set_can_tx_msg(motor_position_commands_);
+  //////////////////////////////////////////////////////////////////////////////////////////
 
   return hardware_interface::return_type::OK;
 }

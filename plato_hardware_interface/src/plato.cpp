@@ -235,7 +235,7 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
   /////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////
   motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
-                                                   motor_position_commands_)
+                                                   motor_position_commands_);
   socket_can_.set_can_tx_msg(motor_position_commands_);
   //////////////////////////////////////////////////////////////////////////////////////////
 

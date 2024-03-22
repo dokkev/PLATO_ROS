@@ -46,9 +46,6 @@ public:
     
     void set_can_tx_msg(std::vector<double>& msg);
 
-    void begin_send_thread();
-    void stop_send_thread(); 
-
 
 private:
     void setup_can_ids();
@@ -59,14 +56,8 @@ private:
     struct sockaddr_can addr_;
     const std::string CAN_CHANNEL;
 
-    int send_timer;
 
-    // Multithreading
-    std::thread send_thread;
-    bool send_thread_active = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    
+
 
     std::vector<int> can_tx_id_;
     std::vector<int> can_rx_id_;

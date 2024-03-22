@@ -207,19 +207,19 @@ PLATOHardware::read(const rclcpp::Time & /*time*/,
 
   for (unsigned int i = 0; i < info_.joints.size(); ++i) {
     // Read the motor position over CAN
-    socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
+    // socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
 
     // Adjust the motor position with Offset and Direction
 
-    motor_direction_.convert_motor_to_joint_position(
-        motor_position_states_, joint_position_states_,
-        motor_position_states_prev_);
+    // motor_direction_.convert_motor_to_joint_position(
+        // motor_position_states_, joint_position_states_,
+        // motor_position_states_prev_);
 
-    PLATOHardware::compute_velocity(period);
+    // PLATOHardware::compute_velocity(period);
 
     // update the previous joint position states
-    motor_position_states_prev_ = motor_position_states_;
-    joint_position_states_prev_ = joint_position_states_;
+    // motor_position_states_prev_ = motor_position_states_;
+    // joint_position_states_prev_ = joint_position_states_;
   }
   return hardware_interface::return_type::OK;
 }
@@ -234,9 +234,9 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
 
   /////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////
-  motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
-                                                   motor_position_commands_);
-  socket_can_.set_can_tx_msg(motor_position_commands_);
+  // motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
+                                                  //  motor_position_commands_);
+  // socket_can_.set_can_tx_msg(motor_position_commands_);
   //////////////////////////////////////////////////////////////////////////////////////////
 
   return hardware_interface::return_type::OK;

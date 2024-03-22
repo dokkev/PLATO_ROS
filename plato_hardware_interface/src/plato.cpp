@@ -146,12 +146,20 @@ PLATOHardware::export_command_interfaces() {
 
 
   // Position Command Interface
+  // for (size_t i = 0; i < info_.joints.size(); ++i) {
+  //   command_interfaces.emplace_back(hardware_interface::CommandInterface(
+  //       info_.joints[i].name, hardware_interface::HW_IF_POSITION,
+  //       &joint_position_commands_[i]));
+  //   position_command_interface_names_.push_back(
+  //       command_interfaces.back().get_name());
+  // }
+
+  // Effort Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_POSITION,
-        &joint_position_commands_[i]));
-    position_command_interface_names_.push_back(
-        command_interfaces.back().get_name());
+        info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
+        &joint_effort_commands_[i]));
+    effort_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
 
   return command_interfaces;
@@ -172,8 +180,9 @@ PLATOHardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) {
   PLATOHardware::set_zero_torque_command(motor_position_commands_);
 
   // init CAN
-  socket_can_.init();
-  can_error_.resize(info_.joints.size(), false);
+
+  // socket_can_.init();
+  // can_error_.resize(info_.joints.size(), false);
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 

@@ -134,9 +134,6 @@ private:
 
   plato_motor_direction::PlatoMotorDirection motor_direction_;
 
-  rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_subscriber_;
-  rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_publisher_;
-  rclcpp::Node::SharedPtr node_;
 
   can_msgs::msg::Frame can_rx_msg_;
 };

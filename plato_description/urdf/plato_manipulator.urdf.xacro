@@ -6,7 +6,7 @@
     <link name="world"/>
 
     <!-- Include Xacro -->
-    <xacro:include filename="$(find optimo_description)/urdf/optimo_xacro/pedestal.xacro" />
+    <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/pedestal.xacro" />
     <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/optimo_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
     <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>

@@ -71,7 +71,6 @@ private:
     std::vector<int> can_tx_id_;
     std::vector<int> can_rx_id_;
 
-
     std::vector<double> can_rx_msg_;
     std::vector<double> can_tx_msg_;
 

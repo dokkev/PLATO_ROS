@@ -24,7 +24,7 @@
     
     <!-- Plato Hand Ros2 Control -->
     <xacro:plato_ros2_control 
-        name="plato_hand_gazebo_controller"
+        name="plato_hand_controller"
         gazebo_classic="$(arg gazebo_classic)"/>
 
     <xacro:plato_gazebo 

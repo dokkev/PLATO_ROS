@@ -36,6 +36,7 @@ static constexpr double ZERO_CURRENT = 0.0001;
 class PlatoSocketCAN{
 public:
     explicit PlatoSocketCAN();
+    ~PlatoSocketCAN() = default;
 
     void init();
 

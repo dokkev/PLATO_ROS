@@ -58,9 +58,12 @@ void PlatoSocketCAN::setup_can_ids() {
 
 
 void PlatoSocketCAN::write_can(int socket, int id, double data) {
+  // sleep for 1us
+  // usleep(1);
   struct can_frame frame;
 
   frame.can_id = id;
+  frame.can_dlc = 8; 
 
 
   std::memcpy(frame.data, &data, sizeof(double));
@@ -80,7 +83,14 @@ void PlatoSocketCAN::send_can_tx_msg() {
 
   double data = 0.0;
   write_can(socket_, can_tx_id_[0], data);
-  usleep(1);
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+  write_can(socket_, can_tx_id_[1], data);
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+  write_can(socket_, can_tx_id_[2], data);
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+  
+  
+ 
 
 
 }

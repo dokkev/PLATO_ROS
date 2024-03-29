@@ -78,7 +78,8 @@
         "__nullptr": "cpp",
         "__node_handle": "cpp",
         "__locale": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "*.txx": "cpp"
     },
     "ros.distro": "iron",
     "python.autoComplete.extraPaths": [

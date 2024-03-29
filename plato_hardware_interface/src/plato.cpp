@@ -21,7 +21,7 @@ namespace plato_hardware_interface {
 
 void PLATOHardware::set_zero_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 0.0;
+    command[i] = 0.1;
   }
 }
 
@@ -43,7 +43,7 @@ void PLATOHardware::stop() {
               "Deactivating ...Setting all commands to zero...");
   // set all command effort to 0
   for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
-    set_zero_torque_command(motor_position_commands_);
+    set_zero_torque_command(joint_effort_commands_);
                                    // zero filter in ESP32
   }
 
@@ -212,21 +212,24 @@ hardware_interface::return_type
 PLATOHardware::read(const rclcpp::Time & /*time*/,
                     const rclcpp::Duration &period) {
 
-  for (unsigned int i = 0; i < info_.joints.size(); ++i) {
+  // repeat 3 times to ensure the motor position is read correctly
+  for (unsigned int i = 0; i < 3; i++) {
     // Read the motor position over CAN
-    // socket_can_.receive_can_rx_msg(motor_position_states_, can_error_);
+    socket_can_.receive_can(motor_position_states_);
 
     // Adjust the motor position with Offset and Direction
+    motor_direction_.convert_motor_to_joint_position(
+        motor_position_states_, joint_position_states_);
 
-    // motor_direction_.convert_motor_to_joint_position(
-        // motor_position_states_, joint_position_states_,
-        // motor_position_states_prev_);
+    // compute the joint velocity
+    PLATOHardware::compute_velocity(period);
 
-    // PLATOHardware::compute_velocity(period);
+    // joint effort state is same as joint effort command
+    joint_effort_states_ = joint_effort_commands_;
 
     // update the previous joint position states
-    // motor_position_states_prev_ = motor_position_states_;
-    // joint_position_states_prev_ = joint_position_states_;
+    motor_position_states_prev_ = motor_position_states_;
+    joint_position_states_prev_ = joint_position_states_;
   }
   return hardware_interface::return_type::OK;
 }
@@ -235,18 +238,17 @@ hardware_interface::return_type
 PLATOHardware::write(const rclcpp::Time & /*time*/,
                      const rclcpp::Duration & /*period*/) {
 
-  // convert the joint position commands to motor position commands with
-  // direction
 
+                    
+  PLATOHardware::set_zero_command(joint_effort_commands_);
 
-  /////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////////////////
-  // motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
-                                                  //  motor_position_commands_);
-  // socket_can_.set_can_tx_msg(motor_position_commands_);
-  //////////////////////////////////////////////////////////////////////////////////////////
+  // Adjust joint commands -> motor commands with direction and offset
+  motor_direction_.convert_joint_to_motor_position(joint_effort_commands_,
+                                                   motor_effort_commands_);
+  // send the motor commands over CAN                                              
+  socket_can_.send_can(motor_effort_commands_);
+  // socket_can_.send_can_tx_msg();
 
-  socket_can_.send_can_tx_msg();
 
   return hardware_interface::return_type::OK;
 }

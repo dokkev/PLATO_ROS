@@ -7,6 +7,8 @@ namespace plato_socket_can {
 PlatoSocketCAN::PlatoSocketCAN() : CAN_CHANNEL("can0"),
   encoder_scale_factor_(SCALE_INT / (ENCODER_MAX_SCALE_VALUE - ENCODER_MIN_SCALE_VALUE)),
   command_scale_factor_(SCALE_INT / (COMMAND_MAX_SCALE_VALUE - COMMAND_MIN_SCALE_VALUE)),
+  encoder_scale_offset_(ENCODER_MIN_SCALE_VALUE),
+  command_scale_offset_(COMMAND_MIN_SCALE_VALUE),
   can_tx_id_list_({ESP0_CAN_TX_ID, ESP1_CAN_TX_ID, ESP2_CAN_TX_ID}),
   can_rx_id_list_({ESP0_CAN_RX_ID, ESP1_CAN_RX_ID, ESP2_CAN_RX_ID})
 {}
@@ -110,9 +112,9 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
         // Unpack the data from the frame assuming it is in little endian and each value is 16 bits
         // Note: Adjust the indices if your data starts at a different byte within the frame
         
-        double decoded_value0 = static_cast<double>(frame.data[0] | (frame.data[1] << 8)) / encoder_scale_factor_;
-        double decoded_value1 = static_cast<double>(frame.data[2] | (frame.data[3] << 8)) / encoder_scale_factor_;
-        double decoded_value2 = static_cast<double>(frame.data[4] | (frame.data[5] << 8)) / encoder_scale_factor_;
+        double decoded_value0 = static_cast<double>(frame.data[0] | (frame.data[1] << 8)) / encoder_scale_factor_ + encoder_scale_offset_;
+        double decoded_value1 = static_cast<double>(frame.data[2] | (frame.data[3] << 8)) / encoder_scale_factor_ + encoder_scale_offset_;
+        double decoded_value2 = static_cast<double>(frame.data[4] | (frame.data[5] << 8)) / encoder_scale_factor_ + encoder_scale_offset_;
 
         if (id == can_rx_id_list_[0]){
           motor_position_states[0] = decoded_value0;
@@ -135,6 +137,8 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
 
         
     }
+
+
 }
 
 void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
@@ -159,9 +163,10 @@ void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
 
     }
 
-    int16_t encoded_data0 = static_cast<int16_t>(motor_effort_commands[0+offset] * command_scale_factor_);
-    int16_t encoded_data1 = static_cast<int16_t>(motor_effort_commands[1+offset] * command_scale_factor_);
-    int16_t encoded_data2 = static_cast<int16_t>(motor_effort_commands[2+offset] * command_scale_factor_);
+    // Encode the motor effort commands to CAN message in little endian
+    uint16_t encoded_data0 = static_cast<uint16_t>((motor_effort_commands[0+offset] + command_scale_offset_) * command_scale_factor_);
+    uint16_t encoded_data1 = static_cast<uint16_t>((motor_effort_commands[1+offset] + command_scale_offset_) * command_scale_factor_);
+    uint16_t encoded_data2 = static_cast<uint16_t>((motor_effort_commands[2+offset] + command_scale_offset_) * command_scale_factor_);
 
     frame.data[0] = encoded_data0 & 0xFF;
     frame.data[1] = (encoded_data0 >> 8) & 0xFF;

@@ -21,7 +21,7 @@ namespace plato_hardware_interface {
 
 void PLATOHardware::set_zero_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 0.1;
+    command[i] = 0.0;
   }
 }
 
@@ -243,10 +243,11 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
   PLATOHardware::set_zero_command(joint_effort_commands_);
 
   // Adjust joint commands -> motor commands with direction and offset
-  motor_direction_.convert_joint_to_motor_position(joint_effort_commands_,
+  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_,
                                                    motor_effort_commands_);
   // send the motor commands over CAN                                              
   socket_can_.send_can(motor_effort_commands_);
+  
   // socket_can_.send_can_tx_msg();
 
 

@@ -63,6 +63,8 @@ private:
     // CAN Message Packing/Unpacking Scale Factors
     double encoder_scale_factor_;
     double command_scale_factor_;
+    double encoder_scale_offset_;
+    double command_scale_offset_;
 
     const std::vector<long int> can_tx_id_list_;
     const std::vector<long int> can_rx_id_list_;

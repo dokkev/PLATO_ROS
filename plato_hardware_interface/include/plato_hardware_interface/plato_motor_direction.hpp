@@ -8,6 +8,7 @@
 #include <chrono>
 #include <map>
 #include <unordered_map>
+#include <cmath>
 
 
 namespace plato_motor_direction {
@@ -16,6 +17,7 @@ namespace plato_motor_direction {
 struct MotorConfig {
     bool is_cw;
     double angle_offset;
+    double reduction_ratio;
 };
 
 
@@ -26,7 +28,7 @@ public:
     PlatoMotorDirection();
     void set_motor_config(const std::array<MotorConfig, 9> &motor_config);
 
-    void convert_joint_to_motor_effort(const std::vector<double>&    joint_effort_commands, std::vector<double>& motor_effort_commands);
+    void convert_joint_to_motor_effort(const std::vector<double>&joint_effort_commands, std::vector<double>& motor_effort_commands);
 
     void convert_joint_to_motor_position(const std::vector<double>& joint_position_commands, std::vector<double>& motor_position_commands);
 

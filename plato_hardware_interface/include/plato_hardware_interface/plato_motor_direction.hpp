@@ -9,6 +9,8 @@
 #include <map>
 #include <unordered_map>
 #include <cmath>
+#include <vector>
+#include <condition_variable>
 
 
 namespace plato_motor_direction {

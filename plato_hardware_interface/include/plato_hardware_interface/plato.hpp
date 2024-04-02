@@ -93,7 +93,9 @@ public:
   void set_zero_states(std::vector<double> &joint_states);
 
   PLATO_HARDWARE_INTERFACE_PUBLIC
-  void compute_velocity(const rclcpp::Duration &period);
+  void compute_velocity(const rclcpp::Duration &period, const std::vector<double> &joint_position_states_,
+                                     std::vector<double> &joint_velocity_states_,
+                                     std::vector<double> &joint_position_states_prev_);
 
   PLATO_HARDWARE_INTERFACE_PUBLIC
   void set_can_id_map();
@@ -101,8 +103,6 @@ public:
   PLATO_HARDWARE_INTERFACE_PUBLIC
   void stop();
 
-  PLATO_HARDWARE_INTERFACE_PUBLIC
-  void can_frame_callback(const can_msgs::msg::Frame::SharedPtr msg);
 
 private:
   /// The size of this vector is (standard_interfaces_.size() x nr_joints)

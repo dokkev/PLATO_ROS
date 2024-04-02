@@ -30,8 +30,7 @@
 
 namespace plato_socket_can{
 
-static constexpr double MAX_CURRENT = 0.8;
-static constexpr double ZERO_CURRENT = 0.0001; 
+
 
 
 class PlatoSocketCAN{
@@ -41,15 +40,11 @@ public:
 
     void init();
 
-    void send_can_tx_msg(std::vector<double>& motor_effort_commands);
-    void send_can_tx_msg();
-    void receive_can_rx_msg(std::vector<double>& motor_position_states,
-                            std::vector<bool>& can_error);
     void receive_can(std::vector<double>& motor_position_states);
     void send_can(std::vector<double>& motor_effort_commands);
-                       
-    void set_can_tx_msg(std::vector<double>& msg);
 
+    void send_can_zero_effort();
+                       
 
 private:
     void setup_can_ids();

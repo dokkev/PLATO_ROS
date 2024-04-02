@@ -34,6 +34,13 @@ void PlatoMotorDirection::convert_joint_to_motor_effort(
                                    : -joint_effort_commands[i];
     motor_effort_commands[i] /=
         0.06; // Convert torque to current, where torque constant is 0.06 Nm/A
+
+    // current limit
+    if (motor_effort_commands[i] > MAX_CURRENT) {
+      motor_effort_commands[i] = MAX_CURRENT;
+    } else if (motor_effort_commands[i] < -MAX_CURRENT) {
+      motor_effort_commands[i] = -MAX_CURRENT;
+    }
   }
 }
 

@@ -39,6 +39,7 @@ include_directories(${THIS_PACKAGE_INCLUDE_DIRS})
 # add_executable(controller_WholeRobots src/controller_WholeRobots.cpp)
 # add_executable(controller_PlatoHand src/controller_PlatoHand.cpp)
 add_executable(controller_spaceMouse src/controller_spaceMouse.cpp)
+add_executable(plato_controller src/plato_controller.cpp)
 
 # target_include_directories(state_and_model
 #     PUBLIC include)
@@ -49,6 +50,8 @@ add_executable(controller_spaceMouse src/controller_spaceMouse.cpp)
 # target_include_directories(controller_PlatoHand
 #     PUBLIC include)
 target_include_directories(controller_spaceMouse
+    PUBLIC include)
+target_include_directories(plato_controller
     PUBLIC include)
 
 # ament_target_dependencies(rclcpp std_msgs)
@@ -63,6 +66,8 @@ target_include_directories(controller_spaceMouse
 #     ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
 ament_target_dependencies(controller_spaceMouse
     ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
+ament_target_dependencies(plato_controller
+    ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
 # install(TARGETS moveit_control 
 #     DESTINATION lib/${PROJECT_NAME}
@@ -80,6 +85,10 @@ ament_target_dependencies(controller_spaceMouse
 #   DESTINATION lib/${PROJECT_NAME}
 # )
 install(TARGETS controller_spaceMouse
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS plato_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 

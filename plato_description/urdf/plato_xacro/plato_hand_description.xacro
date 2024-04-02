@@ -155,7 +155,7 @@
         <parent link="plato_proximal_1" />
         <child link="plato_distal_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="0.0872665" lower="-0.34906585039886589561" upper="1.570796326794896558"/>
+        <limit effort="0.06" velocity="0.0872665" lower="0.0" upper="1.570796326794896558"/>
         <joint_properties friction="0.03"/>
     </joint>
 
@@ -252,7 +252,7 @@
         <parent link="plato_proximal_2" />
         <child link="plato_distal_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.0"/>
         <joint_properties friction="0.03"/>
     </joint>
 
@@ -350,7 +350,7 @@
         <parent link="plato_proximal_3" />
         <child link="plato_distal_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.0"/>
         <joint_properties friction="0.01"/>
     </joint>
 

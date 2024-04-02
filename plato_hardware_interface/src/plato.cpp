@@ -21,7 +21,7 @@ namespace plato_hardware_interface {
 
 void PLATOHardware::set_zero_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 0.0;
+    command[i] = 0.000;
   }
 }
 
@@ -41,22 +41,24 @@ void PLATOHardware::stop() {
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"),
               "Deactivating ...Setting all commands to zero...");
+
   // set all command effort to 0
-  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
-    set_zero_torque_command(joint_effort_commands_);
-                                   // zero filter in ESP32
-  }
+  set_zero_command(motor_effort_commands_);
+  socket_can_.send_can(motor_effort_commands_);
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
 }
 
-void PLATOHardware::compute_velocity(const rclcpp::Duration &period) {
+void PLATOHardware::compute_velocity(const rclcpp::Duration &period, const std::vector<double> &joint_position_states_,
+                                     std::vector<double> &joint_velocity_states_,
+                                     std::vector<double> &joint_position_states_prev_) {
   for (size_t i = 0; i < joint_position_states_.size(); ++i) {
-    joint_velocity_states_[i] =
-        (joint_position_states_[i] - joint_position_states_prev_[i]) /
-        period.seconds();
-    joint_position_states_prev_[i] = joint_position_states_[i];
+    joint_velocity_states_[i] = (joint_position_states_[i] - joint_position_states_prev_[i]) / period.seconds();
+   
   }
+
+
 }
 
 hardware_interface::CallbackReturn
@@ -102,7 +104,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"),
               "Configuring ...setting all joint state to 0..");
-  PLATOHardware::set_zero_states(joint_position_states_);
+  set_zero_states(joint_position_states_);
   PLATOHardware::set_zero_states(joint_velocity_states_);
   PLATOHardware::set_zero_states(joint_effort_states_);
 
@@ -124,6 +126,8 @@ PLATOHardware::export_state_interfaces() {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION,
         &joint_position_states_[i]));
+
+        RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joint Name: %s", info_.joints[i].name.c_str());
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
         &joint_velocity_states_[i]));
@@ -217,12 +221,15 @@ PLATOHardware::read(const rclcpp::Time & /*time*/,
     // Read the motor position over CAN
     socket_can_.receive_can(motor_position_states_);
 
+
+
     // Adjust the motor position with Offset and Direction
     motor_direction_.convert_motor_to_joint_position(
         motor_position_states_, joint_position_states_);
 
     // compute the joint velocity
-    PLATOHardware::compute_velocity(period);
+    // compute_velocity(period, joint_position_states_, joint_velocity_states_,
+    //                  joint_position_states_prev_);
 
     // joint effort state is same as joint effort command
     joint_effort_states_ = joint_effort_commands_;
@@ -239,8 +246,7 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
                      const rclcpp::Duration & /*period*/) {
 
 
-                    
-  PLATOHardware::set_zero_command(joint_effort_commands_);
+  
 
   // Adjust joint commands -> motor commands with direction and offset
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_,
@@ -248,7 +254,7 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
   // send the motor commands over CAN                                              
   socket_can_.send_can(motor_effort_commands_);
   
-  // socket_can_.send_can_tx_msg();
+
 
 
   return hardware_interface::return_type::OK;

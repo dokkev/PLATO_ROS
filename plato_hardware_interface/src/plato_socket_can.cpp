@@ -15,7 +15,6 @@ PlatoSocketCAN::PlatoSocketCAN() : CAN_CHANNEL("can0"),
 
 void PlatoSocketCAN::init() {
   // Setup ID mappings for Motor and CAN IDs
-  // setup_can_ids();
 
   // Create a socket
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -82,18 +81,34 @@ void PlatoSocketCAN::write_can(int socket, int id, int8_t data) {
 }
 
 
-void PlatoSocketCAN::send_can_tx_msg() {
+void PlatoSocketCAN::send_can_zero_effort() {
+
+  // Send zero command via CAN messages for each ESP32 (3 times)
+  for (long unsigned int i = 0; i < can_tx_id_list_.size(); i++) {
+    struct can_frame frame;
+    frame.can_dlc = 6; 
+    frame.can_id = can_tx_id_list_[i];
+
+    for (int i = 0; i < 6; i++) {
+      frame.data[i] = 0x00;
+    }
+
+    // write(socket_, &frame, sizeof(frame));
+    if (write(socket_, &frame, sizeof(frame)) != sizeof(frame)) {
+    RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN::send_can"),
+                 "Failed to send CAN frame");     
+    }
+
+      RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::send_zero_effort"),
+              "Sent zero effort command to 3 motors");
+  }
 
 
 
-  write_can(socket_, can_tx_id_list_[0], 0x00);
-  std::this_thread::sleep_for(std::chrono::microseconds(1));
-  write_can(socket_, can_tx_id_list_[1], 0x00);
-  std::this_thread::sleep_for(std::chrono::microseconds(1));
-  write_can(socket_, can_tx_id_list_[2], 0x00);
-  std::this_thread::sleep_for(std::chrono::microseconds(1));
-  
+
 }
+  
+
 
 
 
@@ -180,6 +195,8 @@ void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
     RCLCPP_ERROR(rclcpp::get_logger("PlatoSocketCAN::send_can"),
                  "Failed to send CAN frame");
     }
+
+    // throw info when current over 2
 
     #ifdef DEBUG_MODE
     RCLCPP_INFO(rclcpp::get_logger("PlatoSocketCAN::send_can"),

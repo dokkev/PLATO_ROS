@@ -50,16 +50,38 @@ void PLATOHardware::stop() {
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
 }
 
-void PLATOHardware::compute_velocity(const rclcpp::Duration &period, const std::vector<double> &joint_position_states_,
-                                     std::vector<double> &joint_velocity_states_,
-                                     std::vector<double> &joint_position_states_prev_) {
-  for (size_t i = 0; i < joint_position_states_.size(); ++i) {
-    joint_velocity_states_[i] = (joint_position_states_[i] - joint_position_states_prev_[i]) / period.seconds();
-   
+std::vector<double> PLATOHardware::compute_velocity(
+                      const rclcpp::Duration &period, 
+                      std::vector<double> joint_position_states_,
+                      std::vector<double> joint_position_states_prev_){
+
+  std::vector<double> joint_velocity_states(joint_position_states_.size(), 0.0);
+
+  for (size_t i = 0; i < joint_velocity_states.size(); ++i) {
+    joint_velocity_states[i]= (joint_position_states_[i] - joint_position_states_prev_[i]) / period.seconds();
   }
 
+  return joint_velocity_states;
+                                      
+}
+
+std::vector<double> PLATOHardware::lpf_filter(
+                                double alpha,
+                               std::vector<double> states,
+                               std::vector<double> states_prev){
+ 
+ 
+  std::vector<double> filtered_states(states.size(), 0.0);
+  for (size_t i = 0; i < filtered_states.size(); ++i) {
+
+    filtered_states[i] = alpha * states[i] + (1 - alpha) * states_prev[i];
+
+  }
+
+  return filtered_states;
 
 }
+    
 
 hardware_interface::CallbackReturn
 PLATOHardware::on_init(const hardware_interface::HardwareInfo &info) {
@@ -71,6 +93,7 @@ PLATOHardware::on_init(const hardware_interface::HardwareInfo &info) {
   // Initialize all Joint Vectors
   joint_position_commands_.resize(info_.joints.size(),
                                   std::numeric_limits<double>::quiet_NaN());
+
   joint_effort_commands_.resize(info_.joints.size(),
                                 std::numeric_limits<double>::quiet_NaN());
   joint_effort_commands_prev_.resize(info_.joints.size(),
@@ -80,8 +103,17 @@ PLATOHardware::on_init(const hardware_interface::HardwareInfo &info) {
                                 std::numeric_limits<double>::quiet_NaN());
   joint_position_states_prev_.resize(info_.joints.size(),
                                      std::numeric_limits<double>::quiet_NaN());
+  joint_position_states_raw_.resize(info_.joints.size(),
+                                      std::numeric_limits<double>::quiet_NaN());
+
+
   joint_velocity_states_.resize(info_.joints.size(),
                                 std::numeric_limits<double>::quiet_NaN());
+  joint_velocity_states_prev_.resize(info_.joints.size(),
+                                     std::numeric_limits<double>::quiet_NaN());
+  joint_velocity_states_raw_.resize(info_.joints.size(),
+                                      std::numeric_limits<double>::quiet_NaN());      
+
   joint_effort_states_.resize(info_.joints.size(),
                               std::numeric_limits<double>::quiet_NaN());
 
@@ -105,8 +137,12 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"),
               "Configuring ...setting all joint state to 0..");
   set_zero_states(joint_position_states_);
-  PLATOHardware::set_zero_states(joint_velocity_states_);
-  PLATOHardware::set_zero_states(joint_effort_states_);
+  set_zero_states(joint_position_states_prev_);
+  set_zero_states(joint_position_states_raw_);
+  set_zero_states(joint_velocity_states_);
+  set_zero_states(joint_velocity_states_prev_);
+  set_zero_states(joint_velocity_states_raw_);
+  set_zero_states(joint_effort_states_);
 
   PLATOHardware::set_zero_torque_command(motor_position_commands_);
   // PLATOHardware::set_zero_torque_command(joint_position_commands_prev_);
@@ -126,8 +162,6 @@ PLATOHardware::export_state_interfaces() {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION,
         &joint_position_states_[i]));
-
-        RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Joint Name: %s", info_.joints[i].name.c_str());
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
         &joint_velocity_states_[i]));
@@ -213,7 +247,7 @@ PLATOHardware::on_shutdown(const rclcpp_lifecycle::State & /*previous_state*/) {
 }
 
 hardware_interface::return_type
-PLATOHardware::read(const rclcpp::Time & /*time*/,
+PLATOHardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
 
   // repeat 3 times to ensure the motor position is read correctly
@@ -226,18 +260,26 @@ PLATOHardware::read(const rclcpp::Time & /*time*/,
     // Adjust the motor position with Offset and Direction
     motor_direction_.convert_motor_to_joint_position(
         motor_position_states_, joint_position_states_);
-
-    // compute the joint velocity
-    // compute_velocity(period, joint_position_states_, joint_velocity_states_,
-    //                  joint_position_states_prev_);
-
-    // joint effort state is same as joint effort command
-    joint_effort_states_ = joint_effort_commands_;
-
-    // update the previous joint position states
-    motor_position_states_prev_ = motor_position_states_;
-    joint_position_states_prev_ = joint_position_states_;
   }
+
+  //update velocity
+   // Define the filter coefficient (alpha)
+  const double alpha = 0.001;
+
+  // Calculate and filter the joint velocities
+  for (size_t i = 0; i < joint_velocity_states_.size(); i++) {
+    // Calculate the raw velocity
+    double raw_velocity = (joint_position_states_[i] - joint_position_states_prev_[i]) / period.seconds();
+
+    // Apply the low-pass filter to the velocity
+    joint_velocity_states_[i] = alpha * raw_velocity + (1 - alpha) * joint_velocity_states_prev_[i];
+  }
+  
+
+  // update the previous joint position states
+  joint_position_states_prev_ = joint_position_states_;
+  joint_velocity_states_prev_ = joint_velocity_states_;
+
   return hardware_interface::return_type::OK;
 }
 
@@ -246,7 +288,6 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
                      const rclcpp::Duration & /*period*/) {
 
 
-  
 
   // Adjust joint commands -> motor commands with direction and offset
   motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_,

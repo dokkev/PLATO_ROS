@@ -19,6 +19,7 @@ class PositionPIDController : public rclcpp::Node {
 public:
     PositionPIDController(const std::vector<PID>& pid_params, double tolerance)
         : Node("position_pid_controller"), pid_params_(pid_params), tolerance_(tolerance) {
+        previous_time_stamp = this->now();
         // Initialize desired positions for each joint with default values
         desired_positions_ = std::vector<double>
             { 
@@ -71,42 +72,40 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
 
 
         // Calculate time difference
-        rclcpp::Time current_time_stamp = ros_clock.now();
+        rclcpp::Time current_time_stamp = this->now();
 
         // joint state 5 and 6 are flipped so we need to swap them
         std::swap(msg->position[5], msg->position[6]);
+        std::swap(msg->velocity[5], msg->velocity[6]);
+
+        double dt = (current_time_stamp - previous_time_stamp).seconds();
 
    
-        if (counter < 1000){
+        // if (counter < 1000){
 
-            desired_positions2_[1] = desired_positions2_[1] - 0.0000;
-            desired_positions2_[2] = desired_positions2_[2] - 0.001;
+        //     desired_positions2_[1] = desired_positions2_[1] - 0.0000;
+        //     desired_positions2_[2] = desired_positions2_[2] - 0.001;
 
-            desired_positions2_[4] = desired_positions2_[4] + 0.0000;
-            desired_positions2_[5] = desired_positions2_[5] + 0.001;
+        //     desired_positions2_[4] = desired_positions2_[4] + 0.0000;
+        //     desired_positions2_[5] = desired_positions2_[5] + 0.001;
   
 
-        }
-        else if (counter >= 1000 && counter < 2000){
-        desired_positions2_[1] = desired_positions2_[1] + 0.0000;
-        desired_positions2_[2] = desired_positions2_[2] + 0.001;
+        // }
+        // else if (counter >= 1000 && counter < 2000){
+        // desired_positions2_[1] = desired_positions2_[1] + 0.0000;
+        // desired_positions2_[2] = desired_positions2_[2] + 0.001;
 
-        desired_positions2_[4] = desired_positions2_[4] - 0.0000;
-        desired_positions2_[5] = desired_positions2_[5] - 0.001;
-
-        
-
-        }
-        else if (counter == 2000){
-            counter = 0;
-        
-        }
-      
-
+        // desired_positions2_[4] = desired_positions2_[4] - 0.0000;
+        // desired_positions2_[5] = desired_positions2_[5] - 0.001;
 
         
 
+        // }
+        // else if (counter == 2000){
+        //     counter = 0;
         
+        // }
+    
 
         for (size_t i = 0; i < 9; ++i) {
 
@@ -116,11 +115,11 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
             msg->position[i] = alpha * msg->position[i] + (1 - alpha) * joint_states_prev_[i];
             
             double error = desired_positions2_[i] - msg->position[i];
-            double error_derivative = error - previous_error_[i];
+            double error_derivative = 0 - msg->velocity[i];
             error_integral_[i] += error;
 
             // velocity estimation
-            double dt = (current_time_stamp - previous_time_stamp).seconds();
+    
             double joint_velocity = (msg->position[i] - joint_states_prev_[i]) / dt;
             double joint_acceleration = (joint_velocity - joint_acceleration_prev_[i]) / dt;
             double joint_jerk = (joint_acceleration - joint_acceleration_prev_[i]) / dt;
@@ -130,8 +129,19 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
             // Implement ki_cap
             error_integral_[i] = std::clamp(error_integral_[i], -pid_params_[i].ki_cap, pid_params_[i].ki_cap);
 
+
+
+
             // PID formula for each motor
             double effort = pid_params_[i].kp * error + pid_params_[i].ki * error_integral_[i] + pid_params_[i].kd * error_derivative;
+
+            double output_rate = (effort - effort_prev_[i]) / dt;
+            if (output_rate > output_ramp){
+                effort = effort_prev_[i] + output_ramp * dt;
+            }
+            else if (output_rate < -output_ramp){
+                effort = effort_prev_[i] - output_ramp * dt;
+            }
 
 
             // Check global tolerance for all joints
@@ -146,8 +156,6 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
             joint_states_prev_[i] = msg->position[i];
             effort_prev_[i] = effort;
 
-            
-
         }
 
         counter = counter + 1;
@@ -155,18 +163,19 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
         // Publish effort commands
         effort_command_publisher_->publish(effort_command);
 
+
         previous_time_stamp = current_time_stamp;
     }
 
 
     // ROS elements
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber_;
-    
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr effort_command_publisher_;
 
     // PID parameters for each joint
     std::vector<PID> pid_params_;
     double tolerance_; // Global goal tolerance for all motors
+    double output_ramp = 0.05;
     std::vector<double> desired_positions_;
     std::vector<double> desired_positions2_;
     std::vector<double> desired_positions3_;
@@ -185,15 +194,15 @@ int main(int argc, char** argv) {
 
     double ki_cap = 2.0;
 
-    double kp0 = 0.25;  double ki0 = 0.00;  double kd0 = 1.0;
-    double kp1 = 0.03;  double ki1 = 0.0;   double kd1 = 0.9;
-    double kp2 = 0.05;  double ki2 = 0.0;   double kd2 = 0.8;
+    double kp0 = 0.00;  double ki0 = 0.00;  double kd0 = 0.0;
+    double kp1 = 0.00;  double ki1 = 0.0;   double kd1 = 0.0;
+    double kp2 = 0.04;  double ki2 = 0.0;   double kd2 = 0.01;
     
     //////////////////////////////////////////////////////////
 
-    double kp3 = 0.3;   double ki3 = 0.0;   double kd3 = 1.0;
-    double kp4 = 0.03;  double ki4 = 0.0;   double kd4 = 0.9;
-    double kp5 = 0.05;  double ki5 = 0.00;  double kd5 = 0.08;
+    double kp3 = 0.00;   double ki3 = 0.0;   double kd3 = 0.00;
+    double kp4 = 0.00;  double ki4 = 0.0;   double kd4 = 0.00;
+    double kp5 = 0.00;  double ki5 = 0.00;  double kd5 = 0.00;
 
     //////////////////////////////////////////////////////////
 
@@ -219,7 +228,7 @@ int main(int argc, char** argv) {
 
         
     };
-    double tolerance = 0.001; // Global tolerance for all motors
+    double tolerance = 0.01; // Global tolerance for all motors
 
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PositionPIDController>(pid_params, tolerance);

@@ -93,9 +93,16 @@ public:
   void set_zero_states(std::vector<double> &joint_states);
 
   PLATO_HARDWARE_INTERFACE_PUBLIC
-  void compute_velocity(const rclcpp::Duration &period, const std::vector<double> &joint_position_states_,
-                                     std::vector<double> &joint_velocity_states_,
-                                     std::vector<double> &joint_position_states_prev_);
+  std::vector<double> compute_velocity(
+                        const rclcpp::Duration &period, 
+                        std::vector<double> joint_position_states_,
+                        std::vector<double> joint_position_states_prev_);
+
+  PLATO_HARDWARE_INTERFACE_PUBLIC
+  std::vector<double> lpf_filter(
+                  double alpha,
+                  const std::vector<double> states, 
+                  const std::vector<double> states_prev_);
 
   PLATO_HARDWARE_INTERFACE_PUBLIC
   void set_can_id_map();
@@ -106,6 +113,8 @@ public:
 
 private:
   /// The size of this vector is (standard_interfaces_.size() x nr_joints)
+ 
+  /////////// Command interfaces ///////////
   std::vector<double> motor_effort_commands_;
   std::vector<double> motor_position_commands_;
 
@@ -114,12 +123,19 @@ private:
 
   std::vector<double> joint_position_commands_;
   std::vector<double> joint_position_commands_prev_;
+
   std::vector<double> joint_effort_commands_;
   std::vector<double> joint_effort_commands_prev_;
 
+  /////////// State interfaces ///////////
   std::vector<double> joint_position_states_;
   std::vector<double> joint_position_states_prev_;
+  std::vector<double> joint_position_states_raw_;
+
   std::vector<double> joint_velocity_states_;
+  std::vector<double> joint_velocity_states_prev_;
+  std::vector<double> joint_velocity_states_raw_;
+
   std::vector<double> joint_effort_states_;
   std::vector<double> ft_sensor_states_;
 
@@ -135,7 +151,6 @@ private:
   plato_motor_direction::PlatoMotorDirection motor_direction_;
 
 
-  can_msgs::msg::Frame can_rx_msg_;
 };
 
 } // namespace plato_hardware_interface

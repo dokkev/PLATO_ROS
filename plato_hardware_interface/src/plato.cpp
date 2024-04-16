@@ -264,7 +264,7 @@ PLATOHardware::read(const rclcpp::Time &/*time*/,
 
   //update velocity
    // Define the filter coefficient (alpha)
-  const double alpha = 0.001;
+  const double alpha = 0.01;
 
   // Calculate and filter the joint velocities
   for (size_t i = 0; i < joint_velocity_states_.size(); i++) {

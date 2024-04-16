@@ -25,7 +25,7 @@ public:
             { 
                 0.0, // Motor0 default position
                 -0.658, // Motor1 default position
-                0.968, // Motor2 default position
+                0.69, // Motor2 default position
                 0.0, // Motor3 default position
                 0.0, // Motor4 default position
                 -1.129, // Motor5 default position
@@ -39,7 +39,7 @@ public:
             { 
                 -0.042, // Motor0
                 -0.617 , // Motor1
-                1.219, // Motor2
+                1.2, // Motor2
                 -0.137, // Motor3
                 -0.400, // Motor4
                 -1.219, // Motor5
@@ -81,37 +81,37 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
         double dt = (current_time_stamp - previous_time_stamp).seconds();
 
    
-        // if (counter < 1000){
+        if (counter < 1000){
 
-        //     desired_positions2_[1] = desired_positions2_[1] - 0.0000;
-        //     desired_positions2_[2] = desired_positions2_[2] - 0.001;
+            desired_positions2_[1] = desired_positions2_[1] - 0.0000;
+            desired_positions2_[2] = desired_positions2_[2] - 0.001;
 
-        //     desired_positions2_[4] = desired_positions2_[4] + 0.0000;
-        //     desired_positions2_[5] = desired_positions2_[5] + 0.001;
+            desired_positions2_[4] = desired_positions2_[4] + 0.0000;
+            desired_positions2_[5] = desired_positions2_[5] + 0.001;
   
 
-        // }
-        // else if (counter >= 1000 && counter < 2000){
-        // desired_positions2_[1] = desired_positions2_[1] + 0.0000;
-        // desired_positions2_[2] = desired_positions2_[2] + 0.001;
+        }
+        else if (counter >= 1000 && counter < 2000){
+        desired_positions2_[1] = desired_positions2_[1] + 0.0000;
+        desired_positions2_[2] = desired_positions2_[2] + 0.001;
 
-        // desired_positions2_[4] = desired_positions2_[4] - 0.0000;
-        // desired_positions2_[5] = desired_positions2_[5] - 0.001;
+        desired_positions2_[4] = desired_positions2_[4] - 0.0000;
+        desired_positions2_[5] = desired_positions2_[5] - 0.001;
 
         
 
-        // }
-        // else if (counter == 2000){
-        //     counter = 0;
+        }
+        else if (counter == 2000){
+            counter = 0;
         
-        // }
+        }
     
 
         for (size_t i = 0; i < 9; ++i) {
 
             // apply low pass filter to joint states
             // msg->position[i] = 0.1 * msg->position[i] + 0.9 * joint_states_prev_[i];
-            double alpha = 0.2;
+            double alpha = 1.0;
             msg->position[i] = alpha * msg->position[i] + (1 - alpha) * joint_states_prev_[i];
             
             double error = desired_positions2_[i] - msg->position[i];
@@ -135,19 +135,19 @@ void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
             // PID formula for each motor
             double effort = pid_params_[i].kp * error + pid_params_[i].ki * error_integral_[i] + pid_params_[i].kd * error_derivative;
 
-            double output_rate = (effort - effort_prev_[i]) / dt;
-            if (output_rate > output_ramp){
-                effort = effort_prev_[i] + output_ramp * dt;
-            }
-            else if (output_rate < -output_ramp){
-                effort = effort_prev_[i] - output_ramp * dt;
-            }
+            // double output_rate = (effort - effort_prev_[i]) / dt;
+            // if (output_rate > output_ramp){
+            //     effort = effort_prev_[i] + output_ramp * dt;
+            // }
+            // else if (output_rate < -output_ramp){
+            //     effort = effort_prev_[i] - output_ramp * dt;
+            // }
 
 
             // Check global tolerance for all joints
-            if (std::abs(error) < tolerance_) {
-                effort = 0.0; // Considered at goal position, stop applying effort
-            }
+            // if (std::abs(error) < tolerance_) {
+            //     effort = 0.0; // Considered at goal position, stop applying effort
+            // }
 
    
 
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
 
     double kp0 = 0.00;  double ki0 = 0.00;  double kd0 = 0.0;
     double kp1 = 0.00;  double ki1 = 0.0;   double kd1 = 0.0;
-    double kp2 = 0.04;  double ki2 = 0.0;   double kd2 = 0.01;
+    double kp2 = 0.03;  double ki2 = 0.0;   double kd2 = 0.0001;
     
     //////////////////////////////////////////////////////////
 

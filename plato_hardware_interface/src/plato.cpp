@@ -43,8 +43,7 @@ void PLATOHardware::stop() {
               "Deactivating ...Setting all commands to zero...");
 
   // set all command effort to 0
-  set_zero_command(motor_effort_commands_);
-  socket_can_.send_can(motor_effort_commands_);
+
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
@@ -144,7 +143,7 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   set_zero_states(joint_velocity_states_raw_);
   set_zero_states(joint_effort_states_);
 
-  set_zero_torque_command(motor_position_commands_);
+  set_zero_torque_command(joint_position_commands_);
   set_zero_torque_command(joint_position_commands_prev_);
   // PLATOHardware::set_zero_command(joint_effort_commands_);
   // PLATOHardware::set_zero_command(joint_effort_commands_prev_);
@@ -177,7 +176,7 @@ std::vector<hardware_interface::CommandInterface>
 PLATOHardware::export_command_interfaces() {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(info_.joints.size());
-  effort_command_interface_names_.reserve(info_.joints.size());
+  // effort_command_interface_names_.reserve(info_.joints.size());
   position_command_interface_names_.reserve(info_.joints.size());
 
 
@@ -213,12 +212,11 @@ PLATOHardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) {
   // PLATOHardware::set_zero_command(joint_effort_commands_);
 
   // send the zero position command to the motor
-  PLATOHardware::set_zero_torque_command(motor_position_commands_);
+  PLATOHardware::set_zero_torque_command(joint_position_commands_);
 
   // init CAN
-
   socket_can_.init();
-  can_error_.resize(info_.joints.size(), false);
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 
@@ -299,10 +297,21 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
 
   /////////////////// Position Command Interface ///////////////////
   // adjust joint position commands -> motor position commands with direction and offset
+
+  set_zero_torque_command(joint_position_commands_);
   motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
                                                    motor_position_commands_);
   // send the motor commands over CAN
   // socket_can_.send_can(motor_position_commands_);
+
+  // Debugging
+  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
+    RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"),
+                "Joint Position Command: %f Motor Position Command: %f",
+                joint_position_commands_[i], motor_position_commands_[i]);
+  }
+
+
   
 
 

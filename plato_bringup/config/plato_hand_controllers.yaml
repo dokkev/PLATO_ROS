@@ -6,11 +6,51 @@ plato:
       plato_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster
 
+      plato_joint_controller:
+        type: joint_trajectory_controller/JointTrajectoryController
+
       plato_position_controller:
+        type: position_controllers/JointGroupPositionController
+
+  plato_joint_controller:
+    ros__parameters:
+      action_monitor_rate: 50.0
+      joints:
+        - plato_joint0
+        - plato_joint1
+        - plato_joint2
+        - plato_joint3
+        - plato_joint4
+        - plato_joint5
+        - plato_joint6
+        - plato_joint7
+        - plato_joint8
+
+      command_interfaces:
+        - position
+      state_interfaces:
+        - position
+        - velocity
 
 
+  plato_position_controller:
+    ros__parameters:
+      joints:
+        - plato_joint0
+        - plato_joint1
+        - plato_joint2
+        - plato_joint3
+        - plato_joint4
+        - plato_joint5
+        - plato_joint6
+        - plato_joint7
+        - plato_joint8
 
+      command_interfaces:
+        - position
 
+      state_interfaces:
+        - position
 
 
 

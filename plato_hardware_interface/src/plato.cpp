@@ -27,7 +27,7 @@ void PLATOHardware::set_zero_command(std::vector<double> &command) {
 
 void PLATOHardware::set_zero_torque_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 3.0;
+    command[i] = 3.20;
   }
 }
 
@@ -302,14 +302,10 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
   motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
                                                    motor_position_commands_);
   // send the motor commands over CAN
-  // socket_can_.send_can(motor_position_commands_);
 
-  // Debugging
-  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
-    RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"),
-                "Joint Position Command: %f Motor Position Command: %f",
-                joint_position_commands_[i], motor_position_commands_[i]);
-  }
+  int8_t mode = 1;
+  socket_can_.send_can(motor_position_commands_, mode);
+
 
 
   

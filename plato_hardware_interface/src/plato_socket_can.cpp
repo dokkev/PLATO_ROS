@@ -156,12 +156,12 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
 
 }
 
-void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
+void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands, int8_t mode) {
 
   // Send CAN messages for each ESP32 (3 times)
   for (long unsigned int i = 0; i < can_tx_id_list_.size(); i++) {
     struct can_frame frame;
-    frame.can_dlc = 6; 
+    frame.can_dlc = 7; 
     frame.can_id = can_tx_id_list_[i];
 
     int offset;
@@ -189,6 +189,8 @@ void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
     frame.data[3] = (encoded_data1 >> 8) & 0xFF;
     frame.data[4] = encoded_data2 & 0xFF;
     frame.data[5] = (encoded_data2 >> 8) & 0xFF;
+    frame.data[6] = mode;
+
 
     // write(socket_, &frame, sizeof(frame));
     if (write(socket_, &frame, sizeof(frame)) != sizeof(frame)) {

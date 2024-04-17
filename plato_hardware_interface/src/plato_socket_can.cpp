@@ -111,9 +111,7 @@ void PlatoSocketCAN::send_can_zero_effort() {
 
 
 
-
-
-void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
+void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states, int8_t &mode) {
     // Initialize the CAN frame
     struct can_frame frame;
     int nbytes = read(socket_, &frame, sizeof(frame));
@@ -122,6 +120,12 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
     // debug_can(frame);
 
     long id = frame.can_id;
+
+    if (nbytes > 0 && id == 0x00){
+      mode = frame.data[0];
+    }
+ 
+
     // Check if the frame is not empty and contains at least 6 bytes of data
     if (nbytes > 0 && frame.can_dlc >= 6) {
         // Unpack the data from the frame assuming it is in little endian and each value is 16 bits

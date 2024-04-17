@@ -117,6 +117,7 @@ private:
   /////////// Command interfaces ///////////
   std::vector<double> motor_effort_commands_;
   std::vector<double> motor_position_commands_;
+  std::vector<double> motor_position_commands_prev_;
 
   std::vector<double> motor_position_states_;
   std::vector<double> motor_position_states_prev_;
@@ -140,6 +141,8 @@ private:
   std::vector<double> ft_sensor_states_;
 
   std::vector<bool> can_error_;
+
+  int8_t mode_ = 0;
 
   int send_counter_ = 0;
 

@@ -117,6 +117,11 @@ PLATOHardware::on_init(const hardware_interface::HardwareInfo &info) {
                               std::numeric_limits<double>::quiet_NaN());
 
   // Initialize all Motor Vectors
+
+  motor_position_commands_.resize(info_.joints.size(),
+                                  std::numeric_limits<double>::quiet_NaN());
+  motor_position_commands_prev_.resize(info_.joints.size(),
+                                  std::numeric_limits<double>::quiet_NaN());
   motor_effort_commands_.resize(info_.joints.size(),
                                 std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(),
@@ -145,6 +150,8 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
 
   set_zero_torque_command(joint_position_commands_);
   set_zero_torque_command(joint_position_commands_prev_);
+  set_zero_torque_command(motor_position_commands_);
+  set_zero_torque_command(motor_position_commands_prev_);
   // PLATOHardware::set_zero_command(joint_effort_commands_);
   // PLATOHardware::set_zero_command(joint_effort_commands_prev_);
 
@@ -251,7 +258,7 @@ PLATOHardware::read(const rclcpp::Time &/*time*/,
   // repeat 3 times to ensure the motor position is read correctly
   for (unsigned int i = 0; i < 3; i++) {
     // Read the motor position over CAN
-    socket_can_.receive_can(motor_position_states_);
+    socket_can_.receive_can(motor_position_states_, mode_);
 
 
 
@@ -298,17 +305,27 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
   /////////////////// Position Command Interface ///////////////////
   // adjust joint position commands -> motor position commands with direction and offset
 
-  set_zero_torque_command(joint_position_commands_);
+
   motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
                                                    motor_position_commands_);
   // send the motor commands over CAN
 
-  int8_t mode = 1;
-  socket_can_.send_can(motor_position_commands_, mode);
+
+  // apply lpf ramp to motor postion commands
+  motor_position_commands_ = lpf_filter(0.1, motor_position_commands_, motor_position_commands_prev_);
+
+
+  // fix some motor position commands
+  motor_position_commands_[6] = 0.0;
+
+
+  socket_can_.send_can(motor_position_commands_, mode_);
 
 
 
   
+
+  motor_position_commands_prev_ = motor_position_commands_;
 
 
   return hardware_interface::return_type::OK;

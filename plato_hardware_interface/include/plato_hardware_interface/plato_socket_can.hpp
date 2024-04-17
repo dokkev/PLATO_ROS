@@ -40,7 +40,7 @@ public:
 
     void init();
 
-    void receive_can(std::vector<double>& motor_position_states);
+    void receive_can(std::vector<double>& motor_position_states, int8_t &mode);
     void send_can(std::vector<double>& motor_effort_commands, int8_t mode);
 
     void send_can_zero_effort();

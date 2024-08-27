@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
-<xacro:macro name="plato_description" params="connector_link">
+<xacro:macro name="plato_description" params="connector_link  xyz:='0 0 0'  rpy:='0 0 0' ">
     
+
+    <!-- if connector_link is defined -->
+    
+
     <!-- Connector Joint -->
     <joint name="plato_connector_joint" type="fixed">
         <parent link="${connector_link}"/>
         <child link="plato_base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="${xyz}" rpy="${rpy}"/>
     </joint>
 
     <!-- Base Link -->
@@ -40,19 +44,19 @@
 
     <joint name="plato_ee_joint1" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_1"/>
+        <parent link="plato_distal_1"/>
         <child link="plato_end_effector_1"/>
     </joint>
 
     <joint name="plato_ee_joint2" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_2"/>
+        <parent link="plato_distal_2"/>
         <child link="plato_end_effector_2"/>
     </joint>
 
     <joint name="plato_ee_joint3" type="fixed">
         <origin xyz="0.05060 0.0 0.0" rpy="-1.5707 0.0 0.0"/>
-        <parent link="plato_proximal_3"/>
+        <parent link="plato_distal_3"/>
         <child link="plato_end_effector_3"/>
     </joint>
 
@@ -133,8 +137,8 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.1745329251994329478" upper="0.785398163397448279"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-0.1745329251994329478" upper="0.785398163397448279"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint1" type="revolute">
@@ -142,8 +146,8 @@
         <parent link="plato_bracket_1" />
         <child link="plato_proximal_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint2" type="revolute">
@@ -151,8 +155,8 @@
         <parent link="plato_proximal_1" />
         <child link="plato_distal_1" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.34906585039886589561" upper="1.570796326794896558"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="0.0" upper="1.570796326794896558"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <!-- Finger 2: Index -->
@@ -230,8 +234,8 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint4" type="revolute">
@@ -239,8 +243,8 @@
         <parent link="plato_bracket_2" />
         <child link="plato_proximal_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint5" type="revolute">
@@ -248,8 +252,8 @@
         <parent link="plato_proximal_2" />
         <child link="plato_distal_2" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.0"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
 
@@ -328,8 +332,8 @@
         <parent link="plato_base_link" />
         <child link="plato_bracket_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-0.087266462599716473902" upper="0.087266462599716473902"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint7" type="revolute">
@@ -337,8 +341,8 @@
         <parent link="plato_bracket_3" />
         <child link="plato_proximal_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-0.87266462599716476678" upper="0.87266462599716476678"/>
+        <joint_properties friction="0.03"/>
     </joint>
 
     <joint name="plato_joint8" type="revolute">
@@ -346,8 +350,8 @@
         <parent link="plato_proximal_3" />
         <child link="plato_distal_3" />
         <axis xyz="0 0 1"/>
-        <limit effort="0.06" velocity="1.5706999999999999851" lower="-1.570796326794896558" upper="0.34906585039886589561"/>
-        <joint_properties friction="0.0"/>
+        <limit effort="0.06" velocity="0.0872665" lower="-1.570796326794896558" upper="0.0"/>
+        <joint_properties friction="0.01"/>
     </joint>
 
 </xacro:macro>

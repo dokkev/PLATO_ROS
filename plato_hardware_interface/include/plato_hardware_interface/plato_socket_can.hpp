@@ -28,30 +28,23 @@
 #include "plato_hardware_interface/plato_common.hpp"
 
 
-
-
 namespace plato_socket_can{
 
-static constexpr double MAX_CURRENT = 1.0;
-static constexpr double ZERO_CURRENT = 0.0001; 
 
 
 
 class PlatoSocketCAN{
 public:
     explicit PlatoSocketCAN();
+    ~PlatoSocketCAN() = default;
 
     void init();
 
-    void send_can_tx_msg();
-    void receive_can_rx_msg(std::vector<double>& motor_position_states,
-                            std::vector<bool>& can_error);
-    
-    void set_can_tx_msg(std::vector<double>& msg);
+    void receive_can(std::vector<double>& motor_position_states);
+    void send_can(std::vector<double>& motor_effort_commands);
 
-    void begin_send_thread();
-    void stop_send_thread(); 
-
+    void send_can_zero_effort();
+                       
 
 private:
     void setup_can_ids();
@@ -62,26 +55,21 @@ private:
     struct sockaddr_can addr_;
     const std::string CAN_CHANNEL;
 
-    int send_timer;
+    // CAN Message Packing/Unpacking Scale Factors
+    double encoder_scale_factor_;
+    double command_scale_factor_;
+    double encoder_scale_offset_;
+    double command_scale_offset_;
 
-    // Multithreading
-    std::thread send_thread;
-    bool send_thread_active = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    
-
-    std::vector<int> can_tx_id_;
-    std::vector<int> can_rx_id_;
-
+    const std::vector<long int> can_tx_id_list_;
+    const std::vector<long int> can_rx_id_list_;
 
     std::vector<double> can_rx_msg_;
     std::vector<double> can_tx_msg_;
 
+    void write_can(int socket, int id, int8_t data);
 
-    void write_can(int socket, int id, double data);
-    std::optional<std::tuple<int, double, bool, bool>> read_can(int socket);
-
+    void debug_can(can_frame frame);
 
 
     struct can_frame frame_;

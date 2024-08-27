@@ -20,7 +20,7 @@
     <joint name="optimo_connector_joint" type="fixed">
         <parent link="${connector_link}"/>
         <child link="optimo_base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0.5" rpy="0 0 0"/>
     </joint>
 
 
@@ -38,13 +38,13 @@
     <link name="optimo_link0">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link0.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link0.stl"/>
             </geometry>
             <material name="blue"/>
         </visual>
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col0.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col0.stl"/>
             </geometry>
     
         </collision>
@@ -59,13 +59,13 @@
     <link name="optimo_link1_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link1.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link1.stl"/>
             </geometry>
             <material name="white"/>
         </visual>
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col1.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col1.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -79,13 +79,13 @@
     <link name="optimo_link2_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link2.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link2.stl"/>
             </geometry>
             <material name="blue"/>
         </visual>
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col2.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col2.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -99,14 +99,14 @@
     <link name="optimo_link3_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link3.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link3.stl"/>
             </geometry>
             <material name="white"/>
         </visual>
 
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col3.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col3.stl"/>
             </geometry>
         </collision>
         <inertial>            
@@ -121,14 +121,14 @@
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link4.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link4.stl"/>
             </geometry>
             <material name="blue"/>
         </visual>
         
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col4.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col4.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -142,14 +142,14 @@
     <link name="optimo_link5_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link5.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link5.stl"/>
             </geometry>
             <material name="white"/>
         </visual>
 
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col5.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col5.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -163,13 +163,13 @@
     <link name="optimo_link6_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link6.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link6.stl"/>
             </geometry>
             <material name="blue"/>
         </visual>
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col6.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col6.stl"/>
             </geometry>
         </collision>
         <inertial>
@@ -184,13 +184,13 @@
     <link name="optimo_link7_passive">
         <visual>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/link7.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/link7.stl"/>
             </geometry>
             <material name="white"/>
         </visual>
         <collision>
             <geometry>
-                <mesh filename="file://$(find optimo_description)/meshes/col7.stl"/>
+                <mesh filename="file://$(find optiman_description)/meshes/col7.stl"/>
             </geometry>
         </collision>
         <inertial>

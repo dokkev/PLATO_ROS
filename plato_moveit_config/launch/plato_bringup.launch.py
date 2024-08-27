@@ -42,9 +42,9 @@ def generate_launch_description():
     plato_ns = LaunchConfiguration("plato_ns")
 
     # Get URDF via xacro
-    pkg_name = 'plato_description'
+    pkg_name = 'plato_moveit_config'
     pkg_share= get_package_share_directory(pkg_name)
-    urdf_path = 'urdf/plato_hand.urdf.xacro'
+    urdf_path = 'config/plato_hand.urdf.xacro'
     rviz_config_file = pkg_share + '/rviz/plato.rviz'
     xacro_file = os.path.join(pkg_share, urdf_path)
 
@@ -95,7 +95,7 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["plato_effort_controller", "--controller-manager", "/plato/controller_manager"],
+        arguments=["plato_joint_controller", "--controller-manager", "/plato/controller_manager"],
         namespace=plato_ns,  
     )
 
@@ -103,7 +103,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
+            arguments=['0', '0', '0', '0.707388', '0.0005629', '0.706825', '0.0005633', 'ee', 'plato_base_link'],
         )  
 
     # Event handlers remain unchanged
@@ -122,23 +122,15 @@ def generate_launch_description():
     )
 
 
-    rqt_joint_trajectory_controller = Node(
-        package="rqt_joint_trajectory_controller",
-        executable="rqt_joint_trajectory_controller",
-        name="rqt_joint_trajectory_controller",
-        output="screen",
-        namespace=plato_ns,  
-    )
-
+ 
 
     nodes = [
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
-        delay_rviz_after_joint_state_broadcaster_spawner,
+        # delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        # optimo_plato_transform_broadcaster,
-        # rqt_joint_trajectory_controller
+        optimo_plato_transform_broadcaster,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

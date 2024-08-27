@@ -1,18 +1,26 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="plato">
-    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
-    <xacro:arg name="hardware_type" default="gazebo" /> <!-- gazebo | mock -->
-
-    <!-- Import plato urdf file -->
-    <xacro:include filename="$(find plato_description)/urdf/plato_manipulator.urdf.xacro" />
-
-    <!-- Import control_xacro -->
-    <xacro:include filename="plato.ros2_control.xacro" />
-
-    <xacro:plato_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)" hardware_type="$(arg hardware_type)"/>
-
-    
+<robot name="plato_manipulator" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
 
-    
+    <!-- Set World Frame -->
+    <link name="world"/>
+
+    <!-- Include Xacro -->
+    <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/pedestal.xacro" />
+    <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/optimo_description.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato_hand_description.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.transmission.xacro"/>
+    <xacro:include filename="$(find plato_description)/urdf/plato_xacro/plato.ros2_control.xacro"/>
+
+    <!-- Pedestal -->
+    <xacro:pedestal_description connector_link="world" />
+    <!-- Optimo Arm -->
+    <xacro:optimo_description connector_link="stand_link"/>
+    <!-- Plato Hand -->
+    <xacro:plato_description connector_link="optimo_ee_link"/>
+
+    <xacro:plato_ros2_control name="plato_hand_controller" />
+
+
+
 </robot>

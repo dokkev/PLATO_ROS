@@ -59,55 +59,55 @@ plato:
 
       gains:
         plato_joint0:
-          p: 0.001
+          p: 0.000
           i: 0.0
           d: 0.0
           i_clamp: 1.0
           ff_velocity_scale: 0.0
         plato_joint1:
-          p: 0.0
+          p: 0.05
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint2: # 
-          p: 0.05
+          p: 0.00
           i: 0.0
           d: 0.000
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint3:
-          p: 0.001
+          p: 0.000
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint4:
-          p: 0.01
+          p: 0.00
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint5:
-          p: 0.001
+          p: 0.00
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint6:
-          p: 0.001
+          p: 0.000
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint7:
-          p: 0.001
+          p: 0.000
           i: 0.0
           d: 0.0
           i_clamp: 0.0
           ff_velocity_scale: 0.0
         plato_joint8:
-          p: 0.001
+          p: 0.000
           i: 0.0
           d: 0.0
           i_clamp: 0.0

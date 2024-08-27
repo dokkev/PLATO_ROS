@@ -17,7 +17,7 @@ def generate_launch_description():
     use_gui = LaunchConfiguration('use_gui')
 
     # getting the package path
-    pkg_name = 'optimo_description'
+    pkg_name = 'optiman_description'
     pkg_share= get_package_share_directory(pkg_name)
 
     # URDF file path

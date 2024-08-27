@@ -74,6 +74,10 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+        optimo_ee_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         optimo_link0:
           Alpha: 1
           Show Axes: false
@@ -83,7 +87,6 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         optimo_link1_passive:
           Alpha: 1
           Show Axes: false
@@ -143,12 +146,17 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        stand_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         world:
           Alpha: 1
           Show Axes: false
           Show Trail: false
       Mass Properties:
-        Inertia: true
+        Inertia: false
         Mass: false
       Name: RobotModel
       TF Prefix: ""
@@ -162,6 +170,8 @@ Visualization Manager:
         All Enabled: false
         optimo_base_link:
           Value: true
+        optimo_ee_link:
+          Value: true
         optimo_link0:
           Value: false
         optimo_link1:
@@ -192,6 +202,8 @@ Visualization Manager:
           Value: false
         optimo_link7_passive:
           Value: false
+        stand_link:
+          Value: true
         world:
           Value: false
       Marker Scale: 0.5
@@ -201,23 +213,25 @@ Visualization Manager:
       Show Names: false
       Tree:
         world:
-          optimo_base_link:
-            optimo_link0:
-              optimo_link1:
-                optimo_link1_passive:
-                  optimo_link2:
-                    optimo_link2_passive:
-                      optimo_link3:
-                        optimo_link3_passive:
-                          optimo_link4:
-                            optimo_link4_passive:
-                              optimo_link5:
-                                optimo_link5_passive:
-                                  optimo_link6:
-                                    optimo_link6_passive:
-                                      optimo_link7:
-                                        optimo_link7_passive:
-                                          {}
+          stand_link:
+            optimo_base_link:
+              optimo_link0:
+                optimo_link1:
+                  optimo_link1_passive:
+                    optimo_link2:
+                      optimo_link2_passive:
+                        optimo_link3:
+                          optimo_link3_passive:
+                            optimo_link4:
+                              optimo_link4_passive:
+                                optimo_link5:
+                                  optimo_link5_passive:
+                                    optimo_link6:
+                                      optimo_link6_passive:
+                                        optimo_link7:
+                                          optimo_link7_passive:
+                                            optimo_ee_link:
+                                              {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -266,25 +280,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.4179853200912476
+      Distance: 3.3129796981811523
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.021413573995232582
-        Y: 0.16889849305152893
-        Z: 0.4246121644973755
+        X: 0.19062155485153198
+        Y: -0.19505280256271362
+        Z: 0.08907558023929596
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.15039880573749542
+      Pitch: 0.2403988242149353
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.237262725830078
+      Yaw: 0.12912502884864807
     Saved: ~
 Window Geometry:
   Displays:
@@ -303,4 +317,4 @@ Window Geometry:
     collapsed: false
   Width: 1850
   X: 70
-  Y: 263
+  Y: 450

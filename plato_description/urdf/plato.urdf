@@ -4,111 +4,19 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="plato_hand">
-  <!-- Set World Frame -->
-  <transmission name="plato_joint0_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint0">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint0_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint1_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint1">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint1_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint2_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint2">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint2_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint3_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint3">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint3_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint4_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint4">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint4_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint5_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint5">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint5_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint6_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint6">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint6_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint7_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint7">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint7_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="plato_joint8_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="plato_joint8">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="plato_joint8_motor">
-      <hardwareInterface>EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1.0</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <!-- <xacro:include filename="$(find optiman_description)/urdf/optimo_xacro/pedestal.xacro"/> -->
-  <!-- if connector_link is defined -->
-  <!-- Connector Joint -->
-  <!-- <joint name="plato_connector_joint" type="fixed">
-        <parent link="${connector_link}"/>
-        <child link="plato_base_link"/>
-        <origin xyz="${xyz}" rpy="${rpy}"/>
-    </joint> -->
+
+  <joint name="plato_connector_joint" type="fixed">
+    <parent link="world"/>
+    <child link="plato_base_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
   <!-- Base Link -->
   <link name="plato_base_link">
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_base_link_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_base_link_visual.stl"/>
       </geometry>
       <material name="plato_base_link_material">
         <color rgba="0.92522325716667042084 0.93028137847967418139 0.9333162512674763045 1.0"/>
@@ -117,7 +25,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_base_link_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_base_link_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -126,10 +34,12 @@
       <inertia ixx="0.00014107640982160277654" ixy="-1.6705856892590392037e-06" ixz="2.2974647250647586648e-05" iyy="0.00020732421359090659452" iyz="2.6143219043340646574e-06" izz="0.00029225640965350557733"/>
     </inertial>
   </link>
+
   <!-- End effectors (Fingertips) -->
   <link name="plato_end_effector_1"/>
   <link name="plato_end_effector_2"/>
   <link name="plato_end_effector_3"/>
+
   <joint name="plato_ee_joint1" type="fixed">
     <origin rpy="-1.5707 0.0 0.0" xyz="0.05060 0.0 0.0"/>
     <parent link="plato_distal_1"/>
@@ -145,12 +55,13 @@
     <parent link="plato_distal_3"/>
     <child link="plato_end_effector_3"/>
   </joint>
+
   <!-- Finger 1: Thumb -->
   <link name="plato_bracket_1">
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_visual.stl"/>
       </geometry>
       <material name="plato_bracket_material">
         <color rgba="0.29588156155479994336 0.31447294875599396402 0.33306433595718798468 1.0"/>
@@ -159,7 +70,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -172,7 +83,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_visual.stl"/>
       </geometry>
       <material name="plato_proximal_material">
         <color rgba="0.34674225592475715896 0.3637734991268727347 0.38080474232898831044 1.0"/>
@@ -181,7 +92,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -194,7 +105,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_visual.stl"/>
       </geometry>
       <material name="plato_distal_material">
         <color rgba="0.6462146502129876291 0.65534742206524643215 0.66425012842436204075 1.0"/>
@@ -203,7 +114,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -233,7 +144,7 @@
     <parent link="plato_proximal_1"/>
     <child link="plato_distal_1"/>
     <axis xyz="0 0 1"/>
-    <limit effort="0.06" lower="-0.34906585039886589561" upper="1.570796326794896558" velocity="0.0872665"/>
+    <limit effort="0.06" lower="0.0" upper="1.570796326794896558" velocity="0.0872665"/>
     <joint_properties friction="0.03"/>
   </joint>
   <!-- Finger 2: Index -->
@@ -241,7 +152,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_2_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_2_visual.stl"/>
       </geometry>
       <material name="plato_bracket_2_material">
         <color rgba="0.29588156155479994336 0.31447294875599396402 0.33306433595718798468 1.0"/>
@@ -250,7 +161,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_2_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_2_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -263,7 +174,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_2_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_2_visual.stl"/>
       </geometry>
       <material name="plato_proximal_2_material">
         <color rgba="0.34674225592475710345 0.36377349912687267919 0.38080474232898825493 1.0"/>
@@ -272,7 +183,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_2_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_2_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -285,7 +196,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_2_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_2_visual.stl"/>
       </geometry>
       <material name="plato_distal_2_material">
         <color rgba="0.64621465021298751807 0.65534742206524643215 0.66425012842436204075 1.0"/>
@@ -294,7 +205,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_2_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_2_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -324,7 +235,7 @@
     <parent link="plato_proximal_2"/>
     <child link="plato_distal_2"/>
     <axis xyz="0 0 1"/>
-    <limit effort="0.06" lower="-1.570796326794896558" upper="0.34906585039886589561" velocity="0.0872665"/>
+    <limit effort="0.06" lower="-1.570796326794896558" upper="0.0" velocity="0.0872665"/>
     <joint_properties friction="0.03"/>
   </joint>
   <!-- Finger 3: Pinky (or Middle) -->
@@ -332,7 +243,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_3_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_3_visual.stl"/>
       </geometry>
       <material name="plato_bracket_3_material">
         <color rgba="0.29588156155479994336 0.31447294875599396402 0.33306433595718798468 1.0"/>
@@ -341,7 +252,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_3_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_bracket_3_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -354,7 +265,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_3_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_3_visual.stl"/>
       </geometry>
       <material name="plato_proximal_3_material">
         <color rgba="0.34674225592475710345 0.36377349912687267919 0.38080474232898825493 1.0"/>
@@ -363,7 +274,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_3_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_proximal_3_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -376,7 +287,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_3_visual.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_3_visual.stl"/>
       </geometry>
       <material name="plato_distal_3_material">
         <color rgba="0.64621465021298751807 0.6553474220652466542 0.66425012842436204075 1.0"/>
@@ -385,7 +296,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/optimo/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_3_collision.stl"/>
+        <mesh filename="file:///home/dk/workspaces/plato_ws/install/plato_description/share/plato_description/meshes/plato/plato_distal_3_collision.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -415,104 +326,8 @@
     <parent link="plato_proximal_3"/>
     <child link="plato_distal_3"/>
     <axis xyz="0 0 1"/>
-    <limit effort="0.06" lower="-1.570796326794896558" upper="0.34906585039886589561" velocity="0.0872665"/>
+    <limit effort="0.06" lower="-1.570796326794896558" upper="0.0" velocity="0.0872665"/>
     <joint_properties friction="0.01"/>
   </joint>
-  <ros2_control name="plato_hand_gazebo_controller" type="system">
-    <!-- Hardware -->
-    <hardware>
-      <plugin>plato_hardware_interface/PLATOHardware</plugin>
-    </hardware>
-    <joint name="plato_joint0">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint1">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint2">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position">
-                </state_interface>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint3">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint4">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint5">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint6">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint7">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="plato_joint8">
-      <command_interface name="effort">
-        <param name="min">-0.06</param>
-        <param name="max">0.06</param>
-      </command_interface>
-      <!-- <command_interface name="position"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-  </ros2_control>
+
 </robot>

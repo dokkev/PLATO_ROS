@@ -1,0 +1,9 @@
+<library path="plato2_hardware_interface">
+  <class name="plato2_hardware_interface/PLATO2Hardware"
+         type="plato2_hardware_interface::PLATO2Hardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ros2_control hardware interface for PLATO Hand V2
+    </description>
+  </class>
+</library>

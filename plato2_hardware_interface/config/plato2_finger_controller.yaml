@@ -1,0 +1,26 @@
+plato2:
+  controller_manager:
+    ros__parameters:
+      update_rate: 100  # Hz
+
+      plato2_joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+
+      plato2_position_controller:
+        type: position_controllers/JointGroupPositionController
+
+
+  plato2_position_controller:
+    ros__parameters:
+      joints:
+        - mcp_joint
+        - pip_joint
+
+      command_interfaces:
+        - position
+
+      state_interfaces:
+        - position
+        - velocity
+        - effort

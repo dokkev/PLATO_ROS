@@ -27,7 +27,7 @@ void PLATOHardware::set_zero_command(std::vector<double> &command) {
 
 void PLATOHardware::set_zero_torque_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 200.0;
+    command[i] = 3.20;
   }
 }
 
@@ -43,8 +43,7 @@ void PLATOHardware::stop() {
               "Deactivating ...Setting all commands to zero...");
 
   // set all command effort to 0
-  set_zero_command(motor_effort_commands_);
-  socket_can_.send_can(motor_effort_commands_);
+
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully Stopped!");
@@ -118,6 +117,11 @@ PLATOHardware::on_init(const hardware_interface::HardwareInfo &info) {
                               std::numeric_limits<double>::quiet_NaN());
 
   // Initialize all Motor Vectors
+
+  motor_position_commands_.resize(info_.joints.size(),
+                                  std::numeric_limits<double>::quiet_NaN());
+  motor_position_commands_prev_.resize(info_.joints.size(),
+                                  std::numeric_limits<double>::quiet_NaN());
   motor_effort_commands_.resize(info_.joints.size(),
                                 std::numeric_limits<double>::quiet_NaN());
   motor_position_states_.resize(info_.joints.size(),
@@ -144,10 +148,12 @@ hardware_interface::CallbackReturn PLATOHardware::on_configure(
   set_zero_states(joint_velocity_states_raw_);
   set_zero_states(joint_effort_states_);
 
-  PLATOHardware::set_zero_torque_command(motor_position_commands_);
-  // PLATOHardware::set_zero_torque_command(joint_position_commands_prev_);
-  PLATOHardware::set_zero_command(joint_effort_commands_);
-  PLATOHardware::set_zero_command(joint_effort_commands_prev_);
+  set_zero_torque_command(joint_position_commands_);
+  set_zero_torque_command(joint_position_commands_prev_);
+  set_zero_torque_command(motor_position_commands_);
+  set_zero_torque_command(motor_position_commands_prev_);
+  // PLATOHardware::set_zero_command(joint_effort_commands_);
+  // PLATOHardware::set_zero_command(joint_effort_commands_prev_);
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully configured!");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -177,26 +183,26 @@ std::vector<hardware_interface::CommandInterface>
 PLATOHardware::export_command_interfaces() {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(info_.joints.size());
-  effort_command_interface_names_.reserve(info_.joints.size());
+  // effort_command_interface_names_.reserve(info_.joints.size());
   position_command_interface_names_.reserve(info_.joints.size());
 
 
   // Position Command Interface
-  // for (size_t i = 0; i < info_.joints.size(); ++i) {
-  //   command_interfaces.emplace_back(hardware_interface::CommandInterface(
-  //       info_.joints[i].name, hardware_interface::HW_IF_POSITION,
-  //       &joint_position_commands_[i]));
-  //   position_command_interface_names_.push_back(
-  //       command_interfaces.back().get_name());
-  // }
-
-  // Effort Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-        &joint_effort_commands_[i]));
-    effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+        info_.joints[i].name, hardware_interface::HW_IF_POSITION,
+        &joint_position_commands_[i]));
+    position_command_interface_names_.push_back(
+        command_interfaces.back().get_name());
   }
+
+  // Effort Command Interface
+  // for (size_t i = 0; i < info_.joints.size(); ++i) {
+  //   command_interfaces.emplace_back(hardware_interface::CommandInterface(
+  //       info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
+  //       &joint_effort_commands_[i]));
+  //   effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+  // }
 
   return command_interfaces;
 }
@@ -213,12 +219,11 @@ PLATOHardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) {
   // PLATOHardware::set_zero_command(joint_effort_commands_);
 
   // send the zero position command to the motor
-  PLATOHardware::set_zero_torque_command(motor_position_commands_);
+  PLATOHardware::set_zero_torque_command(joint_position_commands_);
 
   // init CAN
-
   socket_can_.init();
-  can_error_.resize(info_.joints.size(), false);
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATOHardware"), "Successfully activated!");
 
@@ -253,7 +258,7 @@ PLATOHardware::read(const rclcpp::Time &/*time*/,
   // repeat 3 times to ensure the motor position is read correctly
   for (unsigned int i = 0; i < 3; i++) {
     // Read the motor position over CAN
-    socket_can_.receive_can(motor_position_states_);
+    socket_can_.receive_can(motor_position_states_, mode_);
 
 
 
@@ -288,14 +293,39 @@ PLATOHardware::write(const rclcpp::Time & /*time*/,
                      const rclcpp::Duration & /*period*/) {
 
 
-
+  /////////////////// Effort Command Interface ///////////////////
   // Adjust joint commands -> motor commands with direction and offset
-  motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_,
-                                                   motor_effort_commands_);
+  // motor_direction_.convert_joint_to_motor_effort(joint_effort_commands_,
+  //                                                  motor_effort_commands_);
   // send the motor commands over CAN                                              
-  socket_can_.send_can(motor_effort_commands_);
+  // socket_can_.send_can(motor_effort_commands_);
+
+
+
+  /////////////////// Position Command Interface ///////////////////
+  // adjust joint position commands -> motor position commands with direction and offset
+
+
+  motor_direction_.convert_joint_to_motor_position(joint_position_commands_,
+                                                   motor_position_commands_);
+  // send the motor commands over CAN
+
+
+  // apply lpf ramp to motor postion commands
+  motor_position_commands_ = lpf_filter(0.1, motor_position_commands_, motor_position_commands_prev_);
+
+
+  // fix some motor position commands
+  motor_position_commands_[6] = 0.0;
+
+
+  socket_can_.send_can(motor_position_commands_, mode_);
+
+
+
   
 
+  motor_position_commands_prev_ = motor_position_commands_;
 
 
   return hardware_interface::return_type::OK;

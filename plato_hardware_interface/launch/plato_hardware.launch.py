@@ -95,7 +95,7 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["plato_effort_controller", "--controller-manager", "/plato/controller_manager"],
+        arguments=["plato_position_controller", "--controller-manager", "/plato/controller_manager"],
         namespace=plato_ns,  
     )
 
@@ -103,7 +103,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
+            arguments=['0', '0', '0', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
         )  
 
     # Event handlers remain unchanged

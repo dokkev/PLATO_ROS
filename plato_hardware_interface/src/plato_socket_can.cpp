@@ -111,9 +111,7 @@ void PlatoSocketCAN::send_can_zero_effort() {
 
 
 
-
-
-void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
+void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states, int8_t &mode) {
     // Initialize the CAN frame
     struct can_frame frame;
     int nbytes = read(socket_, &frame, sizeof(frame));
@@ -122,6 +120,12 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
     // debug_can(frame);
 
     long id = frame.can_id;
+
+    if (nbytes > 0 && id == 0x00){
+      mode = frame.data[0];
+    }
+ 
+
     // Check if the frame is not empty and contains at least 6 bytes of data
     if (nbytes > 0 && frame.can_dlc >= 6) {
         // Unpack the data from the frame assuming it is in little endian and each value is 16 bits
@@ -156,12 +160,12 @@ void PlatoSocketCAN::receive_can(std::vector<double> &motor_position_states) {
 
 }
 
-void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
+void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands, int8_t mode) {
 
   // Send CAN messages for each ESP32 (3 times)
   for (long unsigned int i = 0; i < can_tx_id_list_.size(); i++) {
     struct can_frame frame;
-    frame.can_dlc = 6; 
+    frame.can_dlc = 7; 
     frame.can_id = can_tx_id_list_[i];
 
     int offset;
@@ -189,6 +193,8 @@ void PlatoSocketCAN::send_can(std::vector<double> &motor_effort_commands) {
     frame.data[3] = (encoded_data1 >> 8) & 0xFF;
     frame.data[4] = encoded_data2 & 0xFF;
     frame.data[5] = (encoded_data2 >> 8) & 0xFF;
+    frame.data[6] = mode;
+
 
     // write(socket_, &frame, sizeof(frame));
     if (write(socket_, &frame, sizeof(frame)) != sizeof(frame)) {

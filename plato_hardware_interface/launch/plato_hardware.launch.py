@@ -25,7 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "gui",
             default_value="true",
-            description="Start RViz2 automatically with this launch file.",
+            description="Start RViz automatically with this launch file.",
         )
     )
     declared_arguments.append(

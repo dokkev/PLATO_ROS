@@ -141,6 +141,8 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_effort_states_[i] = 0.0;
   }
 
+  pcan_interface_.read_message();
+
 
   return hardware_interface::return_type::OK;
 }

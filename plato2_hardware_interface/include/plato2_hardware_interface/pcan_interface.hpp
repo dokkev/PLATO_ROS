@@ -13,7 +13,7 @@ class PCANInterface {
 
 private:
     // @bridf CAN FD bool indicator
-    const bool b_is_fd = false;
+    const bool b_fd = false;
 
     /// @brief Sets PCANHanddle (Hardware Chaneel)
     const TPCANHandle pcan_handle = PCAN_USBBUS1;
@@ -35,6 +35,12 @@ public:
     /// @brief Read messages from CAN devices
     TPCANStatus read_message();
 
+    /// @brief Process a message
+    /// @param msg TPCANMsg to process
+    /// @param timestamp TPCANTimestamp of the message
+    void process_message(const TPCANMsg msg, TPCANTimestamp timestamp);
+
+
     /// @brief Print a message on the console for debugging
     void print_message(const TPCANMsg msg); 
 
@@ -45,6 +51,30 @@ private:
     /// @brief Shows formatted status
     /// @param status will be formatted
     void show_status(TPCANStatus status);
+
+    /// @brief print PCAN Configuration
+    void print_current_config();
+
+    /// @brief gets the formatted text from a PCAN-Basic channel handle
+    /// @param handle PCAN-Basic Handle to format
+    /// @param buffer Buffer to store the formatted text
+    /// @param b_fd If the channel is FD capable
+    void format_channel_name(TPCANHandle handle, LPSTR buffer, bool b_fd);
+
+    /// @brief Gets name of a TPCANHandle
+    /// @param handle TPCANHandle to get the name of
+    /// @param buffer Buffer to store the name
+    void get_handle_name(TPCANHandle handle, LPSTR buffer);
+
+    /// @brief Gets the formatted error text from a PCAN-Basic error code
+    /// @param error PCAN-Basic error code to format
+    /// @param buffer A string buffer for the translated error
+    void get_formatted_error(TPCANStatus error, LPSTR buffer);
+
+    /// @brief Covernt bitrate c_short value to readable string
+    /// @param bitrate TPCANBaudrate to convert
+    /// @param buffer Buffer to store the converted string
+    void convert_bitrate_to_string(TPCANBaudrate bitrate, LPSTR buffer);
   
 };
 

@@ -34,9 +34,9 @@ cd ~/plato_ws && colcon build --symlink-install
 ```
 
 ## Packages Overview
-<list>
-`optiman_description` - Contains the URDF files of the Roboligent's Optimo Robot. Note that its called "optim**a**n" to avoid conflict with [Roboligent SDK](https://roboligent.bitbucket.io/)'s ROS 2 Package called `optimo_description`. 
-- 
+
+- [`optiman_description`](https://github.com/dokkev/PLATO_ROS/tree/master/optiman_description) Contains the URDF files of the Roboligent's Optimo Robot. Note that its called "optim**a**n" to avoid conflict with [Roboligent SDK](https://roboligent.bitbucket.io/) ROS 2 Package called `optimo_description`. 
+- [`plato_description`](https://github.com/dokkev/PLATO_ROS/tree/master/plato_description)
 
 ## Getting Started
 

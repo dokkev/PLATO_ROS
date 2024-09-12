@@ -65,7 +65,7 @@ You can see that `ttycan` is linked to `ttyACMx`
 Lastly, compare `udevadm info -a /dev/ttyACMx` and `udevadm info -a /dev/ttycan` to make sure they output the same device info.
 
 ---
-#### Connect CAN driver to CAN hardware using `can-utils`
+#### Connect CAN driver and Setup CAN chaneel `can-utils`
 
 Run:
 
@@ -89,25 +89,50 @@ You should see:
 ```
 ==> can0: <NOARP> mtu 16 qdisc noop state DOWN mode DEFAULT group default qlen 10
 ```
-Note that can0 is down. To make it up:
+Note that can0 is down. To set it to `UP` state, run:
 
+```
 sudo ip link set up can0 type can 
+```
 
 Confirm by:
 
 ```
 ip link ls
+```
+You should see:
+```
 ==> <NOARP,UP,LOWER_UP> mtu 16 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
     link/can
 ```
+Somethimes, it's shown as `state UNKNOWN` instead of `state UP`. This is normal.
+
 To set buffer:
 
+```
 ip link set can0 txqueuelen 1000
+```
+
+#### Testing SocketCAN in Terminal
+After you set the CAN state to `UP`, run:
+
+```
+candump can0
+```
+And open another terminal and run:
+
+```
+cansend can0 123#1122334455667788
+```
+You will see somethime like this in the terminal where `candump can0` is running:
+![alt text](/docs/img/candump.png)
+
 
 To stop the CAN interface, run:
 
+```
 sudo ip link set can0 down
-
+```
 ## Option 2: Candlelight
 
 `can0` should appear as down state when you run `ip link ls`
@@ -121,14 +146,22 @@ To set buffer to 1000:
 
 ```sudo ip link set canX txqueuelen 1000```
 
-To stop the CAN interface, run:
-
-```sudo ip link set can0 down```
 
 <!-- Note -->
-> If the USB-CAN device with candlelight firmware is not connected to any other CAN devices (such as ESP32 + CAN Transceiver), it will not process CAN messages and will not show any data in `candump` or `cansniffer`. In order to debug the isolated USB-CAN device, you have to enable to loopback on
+> If the USB-CAN device with candlelight firmware is not connected to any other CAN devices (such as ESP32 + CAN Transceiver), it will not process CAN messages and will not show any data in `candump` or `cansniffer` after processing 2~3 messages. In order to debug the isolated USB-CAN device, you have to enable to loopback on
 
 ```
-sudo ip set
+sudo ip link set can0 type can loopback on 
 ```
- after 2 to 3 messages sent or received. If you use slcan firmware, you may not encounter this issue.
+
+Note that CAN bus state has be to `DOWN` in order to enable the loopback
+
+To set the loopback off, run:
+```
+sudo ip link set can0 type can loopback off 
+```
+
+
+ To stop the CAN interface, run:
+
+```sudo ip link set can0 down```

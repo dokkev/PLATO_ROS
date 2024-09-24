@@ -40,7 +40,7 @@
 #include "plato2_hardware_interface/pcan_interface.hpp"
 
 
-#include "plato2_hardware_interface/visibility_control.h"
+#include "plato2_hardware_interface/utils/visibility_control.h"
 
 namespace plato2_hardware_interface {
 

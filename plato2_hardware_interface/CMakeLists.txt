@@ -54,6 +54,7 @@ add_library(
   SHARED
   src/plato2.cpp
   src/pcan_interface.cpp
+  src/utils/ring_buf.cpp
 )
 target_compile_features(plato2_hardware_interface PUBLIC cxx_std_17)
 target_include_directories(plato2_hardware_interface PUBLIC

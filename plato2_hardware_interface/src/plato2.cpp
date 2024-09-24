@@ -129,7 +129,6 @@ hardware_interface::CallbackReturn PLATO2Hardware::on_deactivate(
 }
 
 
-
 hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
@@ -142,6 +141,17 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
   }
 
   pcan_interface_.read_message();
+  
+  TPCANMsg msg;
+  if (pcan_interface_.get_buffer_message(msg)) {
+
+    pcan_interface_.print_message(msg);
+    RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Received message from CAN");
+  }
+ 
+
+
+
 
 
   return hardware_interface::return_type::OK;
@@ -154,6 +164,8 @@ PLATO2Hardware::write(const rclcpp::Time & /*time*/,
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     joint_position_commands_[i] = 0.0;
   }
+
+
 
 
 

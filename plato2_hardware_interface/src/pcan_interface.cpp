@@ -21,6 +21,9 @@ PCANInterface::PCANInterface() {
     }
     std::cout << "...CAN Initialized" << std::endl;
 
+	// Intialize the buffer
+	RingBuf_ctor(&can_rx_buffer, can_rx_buffer_storage, CAN_RX_BUFFER_SIZE);
+
 
    
 }
@@ -48,25 +51,40 @@ TPCANStatus PCANInterface::read_message(){
     TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
     if (status != PCAN_ERROR_QRCVEMPTY)
         process_message(msg, timestamp);
+		// print_message(msg);
 
     return status;
-        
 }
 
 void PCANInterface::process_message(const TPCANMsg msg, TPCANTimestamp timestamp){
-    UINT64 micro_timestamp = timestamp.micros + (1000ULL * timestamp.millis) + (0x100000000ULL * 1000ULL * timestamp.millis_overflow);
+    // UINT64 micro_timestamp = timestamp.micros + (1000ULL * timestamp.millis) + (0x100000000ULL * 1000ULL * timestamp.millis_overflow);
 
-    std::cout << "ID: 0x" << std::hex << msg.ID <<  "Length: " << std::dec << (int)msg.LEN;
+	if (!RingBuf_put(&can_rx_buffer, msg)) {
+        // Handle buffer overflow (if necessary)
+        std::cout << "PCANInterface::process_message:: WARNING! CAN RX buffer overflow!" << std::endl;
+    }
+
+	#ifdef DEBUG_MODE
+		print_message(msg);
+	#endif
+}
+
+bool PCANInterface::get_buffer_message(TPCANMsg& msg){
+	return RingBuf_get(&can_rx_buffer, &msg);
+}
+
+void PCANInterface::print_message(const TPCANMsg msg){
+	std::cout << "ID: 0x" << std::hex << msg.ID << "   " <<  "Length: " << std::dec << (int)msg.LEN << "   ";
     BYTE data[msg.LEN];
     std::cout << "Data: ";
     for (int i = 0; i < msg.LEN; i++){
         data[i] = msg.DATA[i];
-        std::cout << "  " << std::hex << (int)data[i];
+        std::cout << " " << std::hex << (int)data[i];
     }
-    std::cout << "Timestamp: " << micro_timestamp << std::endl;
-   
+	std::cout << std::endl;
 }
 
+   
 ////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// PRIVATE FUNCTIONS /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////

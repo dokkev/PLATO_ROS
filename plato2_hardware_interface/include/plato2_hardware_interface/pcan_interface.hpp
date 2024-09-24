@@ -4,7 +4,11 @@
 #include <PCANBasic.h>
 #include <cstdint>
 #include "linux_interop.h"
+#include "utils/ring_buf.h"
 
+#define CAN_RX_BUFFER_SIZE 10
+
+// #define DEBUG_MODE
 
 namespace pcan_interface {
 
@@ -21,6 +25,9 @@ private:
     /// @brief Sets PCANBaudrate (Baudrate)
     const TPCANBaudrate bitrate = PCAN_BAUD_1M;
 
+    TPCANMsg can_rx_buffer_storage[CAN_RX_BUFFER_SIZE];
+    RingBuf can_rx_buffer;
+
 
 public:
     /// @brief Constructor
@@ -30,21 +37,27 @@ public:
     ~PCANInterface();
 
     /// @brief Write messages on CAN devices
+    /// @param msg TPCANMsg to write
+    /// @return TPCANStatus of the write operation
     TPCANStatus write_message(TPCANMsg* msg);
 
     /// @brief Read messages from CAN devices
+    /// @return TPCANStatus of the read operation
     TPCANStatus read_message();
 
-    /// @brief Process a message
+    /// @brief Process a message to store the data in to a buffer
     /// @param msg TPCANMsg to process
     /// @param timestamp TPCANTimestamp of the message
     void process_message(const TPCANMsg msg, TPCANTimestamp timestamp);
 
+    /// @brief Get the RX message from the buffer
+    /// @param msg TPCANMsg to store the message
+    /// @return bool true if there is a message in the buffer
+    bool get_buffer_message(TPCANMsg& msg);
 
     /// @brief Print a message on the console for debugging
+    /// @param msg TPCANMsg to print
     void print_message(const TPCANMsg msg); 
-
-
 
 private:
 

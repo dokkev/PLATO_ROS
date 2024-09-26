@@ -2,113 +2,112 @@
 #define PLATO_HARDWARE_INTERFACE__STEADYWIN_CAN_PROTOCOL_HPP_
 
 #include <cstdint>
+#include <cstring>
+#include <cmath> 
+#include <iostream>
+
+#include "PCANBasic.h"
+
+#include "plato2_hardware_interface/steadywin_can_ids.hpp"
+
+namespace can_protocol{
 
 
-namespace MotorTxID{
-    constexpr uint8_t MOTOR1 = 0x11;
-    constexpr uint8_t MOTOR2 = 0x12;
-    constexpr uint8_t MOTOR3 = 0x13;
-    constexpr uint8_t MOTOR4 = 0x14;
-    constexpr uint8_t MOTOR5 = 0x15;
-    constexpr uint8_t MOTOR6 = 0x16;
-    constexpr uint8_t MOTOR7 = 0x17;
-    constexpr uint8_t MOTOR8 = 0x18;
-}
+/////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace MotorRxID{
-    constexpr uint8_t MOTOR1 = 0x21;
-    constexpr uint8_t MOTOR2 = 0x22;
-    constexpr uint8_t MOTOR3 = 0x23;
-    constexpr uint8_t MOTOR4 = 0x24;
-    constexpr uint8_t MOTOR5 = 0x25;
-    constexpr uint8_t MOTOR6 = 0x26;
-    constexpr uint8_t MOTOR7 = 0x27;
-    constexpr uint8_t MOTOR8 = 0x28;
-}
+/// @brief Runtime motor control message builder for SteadyWin motor driver
+class CommandMessage{
 
-namespace CommandByte{
+public:
+    /// @brief Default constructor
+    CommandMessage() = default;
 
-    // Configuration
-    constexpr uint8_t RESET_CONFIGURATION = 0x81;
-    constexpr uint8_t REFRESH_CONFIGURATION = 0x82;
-    constexpr uint8_t MODIFY_CONFIGURATION = 0x83;
-    constexpr uint8_t RETRIVE_CONFIGURATION = 0x84;
-    
-    // Control
-    constexpr uint8_t START_MOTOR = 0x91;
-    constexpr uint8_t STOP_MOTOR = 0x92;
-    constexpr uint8_t TORQUE_CONTROL = 0x93;
-    constexpr uint8_t SPEED_CONTROL = 0x94;
-    constexpr uint8_t POSITION_CONTROL = 0x95;
-    // constexpr uint8_t PTS= 0x96; // Unsupported
-    constexpr uint8_t STOP_CONTROL = 0x97;
+    /// @brief Set the motor enable ID to the message
+    void start_motor(TPCANMsg &msg);
 
-    // Parameter
-    constexpr uint8_t MODIFY_PARAMETER = 0xA1;
-    constexpr uint8_t RETRIVE_PARAMETER = 0xA2;
+    /// @brief Set the motor disable ID to the message
+    void stop_motor(TPCANMsg &msg);
 
-    // Status
-    constexpr uint8_t GET_VERSION = 0xB1;
-    constexpr uint8_t GET_FAULT = 0xB2;
-    constexpr uint8_t ACKNOWLEDGE_FAULT = 0xB3;
-    constexpr uint8_t RETRIVE_INDICATOR = 0xB4;
+    /// @brief Set the stop control ID to the message. Current ongoing control command should be stopped immediately
+    void stop_control(TPCANMsg &msg);
 
-    // Update
-    // constexpr uint8_t UPDATE_FIRMWARE = 0xC1; // Don't use it
-} 
+    /// @brief Set the torque command ID, torque value and duration to the message
+    /// @param torque desired torque value
+    /// @param duration execution time in ms
+    /// @param msg TPCANMsg reference to store the command message
+    void set_torque(const float torque, const uint32_t duration, TPCANMsg &msg);
 
-namespace ResultByte{
-    constexpr uint8_t SUCCESS = 0x00;
-    constexpr uint8_t FAILURE = 0x01;
-    constexpr uint8_t FAILURE_UNKNOWN_COMMAND = 0x02;
-    constexpr uint8_t FAILURE_UNKNOWN_ID = 0x03;
-    constexpr unit8_t FAILURE_READ_ONLY_REGISTER = 0x04;
-    constexpr unit8_t FAILURE_UNKNOWN_REGISTER = 0x05;
-    constexpr unit8_t FAILURE_STRING_FORMAT = 0x06;
-    constexpr unit8_t FAILURE_DATA_FORMAT_ERROR = 0x07;
-    constexpr unit8_t FAILURE_WRITE_ONLY_REGISTER = 0x08;
-}
+    /// @brief Set the speed command ID, speed value and duration to the message
+    /// @param speed desired speed value
+    /// @param duration execution time in ms
+    /// @param msg TPCANMsg reference to store the command message
+    void set_velocity(const float velocity, const uint32_t duration, TPCANMsg &msg);
+
+    /// @brief Set the position command ID, position value and duration to the message
+    /// @param position in rad
+    /// @param duration execution time in ms
+    /// @param msg TPCANMsg reference to store the command message
+    void set_position(const float position, const uint32_t duration, TPCANMsg &msg);
+
+private:
+
+    /// @brief encode target command value with LSB byte order
+    /// @param value target command value
+    /// @param buffer buffer to store the encoded value
+    void encode_command_float_(const float value, TPCANMsg &msg) const;
+
+    /// @brief encode 24-bit unsigned integer indicating control execution time in unit of ms.
+    /// @param duration control execution time in unit of ms
+    /// @param buffer buffer to store the encoded value
+    void encode_duration_int_(const uint32_t duration, TPCANMsg &msg) const;
+
+    /// @brief initialize the message with standard CAN message type and 8 bytes of data with 0
+    /// @param msg 
+    void init_message_(TPCANMsg &msg) const;
 
 
-namespace ConfigType{
-    constexpr uint8_t INT32 = 0x00;
-    constexpr uint8_t FLOAT32 = 0x01;
-}
+};
 
-namespace IntConfigID{
-    constexpr uint8_t POLE_PAIRS = 0x00;
-    constexpr uint8_t RATED_CURRENT = 0x01; // Ampere
-    constexpr uint8_t MAX_SPEED = 0x02; // RPM
-    constexpr uint8_t RATED_VOLTAGE = 0x06; // V
-    // constexpr uint8_t PWM_FREQUENCY = 0x07; // Hz  // don't use it
-    constexpr uint8_t KP_CURRENT = 0x08;
-    constexpr uint8_t KI_CURRENT = 0x09;
-    constexpr uint8_t KP_SPEED = 0x0C;
-    constexpr uint8_t KI_SPEED = 0x0D;
-    constexpr uint8_t KP_POSITION = 0x0E;
-    constexpr uint8_t KI_POSITION = 0x0F;
-    constexpr uint8_t KD_POSITION = 0x10;
-    constexpr uint8_t GEAR_RATIO = 0x11;
-    constexpr uint8_t CAN_ID = 0x12;
-    constexpr uint8_t HOST_CAN_ID = 0x13;
-    constexpr uint8_t ZERO_POSITION = 0x14;
-    constexpr uint8_t POWER_OFF_POSITION = 0x15; // read-only
-    constexpr uint8_t OVER_VOLTAGE_THRESHOLD = 0x16; // V
-    constexpr uint8_t UNDER_VOLTAGE_THRESHOLD = 0x17; // V
-    constexpr uint8_t CAN_BAUDRATE = 0x18;
-    // constexpr uint8_t KP_FLUX_WEAKENING = 0x19; // don't use it
-    // constexpr uint8_t KI_FLUX_WEAKENING = 0x1A; // don't use it
-    constexpr uint8_t OVER_TEMPERATURE_THRESHOLD = 0x20;
-    // constexpr uint8_t PROTOCOL_OVER_CAN = 0x1C;  // don't use it
-}
+/////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// STATE MESSAGE ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace FloatConfigID{
-    constexpr uint8_t Rs = 0x00; // Ohm
-    constexpr uint8_t Ls = 0x01; // Henry
-    constexpr uint8_t BACK_EMF_CONSTANT = 0x02; // Vrms/krpm
-    constexpr uint8_t TORQUE_CONSTANT = 0x03; // Nm/A
-    constexpr uint8_t SAMPLING_RESISTOR = 0x04; // Ohm
-    constexpr uint8_t AMPLIFICATION_GAIN = 0x05;
-}
+
+class StateMessage{
+public:
+
+
+    /// @brief  get the result of the control command from the received message
+    /// @param msg 
+    /// @param result 
+    void get_result(const TPCANMsg& msg, uint8_t& result) const;
+
+    /// @brief get current temperature of motor or driver board depending on which is available or which is higher if both are available.
+    /// @param msg 
+    /// @param temperature 
+    void get_temperature(const TPCANMsg& msg, int &temperature) const;
+
+    /// @brief get the torque of the motor from the received message
+    /// @param msg received TPACNMsg message
+    /// @param torque reference to store the decoded torque value
+    void get_torque(const TPCANMsg& msg, float& torque) const;
+
+    /// @brief get the velocity of the motor from the received message
+    /// @param msg received TPACNMsg message
+    /// @param velocity reference to store the decoded velocity value
+    void get_velocity(const TPCANMsg& msg, float& velocity) const;
+
+    /// @brief get the position of the motor from the received message
+    /// @param msg received TPACNMsg message
+    /// @param position reference to store the decoded position value
+    void get_position(const TPCANMsg& msg, float& position) const;
+};
+
+
+
+
+} // namespace can_protocol
 
 #endif // PLATO_HARDWARE_INTERFACE__STEADYWIN_CAN_PROTOCOL_HPP_

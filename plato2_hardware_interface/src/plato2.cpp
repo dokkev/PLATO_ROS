@@ -100,8 +100,6 @@ PLATO2Hardware::export_command_interfaces() {
         command_interfaces.back().get_name());
   }
 
-
-
   return command_interfaces;
 }
 
@@ -128,31 +126,30 @@ hardware_interface::CallbackReturn PLATO2Hardware::on_deactivate(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-
 hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
+
+  // Read the CAN bus
+  pcan_interface_.read_message();
 
   // Initialize all Joint Vectors to 0
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     joint_position_states_[i] = 0.0;
     joint_velocity_states_[i] = 0.0;
-    joint_effort_states_[i] = 0.0;
+    joint_effort_states_[i] = 0.0; 
   }
 
-  pcan_interface_.read_message();
-  
-  TPCANMsg msg;
-  if (pcan_interface_.get_buffer_message(msg)) {
-
-    pcan_interface_.print_message(msg);
-    RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Received message from CAN");
-  }
- 
+  // for (int i = 0; i < 20; i++) {
+  //   // Read the CAN bus
+  //   TPCANMsg msg;
+  //   if (pcan_interface_.get_buffer_message(msg)) {
+  //     // RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Received message from CAN");
+  //     pcan_interface_.print_message(msg);
+  // }
 
 
-
-
+  // #endif
 
   return hardware_interface::return_type::OK;
 }
@@ -165,8 +162,18 @@ PLATO2Hardware::write(const rclcpp::Time & /*time*/,
     joint_position_commands_[i] = 0.0;
   }
 
+  // TPCANMsg msg;
+  // msg.ID = 0x11;
+  // cmd_msg_.start_motor(msg);
+  // pcan_interface_.write_message(&msg);
 
+  // msg.ID = 0x12;
+  // cmd_msg_.stop_motor(msg);
+  // pcan_interface_.write_message(&msg);
 
+  // msg.ID = 0x13;
+  // cmd_msg_.start_motor(msg);
+  // pcan_interface_.write_message(&msg);
 
 
   return hardware_interface::return_type::OK;

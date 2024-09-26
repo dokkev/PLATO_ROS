@@ -55,6 +55,7 @@ bool RingBuf_put(RingBuf * const me, RingBufElement const el) {
         if (me->tail == me->end) {
             me->tail = 0U;  // Wrap the tail around to the start if necessary
         }
+        
     }
 
     // Store the new element and update the head position
@@ -62,6 +63,8 @@ bool RingBuf_put(RingBuf * const me, RingBufElement const el) {
     me->head = head;
 
     return true;  // Element was successfully added (either by overwriting or because space was available)
+
+
 }
 /*..........................................................................*/
 bool RingBuf_get(RingBuf * const me, RingBufElement *pel) {

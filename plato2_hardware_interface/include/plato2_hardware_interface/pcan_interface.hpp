@@ -3,10 +3,15 @@
 
 #include <PCANBasic.h>
 #include <cstdint>
+
+#include "rclcpp/rclcpp.hpp"
+
+
 #include "linux_interop.h"
 #include "utils/ring_buf.h"
 
-#define CAN_RX_BUFFER_SIZE 10
+#define CAN_RX_BUFFER_SIZE 100
+#define CAN_DEVICES_NUM 15  // 8 motors + 3 ft sensors + extra
 
 // #define DEBUG_MODE
 
@@ -25,8 +30,14 @@ private:
     /// @brief Sets PCANBaudrate (Baudrate)
     const TPCANBaudrate bitrate = PCAN_BAUD_1M;
 
+    /// @brief  CAN RX Buffer Storage
     TPCANMsg can_rx_buffer_storage[CAN_RX_BUFFER_SIZE];
+
+    /// @brief  CAN RX Buffer
     RingBuf can_rx_buffer;
+
+    /// @brief Batch size to process to read CAN messages per cycle
+    const int max_msg_num_to_process = CAN_DEVICES_NUM;
 
 
 public:

@@ -1,10 +1,13 @@
-#ifndef PLATO_HARDWARE_INTERFACE__STEADYWIN_CAN_IDS_HPP_
-#define PLATO_HARDWARE_INTERFACE__STEADYWIN_CAN_IDS_HPP_
+#ifndef PLATO_HARDWARE_INTERFACE__CAN_IDS_HPP_
+#define PLATO_HARDWARE_INTERFACE__CAN_IDS_HPP_
 
 #include <cstdint>
 #include <cstring>
 #include <cmath> 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//// MOTOR CAN IDs. These values can be modified through either CAN command or UART GUI on Windows ////
+///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace MotorTxID{
     constexpr uint8_t MOTOR1 = 0x11;
@@ -28,6 +31,8 @@ namespace MotorRxID{
     constexpr uint8_t MOTOR8 = 0x28;
 } // namespace MotorRxID
 
+
+//// These Values need to match with the values in the motor driver. Don't Modify them
 namespace CommandByte{
 
     // Configuration
@@ -54,7 +59,6 @@ namespace CommandByte{
     constexpr uint8_t GET_FAULT = 0xB2;
     constexpr uint8_t ACKNOWLEDGE_FAULT = 0xB3;
     constexpr uint8_t RETRIVE_INDICATOR = 0xB4;
-
     // Update
     // constexpr uint8_t UPDATE_FIRMWARE = 0xC1; // Don't use it
 } // namespace CommandByte
@@ -113,6 +117,42 @@ namespace FloatConfigID{
     constexpr uint8_t AMPLIFICATION_GAIN = 0x05;
 } // namespace FloatConfigID
 
+namespace ParamID{
+    constexpr uint8_t KP_CURRENT = 0x00;
+    constexpr uint8_t KI_CURRENT = 0x01;
+    constexpr uint8_t KP_SPEED = 0x02;
+    constexpr uint8_t KI_SPEED = 0x03;
+    constexpr uint8_t KP_POSITION = 0x04;
+    constexpr uint8_t KI_POSITION = 0x05;
+    constexpr uint8_t KD_POSITION = 0x06;
+    // constexpr uint8_t KP_FLUX_WEAKENING = 0x07; // don't use it
+    // constexpr uint8_t KI_FLUX_WEAKENING = 0x08; // don't use it
+
+}
+
+namespace IndicatorID{
+
+    // TODO: Add more indicators
+    constexpr uint8_t BUS_VOLTAGE = 0x00;
+    constexpr uint8_t OUTPUT_SHAFT_ANGLE = 0x13; // rad
+    constexpr uint8_t OUTPUT_SHAFT_SPEED = 0x14; // rpm
+
+} // namespace IndicatorID
 
 
-#endif // PLATO_HARDWARE_INTERFACE__STEADYWIN_CAN_IDS_HPP_
+namespace FaultID{
+    constexpr uint8_t NO_FAULT = 0x00;
+    constexpr uint8_t FOC_FREQ_TOO_HIGH = 0x01;
+    constexpr uint8_t OVER_VOLTAGE = 0x02;
+    constexpr uint8_t UNDER_VOLTAGE = 0x03;
+    constexpr uint8_t OVER_TEMPARATURE = 0x08;
+    constexpr uint8_t OVER_CURRENT = 0x10;
+} // namespace FaultID
+
+
+namespace CalibrationID{
+    constexpr uint8_t PHASE_ORDER = 0x00;
+    constexpr uint8_t ENCODER = 0x01;
+} // namespace CalibrationID
+
+#endif // PLATO_HARDWARE_INTERFACE__CAN_IDS_HPP_

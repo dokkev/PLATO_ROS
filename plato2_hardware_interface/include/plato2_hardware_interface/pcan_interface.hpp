@@ -7,7 +7,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 
-#include "linux_interop.h"
+#include "utils/linux_interop.h"
 #include "utils/ring_buf.h"
 
 #define CAN_RX_BUFFER_SIZE 100

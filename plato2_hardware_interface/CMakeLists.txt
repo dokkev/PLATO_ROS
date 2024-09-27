@@ -54,7 +54,8 @@ add_library(
   SHARED
   src/plato2.cpp
   src/pcan_interface.cpp
-  src/steadywin_can_protocol.cpp
+  src/can_protocol.cpp
+  src/can_messanger.cpp
   src/utils/ring_buf.cpp
 )
 target_compile_features(plato2_hardware_interface PUBLIC cxx_std_17)

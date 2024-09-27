@@ -38,7 +38,7 @@
 #include <sensor_msgs/msg/joint_state.h>
 
 #include "plato2_hardware_interface/pcan_interface.hpp"
-#include "plato2_hardware_interface/steadywin_can_protocol.hpp"
+#include "plato2_hardware_interface/can_protocol.hpp"
 
 
 #include "plato2_hardware_interface/utils/visibility_control.h"
@@ -112,7 +112,7 @@ private:
   std::vector<std::string> position_command_interface_names_;
 
   pcan_interface::PCANInterface pcan_interface_;
-  can_protocol::CommandMessage cmd_msg_;
+  // can_protocol::CommandMessage cmd_msg_;
 
 };
 

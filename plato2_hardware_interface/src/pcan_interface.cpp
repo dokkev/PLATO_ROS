@@ -38,7 +38,6 @@ PCANInterface::~PCANInterface() {
 
 TPCANStatus PCANInterface::write_message(TPCANMsg* msg) {
 
-	print_message(*msg);
     return CAN_Write(pcan_handle, msg);
 }
 

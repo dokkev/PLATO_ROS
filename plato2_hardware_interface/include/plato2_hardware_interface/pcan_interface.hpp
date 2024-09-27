@@ -50,11 +50,16 @@ public:
     /// @brief Write messages on CAN devices
     /// @param msg TPCANMsg to write
     /// @return TPCANStatus of the write operation
-    TPCANStatus write_message(TPCANMsg* msg);
+    TPCANStatus write_can(TPCANMsg msg);
 
     /// @brief Read messages from CAN devices
     /// @return TPCANStatus of the read operation
-    TPCANStatus read_message();
+    TPCANStatus read_can();
+
+
+    void send_message(const TPCANMsg &msg);
+
+    void receive_message();
 
     /// @brief Process a message to store the data in to a buffer
     /// @param msg TPCANMsg to process

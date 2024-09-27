@@ -10,14 +10,14 @@ void MessageManager::init_message_(TPCANMsg &msg){
 }
 
 void MessageManager::send_message(const TPCANMsg &msg){
-    pcan_interface_.write_message(&msg);
+    // pcan_interface_.write_message(&msg);
 }
 
 void MessageManager::receive_message(){
 
     TPCANMsg rx_msg;
 
-    pcan_interface_.read_message();
+    // pcan_interface_.read_message();
 
     // pcan_interface_.get_buffer_message(rx_msg);
     

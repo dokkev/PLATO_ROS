@@ -134,25 +134,25 @@ public:
     /// @brief Default constructor
     GainMessage() = default;
 
-    void set_kp_velocity(TPCANMsg &msg, const int kp_velocity);
+    void set_kp_velocity(TPCANMsg &msg, const uint32_t kp_velocity);
 
-    void set_ki_velocity(TPCANMsg &msg, const int ki_velocity);
+    void set_ki_velocity(TPCANMsg &msg, const uint32_t  ki_velocity);
 
-    void set_kp_position(TPCANMsg &msg, const int kp_position);
+    void set_kp_position(TPCANMsg &msg, const uint32_t  kp_position);
 
-    void set_ki_position(TPCANMsg &msg, const int ki_position);
+    void set_ki_position(TPCANMsg &msg, const uint32_t  ki_position);
 
-    void set_kd_position(TPCANMsg &msg, const int kd_position);
+    void set_kd_position(TPCANMsg &msg, const uint32_t  kd_position);
 
-    void get_kp_velocity(const TPCANMsg &msg, int &kp_velocity);
+    void get_kp_velocity(const TPCANMsg &msg, uint32_t  &kp_velocity);
 
-    void get_ki_velocity(const TPCANMsg &msg, int &ki_velocity);
+    void get_ki_velocity(const TPCANMsg &msg, uint32_t  &ki_velocity);
 
-    void get_kp_position(const TPCANMsg &msg, int &kp_position);
+    void get_kp_position(const TPCANMsg &msg, uint32_t  &kp_position);
 
-    void get_ki_position(const TPCANMsg &msg, int &ki_position);
+    void get_ki_position(const TPCANMsg &msg, uint32_t  &ki_position);
 
-    void get_kd_position(const TPCANMsg &msg, int &kd_position);
+    void get_kd_position(const TPCANMsg &msg, uint32_t  &kd_position);
 
 private:
 

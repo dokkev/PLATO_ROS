@@ -131,7 +131,7 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
 
   // Read the CAN bus
-  pcan_interface_.read_message();
+  // pcan_interface_.read_message();
 
   // Initialize all Joint Vectors to 0
   for (size_t i = 0; i < info_.joints.size(); ++i) {

@@ -16,6 +16,8 @@ public:
     /// @param msg 
     void send_message(const TPCANMsg &msg);
 
+    void receive_message();
+
 private:
     pcan_interface::PCANInterface pcan_interface_;
     can_protocol::ControlMessage control_msg_;

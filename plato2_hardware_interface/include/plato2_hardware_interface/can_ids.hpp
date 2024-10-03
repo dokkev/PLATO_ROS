@@ -134,8 +134,11 @@ namespace IndicatorID{
 
     // TODO: Add more indicators
     constexpr uint8_t BUS_VOLTAGE = 0x00;
-    constexpr uint8_t OUTPUT_SHAFT_ANGLE = 0x13; // rad
-    constexpr uint8_t OUTPUT_SHAFT_SPEED = 0x14; // rpm
+    constexpr uint8_t IQ = 0x09; // Ampere
+    constexpr uint8_t IQ_TARGET = 0x0B; // Ampere
+    constexpr uint8_t ROTOR_ANGLE = 0x12; // rad
+    constexpr uint8_t SHAFT_ANGLE = 0x13; // rad
+    constexpr uint8_t SHAFT_SPEED = 0x14; // rpm
 
 } // namespace IndicatorID
 

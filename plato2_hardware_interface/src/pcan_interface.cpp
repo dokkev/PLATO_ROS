@@ -37,6 +37,8 @@ PCANInterface::~PCANInterface() {
 
 
 TPCANStatus PCANInterface::write_can(TPCANMsg msg) {
+	
+	std::this_thread::sleep_for(std::chrono::microseconds(300));
 
     return CAN_Write(pcan_handle, &msg);
 }
@@ -72,8 +74,8 @@ void PCANInterface::receive_message(){
 	do{
 		status = read_can();
 		if (status != PCAN_ERROR_OK){
-			std::cout << "PCANInterface::receive_message:: ERROR! Failed to read message!" << std::endl;
-			show_status(status);
+			// std::cout << "PCANInterface::receive_message:: ERROR! Failed to read message!" << std::endl;
+			// show_status(status);
 			return;
 		}
 
@@ -117,12 +119,13 @@ void PCANInterface::receive_message(){
 
 void PCANInterface::process_message(const TPCANMsg msg, TPCANTimestamp timestamp){
     // UINT64 micro_timestamp = timestamp.micros + (1000ULL * timestamp.millis) + (0x100000000ULL * 1000ULL * timestamp.millis_overflow);
+	print_message(msg);
 	if (!RingBuf_put(&can_rx_buffer, msg)) {
         // Handle buffer overflow (if necessary)
         std::cout << "PCANInterface::process_message:: WARNING! CAN RX buffer overflow!" << std::endl;
     }
 
-	print_message(msg);
+	
 }
 
 bool PCANInterface::get_buffer_message(TPCANMsg& msg){

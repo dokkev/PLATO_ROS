@@ -43,12 +43,6 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
   joint_effort_states_.resize(info_.joints.size(),
                               std::numeric_limits<double>::quiet_NaN());
 
-  // Initialize all Motor Vectors
-  motor_effort_commands_.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
-  motor_position_states_.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
-
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -130,8 +124,6 @@ hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
 
-  // Read the CAN bus
-  // pcan_interface_.read_message();
 
   // Initialize all Joint Vectors to 0
   for (size_t i = 0; i < info_.joints.size(); ++i) {
@@ -140,10 +132,13 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_effort_states_[i] = 0.0; 
   }
 
+  pcan_interface_.receive_message();
+
+
   // for (int i = 0; i < 20; i++) {
   //   // Read the CAN bus
-  //   TPCANMsg msg;
-  //   if (pcan_interface_.get_buffer_message(msg)) {
+    // TPCANMsg msg;
+    // if (pcan_interface_.get_buffer_message(msg)) {
   //     // RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Received message from CAN");
   //     pcan_interface_.print_message(msg);
   // }
@@ -155,25 +150,62 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
 }
 
 hardware_interface::return_type
-PLATO2Hardware::write(const rclcpp::Time & /*time*/,
+PLATO2Hardware::write(const rclcpp::Time &time,
                      const rclcpp::Duration & /*period*/) {
             
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     joint_position_commands_[i] = 0.0;
   }
 
-  // TPCANMsg msg;
-  // msg.ID = 0x11;
-  // cmd_msg_.start_motor(msg);
-  // pcan_interface_.write_message(&msg);
+
+  TPCANMsg msg;
+  msg.ID = 0x11;
+  control_msg_.stop_motor(msg);
+  pcan_interface_.send_message(msg);
+
 
   // msg.ID = 0x12;
-  // cmd_msg_.stop_motor(msg);
-  // pcan_interface_.write_message(&msg);
+  // control_msg_.stop_control(msg);
+  // pcan_interface_.send_message(msg);
 
-  // msg.ID = 0x13;
-  // cmd_msg_.start_motor(msg);
-  // pcan_interface_.write_message(&msg);
+
+  msg.ID = 0x13;
+  control_msg_.stop_motor(msg);
+  pcan_interface_.send_message(msg);
+  
+
+  TPCANMsg msg2;
+  msg2.ID = 0x14;
+  control_msg_.stop_motor(msg2);
+  pcan_interface_.send_message(msg2);
+  
+  TPCANMsg msg3;
+  msg3.ID = 0x15;
+  control_msg_.stop_motor(msg3);
+  pcan_interface_.send_message(msg3);
+
+
+  msg.ID = 0x16;
+  control_msg_.stop_motor(msg);
+  pcan_interface_.send_message(msg);
+
+  msg.ID = 0x17;
+  control_msg_.stop_motor(msg);
+  pcan_interface_.send_message(msg);
+
+  msg.ID = 0x18;
+  control_msg_.stop_motor(msg);
+  pcan_interface_.send_message(msg);
+
+  // print the time
+  // RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Current time: %f", time.seconds());
+
+
+
+
+
+
+
 
 
   return hardware_interface::return_type::OK;

@@ -52,7 +52,6 @@ public:
     /// @param msg TPCANMsg reference to store the command message
     void set_position(TPCANMsg &msg, const float position, const uint32_t duration);
 
-
     /// @brief  On any fault, motor would stop running and wait host command. If you want to continue
     /// running, this COMMAND should be sent to erase fault status and return to normal state. If fault
     /// is not acknowledged in runtime, motor driver will decline any COMMANDs from host.
@@ -60,6 +59,8 @@ public:
     void acknowledge_fault(TPCANMsg &msg);
 
 private:
+
+
 
     /// @brief encode target command value with LSB byte order
     /// @param value target command value
@@ -86,10 +87,10 @@ private:
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-class StateMessage{
+class ResponseMessage{
 public:
     /// @brief Default constructor
-    StateMessage() = default;
+    ResponseMessage() = default;
 
     /// @brief get the result of the response message from the command message if successful return true otherwise false
     /// @param msg 
@@ -99,7 +100,7 @@ public:
     /// @brief get current temperature of motor or driver board depending on which is available or which is higher if both are available.
     /// @param msg 
     /// @param temperature 
-    void get_temperature(const TPCANMsg& msg, int &temperature) const;
+    void get_temperature(const TPCANMsg& msg, uint8_t &temperature) const;
 
     /// @brief get the torque of the motor from the received message
     /// @param msg received TPACNMsg message
@@ -117,11 +118,11 @@ public:
     void get_position(const TPCANMsg& msg, float& position) const;
 
 private:
-    /// @brief torque constant of the motor
-    const float torque_constant_ = 0.41f;
-
     /// @brief gear ratio of the motor
     const float gear_ratio_ = 8.0f;
+
+    /// @brief torque constant of the motor
+    const float torque_constant_ = 0.41f / gear_ratio_; // there is a glitch that motor driver multiplies output torque by gear ratio
 
 };
 
@@ -178,9 +179,34 @@ private:
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////// INDICAOTR MESSAGE ////////////////////////////////////////////
+////////////////////////////////////// STATUS MESSAGE ////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+class StatusMessage{
+public:
+    /// @brief Default constructor
+    StatusMessage() = default;
+
+    /// @brief get the result of the response message from the command message if successful return true otherwise false
+    /// @param msg 
+    /// @return 
+    bool get_result(const TPCANMsg& msg) const;
+
+    void get_voltage(const TPCANMsg &msg, float &voltage) const;
+
+    void get_current(const TPCANMsg &msg, float &current) const;
+
+    void get_shaft_angle(const TPCANMsg &msg, float &shaft_angle) const;
+
+    void get_shaft_velocity(const TPCANMsg &msg, float &shaft_velocity) const;
+
+
+private:
+    inline void decode_float_(const TPCANMsg &msg, float &value) const {
+        std::memcpy(&value, &msg.DATA[4], sizeof(float));
+    }
+
+};
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////  

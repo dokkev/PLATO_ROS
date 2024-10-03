@@ -60,7 +60,7 @@ void ControlMessage::acknowledge_fault(TPCANMsg &msg) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// STATE MESSAGE /////////////////////////////////////////
+//////////////////////////////// RESPONSE MESSAGE //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 
 // BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
@@ -77,25 +77,25 @@ void ControlMessage::acknowledge_fault(TPCANMsg &msg) {
 // The actual torque value is float in N.m:
 // torque_float = torque_int * (450 * torque_constant * gear_ratio) / 4095 – 225 * torque_constant * gear_ratio
 
-bool StateMessage::get_result(const TPCANMsg& msg) const {
+bool ResponseMessage::get_result(const TPCANMsg& msg) const {
     return identify_result(msg.DATA[1]);
 }
 
-void StateMessage::get_temperature(const TPCANMsg& msg, int &temperature) const {
+void ResponseMessage::get_temperature(const TPCANMsg& msg, uint8_t &temperature) const {
     temperature = msg.DATA[2];
 }
 
-void StateMessage::get_position(const TPCANMsg& msg, float &position) const {
+void ResponseMessage::get_position(const TPCANMsg& msg, float &position) const {
     uint16_t pos_int = (msg.DATA[4] << 8) | msg.DATA[3];
     position = pos_int * 25.0f / 65536.0f - 12.5f;
 }
 
-void StateMessage::get_velocity(const TPCANMsg& msg, float &velocity) const {
+void ResponseMessage::get_velocity(const TPCANMsg& msg, float &velocity) const {
     uint16_t velocity_int = (msg.DATA[5] << 4) | ((msg.DATA[6] & 0xF0) >> 4);
     velocity = velocity_int * 130.0f / 4095.0f - 65.0f;
 }
 
-void StateMessage::get_torque(const TPCANMsg& msg, float &torque) const {
+void ResponseMessage::get_torque(const TPCANMsg& msg, float &torque) const {
     uint16_t torque_int = ((msg.DATA[6] & 0x0F) << 8) | msg.DATA[7];
     torque = torque_int * (450.0f * torque_constant_ * gear_ratio_) / 4095.0f - 225.0f * torque_constant_ * gear_ratio_;
 }
@@ -105,66 +105,76 @@ void StateMessage::get_torque(const TPCANMsg& msg, float &torque) const {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 // BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
-// COMMAND | ParaID | NULL  | NULL  | DATA0 | DATA1 | DATA2 | DATA0 |
+// COMMAND | ParaID | NULL  | NULL  | DATA0 | DATA1 | DATA2 | DATA3 |
 
 
 void GainMessage::set_kp_velocity(TPCANMsg &msg, const uint32_t kp_velocity) {
-    init_message_(msg);
+
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KP_SPEED;
     encode_param_int_(msg, kp_velocity);
 }
 void GainMessage::set_ki_velocity(TPCANMsg &msg, const uint32_t ki_velocity) {
-    init_message_(msg);
+  
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KI_SPEED;
     encode_param_int_(msg, ki_velocity);
 }
 
 void GainMessage::set_kp_position(TPCANMsg &msg, const uint32_t kp_position) {
-    init_message_(msg);
+
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KP_POSITION;
     encode_param_int_(msg, kp_position);
 }
 
 void GainMessage::set_ki_position(TPCANMsg &msg, const uint32_t ki_position) {
-    init_message_(msg);
+   
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KI_POSITION;
     encode_param_int_(msg, ki_position);
 }
 
 void GainMessage::set_kd_position(TPCANMsg &msg, const uint32_t kd_position) {
-    init_message_(msg);
+   
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KD_POSITION;
     encode_param_int_(msg, kd_position);
 }
 
 void GainMessage::get_kp_velocity(const TPCANMsg &msg, uint32_t &kp_velocity) {
-
     decode_param_int_(msg, kp_velocity);
 }
 
 void GainMessage::get_ki_velocity(const TPCANMsg &msg, uint32_t &ki_velocity) {
-
     decode_param_int_(msg, ki_velocity);
 }
 
 void GainMessage::get_kp_position(const TPCANMsg &msg, uint32_t &kp_position) {
-    
     decode_param_int_(msg, kp_position);
 }
 
 void GainMessage::get_ki_position(const TPCANMsg &msg, uint32_t &ki_position) {
-
     decode_param_int_(msg, ki_position);
 }
 
 void GainMessage::get_kd_position(const TPCANMsg &msg, uint32_t &kd_position) {
-
     decode_param_int_(msg, kd_position);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////// STATUS MESSAGE ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+// BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
+// COMMAND | IndID  | RES   | NULL  | DATA0 | DATA1 | DATA2 | DATA3 |
+
+bool StatusMessage::get_result(const TPCANMsg& msg) const {
+    return identify_result(msg.DATA[2]);
+}
+
+void StatusMessage::get_voltage(const TPCANMsg &msg, float &voltage) const {
+    decode_float_(msg, voltage);
 }
 
 } // namespace can_protocol

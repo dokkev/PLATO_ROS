@@ -85,11 +85,6 @@ private:
   /// The size of this vector is (standard_interfaces_.size() x nr_joints)
  
   /////////// Command interfaces ///////////
-  std::vector<double> motor_effort_commands_;
-  std::vector<double> motor_position_commands_;
-
-  std::vector<double> motor_position_states_;
-
   std::vector<double> joint_position_commands_;
  
 
@@ -98,21 +93,22 @@ private:
 
   /////////// State interfaces ///////////
   std::vector<double> joint_position_states_;
-
   std::vector<double> joint_velocity_states_;
-
   std::vector<double> joint_effort_states_;
+
   std::vector<double> ft_sensor_states_;
 
-  std::vector<bool> can_error_;
 
-  int send_counter_ = 0;
+
+ 
+
+
 
   std::vector<std::string> effort_command_interface_names_;
   std::vector<std::string> position_command_interface_names_;
 
   pcan_interface::PCANInterface pcan_interface_;
-  // can_protocol::CommandMessage cmd_msg_;
+  can_protocol::ControlMessage control_msg_;
 
 };
 

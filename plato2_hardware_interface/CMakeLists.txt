@@ -52,11 +52,12 @@ message(STATUS "PCANBasic include directory found at: ${PCAN_INCLUDE_DIR}")
 add_library(
   plato2_hardware_interface
   SHARED
-  src/plato2.cpp
+  src/utils/ring_buf.cpp
   src/pcan_interface.cpp
   src/can_protocol.cpp
-  src/can_messanger.cpp
-  src/utils/ring_buf.cpp
+  src/actuator.cpp
+  src/plato2.cpp
+  
 )
 target_compile_features(plato2_hardware_interface PUBLIC cxx_std_17)
 target_include_directories(plato2_hardware_interface PUBLIC

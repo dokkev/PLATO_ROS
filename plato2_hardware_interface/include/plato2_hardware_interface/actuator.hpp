@@ -24,6 +24,7 @@ struct Gains{
     uint32_t ki_velocity;
     uint32_t kp_position;
     uint32_t ki_position;
+    uint32_t kd_position;
 };
 
 struct Status{
@@ -54,35 +55,54 @@ private:
     Config config_;  
 
 public:
-    Actuator(pcan_interface::PCANInterface& pcan_interface, const Config& config)
-
-    set_joint_torque(const float joint_torque, const uint32_t duration);
-
-    set_joint_position(const float joint_position, const uint32_t duration);
+    Actuator(pcan_interface::PCANInterface& pcan_interface, const Config& config);
 
 
+    void set_joint_torque(const float &joint_torque, const uint32_t &duration);
 
+    void set_joint_position(const float &joint_position, const uint32_t &duration);
+
+    void get_joint_torque(float &joint_torque);
+
+    void get_joint_velocity(float &joint_velocity);
+
+    void get_joint_position(float &joint_position);
+
+    void set_joint_gains(const Gains &gains);
 
 
 private:
 
-    TPCANMsg init_message_();
+    /// @brief Initialize a message with with 0 data and the configured CAN ID
+    /// @return TPCANMsg initialized message
+    inline TPCANMsg init_message_(){
+        TPCANMsg msg;
+        msg.ID = config_.can_id;
+        msg.MSGTYPE = PCAN_MESSAGE_STANDARD;
+        msg.LEN = 8;
+        std::memset(msg.DATA, 0, 8);
+
+        return msg;
+    }
 
     /// @brief Convert joint command Value to Motor Command Value considering motor direction and offset
     /// @param joint_value joint command value from the robot
     /// @param motor_value reference to store the motor command value to send to the motor
-    inline void joint_to_motor_(const &joint_value, &motor_value){
-        // motor_value = joint_value * direction + offset
+    inline void joint_to_motor_(const float &joint_value, float &motor_value){
+        motor_value = (joint_value * direction) + offset
     }
 
     /// @brief convert motor state value to joint state value considering motor direction and offset
     /// @param motor_value Motor State Value from the motor
-    /// @param  
-    inline void motor_to_joint_(const &motor_value, &joint_value){
+    /// @param joint_value reference to store the joint state value
+    inline void motor_to_joint_(const float &motor_value, float &joint_value){
+        joint_value = (motor_value - offset) * direction;
 
     }
 
-    void send_message(const TPCANMsg &msg);
+    inline void send_message(const TPCANMsg &msg){
+        pcan_interface_.send_message(msg);
+    }
 
     void receive_message();
 

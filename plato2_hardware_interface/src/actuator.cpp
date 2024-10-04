@@ -3,7 +3,7 @@
 
 namespace actuator{
 
-
+Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, )
 
 
 } // namespace actuator

@@ -107,36 +107,34 @@ void ResponseMessage::get_torque(const TPCANMsg& msg, float &torque) const {
 // BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
 // COMMAND | ParaID | NULL  | NULL  | DATA0 | DATA1 | DATA2 | DATA3 |
 
+void GainMessage::get_result(const TPCANMsg& msg) const {
+    identify_result(msg.DATA[2]);
+}
 
 void GainMessage::set_kp_velocity(TPCANMsg &msg, const uint32_t kp_velocity) {
-
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KP_SPEED;
     encode_param_int_(msg, kp_velocity);
 }
 void GainMessage::set_ki_velocity(TPCANMsg &msg, const uint32_t ki_velocity) {
-  
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KI_SPEED;
     encode_param_int_(msg, ki_velocity);
 }
 
 void GainMessage::set_kp_position(TPCANMsg &msg, const uint32_t kp_position) {
-
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KP_POSITION;
     encode_param_int_(msg, kp_position);
 }
 
 void GainMessage::set_ki_position(TPCANMsg &msg, const uint32_t ki_position) {
-   
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KI_POSITION;
     encode_param_int_(msg, ki_position);
 }
 
 void GainMessage::set_kd_position(TPCANMsg &msg, const uint32_t kd_position) {
-   
     msg.DATA[0] = CommandByte::MODIFY_PARAMETER;
     msg.DATA[1] = ParamID::KD_POSITION;
     encode_param_int_(msg, kd_position);

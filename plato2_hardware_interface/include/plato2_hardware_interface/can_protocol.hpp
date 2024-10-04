@@ -135,6 +135,8 @@ public:
     /// @brief Default constructor
     GainMessage() = default;
 
+    void get_result(const TPCANMsg &msg) const;
+
     void set_kp_velocity(TPCANMsg &msg, const uint32_t kp_velocity);
 
     void set_ki_velocity(TPCANMsg &msg, const uint32_t  ki_velocity);

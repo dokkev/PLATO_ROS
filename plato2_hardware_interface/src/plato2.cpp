@@ -159,9 +159,9 @@ PLATO2Hardware::write(const rclcpp::Time &time,
 
 
   TPCANMsg msg;
-  msg.ID = 0x11;
-  control_msg_.stop_motor(msg);
-  pcan_interface_.send_message(msg);
+  // msg.ID = 0x11;
+  // control_msg_.stop_motor(msg);
+  // pcan_interface_.send_message(msg);
 
 
   // msg.ID = 0x12;
@@ -169,33 +169,33 @@ PLATO2Hardware::write(const rclcpp::Time &time,
   // pcan_interface_.send_message(msg);
 
 
-  msg.ID = 0x13;
-  control_msg_.stop_motor(msg);
-  pcan_interface_.send_message(msg);
+  // msg.ID = 0x13;
+  // control_msg_.stop_motor(msg);
+  // pcan_interface_.send_message(msg);
   
 
-  TPCANMsg msg2;
-  msg2.ID = 0x14;
-  control_msg_.stop_motor(msg2);
-  pcan_interface_.send_message(msg2);
+  // TPCANMsg msg2;
+  // msg2.ID = 0x14;
+  // control_msg_.stop_motor(msg2);
+  // pcan_interface_.send_message(msg2);
   
-  TPCANMsg msg3;
-  msg3.ID = 0x15;
-  control_msg_.stop_motor(msg3);
-  pcan_interface_.send_message(msg3);
+  // TPCANMsg msg3;
+  // msg3.ID = 0x15;
+  // control_msg_.stop_motor(msg3);
+  // pcan_interface_.send_message(msg3);
 
 
-  msg.ID = 0x16;
-  control_msg_.stop_motor(msg);
-  pcan_interface_.send_message(msg);
+  // msg.ID = 0x16;
+  // control_msg_.stop_motor(msg);
+  // pcan_interface_.send_message(msg);
 
-  msg.ID = 0x17;
-  control_msg_.stop_motor(msg);
-  pcan_interface_.send_message(msg);
+  // msg.ID = 0x17;
+  // control_msg_.stop_motor(msg);
+  // pcan_interface_.send_message(msg);
 
-  msg.ID = 0x18;
-  control_msg_.stop_motor(msg);
-  pcan_interface_.send_message(msg);
+  // msg.ID = 0x18;
+  // control_msg_.stop_motor(msg);
+  // pcan_interface_.send_message(msg);
 
   // print the time
   // RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Current time: %f", time.seconds());

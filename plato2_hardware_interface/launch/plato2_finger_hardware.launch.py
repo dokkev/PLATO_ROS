@@ -44,7 +44,7 @@ def generate_launch_description():
     # Get URDF via xacro
     pkg_name = 'plato2_description'
     pkg_share= get_package_share_directory(pkg_name)
-    urdf_path = 'urdf/finger.urdf.xacro'
+    urdf_path = 'urdf/plato2.urdf.xacro'
     rviz_config_file = pkg_share + '/rviz/plato2.rviz'
     xacro_file = os.path.join(pkg_share, urdf_path)
 
@@ -55,7 +55,7 @@ def generate_launch_description():
         [
             FindPackageShare("plato2_hardware_interface"),
             "config",
-            "plato2_finger_controller.yaml",
+            "plato2_position_controller.yaml",
         ]
     )
     rviz_config_file = PathJoinSubstitution(

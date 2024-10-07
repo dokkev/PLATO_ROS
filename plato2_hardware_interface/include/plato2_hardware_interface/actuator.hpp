@@ -88,14 +88,14 @@ private:
     /// @param joint_value joint command value from the robot
     /// @param motor_value reference to store the motor command value to send to the motor
     inline void joint_to_motor_(const float &joint_value, float &motor_value){
-        motor_value = (joint_value * direction) + offset
+        motor_value = (joint_value * config_.direction) + config_.position_offset;
     }
 
     /// @brief convert motor state value to joint state value considering motor direction and offset
     /// @param motor_value Motor State Value from the motor
     /// @param joint_value reference to store the joint state value
     inline void motor_to_joint_(const float &motor_value, float &joint_value){
-        joint_value = (motor_value - offset) * direction;
+        joint_value = (motor_value - config_.position_offset) * config_.direction;
 
     }
 

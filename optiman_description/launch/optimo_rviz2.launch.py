@@ -45,7 +45,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'use_gui',
-            default_value='false',
+            default_value='true',
             description='Use joint_state_publisher_gui'
         ),
 

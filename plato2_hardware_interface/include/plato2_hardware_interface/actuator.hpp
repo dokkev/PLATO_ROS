@@ -57,7 +57,6 @@ private:
 public:
     Actuator(pcan_interface::PCANInterface& pcan_interface, const Config& config);
 
-
     void set_joint_torque(const float &joint_torque, const uint32_t &duration);
 
     void set_joint_position(const float &joint_position, const uint32_t &duration);

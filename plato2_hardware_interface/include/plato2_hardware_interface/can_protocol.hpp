@@ -13,18 +13,17 @@
 namespace can_protocol{
 
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// @brief Runtime motor motion control command message. ControlMessage takes TPCANMsg message and encode the control command following the Steadywin
 /// CAN Protocol for PCANInterface to send to the motor driver later
-class ControlMessage{
+class MsgEncoder{
 
 public:
     /// @brief Default constructor
-    ControlMessage() = default;
+    MsgEncoder() = default;
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////
     /// @brief Set the motor enable ID to the message
     void start_motor(TPCANMsg &msg);
 
@@ -58,9 +57,16 @@ public:
     /// @param msg TPCANMsg reference to store the command message
     void acknowledge_fault(TPCANMsg &msg);
 
+
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////// GAIN MESSAGE /////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    void set_gain(TPCANMsg &msg, const uint32_t &gain_val, const uint8_t param_id);
+
+    
+
 private:
-
-
 
     /// @brief encode target command value with LSB byte order
     /// @param value target command value
@@ -80,86 +86,8 @@ private:
         msg.DATA[6] = (duration >> 8) & 0xFF;
         msg.DATA[7] = (duration >> 16) & 0xFF;
     }
-};
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////// STATE MESSAGE ////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-class ResponseMessage{
-public:
-    /// @brief Default constructor
-    ResponseMessage() = default;
-
-    /// @brief get the result of the response message from the command message if successful return true otherwise false
-    /// @param msg 
-    /// @return 
-    bool get_result(const TPCANMsg& msg) const;
-
-    /// @brief get current temperature of motor or driver board depending on which is available or which is higher if both are available.
-    /// @param msg 
-    /// @param temperature 
-    void get_temperature(const TPCANMsg& msg, uint8_t &temperature) const;
-
-    /// @brief get the torque of the motor from the received message
-    /// @param msg received TPACNMsg message
-    /// @param torque reference to store the decoded torque value
-    void get_torque(const TPCANMsg& msg, float& torque) const;
-
-    /// @brief get the velocity of the motor from the received message
-    /// @param msg received TPACNMsg message
-    /// @param velocity reference to store the decoded velocity value
-    void get_velocity(const TPCANMsg& msg, float& velocity) const;
-
-    /// @brief get the position of the motor from the received message
-    /// @param msg received TPACNMsg message
-    /// @param position reference to store the decoded position value
-    void get_position(const TPCANMsg& msg, float& position) const;
-
-private:
-    /// @brief gear ratio of the motor
-    const float gear_ratio_ = 8.0f;
-
-    /// @brief torque constant of the motor
-    const float torque_constant_ = 0.41f / gear_ratio_; // there is a glitch that motor driver multiplies output torque by gear ratio
-
-};
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////// GAIN MESSAGE /////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-class GainMessage{
-public:
-    /// @brief Default constructor
-    GainMessage() = default;
-
-    void get_result(const TPCANMsg &msg) const;
-
-    void set_kp_velocity(TPCANMsg &msg, const uint32_t kp_velocity);
-
-    void set_ki_velocity(TPCANMsg &msg, const uint32_t  ki_velocity);
-
-    void set_kp_position(TPCANMsg &msg, const uint32_t  kp_position);
-
-    void set_ki_position(TPCANMsg &msg, const uint32_t  ki_position);
-
-    void set_kd_position(TPCANMsg &msg, const uint32_t  kd_position);
-
-    void get_kp_velocity(const TPCANMsg &msg, uint32_t  &kp_velocity);
-
-    void get_ki_velocity(const TPCANMsg &msg, uint32_t  &ki_velocity);
-
-    void get_kp_position(const TPCANMsg &msg, uint32_t  &kp_position);
-
-    void get_ki_position(const TPCANMsg &msg, uint32_t  &ki_position);
-
-    void get_kd_position(const TPCANMsg &msg, uint32_t  &kd_position);
-
-private:
-
-    /// @brief encode 32-bit unsigned integer value to the message buffer's BYTE4 to BYTE7
+    /// @brief encode 32-bit unsigned integer value to the message buffer's BYTE4 to BYTE7 for the gain parameter
     /// @param msg reference  TPCANMsg to store the encoded value
     /// @param value desired 32-bit unsigned integer value of the gain parameter
     inline void encode_param_int_(TPCANMsg &msg, const uint32_t value) const {
@@ -169,6 +97,36 @@ private:
         msg.DATA[6] = (value >> 16) & 0xFF;
         msg.DATA[7] = (value >> 24) & 0xFF;
     }
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// STATE MESSAGE ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+class MsgDecoder{
+public:
+    /// @brief Default constructor
+    MsgDecoder() = default;
+
+
+    /// @brief get the state of the motor from the received message
+    /// @param msg received TPACNMsg message
+    /// @param temperature reference to store the decoded temperature value
+    /// @param position reference to store the decoded position value
+    /// @param velocity reference to store the decoded velocity value
+    /// @param torque reference to store the decoded torque value
+    void get_states(const TPCANMsg &msg, uint8_t &temperature, float &position, float &velocity, float &torque) const;
+
+    /// @brief get the gain value from the received message
+    void get_gain(const TPCANMsg &msg, uint32_t &gain_val) const;
+
+private:
+    /// @brief gear ratio of the motor
+    const float gear_ratio_ = 8.0f;
+
+    /// @brief torque constant of the motor
+    const float torque_constant_ = 0.41f / gear_ratio_; // there is a glitch that motor driver multiplies output torque by gear ratio
 
     /// @brief decode 32-bit unsigned integer value from the message buffer's BYTE4 to BYTE7
     /// @param msg recevied TPCANMsg message
@@ -177,37 +135,12 @@ private:
         value = msg.DATA[4] | (msg.DATA[5] << 8) | (msg.DATA[6] << 16) | (msg.DATA[7] << 24);
     }
 
-};
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////// STATUS MESSAGE ////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-class StatusMessage{
-public:
-    /// @brief Default constructor
-    StatusMessage() = default;
-
-    /// @brief get the result of the response message from the command message if successful return true otherwise false
+    /// @brief decode the float value from the message buffer's BYTE4 to BYTE7 for Indicator 
     /// @param msg 
-    /// @return 
-    bool get_result(const TPCANMsg& msg) const;
-
-    void get_voltage(const TPCANMsg &msg, float &voltage) const;
-
-    void get_current(const TPCANMsg &msg, float &current) const;
-
-    void get_shaft_angle(const TPCANMsg &msg, float &shaft_angle) const;
-
-    void get_shaft_velocity(const TPCANMsg &msg, float &shaft_velocity) const;
-
-
-private:
+    /// @param value 
     inline void decode_float_(const TPCANMsg &msg, float &value) const {
         std::memcpy(&value, &msg.DATA[4], sizeof(float));
     }
-
 };
 
 
@@ -215,40 +148,35 @@ private:
 ////////////////////////////////////// UTILITY FUNCTIONS ////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-inline void init_message_(TPCANMsg &msg){
-    msg.MSGTYPE = PCAN_MESSAGE_STANDARD;
-    msg.LEN = 8;
-    std::memset(msg.DATA, 0, 8);
-}
-
-// Global utility function to identify the result
-inline bool identify_result(const uint8_t error_byte) {
+/// @brief get the result of the response message from the command message if successful return true otherwise false
+/// @param msg 
+/// @param error_byte
+/// @return  true if the response message is successful
+inline bool get_result(const TPCANMsg& msg, const uint8_t error_byte){
     switch (error_byte){
 
         case ResultByte::SUCCESS:
             return true;
 
         case ResultByte::FAILURE:
-            std::cout << "FAILURE" << std::endl;
+            std::cerr << "FAILURE" << std::endl;
             return false;
         case ResultByte::FAILURE_UNKNOWN_COMMAND:
-            std::cout << "FAILURE: UNKNOWN COMMAND" << std::endl;
+            std::cerr << "FAILURE: UNKNOWN COMMAND" << std::endl;
             return false;
         case ResultByte::FAILURE_UNKNOWN_ID:
-            std::cout << "FAILURE: UNKNOWN ID" << std::endl;
+            std::cerr << "FAILURE: UNKNOWN ID" << std::endl;
             return false;
         case ResultByte::FAILURE_READ_ONLY_REGISTER:
-            std::cout << "FAILURE: READ ONLY REGISTER" << std::endl;
+            std::cerr << "FAILURE: READ ONLY REGISTER" << std::endl;
             return false;
         case ResultByte::FAILURE_UNKNOWN_REGISTER:
-            std::cout << "FAILURE: UNKNOWN REGISTER" << std::endl;
+            std::cerr << "FAILURE: UNKNOWN REGISTER" << std::endl;
             return false;
-
         default:
-            std::cout << "UNKNOWN ERROR" << std::endl;
+            std::cerr << "UNKNOWN ERROR" << std::endl;
             return false;
-    }
+        }
 }
 
 

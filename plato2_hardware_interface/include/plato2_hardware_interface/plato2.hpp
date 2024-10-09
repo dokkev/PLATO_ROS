@@ -108,7 +108,7 @@ private:
   std::vector<std::string> position_command_interface_names_;
 
   pcan_interface::PCANInterface pcan_interface_;
-  can_protocol::ControlMessage control_msg_;
+
 
 };
 

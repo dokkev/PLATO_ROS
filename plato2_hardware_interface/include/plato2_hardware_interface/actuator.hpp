@@ -9,6 +9,7 @@ namespace actuator{
 /// @brief Actuator commands variables : position, torque
 struct Commands{
     float position;
+    float velocity;
     float torque;
 };
 
@@ -25,6 +26,15 @@ struct Gains{
     uint32_t kp_position;
     uint32_t ki_position;
     uint32_t kd_position;
+
+    // unordered map for gain parameters
+    std::unordered_map<uint8_t, uint32_t*> param_map = {
+        {ParamID::KP_SPEED, &kp_velocity},
+        {ParamID::KI_SPEED, &ki_velocity},
+        {ParamID::KP_POSITION, &kp_position},
+        {ParamID::KI_POSITION, &ki_position},
+        {ParamID::KD_POSITION, &kd_position}
+    };
 };
 
 struct Status{
@@ -43,10 +53,8 @@ class Actuator{
 private:
     pcan_interface::PCANInterface& pcan_interface_;
 
-    can_protocol::ControlMessage control_msg_;
-    can_protocol::ResponseMessage response_msg_;
-    can_protocol::GainMessage gain_msg_;
-    can_protocol::StatusMessage status_msg_;
+    can_protocol::MsgEncoder encoder_;
+    can_protocol::MsgDecoder decoder_;
 
     Commands commands_;
     States states_;
@@ -68,6 +76,44 @@ public:
     void get_joint_position(float &joint_position);
 
     void set_joint_gains(const Gains &gains);
+
+    void process_message(const TPCANMsg &msg){
+        
+        // Check the Command Byte of the Received Message and call the corresponding function
+        // In switch statement, check the Message with higher priority first (msg such as motion control msgs which are updated every loop)
+        // uint8_t command_byte = msg.DATA[0];
+        switch (msg.DATA[0]){
+
+            // Response Message from the Motion Control
+            case CommandByte::POSITION_CONTROL:
+            case CommandByte::SPEED_CONTROL:
+            case CommandByte::TORQUE_CONTROL:
+                // get the states if there is a valid response without any error
+                decoder_.get_states(msg, status_.temperature, states_.position, states_.velocity, states_.torque);
+                
+                break;
+
+            // Gain message reponse upon request to get the gains from the motor
+           case CommandByte::RETRIVE_PARAMETER:
+                // If the parameter exists in the map, retrieve the pointer to the corresponding gain variable, dereference it, and pass it to the get_gain function.
+                // uint8_t param_id = msg.DATA[1];
+                break;
+
+            /////////////////////////// RESPONSE MESSAGES WITHOUT SIGNIFICANT DATA ///////////////////////////
+
+            // Response Message without encoder data; noting to read besides the result
+            case CommandByte::START_MOTOR:  
+            case CommandByte::STOP_MOTOR: 
+            case CommandByte::STOP_CONTROL:
+                can_protocol::get_result(msg, msg.DATA[1]);
+                break;
+
+            // Gain message response upon setting the gains; noting to read besides the result
+            case CommandByte::MODIFY_PARAMETER:
+                can_protocol::get_result(msg, msg.DATA[2]);
+                break;
+        }
+    }    
 
 
 private:
@@ -94,17 +140,15 @@ private:
     /// @brief convert motor state value to joint state value considering motor direction and offset
     /// @param motor_value Motor State Value from the motor
     /// @param joint_value reference to store the joint state value
-    inline void motor_to_joint_(const float &motor_value, float &joint_value){
+    inline void motor_to_joint(const float &motor_value, float &joint_value){
         joint_value = (motor_value - config_.position_offset) * config_.direction;
-
     }
 
-    inline void send_message(const TPCANMsg &msg){
-        pcan_interface_.send_message(msg);
-    }
 
-    void receive_message();
+   
+   
 
+    
 };
 
 } // namespace actuator

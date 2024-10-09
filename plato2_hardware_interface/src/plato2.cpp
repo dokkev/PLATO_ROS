@@ -132,7 +132,7 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_effort_states_[i] = 0.0; 
   }
 
-  pcan_interface_.receive_message();
+  // pcan_interface_.receive_message();
 
 
   // for (int i = 0; i < 20; i++) {
@@ -158,7 +158,7 @@ PLATO2Hardware::write(const rclcpp::Time &time,
   }
 
 
-  TPCANMsg msg;
+  // TPCANMsg msg;
   // msg.ID = 0x11;
   // control_msg_.stop_motor(msg);
   // pcan_interface_.send_message(msg);

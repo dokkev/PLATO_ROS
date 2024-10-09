@@ -49,9 +49,9 @@ TPCANStatus PCANInterface::read_can(){
 	TPCANTimestamp timestamp;
 
 	TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
-	if (status != PCAN_ERROR_QRCVEMPTY)
-		process_message(msg, timestamp);
-	
+	if (status != PCAN_ERROR_QRCVEMPTY && read_message_callback_){
+		read_message_callback_(msg);
+	}
 	return status;
 }
 
@@ -82,51 +82,6 @@ void PCANInterface::receive_message(){
 	} while (!(status & PCAN_ERROR_QRCVEMPTY));
 }
 
-
-// void PCANInterface::read_message(){
-// 	TPCANStatus status;
-//     TPCANMsg msg;
-//     TPCANTimestamp timestamp;
-// 	int processed_msg_num = 0;
-
-// 	// Try to read all messages until the buffer is empty or it reaches the maximum number of messages to process
-// 	while (processed_msg_num <= max_msg_num_to_process)  {
-// 		status = CAN_Read(pcan_handle, &msg, &timestamp);
-		
-// 		// If the buffer is empty, break the loop
-// 		if (status == PCAN_ERROR_QRCVEMPTY){
-// 			break;
-// 		}
-
-// 		// process the message in the buffer
-// 		else if (status != PCAN_ERROR_QRCVEMPTY){
-// 			process_message(msg, timestamp);
-// 			processed_msg_num++;
-// 		}
-// 		else{
-// 			std::cout << "PCANInterface::read_message:: ERROR! Unknown Error!" << std::endl;
-// 			show_status(status);
-// 			break;
-// 		}
-// 	}
-
-// 	if (processed_msg_num == max_msg_num_to_process){
-// 		std::cout << "PCANInterface::read_message:: WARNING! Max Batch Size Reached! Next loop will attempt to process the rest of the messages." << std::endl;
-// 	}
-
-//     return status;
-// }
-
-void PCANInterface::process_message(const TPCANMsg msg, TPCANTimestamp timestamp){
-    // UINT64 micro_timestamp = timestamp.micros + (1000ULL * timestamp.millis) + (0x100000000ULL * 1000ULL * timestamp.millis_overflow);
-	print_message(msg);
-	if (!RingBuf_put(&can_rx_buffer, msg)) {
-        // Handle buffer overflow (if necessary)
-        std::cout << "PCANInterface::process_message:: WARNING! CAN RX buffer overflow!" << std::endl;
-    }
-
-	
-}
 
 bool PCANInterface::get_buffer_message(TPCANMsg& msg){
 	return RingBuf_get(&can_rx_buffer, &msg);

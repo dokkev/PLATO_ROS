@@ -39,6 +39,10 @@ private:
     /// @brief Batch size to process to read CAN messages per cycle
     const int max_msg_num_to_process = CAN_DEVICES_NUM;
 
+    /// @brief External callback function to process the received message
+    std::function<void(const TPCANMsg&)> read_message_callback_;
+
+
 
 public:
     /// @brief Constructor
@@ -56,9 +60,11 @@ public:
     /// @return TPCANStatus of the read operation
     TPCANStatus read_can();
 
-
+    /// @brief Send a message to the CAN device
+    /// @param msg 
     void send_message(const TPCANMsg &msg);
 
+    /// @brief Set the callback function to process the received message
     void receive_message();
 
     /// @brief Process a message to store the data in to a buffer

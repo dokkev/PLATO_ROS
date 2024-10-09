@@ -36,7 +36,6 @@ def generate_launch_description():
         )
     )
 
-
     # Initialize Arguments
     gui = LaunchConfiguration("gui")
     plato_ns = LaunchConfiguration("plato_ns")
@@ -120,7 +119,6 @@ def generate_launch_description():
             on_exit=[robot_controller_spawner],
         )
     )
-
 
     nodes = [
         control_node,

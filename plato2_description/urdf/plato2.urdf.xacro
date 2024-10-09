@@ -7,13 +7,13 @@
     <!-- Include Robot Description Xacro -->
     <xacro:include filename="$(find plato2_description)/urdf/xacro/plato2_description.xacro"/>
     <!-- Include ros2 control Xacro -->
-    <!-- <xacro:include filename="$(find plato2_description)/urdf/ros2_control/finger.ros2_control.xacro"/> -->
+    <xacro:include filename="$(find plato2_description)/urdf/ros2_control/plato2.ros2_control.xacro"/>
 
 
     <!-- Create URDF -->
     <xacro:plato2_description connector_link="world" xyz="0 0 0" rpy="0 0 0"/>
     <!-- Create ros2 control -->
-    <!-- <xacro:plato_ros2_control name="finger_ros2_control"/> -->
+    <xacro:plato_ros2_control name="plato2_ros2_control"/>
 
 
 </robot>

@@ -19,7 +19,7 @@ class MsgEncoder{
 
 public:
     /// @brief Default constructor
-    MsgEncoder() = default;
+    MsgEncoder(const float &gear_ratio, const float &torque_constant);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
@@ -67,10 +67,23 @@ public:
     
 
 private:
+    /// @brief gear ratio of the motor initialized in the actuator constructor
+    const float &gear_ratio_;
+
+    /// @brief torque constant of the motor initialized in the actuator constructor
+    const float &torque_constant_;
+
+
+    // BYTE0   | BYTE1 | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
+    // COMMAND | CMD0  | CMD1  | CMD2  | CMD3  | DUR0  | DUR1  | DUR2  |
+    // Where Torque0~Torque3 are value of target torque with byte order of LSB and in unit of N.m. 
+    // It is represented using IEEE format and can be converted into float value with correct byte order.
+    // Duration0~Duration2 are 24-bit unsigned integer indicating torque control execution time in unit of ms.
 
     /// @brief encode target command value with LSB byte order
     /// @param value target command value
     /// @param msg buffer to store the encoded value
+    /// @details BYTE0   | BYTE1 | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
     inline void encode_command_float_(TPCANMsg &msg, const float value) const {
         // Copy the float value to the buffer using little-endian byte order
         // most CPU architectures are little-endian, but make sure that the byte order is correct
@@ -107,7 +120,38 @@ private:
 class MsgDecoder{
 public:
     /// @brief Default constructor
-    MsgDecoder() = default;
+    MsgDecoder(const float &gear_ratio, const float &torque_constant);
+
+    /// @brief get the result of the response message from the command message if successful return true otherwise false
+    /// @param msg 
+    /// @param error_byte
+    /// @return  true if the response message is successful
+    inline bool get_result(const uint8_t error_byte) const{
+        switch (error_byte){
+
+            case ResultByte::SUCCESS:
+                return true;
+
+            case ResultByte::FAILURE:
+                std::cerr << "FAILURE" << std::endl;
+                return false;
+            case ResultByte::FAILURE_UNKNOWN_COMMAND:
+                std::cerr << "FAILURE: UNKNOWN COMMAND" << std::endl;
+                return false;
+            case ResultByte::FAILURE_UNKNOWN_ID:
+                std::cerr << "FAILURE: UNKNOWN ID" << std::endl;
+                return false;
+            case ResultByte::FAILURE_READ_ONLY_REGISTER:
+                std::cerr << "FAILURE: READ ONLY REGISTER" << std::endl;
+                return false;
+            case ResultByte::FAILURE_UNKNOWN_REGISTER:
+                std::cerr << "FAILURE: UNKNOWN REGISTER" << std::endl;
+                return false;
+            default:
+                std::cerr << "UNKNOWN ERROR" << std::endl;
+                return false;
+            }
+}
 
 
     /// @brief get the state of the motor from the received message
@@ -123,10 +167,10 @@ public:
 
 private:
     /// @brief gear ratio of the motor
-    const float gear_ratio_ = 8.0f;
+    const float &gear_ratio_ ;
 
     /// @brief torque constant of the motor
-    const float torque_constant_ = 0.41f / gear_ratio_; // there is a glitch that motor driver multiplies output torque by gear ratio
+    const float &torque_constant_; 
 
     /// @brief decode 32-bit unsigned integer value from the message buffer's BYTE4 to BYTE7
     /// @param msg recevied TPCANMsg message
@@ -148,36 +192,7 @@ private:
 ////////////////////////////////////// UTILITY FUNCTIONS ////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// @brief get the result of the response message from the command message if successful return true otherwise false
-/// @param msg 
-/// @param error_byte
-/// @return  true if the response message is successful
-inline bool get_result(const TPCANMsg& msg, const uint8_t error_byte){
-    switch (error_byte){
 
-        case ResultByte::SUCCESS:
-            return true;
-
-        case ResultByte::FAILURE:
-            std::cerr << "FAILURE" << std::endl;
-            return false;
-        case ResultByte::FAILURE_UNKNOWN_COMMAND:
-            std::cerr << "FAILURE: UNKNOWN COMMAND" << std::endl;
-            return false;
-        case ResultByte::FAILURE_UNKNOWN_ID:
-            std::cerr << "FAILURE: UNKNOWN ID" << std::endl;
-            return false;
-        case ResultByte::FAILURE_READ_ONLY_REGISTER:
-            std::cerr << "FAILURE: READ ONLY REGISTER" << std::endl;
-            return false;
-        case ResultByte::FAILURE_UNKNOWN_REGISTER:
-            std::cerr << "FAILURE: UNKNOWN REGISTER" << std::endl;
-            return false;
-        default:
-            std::cerr << "UNKNOWN ERROR" << std::endl;
-            return false;
-        }
-}
 
 
 } // namespace can_protocol

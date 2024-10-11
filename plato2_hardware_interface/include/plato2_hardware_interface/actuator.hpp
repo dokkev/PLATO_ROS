@@ -47,76 +47,65 @@ struct Config{
     const uint8_t can_id;
     const float position_offset;
     const char direction; // 1 for counter-clockwise, -1 for clockwise
+
+    const float torque_constant;
+    const float gear_ratio;
 };
 
 class Actuator{
-private:
+private:     
     pcan_interface::PCANInterface& pcan_interface_;
-
-    can_protocol::MsgEncoder encoder_;
-    can_protocol::MsgDecoder decoder_;
 
     Commands commands_;
     States states_;
     Gains gains_;
     Status status_;
-    Config config_;  
+    Config config_;
+
+    can_protocol::MsgEncoder encoder_;
+    can_protocol::MsgDecoder decoder_;
+
+    // unordered map for gain parameters
+    std::unordered_map<uint8_t, uint32_t*> gain_map_ = {
+        {ParamID::KP_SPEED,    &gains_.kp_velocity},
+        {ParamID::KI_SPEED,    &gains_.ki_velocity},
+        {ParamID::KP_POSITION, &gains_.kp_position},
+        {ParamID::KI_POSITION, &gains_.ki_position},
+        {ParamID::KD_POSITION, &gains_.kd_position}
+    };
+
 
 public:
-    Actuator(pcan_interface::PCANInterface& pcan_interface, const Config& config);
+    Actuator(pcan_interface::PCANInterface& pcan_interface, Config& config);
 
+    ~Actuator();
+   
+
+    States get_states() const { return states_; }
+
+    Gains get_gains() const { return gains_; }
+
+    void enable_motor();
+
+    void disable_motor();
+
+    void stop_control();
+    
     void set_joint_torque(const float &joint_torque, const uint32_t &duration);
+
+    void set_joint_velocity(const float &joint_velocity, const uint32_t &duration);
 
     void set_joint_position(const float &joint_position, const uint32_t &duration);
 
-    void get_joint_torque(float &joint_torque);
-
-    void get_joint_velocity(float &joint_velocity);
-
-    void get_joint_position(float &joint_position);
-
-    void set_joint_gains(const Gains &gains);
-
-    void process_message(const TPCANMsg &msg){
+    void process_message(const TPCANMsg &msg);
         
-        // Check the Command Byte of the Received Message and call the corresponding function
-        // In switch statement, check the Message with higher priority first (msg such as motion control msgs which are updated every loop)
-        // uint8_t command_byte = msg.DATA[0];
-        switch (msg.DATA[0]){
-
-            // Response Message from the Motion Control
-            case CommandByte::POSITION_CONTROL:
-            case CommandByte::SPEED_CONTROL:
-            case CommandByte::TORQUE_CONTROL:
-                // get the states if there is a valid response without any error
-                decoder_.get_states(msg, status_.temperature, states_.position, states_.velocity, states_.torque);
-                
-                break;
-
-            // Gain message reponse upon request to get the gains from the motor
-           case CommandByte::RETRIVE_PARAMETER:
-                // If the parameter exists in the map, retrieve the pointer to the corresponding gain variable, dereference it, and pass it to the get_gain function.
-                // uint8_t param_id = msg.DATA[1];
-                break;
-
-            /////////////////////////// RESPONSE MESSAGES WITHOUT SIGNIFICANT DATA ///////////////////////////
-
-            // Response Message without encoder data; noting to read besides the result
-            case CommandByte::START_MOTOR:  
-            case CommandByte::STOP_MOTOR: 
-            case CommandByte::STOP_CONTROL:
-                can_protocol::get_result(msg, msg.DATA[1]);
-                break;
-
-            // Gain message response upon setting the gains; noting to read besides the result
-            case CommandByte::MODIFY_PARAMETER:
-                can_protocol::get_result(msg, msg.DATA[2]);
-                break;
-        }
-    }    
-
 
 private:
+    /// @brief Cached message to send to the motor
+    TPCANMsg onoff_msg_;
+    TPCANMsg pos_msg_;
+    TPCANMsg vel_msg_;
+    TPCANMsg trq_msg_;
 
     /// @brief Initialize a message with with 0 data and the configured CAN ID
     /// @return TPCANMsg initialized message
@@ -150,6 +139,11 @@ private:
 
     
 };
+
+// some useful functions
+inline bool almost_equal(float a, float b, float epsilon = 1e-5f) {
+    return std::fabs(a - b) < epsilon;
+}
 
 } // namespace actuator
 

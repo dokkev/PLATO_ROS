@@ -1,28 +1,49 @@
 #ifndef PLATO_HARDWARE_INTERFACE__PLATO2_HAND_HPP_
 #define PLATO_HARDWARE_INTERFACE__PLATO2_HAND_HPP_
 
+#include "plato2_hardware_interface/actuator.hpp"
+
 namespace plato2_hand{
 
-class ActuatorGains{
+
+enum class ControlMode {
+    OFF,
+    POSITION,
+    VELOCITY,
+    TORQUE
+};
+
+class Hand{
 public:
-    ActuatorGains() = default;
 
-    std::vector<unit_32t> kp_velocity
-    std::vector<unit_32t> ki_velocity
+    Hand();
+    ~Hand();
 
-    std::vector<unit_32t> kp_position
-    std::vector<unit_32t> ki_position
-    std::vector<unit_32t> kd_position
+    void init_actuators();
 
-}
+    void enable();
 
-class FiveBarLinkage{
+    void disable();
 
-}
+    void stop();
 
-class PLATO2Hand{
+    void send_command();
 
-}
+    void receive_states();   
+
+    void update();
+
+    void set_control_mode(const ControlMode &control_mode);
+
+private:
+    pcan_interface::PCANInterface pcan_interface_;
+
+    std::vector<actuator::Actuator> actuators_;
+
+    ControlMode control_mode_;
+
+};
+
 
 } // namespace plato2_hand
 

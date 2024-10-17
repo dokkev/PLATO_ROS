@@ -72,6 +72,14 @@ void MsgEncoder::set_gain(TPCANMsg &msg, const uint32_t &gain_val, const uint8_t
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+// BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
+// COMMAND | IndID  | NULL  | NULL  | NULL  | NULL  | NULL  | NULL  |
+void MsgEncoder::retrieve_position(TPCANMsg &msg) {
+    msg.DATA[0] = CommandByte::RETRIVE_INDICATOR;
+    msg.DATA[1] = IndicatorID::SHAFT_ANGLE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 MsgDecoder::MsgDecoder(const float &gear_ratio, const float &torque_constant) 
         : gear_ratio_(gear_ratio), torque_constant_(torque_constant) {} 
@@ -122,7 +130,15 @@ void MsgDecoder::get_gain(const TPCANMsg &msg, uint32_t &gain_val) const {
     decode_param_int_(msg, gain_val);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
 
-
+// BYTE0   | BYTE1  | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
+// COMMAND | IndID  | RES   | NULL  | DATA0 | DATA1 | DATA2 | DATA3 |
+void MsgDecoder::retrieve_position(const TPCANMsg &msg, float &position) const {
+ if (get_result(msg.DATA[2]) == false) {
+        return;
+    }
+   decode_ind_float_(msg, position);
+}
 
 } // namespace can_protocol

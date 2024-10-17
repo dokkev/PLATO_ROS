@@ -23,7 +23,6 @@ plato2:
         - joint7
         - joint8
 
-
       command_interfaces:
         - position
 

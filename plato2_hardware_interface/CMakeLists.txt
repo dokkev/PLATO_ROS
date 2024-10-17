@@ -56,6 +56,7 @@ add_library(
   src/pcan_interface.cpp
   src/can_protocol.cpp
   src/actuator.cpp
+  src/plato2_hand.cpp
   src/plato2.cpp
   
 )

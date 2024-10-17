@@ -5,32 +5,6 @@
 #include <cstring>
 #include <cmath> 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-//// MOTOR CAN IDs. These values can be modified through either CAN command or UART GUI on Windows ////
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace MotorTxID{
-    constexpr uint8_t MOTOR1 = 0x11;
-    constexpr uint8_t MOTOR2 = 0x12;
-    constexpr uint8_t MOTOR3 = 0x13;
-    constexpr uint8_t MOTOR4 = 0x14;
-    constexpr uint8_t MOTOR5 = 0x15;
-    constexpr uint8_t MOTOR6 = 0x16;
-    constexpr uint8_t MOTOR7 = 0x17;
-    constexpr uint8_t MOTOR8 = 0x18;
-} // namespace MotorTxID
-
-namespace MotorRxID{
-    constexpr uint8_t MOTOR1 = 0x21;
-    constexpr uint8_t MOTOR2 = 0x22;
-    constexpr uint8_t MOTOR3 = 0x23;
-    constexpr uint8_t MOTOR4 = 0x24;
-    constexpr uint8_t MOTOR5 = 0x25;
-    constexpr uint8_t MOTOR6 = 0x26;
-    constexpr uint8_t MOTOR7 = 0x27;
-    constexpr uint8_t MOTOR8 = 0x28;
-} // namespace MotorRxID
-
 
 //// These Values need to match with the values in the motor driver. Don't Modify them
 namespace CommandByte{

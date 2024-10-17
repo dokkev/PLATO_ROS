@@ -8,7 +8,7 @@
 
 #include "PCANBasic.h"
 
-#include "plato2_hardware_interface/can_ids.hpp"
+#include "plato2_hardware_interface/hardware_config/can_ids.hpp"
 
 namespace can_protocol{
 
@@ -58,13 +58,23 @@ public:
     void acknowledge_fault(TPCANMsg &msg);
 
 
-
     /////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////// GAIN MESSAGE /////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// @brief Set the gain parameter ID and value to the message
+    /// @param gain_val desired gain value
     void set_gain(TPCANMsg &msg, const uint32_t &gain_val, const uint8_t param_id);
 
-    
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////// INDICATOR MESSAGE //////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// @brief Send command message to retrieve the output shaft position of the motor
+    /// @param msg TPCANMsg reference to store the command message
+    void retrieve_position(TPCANMsg &msg);
+
+    /// @brief Senc command message to retrieve the gains of the motor
+    /// @param msg 
+    void retrieve_gains(TPCANMsg &msg);
 
 private:
     /// @brief gear ratio of the motor initialized in the actuator constructor
@@ -165,6 +175,12 @@ public:
     /// @brief get the gain value from the received message
     void get_gain(const TPCANMsg &msg, uint32_t &gain_val) const;
 
+    /// @brief decode the float value from the message buffer's BYTE4 to BYTE7 for Indicator
+    /// @param msg 
+    /// @param position 
+    void retrieve_position(const TPCANMsg &msg, float &position) const;
+
+
 private:
     /// @brief gear ratio of the motor
     const float &gear_ratio_ ;
@@ -182,7 +198,7 @@ private:
     /// @brief decode the float value from the message buffer's BYTE4 to BYTE7 for Indicator 
     /// @param msg 
     /// @param value 
-    inline void decode_float_(const TPCANMsg &msg, float &value) const {
+    inline void decode_ind_float_(const TPCANMsg &msg, float &value) const {
         std::memcpy(&value, &msg.DATA[4], sizeof(float));
     }
 };

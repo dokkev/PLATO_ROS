@@ -49,8 +49,9 @@ TPCANStatus PCANInterface::read_can(){
 	TPCANTimestamp timestamp;
 
 	TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
-	if (status != PCAN_ERROR_QRCVEMPTY && read_message_callback_){
-		read_message_callback_(msg);
+	if (status != PCAN_ERROR_QRCVEMPTY && read_can_callback_){
+		read_can_callback_(msg);
+		print_message(msg);
 	}
 	return status;
 }
@@ -68,7 +69,6 @@ void PCANInterface::send_message(const TPCANMsg &msg){
 void PCANInterface::receive_message(){
 	
 	TPCANStatus status;
-
 	// read at lease one time the queue looking for messages, and if there is a message found read until the buffer is empty
 	// if the queue is empty or error occurs, break the loop
 	do{
@@ -80,11 +80,6 @@ void PCANInterface::receive_message(){
 		}
 
 	} while (!(status & PCAN_ERROR_QRCVEMPTY));
-}
-
-
-bool PCANInterface::get_buffer_message(TPCANMsg& msg){
-	return RingBuf_get(&can_rx_buffer, &msg);
 }
 
 void PCANInterface::print_message(const TPCANMsg msg){

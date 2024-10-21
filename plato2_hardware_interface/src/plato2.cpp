@@ -132,7 +132,7 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_effort_states_[i] = 0.0; 
   }
 
-  // pcan_interface_.receive_message();
+  hand_.update_states();
 
 
   // for (int i = 0; i < 20; i++) {

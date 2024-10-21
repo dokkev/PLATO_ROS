@@ -128,6 +128,15 @@ public:
     /// @param msg 
     void process_message(const TPCANMsg &msg);
 
+    /// @brief Get the CAN TX ID of the motor
+    /// @return uint CAN TX ID
+    uint get_tx_id() const { return config_.can_tx_id; }
+
+    /// @brief Get the CAN RX ID of the motor
+    /// @return uint CAN RX ID
+    uint get_rx_id() const { return config_.can_rx_id; }
+
+
 
 
 private:

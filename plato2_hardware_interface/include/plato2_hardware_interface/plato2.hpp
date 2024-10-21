@@ -37,8 +37,7 @@
   #include <can_msgs/msg/frame.hpp>
   #include <sensor_msgs/msg/joint_state.h>
 
-  #include "plato2_hardware_interface/pcan_interface.hpp"
-  #include "plato2_hardware_interface/can_protocol.hpp"
+  #include "plato2_hardware_interface/plato2_hand.hpp"
 
 
   #include "plato2_hardware_interface/utils/visibility_control.h"
@@ -97,11 +96,12 @@
 
     std::vector<double> ft_sensor_states_;
 
-
-
     std::vector<std::string> effort_command_interface_names_;
     std::vector<std::string> velocity_command_interface_names_;
     std::vector<std::string> position_command_interface_names_;
+
+    // Plato Hand V2 Object
+    plato2_hand::Hand hand_;
 
   
 

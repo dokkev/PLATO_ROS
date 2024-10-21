@@ -40,7 +40,7 @@ private:
     const int max_msg_num_to_process = CAN_DEVICES_NUM;
 
     /// @brief External callback function to process the received message
-    std::function<void(const TPCANMsg&)> read_message_callback_;
+    std::function<void(const TPCANMsg&)> read_can_callback_;
 
 
 
@@ -67,19 +67,15 @@ public:
     /// @brief Set the callback function to process the received message
     void receive_message();
 
-    /// @brief Process a message to store the data in to a buffer
-    /// @param msg TPCANMsg to process
-    /// @param timestamp TPCANTimestamp of the message
-    void process_message(const TPCANMsg msg, TPCANTimestamp timestamp);
-
-    /// @brief Get the RX message from the buffer
-    /// @param msg TPCANMsg to store the message
-    /// @return bool true if there is a message in the buffer
-    bool get_buffer_message(TPCANMsg& msg);
-
     /// @brief Print a message on the console for debugging
     /// @param msg TPCANMsg to print
-    void print_message(const TPCANMsg msg); 
+    void print_message(const TPCANMsg msg);
+
+    /// @brief set the callback function for read_can
+    /// @param callback 
+    void set_read_callback(std::function<void(const TPCANMsg&)> callback){
+        read_can_callback_ = callback;
+    } 
 
 private:
 

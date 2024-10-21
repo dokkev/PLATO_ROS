@@ -46,7 +46,7 @@ void Actuator::stop_control(){
     encoder_.stop_control(onoff_msg_);
     pcan_interface_.send_message(onoff_msg_);
 
-    std::cerr << "Actuator is being Stopped!" << std::endl;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ void Actuator::set_joint_velocity(const float &joint_velocity, const uint32_t &d
 
 ////////////////////////////////////////////////////////////////////////////
 
-void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &duration) {
+void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &duration ) {
 
     // Convert the joint torque to motor torque
     float motor_torque;
@@ -176,6 +176,7 @@ void Actuator::process_message(const TPCANMsg &msg){
             // If the parameter exists in the map, retrieve the pointer to the corresponding gain variable, dereference it, and pass it to the get_gain function.
             // uint8_t gain_byte = msg.DATA[1];
             // check if the parameter exists in the map
+
             try {
                 decoder_.get_gain(msg, *gain_map_.at(msg.DATA[1]));
             } catch (const std::out_of_range& e) {

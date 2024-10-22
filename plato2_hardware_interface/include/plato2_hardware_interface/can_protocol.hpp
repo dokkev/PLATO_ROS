@@ -129,7 +129,7 @@ private:
 
 class MsgDecoder{
 public:
-    /// @brief Default constructor
+    /// @brief constructor
     MsgDecoder(const float &gear_ratio, const float &torque_constant);
 
     /// @brief get the result of the response message from the command message if successful return true otherwise false

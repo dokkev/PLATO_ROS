@@ -1,6 +1,8 @@
 #ifndef PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_
 #define PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_
 
+#include "plato2_hardware_interface/hardware_config/actuator_config.hpp"
+
 #include "plato2_hardware_interface/pcan_interface.hpp"
 #include "plato2_hardware_interface/can_protocol.hpp"
 
@@ -186,11 +188,6 @@ private:
     }
     
 };
-
-// some useful functions
-inline bool almost_equal(float a, float b, float epsilon = 1e-5f) {
-    return std::fabs(a - b) < epsilon;
-}
 
 } // namespace actuator
 

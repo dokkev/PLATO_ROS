@@ -1,8 +1,12 @@
 #ifndef PLATO_HARDWARE_INTERFACE__PLATO2_HAND_HPP_
 #define PLATO_HARDWARE_INTERFACE__PLATO2_HAND_HPP_
 
+
+#include "plato2_hardware_interface/hardware_config/linkage_config.hpp"
+
 #include "plato2_hardware_interface/actuator.hpp"
-#include "plato2_hardware_interface/hardware_config/actuator_config.hpp"
+#include "plato2_hardware_interface/five_bar_linkage.hpp"
+
 
 namespace plato2_hand{
 
@@ -55,7 +59,7 @@ public:
     void set_commands(const double &joint_command, const uint32_t &duration);
 
     /// @brief Update the states of the motors
-    void update_states();
+    void update_states(double &joint_position_states, double &joint_velocity_states, double &joint_effort_states);
 
     /// @brief  
     void get_states();   
@@ -68,36 +72,57 @@ private:
     /// @brief PCAN Interface to communicate with motors
     pcan_interface::PCANInterface pcan_interface_;
 
-    /// @brief 
+    /// @brief Actuator Vector
     std::vector<actuator::Actuator> actuators_;
 
+    /// @brief Control Mode of the Hand
     ControlMode control_mode_;
 
+    /// @brief Internal Counter
+    uint32_t counter_ = 0;
 
-
-
+    /// @brief Print the Actuator Information
     void print_actuator_info_();
 
     /// @brief read RX CAN messages from the Bus using the PCAN Interface and sort the messages to the corresponding actuators
     void sort_can_rx_id_(const TPCANMsg &msg);
 
 
+    /// @brief Predefined Actuator Configurations
+    std::vector<actuator::Config> actuator_configs_ = {
+        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1, MotorDirection::MOTOR1, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2, MotorDirection::MOTOR2, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3, MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4, MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5, MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6, MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7, MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8, MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
+    };
 
-    std::vector<actuator::Config> init_actuator_configs() {
-        return {
-            actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1, MotorDirection::MOTOR1, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2, MotorDirection::MOTOR2, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3, MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4, MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5, MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6, MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7, MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-            actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8, MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
-        };
-    }
+    ///@brief Five Bar Linkage Configuration
+    // FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_ = {
+    //     PlatoLinkage::L1,
+    //     PlatoLinkage::L2,
+    //     PlatoLinkage::L3,
+    //     PlatoLinkage::L4,
+    //     PlatoLinkage::L5,
+    //     Plato::deg2rad(PlatoLinkage::PIP_MOTOR_ZERO_ANGLE_OFFSET)
+
+    // };
 
 
-    std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
+    /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
+    std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_ = {
+        {MotorRxID::MOTOR1, &actuators_[0]},
+        {MotorRxID::MOTOR2, &actuators_[1]},
+        {MotorRxID::MOTOR3, &actuators_[2]},
+        {MotorRxID::MOTOR4, &actuators_[3]},
+        {MotorRxID::MOTOR5, &actuators_[4]},
+        {MotorRxID::MOTOR6, &actuators_[5]},
+        {MotorRxID::MOTOR7, &actuators_[6]},
+        {MotorRxID::MOTOR8, &actuators_[7]}
+    };
 
 
 };

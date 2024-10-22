@@ -19,6 +19,7 @@ Hand::Hand() : control_mode_(ControlMode::OFF){
 
 
 
+
     
 }
 
@@ -33,23 +34,18 @@ Hand::~Hand(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::init_actuators(){
-    // Get actuator configs 
-    auto actuator_configs = init_actuator_configs();
+  
+
 
     // Reserve space in the vector to avoid reallocation
-    actuators_.reserve(actuator_configs.size());
+    actuators_.reserve(actuator_configs_.size());
 
     // Initialize the actuators
-    for (size_t i = 0; i < actuator_configs.size(); ++i) {
+    for (size_t i = 0; i < actuator_configs_.size(); ++i) {
         // 'push back' the actuator to the vector of actuators
-        actuators_.emplace_back(pcan_interface_, actuator_configs[i]);
+        actuators_.emplace_back(pcan_interface_, actuator_configs_[i]);
 
-        // get the reference to the last actuator  (last element of the vector)
-        // create a map of actuator's CAN RX ID to the corresponding actuator pointer
-        actuator_rx_id_map_.emplace(actuator_configs[i].can_rx_id, &actuators_.back());
     }
-
-    
 
     // Retrieve the initial position of the actuators
     for (auto &actuator : actuators_){
@@ -100,6 +96,7 @@ void Hand::set_commands(const double &joint_command, const uint32_t &duration=20
             stop();
             break;
 
+        // Send zero torque command to the motors and update the joint states
         case ControlMode::IDLE:
             for (auto &actuator : actuators_){
                 actuator.set_joint_torque(0.0, duration);
@@ -130,9 +127,38 @@ void Hand::set_commands(const double &joint_command, const uint32_t &duration=20
     }
 }
 
-void Hand::update_states(){
+void Hand::update_states(double &joint_position_states, double &joint_velocity_states, double &joint_effort_states){
 
+    // recevie the message from the CAN bus every loop
     pcan_interface_.receive_message();
+
+    switch (control_mode_){
+        case ControlMode::POSITION:
+        case ControlMode::VELOCITY:
+        case ControlMode::TORQUE:
+        case ControlMode::IDLE:
+            // update the joint states for each actuator
+            for (size_t i = 0; i < actuators_.size(); ++i){
+            //     // joint_position_states[i] = actuators_[i].get_states().position;
+            //     // joint_velocity_states[i] = actuators_[i].get_states().velocity;
+            //     // joint_effort_states[i] = actuators_[i].get_states().effort;
+            }
+            
+            break;
+
+ 
+
+        case ControlMode::OFF:
+            for (size_t i = 0; i < actuators_.size(); ++i){
+                // joint_position_states[i] = actuators_[i].get_states().position;
+            }
+   
+            break;
+
+        default:
+            std::cerr << "ERROR: plato2_hand::Invalid Control Mode!" << std::endl;
+            break;
+    }
 
 }
 

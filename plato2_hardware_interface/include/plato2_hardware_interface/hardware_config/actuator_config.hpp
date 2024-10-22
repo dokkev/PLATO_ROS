@@ -3,6 +3,9 @@
 
 // TODO: Change this to yaml file
 
+#include <cstdint>
+
+
 namespace MotorTxID{
     constexpr uint8_t MOTOR1 = 0x11;
     constexpr uint8_t MOTOR2 = 0x12;
@@ -45,7 +48,6 @@ namespace MotorOffset{
     constexpr float MOTOR7 = 0.0f;
     constexpr float MOTOR8 = 0.0f;
 }
-
 
 namespace MotorDirection{
     constexpr char MOTOR1 = -1;

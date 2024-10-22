@@ -27,7 +27,7 @@ void PLATOHardware::set_zero_command(std::vector<double> &command) {
 
 void PLATOHardware::set_zero_torque_command(std::vector<double> &command) {
   for (size_t i = 0; i < command.size(); ++i) {
-    command[i] = 10.00;
+    command[i] = 3.2;
   }
 }
 

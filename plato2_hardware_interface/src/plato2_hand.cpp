@@ -51,18 +51,23 @@ void Hand::init_actuators(){
     for (size_t i = 0; i < actuator_configs_.size(); ++i) {
         // 'push back' the actuator to the vector of actuators
         actuators_.emplace_back(pcan_interface_, actuator_configs_[i]);
+        
     }
 
-    actuator_rx_id_map_ = {
-        {MotorRxID::MOTOR1, &actuators_[0]},
-        {MotorRxID::MOTOR2, &actuators_[1]},
-        {MotorRxID::MOTOR4, &actuators_[3]},
-        {MotorRxID::MOTOR3, &actuators_[2]},
-        {MotorRxID::MOTOR6, &actuators_[5]},
-        {MotorRxID::MOTOR5, &actuators_[4]},
-        {MotorRxID::MOTOR8, &actuators_[7]},
-        {MotorRxID::MOTOR7, &actuators_[6]}
-    };
+    for (auto &actuator : actuators_) {
+        actuator_rx_id_map_[actuator.get_rx_id()] = &actuator;
+    }
+
+    // actuator_rx_id_map_ = {
+    //     {MotorRxID::MOTOR1, &actuators_[0]}, // joint[0]
+    //     {MotorRxID::MOTOR2, &actuators_[1]}, // joint[1]
+    //     {MotorRxID::MOTOR3, &actuators_[2]}, // joint[2]
+    //     {MotorRxID::MOTOR4, &actuators_[3]}, // joint[3]
+    //     {MotorRxID::MOTOR5, &actuators_[4]}, // joint[4]
+    //     {MotorRxID::MOTOR6, &actuators_[5]}, // joint[5]
+    //     {MotorRxID::MOTOR7, &actuators_[6]}, // joint[6]
+    //     {MotorRxID::MOTOR8, &actuators_[7]}  // joint[7]
+    // };
 
   
 
@@ -198,7 +203,7 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
             }
 
             for (size_t i = 0; i < num_actuators_; ++i){
-                joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position) * static_cast<double>(linkage_reduction_ratios_[i]);
+                joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position);
                 // TODO: Implement the velocity and effort states reduction ratios
                 joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
                 joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);

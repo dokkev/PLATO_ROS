@@ -265,7 +265,6 @@
 <joint_properties friction="0.0"/>
 </joint>
 
-
 <joint name="joint2" type="revolute">
 <origin xyz="0.058249999999999593769 5.5511151231257827021e-16 0.03224999999999998701" rpy="-3.1415926535897891192 1.5707963267948927832 0" />
 <parent link="thumb_metacarpal" />

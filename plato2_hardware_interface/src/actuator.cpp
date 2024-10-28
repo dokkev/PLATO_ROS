@@ -196,11 +196,8 @@ void Actuator::process_message(const TPCANMsg &msg){
 
         case CommandByte::RETRIVE_INDICATOR:
             // get the position if there is a valid response without any error
-            float motor_position;
-            decoder_.retrieve_position(msg, motor_position);
+            std::cerr << "Unimplemented Feature [Glitch found]" << std::endl;
 
-            // apply the motor to joint conversion and store the states
-            motor_to_joint_(motor_position, states_.position, true);
 
             break;
 

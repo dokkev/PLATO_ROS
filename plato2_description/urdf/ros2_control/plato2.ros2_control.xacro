@@ -18,16 +18,7 @@
                 <state_interface name="effort"/>
             </joint>
 
-
             <joint name="joint2">
-                <command_interface name="position"/>
-
-                <state_interface name="position"/>
-                <state_interface name="velocity"/>
-                <state_interface name="effort"/>
-            </joint>
-
-            <joint name="joint4">
                 <command_interface name="position"/>
 
                 <state_interface name="position"/>
@@ -43,13 +34,14 @@
                 <state_interface name="effort"/>
             </joint>
 
-            <joint name="joint6">
+            <joint name="joint4">
                 <command_interface name="position"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="effort"/>
             </joint>
+
 
             <joint name="joint5">
                 <command_interface name="position"/>
@@ -59,8 +51,7 @@
                 <state_interface name="effort"/>
             </joint>
 
-            
-            <joint name="joint8">
+            <joint name="joint6">
                 <command_interface name="position"/>
 
                 <state_interface name="position"/>
@@ -68,8 +59,15 @@
                 <state_interface name="effort"/>
             </joint>
 
-
             <joint name="joint7">
+                <command_interface name="position"/>
+
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+            </joint>
+
+            <joint name="joint8">
                 <command_interface name="position"/>
 
                 <state_interface name="position"/>

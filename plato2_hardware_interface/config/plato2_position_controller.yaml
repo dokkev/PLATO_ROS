@@ -1,7 +1,7 @@
 plato2:
   controller_manager:
     ros__parameters:
-      update_rate: 1  # Hz
+      update_rate: 30  # Hz
 
       plato2_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster

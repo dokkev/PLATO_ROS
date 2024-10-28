@@ -7,19 +7,19 @@
 namespace Plato{
 
     /// @brief PI
-    constexpr double PI = 3.14159265358979323846f;
+    constexpr float PI = 3.141592f;
 
     /// @brief Convert degrees to radians
     /// @param degrees angle in degree
     /// @return angle in radians
-    inline double deg2rad(float degrees){
+    inline float deg2rad(float degrees){
         return degrees * PI / 180.0f;
     }
 
     /// @brief Convert radians to degrees
     /// @param radians input angle in radians
     /// @return output angle in degrees
-    inline double rad2deg(float radians){
+    inline float rad2deg(float radians){
         return radians * 180.0f / PI;
     }
 

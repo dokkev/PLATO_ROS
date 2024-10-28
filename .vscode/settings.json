@@ -96,5 +96,6 @@
         "/home/dk/ws_moveit/install/moveit_configs_utils/lib/python3.10/site-packages",
         "/opt/ros/iron/lib/python3.10/site-packages"
     ],
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "taipyStudio.gUI.elementsFilePaths": []
 }

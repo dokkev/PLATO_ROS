@@ -51,7 +51,7 @@ TPCANStatus PCANInterface::read_can(){
 	TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
 	if (status != PCAN_ERROR_QRCVEMPTY && read_can_callback_){
 		read_can_callback_(msg);
-		print_message(msg);
+		// print_message(msg);
 	}
 	return status;
 }
@@ -59,6 +59,7 @@ TPCANStatus PCANInterface::read_can(){
 void PCANInterface::send_message(const TPCANMsg &msg){
 
 	TPCANStatus status = write_can(msg);
+	// print_message(msg);
 
 	if (status != PCAN_ERROR_OK){
 		std::cout << "PCANInterface::write_message:: ERROR! Failed to write message!" << std::endl;

@@ -134,41 +134,6 @@
 <axis xyz="0 0 0"/>
 </joint>
 
-<joint name="joint4" type="revolute">
-<origin xyz="0.060000000000000011657 -1.3877787807814456755e-17 -6.9388939039072283776e-18" rpy="1.9153167705881153685e-14 6.1331864267087110065e-15 -3.141592653589788231" />
-<parent link="thumb_proximal" />
-<child link="thumb_distal" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-2.0943951023931952626" upper="0"/>
-<joint_properties friction="0.0"/>
-</joint>
-
-<joint name="joint3" type="revolute">
-<origin xyz="-0.024997917591194747378 -0.011999999478458957258 -0.023999999999999993561" rpy="-1.5707963267948970021 -7.7297547565167041677e-16 -3.1415926535897908956" />
-<parent link="thumb_actuators" />
-<child link="thumb_proximal" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-1.0471975511965976313" upper="1.0471975511965976313"/>
-<joint_properties friction="0.0"/>
-</joint>
-
-<joint name="joint2" type="revolute">
-<origin xyz="0.058249999999999593769 5.5511151231257827021e-16 0.03224999999999998701" rpy="-3.1415926535897891192 1.5707963267948927832 0" />
-<parent link="thumb_metacarpal" />
-<child link="thumb_actuators" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-0.785398163397448279" upper="0.785398163397448279"/>
-<joint_properties friction="0.0"/>
-</joint>
-
-<joint name="joint1" type="revolute">
-<origin xyz="0.01149999999999984715 0.039000000000000659139 -0.015849999999999926648" rpy="-1.3045120539345319165e-15 1.5707963267948643615 0" />
-<parent link="base_link" />
-<child link="thumb_metacarpal" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-0.34906585039886589561" upper="1.2217304763960306069"/>
-<joint_properties friction="0.0"/>
-</joint>
 
 <link name="index_proximal">
 <visual>
@@ -228,24 +193,6 @@
 <parent link="index_distal" />
 <child link="thumb_fingertip" />
 <axis xyz="0 0 0"/>
-</joint>
-
-<joint name="joint6" type="revolute">
-<origin xyz="0.060000000000000011657 -3.4694469519536141888e-18 0" rpy="-2.1461027329066007583e-16 3.0473921289930194632e-15 3.141592653589793116" />
-<parent link="index_proximal" />
-<child link="index_distal" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="0" upper="2.0943951023931952626"/>
-<joint_properties friction="0.0"/>
-</joint>
-
-<joint name="joint5" type="revolute">
-<origin xyz="0.11342115258546792145 0.041187262013853524756 0.025999851934806916809" rpy="-1.57079632679489678 2.2482016248662969818e-15 -1.850249261987616476e-15" />
-<parent link="base_link" />
-<child link="index_proximal" />
-<axis xyz="0 0 1"/>
-<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-1.0471975511965976313" upper="1.0471975511965976313"/>
-<joint_properties friction="0.0"/>
 </joint>
 
 <link name="middle_proximal">
@@ -308,10 +255,57 @@
 <axis xyz="0 0 0"/>
 </joint>
 
-<joint name="joint8" type="revolute">
-<origin xyz="0.05999999999999999778 3.4694469519536141888e-18 6.9388939039072283776e-18" rpy="-2.7755575615281513959e-16 3.4694469519536398268e-16 3.141592653589793116" />
-<parent link="middle_proximal" />
-<child link="middle_distal" />
+
+<joint name="joint1" type="revolute">
+<origin xyz="0.01149999999999984715 0.039000000000000659139 -0.015849999999999926648" rpy="-1.3045120539345319165e-15 1.5707963267948643615 0" />
+<parent link="base_link" />
+<child link="thumb_metacarpal" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-0.34906585039886589561" upper="1.2217304763960306069"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+
+<joint name="joint2" type="revolute">
+<origin xyz="0.058249999999999593769 5.5511151231257827021e-16 0.03224999999999998701" rpy="-3.1415926535897891192 1.5707963267948927832 0" />
+<parent link="thumb_metacarpal" />
+<child link="thumb_actuators" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-0.785398163397448279" upper="0.785398163397448279"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint3" type="revolute">
+<origin xyz="-0.024997917591194747378 -0.011999999478458957258 -0.023999999999999993561" rpy="-1.5707963267948970021 -7.7297547565167041677e-16 -3.1415926535897908956" />
+<parent link="thumb_actuators" />
+<child link="thumb_proximal" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-1.0471975511965976313" upper="1.0471975511965976313"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint4" type="revolute">
+<origin xyz="0.060000000000000011657 -1.3877787807814456755e-17 -6.9388939039072283776e-18" rpy="1.9153167705881153685e-14 6.1331864267087110065e-15 -3.141592653589788231" />
+<parent link="thumb_proximal" />
+<child link="thumb_distal" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-2.0943951023931952626" upper="0"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint5" type="revolute">
+<origin xyz="0.11342115258546792145 0.041187262013853524756 0.025999851934806916809" rpy="-1.57079632679489678 2.2482016248662969818e-15 -1.850249261987616476e-15" />
+<parent link="base_link" />
+<child link="index_proximal" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-1.0471975511965976313" upper="1.0471975511965976313"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint6" type="revolute">
+<origin xyz="0.060000000000000011657 -3.4694469519536141888e-18 0" rpy="-2.1461027329066007583e-16 3.0473921289930194632e-15 3.141592653589793116" />
+<parent link="index_proximal" />
+<child link="index_distal" />
 <axis xyz="0 0 1"/>
 <limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="0" upper="2.0943951023931952626"/>
 <joint_properties friction="0.0"/>
@@ -323,6 +317,15 @@
 <child link="middle_proximal" />
 <axis xyz="0 0 1"/>
 <limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="-1.0471975511965976313" upper="1.0471975511965976313"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint8" type="revolute">
+<origin xyz="0.05999999999999999778 3.4694469519536141888e-18 6.9388939039072283776e-18" rpy="-2.7755575615281513959e-16 3.4694469519536398268e-16 3.141592653589793116" />
+<parent link="middle_proximal" />
+<child link="middle_distal" />
+<axis xyz="0 0 1"/>
+<limit effort="0.8499999999999999778" velocity="1.5700000000000000622" lower="0" upper="2.0943951023931952626"/>
 <joint_properties friction="0.0"/>
 </joint>
 

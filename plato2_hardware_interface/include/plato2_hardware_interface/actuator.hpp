@@ -138,10 +138,18 @@ public:
     /// @return uint CAN RX ID
     uint get_rx_id() const { return config_.can_rx_id; }
 
+    /// @brief Get the motor position without offset
+    /// @return float motor position
+    float get_motor_position() const { return motor_position_; }
+
+
 
 
 
 private:
+    /// @brief Motor position without offset
+    float motor_position_;
+
     /// @brief Cached message to send to the motor
     TPCANMsg onoff_msg_;
     TPCANMsg pos_msg_;
@@ -169,6 +177,9 @@ private:
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
         if (apply_offset) {
             motor_value = (joint_value * config_.direction) + config_.position_offset;
+            std::cout << "motor_value: " << motor_value << std::endl;
+            std::cout << "direction: " << config_.direction << std::endl;
+            std::cout << "position_offset: " << config_.position_offset << std::endl;
         } else {
             motor_value = joint_value * config_.direction;
         }
@@ -178,9 +189,10 @@ private:
     /// @param motor_value Motor State Value from the motor
     /// @param joint_value reference to store the joint state value
     /// @param apply_offset boolean to apply the offset or not (only for position)
-    inline void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
+    void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
         if (apply_offset) {
-            joint_value = (motor_value - config_.position_offset) * config_.direction;
+            joint_value = (motor_value  * config_.direction) - config_.position_offset;
+
         } else {
             joint_value = motor_value * config_.direction;
         }

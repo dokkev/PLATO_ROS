@@ -162,7 +162,8 @@ void Actuator::process_message(const TPCANMsg &msg){
                 // decode the states
                 float motor_position, motor_velocity, motor_torque;
                 decoder_.get_states(msg, status_.temperature, motor_position, motor_velocity, motor_torque);
-
+                // store motor_position without offset
+                motor_position_ = motor_position;
                 // apply the motor to joint conversion and store the states
                 motor_to_joint_(motor_position, states_.position, true);
                 motor_to_joint_(motor_velocity, states_.velocity);
@@ -209,6 +210,8 @@ void Actuator::process_message(const TPCANMsg &msg){
             decoder_.get_result(msg.DATA[2]);
             break;
     }
-}    
+}
+
+
 
 } // namespace actuator

@@ -27,6 +27,9 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  // Initialize hand with pcan_interface_
+  hand_ = std::make_unique<plato2_hand::Hand>(pcan_interface_);
+
   // Initialize all Joint Vectors
   joint_position_commands_.resize(info_.joints.size(),
                                   std::numeric_limits<double>::quiet_NaN());
@@ -103,6 +106,9 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
               "Activating ...please wait...");
 
+  // Set control mode to IDLE
+  hand_->set_control_mode(plato2_hand::ControlMode::IDLE);
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");
 
@@ -125,14 +131,26 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
                     const rclcpp::Duration &period) {
 
 
-  // Initialize all Joint Vectors to 0
+  // set command to zero
   for (size_t i = 0; i < info_.joints.size(); ++i) {
-    joint_position_states_[i] = 0.0;
-    joint_velocity_states_[i] = 0.0;
-    joint_effort_states_[i] = 0.0; 
+    joint_position_commands_[i] = 0.0;
   }
 
-  // hand_.update_states();
+ 
+  hand_->set_commands(joint_effort_commands_, 200);
+  hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
+  joint_position_states_[0] = 0.0;
+  joint_position_states_[1] = 0.0;
+
+  for (size_t i = 0; i < joint_position_states_.size(); ++i) {
+    RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
+                "Joint: %s, Position: %f",
+                info_.joints[i].name.c_str(),
+                joint_position_states_[i]);
+             
+  }
+  
+
 
 
   // for (int i = 0; i < 20; i++) {
@@ -141,6 +159,12 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     // if (pcan_interface_.get_buffer_message(msg)) {
   //     // RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Received message from CAN");
   //     pcan_interface_.print_message(msg);
+  // }
+
+  // for (size_t i = 0; i < info_.joints.size(); ++i) {
+  //   joint_position_states_[i] = 0.0;
+  //   joint_velocity_states_[i] = 0.0;
+  //   joint_effort_states_[i] = 0.0;
   // }
 
 

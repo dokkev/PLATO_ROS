@@ -41,21 +41,29 @@ namespace XM430{
 namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
-    constexpr float MOTOR3 = 0.0f;
-    constexpr float MOTOR4 = 0.0f;
-    constexpr float MOTOR5 = 0.0f;
-    constexpr float MOTOR6 = 0.0f;
-    constexpr float MOTOR7 = 0.0f;
-    constexpr float MOTOR8 = 0.0f;
+    // constexpr float MOTOR3 = 0.0f;
+    // constexpr float MOTOR4 = 0.0f;
+    // constexpr float MOTOR5 = 0.0f;
+    // constexpr float MOTOR6 = 0.0f;
+    // constexpr float MOTOR7 = 0.0f;
+    // constexpr float MOTOR8 = 0.0f;
 
-    // constexpr float MOTOR1 = 0.0f;
-    // constexpr float MOTOR2 = 0.0f;
-    // constexpr float MOTOR3 = 5.769730;
-    // constexpr float MOTOR4 = 5.7569730f;
-    // constexpr float MOTOR5 = 11.932373f;
-    // constexpr float MOTOR6 = 3.528214f; 
-    // constexpr float MOTOR7 = 0.807953f;
-    // constexpr float MOTOR8 = -3.3468214;
+
+    constexpr float MOTOR4 = 5.7569730f;
+    constexpr float MOTOR3 = 5.769730;
+    constexpr float MOTOR6 = 3.528214f; 
+    constexpr float MOTOR5 = 11.932373f;
+    constexpr float MOTOR8 = -3.3468214;
+    constexpr float MOTOR7 = 0.807953f;
+}
+
+namespace JointOffset{
+    constexpr float JOINT1 = MotorOffset::MOTOR1;
+    constexpr float JOINT2 = MotorOffset::MOTOR2;
+    constexpr float JOINT3 = MotorOffset::MOTOR4;
+    constexpr float JOINT4 = MotorOffset::MOTOR3;
+    constexpr float JOINT5 = MotorOffset::MOTOR6;
+    constexpr float JOINT6 = MotorOffset::MOTOR5;
 }
 
 namespace MotorDirection{

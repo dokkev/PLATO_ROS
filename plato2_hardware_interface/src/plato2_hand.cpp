@@ -58,17 +58,6 @@ void Hand::init_actuators(){
         actuator_rx_id_map_[actuator.get_rx_id()] = &actuator;
     }
 
-    // actuator_rx_id_map_ = {
-    //     {MotorRxID::MOTOR1, &actuators_[0]}, // joint[0]
-    //     {MotorRxID::MOTOR2, &actuators_[1]}, // joint[1]
-    //     {MotorRxID::MOTOR3, &actuators_[2]}, // joint[2]
-    //     {MotorRxID::MOTOR4, &actuators_[3]}, // joint[3]
-    //     {MotorRxID::MOTOR5, &actuators_[4]}, // joint[4]
-    //     {MotorRxID::MOTOR6, &actuators_[5]}, // joint[5]
-    //     {MotorRxID::MOTOR7, &actuators_[6]}, // joint[6]
-    //     {MotorRxID::MOTOR8, &actuators_[7]}  // joint[7]
-    // };
-
   
 
 }

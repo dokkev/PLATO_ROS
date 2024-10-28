@@ -39,10 +39,10 @@ float FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const floa
 
     float theta2 = std::asin((config_.L3 * std::sin(theta3) + config_.L4 * std::sin(theta4) - config_.L1 * std::sin(theta1)) / config_.L2);
 
-    float pip_joint_angle_reduction = (theta3 - config_.eef_angle_offset - theta4) /theta1; 
+    float pip_joint_angle_reduction = (config_.eef_angle_offset - theta4) /theta1; 
 
 
-    return pip_joint_angle_reduction;
+    return 1.0f;
 }
 
 } // namespace FiveBarLinkage

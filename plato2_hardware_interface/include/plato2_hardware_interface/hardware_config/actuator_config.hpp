@@ -41,21 +41,21 @@ namespace XM430{
 namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
-    // constexpr float MOTOR3 = 0.0f;
-    // constexpr float MOTOR4 = 0.0f;
-    // constexpr float MOTOR5 = 0.0f;
-    // constexpr float MOTOR6 = 0.0f;
-    // constexpr float MOTOR7 = 0.0f;
-    // constexpr float MOTOR8 = 0.0f;
+    constexpr float MOTOR3 = 0.0f;
+    constexpr float MOTOR4 = 0.0f;
+    constexpr float MOTOR5 = 0.0f;
+    constexpr float MOTOR6 = 0.0f;
+    constexpr float MOTOR7 = 0.0f;
+    constexpr float MOTOR8 = 0.0f;
 
     // constexpr float MOTOR1 = 0.0f;
     // constexpr float MOTOR2 = 0.0f;
-    constexpr float MOTOR3 = 5.769730;
-    constexpr float MOTOR4 = 5.7569730f;
-    constexpr float MOTOR5 = 11.932373f;
-    constexpr float MOTOR6 = 3.528214f; 
-    constexpr float MOTOR7 = 0.807953f;
-    constexpr float MOTOR8 = -3.3468214;
+    // constexpr float MOTOR3 = 5.769730;
+    // constexpr float MOTOR4 = 5.7569730f;
+    // constexpr float MOTOR5 = 11.932373f;
+    // constexpr float MOTOR6 = 3.528214f; 
+    // constexpr float MOTOR7 = 0.807953f;
+    // constexpr float MOTOR8 = -3.3468214;
 }
 
 namespace MotorDirection{

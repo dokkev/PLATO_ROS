@@ -37,6 +37,10 @@ namespace CommandByte{
     // constexpr uint8_t UPDATE_FIRMWARE = 0xC1; // Don't use it
 } // namespace CommandByte
 
+namespace ConfigByte{
+    constexpr uint8_t ZERO_POSITION = 0x14;
+}
+
 namespace ResultByte{
     constexpr uint8_t SUCCESS = 0x00;
     constexpr uint8_t FAILURE = 0x01;

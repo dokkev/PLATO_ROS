@@ -14,6 +14,19 @@ MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant)
         : gear_ratio_(gear_ratio), torque_constant_(torque_constant) {} 
 
 ////////////////////////////////////////////////////////////////////////////////////////
+void MsgEncoder::set_zero_position(TPCANMsg &msg, const float zero_position) {
+    msg.DATA[0] = CommandByte::MODIFY_CONFIGURATION;
+    msg.DATA[1] = ConfigType::INT32;
+    msg.DATA[2] = ConfigByte::ZERO_POSITION;
+    int32_t pos_int = zero_position / (2*M_PI) * 65536;
+    msg.DATA[4] = pos_int & 0xFF;
+    msg.DATA[5] = (pos_int >> 8) & 0xFF;
+    msg.DATA[6] = (pos_int >> 16) & 0xFF;
+    msg.DATA[7] = (pos_int >> 24) & 0xFF;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 void MsgEncoder::start_motor(TPCANMsg &msg) {
     msg.DATA[0] = CommandByte::START_MOTOR;
@@ -102,6 +115,7 @@ MsgDecoder::MsgDecoder(const float &gear_ratio, const float &torque_constant)
 void MsgDecoder::get_states(const TPCANMsg &msg, uint8_t &temperature, float &position, float &velocity, float &torque) const {
     
     if (get_result(msg.DATA[1]) == false) {
+        std::cerr << "Error in MsgDecoder::get_states" << std::endl;
         return;
     }
 

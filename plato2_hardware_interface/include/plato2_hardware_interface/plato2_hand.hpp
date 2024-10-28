@@ -68,7 +68,7 @@ public:
     void update_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
 
     /// @brief  
-    void get_states();   
+    void set_zero_positions();
 
 
 
@@ -88,7 +88,7 @@ private:
     /// @brief const actuator size for loop iteration
     const size_t num_actuators_;
 
-/// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
+    /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
 
     /// @brief Lambda function for motion control for different control mode
@@ -150,14 +150,15 @@ private:
 
     
     std::vector<float> linkage_reduction_ratios_ = {
-        1.0f, // MOTOR1: Thumb CMC Roll (const)
-        1.0f, // MOTOR2: Thumb CMC Yaw (const)
-        1.0f, // MOTOR3: Thumb IP 
-        1.0f, // MOTOR4: Thumb MCP (const) 
-        1.0f, // MOTOR5: Index PIP 
-        1.0f, // MOTOR6: Index MCP (const) 
-        1.0f, // MOTOR7: Middle PIP 
-        1.0f, // MOTOR8: Middle MCP (const) 
+        1.0f, // MOTOR1 // JOINT1: Thumb CMC Roll (const)
+        1.0f, // MOTOR2 // JOINT2: Thumb CMC Yaw (const)
+        1.0f, // MOTOR4 // JOINT3: Thumb MCP (const)
+        1.0f, // MOTOR3 // JOINT4: Thumb IP  
+        1.0f, // MOTOR6 // JOINT5: Index MCP (const)
+        1.0f, // MOTOR5 // JOINT6: Index PIP 
+        1.0f, // MOTOR8 // JOINT7: Middle MCP (const)  
+        1.0f, // MOTOR7 // JOINT8: Middle PIP 
+        
     };
 };
 

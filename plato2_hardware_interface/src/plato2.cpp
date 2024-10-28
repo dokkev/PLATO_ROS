@@ -107,6 +107,7 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
               "Activating ...please wait...");
 
   // Set control mode to IDLE
+  hand_->enable();
   hand_->set_control_mode(plato2_hand::ControlMode::IDLE);
 
 
@@ -136,11 +137,13 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_position_commands_[i] = 0.0;
   }
 
- 
+
   hand_->set_commands(joint_effort_commands_, 200);
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
   joint_position_states_[0] = 0.0;
   joint_position_states_[1] = 0.0;
+
+  // hand_->set_zero_positions();
 
   for (size_t i = 0; i < joint_position_states_.size(); ++i) {
     RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),

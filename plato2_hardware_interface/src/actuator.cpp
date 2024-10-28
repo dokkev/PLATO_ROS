@@ -20,6 +20,7 @@ Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, Config& config
     trq_msg_ = init_message_();
     gain_msg_ = init_message_();
     ind_msg_ = init_message_();
+    config_msg_ = init_message_();
 }
 
 Actuator::~Actuator(){
@@ -146,6 +147,13 @@ void Actuator::retrieve_position(){
 
 ////////////////////////////////////////////////////////////////////////////
 
+void Actuator::set_zero_position(const float &zero_position){
+    encoder_.set_zero_position(config_msg_, zero_position);
+    pcan_interface_.send_message(config_msg_);
+}
+
+////////////////////////////////////////////////////////////////////////////
+
 void Actuator::process_message(const TPCANMsg &msg){
         
     // Check the Command Byte of the Received Message and call the corresponding function
@@ -208,6 +216,10 @@ void Actuator::process_message(const TPCANMsg &msg){
         // Gain message response upon setting the gains; noting to read besides the result
         case CommandByte::MODIFY_PARAMETER:
             decoder_.get_result(msg.DATA[2]);
+            break;
+
+        case CommandByte::MODIFY_CONFIGURATION:
+            decoder_.get_result(msg.DATA[1]);
             break;
     }
 }

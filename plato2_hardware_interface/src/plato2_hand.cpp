@@ -22,8 +22,7 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // Print the actuator info
     print_actuator_info_();
 
-    //enable the motors
-    enable();
+
     
 }
 
@@ -52,16 +51,6 @@ void Hand::init_actuators(){
     for (size_t i = 0; i < actuator_configs_.size(); ++i) {
         // 'push back' the actuator to the vector of actuators
         actuators_.emplace_back(pcan_interface_, actuator_configs_[i]);
-    }
-
-    // Retrieve the initial position of the actuators
-    for (auto &actuator : actuators_){
-        actuator.retrieve_position();
-    }
-
-    // print actuator position
-    for (auto &actuator : actuators_){
-        std::cout << actuator.get_states().position << std::endl;
     }
 
     actuator_rx_id_map_ = {
@@ -132,11 +121,14 @@ void Hand::set_commands(const std::vector<double> &joint_command, const uint32_t
     switch (control_mode_){
         case ControlMode::OFF:
             stop();
+
+   
             break;
 
         // Send zero torque command to the motors and update the joint states
         case ControlMode::IDLE:
             for (size_t i = 0; i < num_actuators_; ++i){
+
                 actuators_[i].set_joint_torque(0.00f, duration);
 
             }
@@ -171,6 +163,12 @@ void Hand::set_commands(const std::vector<double> &joint_command, const uint32_t
             break;
     }
 }
+
+////////////////////////////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////////////////////////////
 
 void Hand::update_states(std::vector<double>&joint_position_states, std::vector<double>&joint_velocity_states, std::vector<double> &joint_effort_states){
 
@@ -214,6 +212,22 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
 
 }
 
+////////////////////////////////////////////////////////////////////////
+
+void Hand::set_zero_positions(){
+    // disable the motors
+    // disable();
+    
+    for (size_t i=0; i < num_actuators_; ++i){
+        actuators_[i].retrieve_position();
+        // actuators_[i].set_zero_position(actuators_[i].get_motor_position());
+        std::cout << "current zero position of actuator: " << i+1 << " is: " << actuators_[i].get_motor_position() << std::endl;
+    }
+    
+}
+
+////////////////////////////////////////////////////////////////////////
+
 void Hand::sort_can_rx_id_(const TPCANMsg &msg){
       // Find the actuator corresponding to the received CAN Rx ID
     auto it = actuator_rx_id_map_.find(msg.ID);
@@ -237,6 +251,8 @@ void Hand::print_actuator_info_() {
         std::cout << "[INFO] Actuator " << i + 1 << " TX ID: 0x" << std::hex << (int)actuators_[i].get_tx_id()
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
     }
+
+
 
     std::cout << "====================================================" << std::endl;
 }

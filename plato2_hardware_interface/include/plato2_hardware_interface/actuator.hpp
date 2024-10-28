@@ -123,6 +123,9 @@ public:
     /// @param gains Gains struct containing the new gains 
     void set_gains(const Gains &gains);
 
+    /// @brief set zero position of the output shaft of the motor
+    void set_zero_position(const float &zero_position);
+
     /// @brief Send a command to retrieve the position of the motor
     void retrieve_position();    
 
@@ -157,6 +160,7 @@ private:
     TPCANMsg trq_msg_;
     TPCANMsg gain_msg_;
     TPCANMsg ind_msg_;
+    TPCANMsg config_msg_;
 
     /// @brief Initialize a message with with 0 data and the configured CAN ID
     /// @return TPCANMsg initialized message

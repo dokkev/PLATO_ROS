@@ -49,12 +49,12 @@ namespace MotorOffset{
     // constexpr float MOTOR8 = 0.0f;
 
 
-    constexpr float MOTOR4 = 5.7569730f;
-    constexpr float MOTOR3 = 5.769730;
-    constexpr float MOTOR6 = 3.528214f; 
-    constexpr float MOTOR5 = 11.932373f;
-    constexpr float MOTOR8 = -3.3468214;
-    constexpr float MOTOR7 = 0.807953f;
+    constexpr float MOTOR4 = -3.442383f;
+    constexpr float MOTOR3 = 5.813217;
+    constexpr float MOTOR6 = 11.705780f; 
+    constexpr float MOTOR5 = -9.008789f;
+    constexpr float MOTOR8 = -5.375290f;
+    constexpr float MOTOR7 = 0.532150f;
 }
 
 namespace JointOffset{

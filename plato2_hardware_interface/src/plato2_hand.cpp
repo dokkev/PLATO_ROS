@@ -5,9 +5,9 @@ namespace plato2_hand{
 
 Hand::Hand(pcan_interface::PCANInterface &pcan_interface) 
     :          pcan_interface_(pcan_interface),
-               control_mode_(ControlMode::OFF), 
                linkage_(five_bar_linkage_config_),
-               num_actuators_(8){
+               num_actuators_(8),
+               control_mode_(ControlMode::OFF){
 
 
     // set the callback function of the read_car of the PCANInterface to process the received CAN message
@@ -21,6 +21,9 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
 
     // Print the actuator info
     print_actuator_info_();
+
+    initialize_command_functions_();
+    set_control_mode(control_mode_);
 
 
     
@@ -58,7 +61,6 @@ void Hand::init_actuators(){
         actuator_rx_id_map_[actuator.get_rx_id()] = &actuator;
     }
 
-  
 
 }
 
@@ -103,58 +105,24 @@ void Hand::update_linkage_kinematics(){
 ////////////////////////////////////////////////////////////////////////
 
 
-void Hand::set_control_mode(const ControlMode &control_mode){
+void Hand::set_control_mode(const ControlMode& control_mode) {
     control_mode_ = control_mode;
+    auto it = command_function_map_.find(control_mode);
+    if (it != command_function_map_.end()) {
+        command_mode_function_ = it->second;
+    } else {
+        std::cerr << "ERROR: Unsupported control mode." << std::endl;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::set_commands(const std::vector<double> &joint_command, const uint32_t &duration=200){
-
-    float actuator_cmd;
-    switch (control_mode_){
-        case ControlMode::OFF:
-            stop();
-
-   
-            break;
-
-        // Send zero torque command to the motors and update the joint states
-        case ControlMode::IDLE:
-            for (size_t i = 0; i < num_actuators_; ++i){
-
-                actuators_[i].set_joint_torque(0.00f, duration);
-
-            }
-            break;
-
-        case ControlMode::POSITION:
-            for (size_t i = 0; i < num_actuators_; ++i){
-                // Apply the reduction ratio to the joint command
-                actuator_cmd = joint_command[i] / linkage_reduction_ratios_[i];
-                actuators_[i].set_joint_position(actuator_cmd, duration);
-            }
-            break;
-
-        case ControlMode::VELOCITY:
-            for (size_t i = 0; i < num_actuators_; ++i){
-                // Apply the reduction ratio to the joint command
-                actuator_cmd = joint_command[i] / linkage_reduction_ratios_[i];
-                actuators_[i].set_joint_velocity(actuator_cmd, duration);
-            }
-            break;
-
-        case ControlMode::TORQUE:
-            for (size_t i = 0; i < num_actuators_; ++i){
-                // Apply the reduction ratio to the joint command
-                actuator_cmd = joint_command[i] / linkage_reduction_ratios_[i];
-                actuators_[i].set_joint_torque(actuator_cmd, duration);
-            }
-            break;
-
-        default:
-            std::cerr << "ERROR: plato2_hand::Invalid Control Mode!" << std::endl;
-            break;
+void Hand::set_commands(const std::vector<double>& joint_command, const uint32_t& duration) {
+    if (command_mode_function_) {
+        command_mode_function_(joint_command, duration);
+    }
+    else {
+        std::cerr << "Hand::set_commands ERROR: Control mode function not set." << std::endl;
     }
 }
 
@@ -177,6 +145,7 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
         case ControlMode::VELOCITY:
         case ControlMode::TORQUE:
         case ControlMode::IDLE:
+        case ControlMode::GRASP:
             // update the joint states for each actuator
             for (size_t i = 0; i < num_actuators_; ++i){
                 joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(linkage_reduction_ratios_[i]));
@@ -208,16 +177,84 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::set_zero_positions(){
+void Hand::print_motor_positions(){
     // disable the motors
     // disable();
-    
-    for (size_t i=0; i < num_actuators_; ++i){
-        actuators_[i].retrieve_position();
-        // actuators_[i].set_zero_position(actuators_[i].get_motor_position());
-        std::cout << "current zero position of actuator: " << i+1 << " is: " << actuators_[i].get_motor_position() << std::endl;
+    // print actuator 5 and 6 positions
+
+    std::cout << "J 3 Position: " << actuators_[3].get_motor_position() << std::endl;
+    std::cout << "J 4 Position: " << actuators_[2].get_motor_position() << std::endl;
+    std::cout << "J 5 Position: " << actuators_[5].get_motor_position() << std::endl;
+    std::cout << "J 6 Position: " << actuators_[4].get_motor_position() << std::endl;
+    std::cout << "J 7 Position: " << actuators_[7].get_motor_position() << std::endl;
+    std::cout << "J 8 Position: " << actuators_[6].get_motor_position() << std::endl;
+
+
+}
+
+////////////////////////////////////////////////////////////////////////
+
+void Hand::set_current_position_as_zero(){
+    for (auto &actuator : actuators_){
+        actuator.set_zero_position(actuator.get_states().position);
     }
-    
+}
+
+
+void Hand::set_position_command_(const std::vector<double>& joint_position_command, const uint32_t& duration) {
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        float actuator_cmd = joint_position_command[i] / linkage_reduction_ratios_[i];
+        actuators_[i].set_joint_position(actuator_cmd, duration);
+    }
+}
+
+void Hand::set_velocity_command_(const std::vector<double>& joint_velocity_command, const uint32_t& duration) {
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        float actuator_cmd = joint_velocity_command[i];
+        actuators_[i].set_joint_velocity(actuator_cmd, duration);
+    }
+}
+
+void Hand::set_torque_command_(const std::vector<double>& joint_torque_command, const uint32_t& duration) {
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        float actuator_cmd = joint_torque_command[i];
+        actuators_[i].set_joint_torque(actuator_cmd, duration);
+    }
+}
+
+void Hand::set_grasp_command_() {
+    float grasping_torque = 0.06f;
+
+    actuators_[2].set_joint_torque(-grasping_torque, 200);
+    actuators_[3].set_joint_torque(-grasping_torque, 200);
+    actuators_[4].set_joint_torque(grasping_torque, 200);
+    actuators_[5].set_joint_torque(grasping_torque, 200);
+    actuators_[6].set_joint_torque(0.0, 200);
+    actuators_[7].set_joint_torque(0.0, 200);
+}
+
+void Hand::set_idle_command_() {
+    for (auto& actuator : actuators_) {
+        actuator.set_joint_torque(0.0f, 200);
+    }
+}
+
+void Hand::set_off_command_() {
+    stop();
+}
+
+////////////////////////////////////////////////////////////////////////
+
+void Hand::initialize_command_functions_() {
+    command_function_map_ = {
+        {ControlMode::OFF, [this](const std::vector<double>&, const uint32_t&) { set_off_command_(); }},
+        {ControlMode::IDLE, [this](const std::vector<double>&, const uint32_t& duration) { set_idle_command_(); }},
+        {ControlMode::POSITION, [this](const std::vector<double>& command, const uint32_t& duration) { set_position_command_(command, duration); }},
+        {ControlMode::VELOCITY, [this](const std::vector<double>& command, const uint32_t& duration) { set_velocity_command_(command, duration); }},
+        {ControlMode::TORQUE, [this](const std::vector<double>& command, const uint32_t& duration) { set_torque_command_(command, duration); }},
+        {ControlMode::GRASP, [this](const std::vector<double>& command, const uint32_t& duration) { set_grasp_command_(); }}
+
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////

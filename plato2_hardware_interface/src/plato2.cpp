@@ -109,6 +109,7 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
   // Set control mode to IDLE
   hand_->enable();
   hand_->set_control_mode(plato2_hand::ControlMode::IDLE);
+  // hand_->set_control_mode(plato2_hand::ControlMode::POSITION);
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");
@@ -137,21 +138,21 @@ PLATO2Hardware::read(const rclcpp::Time &/*time*/,
     joint_position_commands_[i] = 0.0;
   }
 
-
-  hand_->set_commands(joint_effort_commands_, 200);
+  
+  hand_->set_commands(joint_effort_commands_, 100);
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
-  joint_position_states_[0] = 0.0;
-  joint_position_states_[1] = 0.0;
 
-  // hand_->set_zero_positions();
 
-  for (size_t i = 0; i < joint_position_states_.size(); ++i) {
-    RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
-                "Joint: %s, Position: %f",
-                info_.joints[i].name.c_str(),
-                joint_position_states_[i]);
+  hand_->print_motor_positions();
+  
+
+  // for (size_t i = 0; i < joint_position_states_.size(); ++i) {
+  //   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
+  //               "Joint: %s, Position: %f",
+  //               info_.joints[i].name.c_str(),
+  //               joint_position_states_[i]);
              
-  }
+  // }
   
 
 
@@ -180,9 +181,7 @@ hardware_interface::return_type
 PLATO2Hardware::write(const rclcpp::Time &time,
                      const rclcpp::Duration & /*period*/) {
             
-  for (size_t i = 0; i < info_.joints.size(); ++i) {
-    joint_position_commands_[i] = 0.0;
-  }
+ 
 
 
   // TPCANMsg msg;

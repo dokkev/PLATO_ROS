@@ -51,7 +51,8 @@ TPCANStatus PCANInterface::read_can(){
 	TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
 	if (status != PCAN_ERROR_QRCVEMPTY && read_can_callback_){
 		read_can_callback_(msg);
-		// print_message(msg);
+
+		
 	}
 	return status;
 }

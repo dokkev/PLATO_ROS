@@ -118,12 +118,11 @@ void MsgDecoder::get_states(const TPCANMsg &msg, uint8_t &temperature, float &po
         std::cerr << "Error in MsgDecoder::get_states" << std::endl;
         return;
     }
-
     // decode the temperature value
     temperature = msg.DATA[2];
     // decode the position value
     uint16_t pos_int = (msg.DATA[4] << 8) | msg.DATA[3];
-    position = pos_int * 25.0f / 65536.0f - 12.5f;
+    position = pos_int * 25.0f / 65535.0f - 12.5f;
     // decode the velocity value
     uint16_t velocity_int = (msg.DATA[5] << 4) | ((msg.DATA[6] & 0xF0) >> 4);
     velocity = velocity_int * 130.0f / 4095.0f - 65.0f;

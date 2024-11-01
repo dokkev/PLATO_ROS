@@ -143,7 +143,7 @@ public:
 
     /// @brief Get the motor position without offset
     /// @return float motor position
-    float get_motor_position() const { return motor_position_; }
+    float get_motor_position() { return motor_position_; }
 
 
 
@@ -195,7 +195,7 @@ private:
     /// @param apply_offset boolean to apply the offset or not (only for position)
     void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
         if (apply_offset) {
-            joint_value = (motor_value  * config_.direction) - config_.position_offset;
+            joint_value = (motor_value - config_.position_offset)* config_.direction;
 
         } else {
             joint_value = motor_value * config_.direction;

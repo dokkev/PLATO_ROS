@@ -30,7 +30,8 @@ enum class ControlMode {
     IDLE,     // Send Zero Torque Command to the motors. Joint states are updated
     POSITION, // Send Position Command to the motors. Joint states are updated
     VELOCITY, // Send Velocity Command to the motors. Joint states are updated
-    TORQUE    // Send Torque Command to the motors. Joint states are updated
+    TORQUE,   // Send Torque Command to the motors. Joint states are updated
+    GRASP     // Send Grasp Command to the motors. Joint states are updated
 };
 
 class Hand{
@@ -68,7 +69,9 @@ public:
     void update_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
 
     /// @brief  
-    void set_zero_positions();
+    void print_motor_positions();
+
+    void set_current_position_as_zero();
 
 
 
@@ -79,8 +82,6 @@ private:
     /// @brief Actuator Vector
     std::vector<actuator::Actuator> actuators_;
 
-    /// @brief Control Mode of the Hand
-    ControlMode control_mode_;
 
     /// @brief Five bar linkage object
     FiveBarLinkage::FiveBarLinkage linkage_;
@@ -91,8 +92,8 @@ private:
     /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
 
-    /// @brief Lambda function for motion control for different control mode
-    std::function<void(const std::vector<double> &joint_command, const uint32_t &duration)> command_mode_function_;
+    /// @brief Control Mode of the Hand
+    ControlMode control_mode_;
 
     /// @brief Off Command fuction
     void set_off_command_();
@@ -108,6 +109,18 @@ private:
 
     /// @brief TORQUE Command fuction
     void set_torque_command_(const std::vector<double> &joint_torque_command, const uint32_t &duration);
+
+    /// @brief Grasp Command fuction
+    void set_grasp_command_();
+
+    /// Control Mode to Command Function Map
+    std::unordered_map<ControlMode, std::function<void(const std::vector<double>&, const uint32_t&)>> command_function_map_;
+
+    /// @brief Lambda function for motion control for different control mode
+    std::function<void(const std::vector<double> &joint_command, const uint32_t &duration)> command_mode_function_;
+
+    /// @brief Function to initialize the function map
+    void initialize_command_functions_();
 
     /// @brief Internal Counter
     uint32_t counter_ = 0;

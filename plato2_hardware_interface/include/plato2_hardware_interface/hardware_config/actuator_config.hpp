@@ -30,12 +30,12 @@ namespace MotorRxID{
 
 namespace GIM3505{
     constexpr float GEAR_RATIO = 8.0f;
-    constexpr float TORQUE_CONSTANT = 0.41 / 8.0f;
+    constexpr float TORQUE_CONSTANT = 0.41f / 8.0f;
 } // namespace GIM3505
 
 namespace XM430{
     constexpr float GEAR_RATIO = 350.0f;
-    constexpr float TORQUE_CONSTANT = 1.17f;
+    constexpr float TORQUE_CONSTANT = 1.17 / 350.0f;
 } // namespace XM430
 
 namespace MotorOffset{
@@ -49,22 +49,16 @@ namespace MotorOffset{
     // constexpr float MOTOR8 = 0.0f;
 
 
-    constexpr float MOTOR4 = -3.442383f;
-    constexpr float MOTOR3 = 5.813217;
-    constexpr float MOTOR6 = 12.490845f; 
-    constexpr float MOTOR5 = -9.350586f;
-    constexpr float MOTOR8 = -5.375290f;
-    constexpr float MOTOR7 = 0.532150f;
+    
+    constexpr float MOTOR4 = -5.73987f;
+    constexpr float MOTOR3 = -5.72614f;
+    constexpr float MOTOR6 = -11.7702f;
+    constexpr float MOTOR5 = -9.29942f;
+    constexpr float MOTOR8 = -5.45224f;
+    constexpr float MOTOR7 = -0.174525f;
+
 }
 
-namespace JointOffset{
-    constexpr float JOINT1 = MotorOffset::MOTOR1;
-    constexpr float JOINT2 = MotorOffset::MOTOR2;
-    constexpr float JOINT3 = MotorOffset::MOTOR4;
-    constexpr float JOINT4 = MotorOffset::MOTOR3;
-    constexpr float JOINT5 = MotorOffset::MOTOR6;
-    constexpr float JOINT6 = MotorOffset::MOTOR5;
-}
 
 namespace MotorDirection{
     constexpr char MOTOR1 = 1;

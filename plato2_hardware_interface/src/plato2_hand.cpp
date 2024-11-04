@@ -24,9 +24,9 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // calibrate();
 
     // set default gains
-    set_default_gains();
+    // set_default_gains();
     
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // get current gains
     retrieve_runtime_gains();

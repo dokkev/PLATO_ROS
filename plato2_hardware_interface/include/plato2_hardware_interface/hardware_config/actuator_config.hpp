@@ -64,10 +64,14 @@ namespace CommandOffset{
     constexpr float MOTOR2 = 0.0f;
     constexpr float MOTOR3 = 0.0f;
     constexpr float MOTOR4 = 0.0f;
-    constexpr float MOTOR5 = 5.79328f;
-    constexpr float MOTOR6 = 5.76429f;
-    constexpr float MOTOR7 = -5.8338;
-    constexpr float MOTOR8 = -5.84033f;
+    // constexpr float MOTOR5 = 5.79328f;
+    // constexpr float MOTOR6 = 5.76429f;
+    // constexpr float MOTOR7 = -5.8338;
+    // constexpr float MOTOR8 = -5.84033f;
+    constexpr float MOTOR5 = 0.0f;
+    constexpr float MOTOR6 = 0.0f;
+    constexpr float MOTOR7 = 0.0f;
+    constexpr float MOTOR8 = 0.0f;
 }
 
 namespace MotorDirection{

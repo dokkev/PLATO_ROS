@@ -197,7 +197,7 @@ private:
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
         if (apply_offset) {
             motor_value = (joint_value * config_.direction) + config_.position_offset - config_.command_offset;
-            std::cout << "Joint Cmd: " << joint_value << std::endl;
+            // std::cout << "Joint Cmd: " << joint_value << std::endl;
 
         } else {
             motor_value = joint_value * config_.direction;

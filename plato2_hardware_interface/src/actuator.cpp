@@ -272,7 +272,7 @@ void Actuator::process_message(const TPCANMsg &msg){
                 motor_position_ = motor_position;
                 // apply the motor to joint conversion and store the states
                 // cover velocity units from RPM to rad/s
-                motor_velocity = motor_velocity * 2.0f * M_PI / 60.0f;
+                // motor_velocity = motor_velocity * 2.0f * M_PI / 60.0f;
 
                 motor_to_joint_(motor_position, states_.position, true);
                 motor_to_joint_(motor_velocity, states_.velocity);

@@ -137,12 +137,12 @@ private:
     std::vector<actuator::Gains> default_gains = {
         actuator::Gains{KpVelocity::MOTOR1, KiVelocity::MOTOR1, KpPosition::MOTOR1, KiPosition::MOTOR1, KdPosition::MOTOR1},
         actuator::Gains{KpVelocity::MOTOR2, KiVelocity::MOTOR2, KpPosition::MOTOR2, KiPosition::MOTOR2, KdPosition::MOTOR2},
-        actuator::Gains{KpVelocity::MOTOR4, KiVelocity::MOTOR3, KpPosition::MOTOR3, KiPosition::MOTOR3, KdPosition::MOTOR3},
-        actuator::Gains{KpVelocity::MOTOR3, KiVelocity::MOTOR4, KpPosition::MOTOR4, KiPosition::MOTOR4, KdPosition::MOTOR4},
-        actuator::Gains{KpVelocity::MOTOR6, KiVelocity::MOTOR5, KpPosition::MOTOR5, KiPosition::MOTOR5, KdPosition::MOTOR5},
-        actuator::Gains{KpVelocity::MOTOR5, KiVelocity::MOTOR6, KpPosition::MOTOR6, KiPosition::MOTOR6, KdPosition::MOTOR6},
-        actuator::Gains{KpVelocity::MOTOR8, KiVelocity::MOTOR7, KpPosition::MOTOR7, KiPosition::MOTOR7, KdPosition::MOTOR7},
-        actuator::Gains{KpVelocity::MOTOR7, KiVelocity::MOTOR8, KpPosition::MOTOR8, KiPosition::MOTOR8, KdPosition::MOTOR8}
+        actuator::Gains{KpVelocity::MOTOR4, KiVelocity::MOTOR4, KpPosition::MOTOR4, KiPosition::MOTOR4, KdPosition::MOTOR4},
+        actuator::Gains{KpVelocity::MOTOR3, KiVelocity::MOTOR3, KpPosition::MOTOR3, KiPosition::MOTOR3, KdPosition::MOTOR3},
+        actuator::Gains{KpVelocity::MOTOR6, KiVelocity::MOTOR6, KpPosition::MOTOR6, KiPosition::MOTOR6, KdPosition::MOTOR6},
+        actuator::Gains{KpVelocity::MOTOR5, KiVelocity::MOTOR5, KpPosition::MOTOR5, KiPosition::MOTOR5, KdPosition::MOTOR5},
+        actuator::Gains{KpVelocity::MOTOR8, KiVelocity::MOTOR8, KpPosition::MOTOR8, KiPosition::MOTOR8, KdPosition::MOTOR8},
+        actuator::Gains{KpVelocity::MOTOR7, KiVelocity::MOTOR7, KpPosition::MOTOR7, KiPosition::MOTOR7, KdPosition::MOTOR7}
     };
     
 

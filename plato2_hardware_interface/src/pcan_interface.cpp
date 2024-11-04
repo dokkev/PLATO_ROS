@@ -38,9 +38,10 @@ PCANInterface::~PCANInterface() {
 
 TPCANStatus PCANInterface::write_can(TPCANMsg msg) {
 	
+	TPCANStatus status = CAN_Write(pcan_handle, &msg);
 	std::this_thread::sleep_for(std::chrono::microseconds(200));
 
-    return CAN_Write(pcan_handle, &msg);
+    return status;
 }
 
 TPCANStatus PCANInterface::read_can(){
@@ -51,7 +52,7 @@ TPCANStatus PCANInterface::read_can(){
 	TPCANStatus status = CAN_Read(pcan_handle, &msg, &timestamp);
 	if (status != PCAN_ERROR_QRCVEMPTY && read_can_callback_){
 		read_can_callback_(msg);
-		print_message(msg);
+		// print_message(msg);
 	}
 	return status;
 }

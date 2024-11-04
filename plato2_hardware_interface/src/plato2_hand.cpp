@@ -24,11 +24,12 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // calibrate();
 
     // set default gains
-    // set_default_gains();
+    set_default_gains();
     
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // get current gains
-    // retrieve_runtime_gains();
+    retrieve_runtime_gains();
 
     // Enable the motors
     enable();
@@ -217,6 +218,7 @@ void Hand::set_default_gains(){
     for (size_t i=2; i < num_actuators_; ++i){
 
         actuators_[i].set_default_gains(default_gains[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     // receive the message from the CAN bus
     

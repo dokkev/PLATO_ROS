@@ -46,6 +46,7 @@ struct Config{
     const uint8_t can_tx_id;
     const uint8_t can_rx_id;
     const float position_offset;
+    const float command_offset;
     const char direction; // 1 for counter-clockwise, -1 for clockwise
 
     const float torque_constant;
@@ -194,7 +195,9 @@ private:
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
         if (apply_offset) {
-            motor_value = (joint_value * config_.direction) + config_.position_offset;
+            motor_value = (joint_value * config_.direction) + config_.position_offset - config_.command_offset;
+            std::cout << "Joint Cmd: " << joint_value << std::endl;
+
         } else {
             motor_value = joint_value * config_.direction;
         }
@@ -207,6 +210,7 @@ private:
     void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
         if (apply_offset) {
             joint_value = (motor_value - config_.position_offset)* config_.direction;
+
 
         } else {
             joint_value = motor_value * config_.direction;

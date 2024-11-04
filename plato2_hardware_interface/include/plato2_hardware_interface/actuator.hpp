@@ -45,6 +45,7 @@ struct Status{
 struct Config{
     const uint8_t can_tx_id;
     const uint8_t can_rx_id;
+    
     const float position_offset;
     const float command_offset;
     const char direction; // 1 for counter-clockwise, -1 for clockwise
@@ -209,7 +210,7 @@ private:
     /// @param apply_offset boolean to apply the offset or not (only for position)
     void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
         if (apply_offset) {
-            joint_value = (motor_value - config_.position_offset)* config_.direction;
+            joint_value = (motor_value - config_.position_offset) * config_.direction;
 
 
         } else {

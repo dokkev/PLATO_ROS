@@ -108,12 +108,12 @@ namespace KiVelocity{
 namespace KpPosition{
     constexpr uint32_t MOTOR1 = 0;
     constexpr uint32_t MOTOR2 = 0;
-    constexpr uint32_t MOTOR3 = 5;
-    constexpr uint32_t MOTOR4 = 5;
-    constexpr uint32_t MOTOR5 = 5;
-    constexpr uint32_t MOTOR6 = 5;
-    constexpr uint32_t MOTOR7 = 5;
-    constexpr uint32_t MOTOR8 = 5;
+    constexpr uint32_t MOTOR3 = 10;
+    constexpr uint32_t MOTOR4 = 10;
+    constexpr uint32_t MOTOR5 = 10;
+    constexpr uint32_t MOTOR6 = 10;
+    constexpr uint32_t MOTOR7 = 10;
+    constexpr uint32_t MOTOR8 = 10;
 } // namespace KpPosition
 
 namespace KiPosition{

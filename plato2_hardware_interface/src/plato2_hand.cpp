@@ -43,7 +43,7 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
 Hand::~Hand(){
     // Stop the motion control
 
-    stop();
+    set_idle_command();
     std::cout << "Stopping the motion control..." << std::endl;
     
     disable();
@@ -100,6 +100,7 @@ void Hand::disable(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::stop(){
+    // Don't use this function.
     // Dynamixel
     actuators_[0].set_joint_position(0.0, 0);
     actuators_[1].set_joint_position(0.0, 0);
@@ -253,10 +254,11 @@ void Hand::retrieve_runtime_gains(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::calibrate(){
-    for (size_t i=2; i < num_actuators_; ++i){
-        actuators_[i].calibrate_encoder();
+    // Don't Use this function. It is not working properly
+    // for (size_t i=2; i < num_actuators_; ++i){
+        // actuators_[i].calibrate_encoder();
 
-    }
+    // }
 }
 
 

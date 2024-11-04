@@ -142,17 +142,22 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   const double frequency = 0.5; // Set frequency of the sine wave in Hz
 
   // Update each joint position command based on a sine wave pattern
-  for (size_t i = 2; i < joint_position_commands_.size(); ++i) {
-    // Generate a sine wave value based on time, frequency, and amplitude
-    joint_position_commands_[i] = amplitude * std::sin(2.0 * M_PI * frequency * time.seconds());
-    joint_effort_commands_[i] = 0.0; // Keep effort commands at zero
+  // for (size_t i = 2; i < joint_position_commands_.size(); ++i) {
+  //   // Generate a sine wave value based on time, frequency, and amplitude
+  //   joint_position_commands_[i] = amplitude * std::sin(2.0 * M_PI * frequency * time.seconds());
+  //   joint_effort_commands_[i] = 0.0; // Keep effort commands at zero
+  // }
+
+  // Set the first two joint position commands to zero
+  for (size_t i=0; i < joint_position_commands_.size(); ++i){
+    joint_position_commands_[i] = 0.0;
   }
 
   // Send the sine wave position command to the hand
-  // hand_->set_position_command(joint_position_commands_, 0);
+  hand_->set_position_command(joint_position_commands_, 0);
 
   // Update hand states
-  hand_->set_idle_command();
+  // hand_->set_idle_command();
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
 
   return hardware_interface::return_type::OK;

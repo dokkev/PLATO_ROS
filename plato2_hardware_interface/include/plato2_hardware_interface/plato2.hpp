@@ -105,6 +105,8 @@
     // Plato Hand V2 Object
     std::unique_ptr<plato2_hand::Hand> hand_;
 
+    uint64_t counter_ = 0;
+
   
 
 

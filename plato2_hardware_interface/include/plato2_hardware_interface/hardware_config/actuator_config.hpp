@@ -59,7 +59,6 @@ namespace MotorOffset{
 
 }
 
-
 namespace MotorDirection{
     constexpr char MOTOR1 = 1;
     constexpr char MOTOR2 = 1;
@@ -70,6 +69,65 @@ namespace MotorDirection{
     constexpr char MOTOR7 = 1;
     constexpr char MOTOR8 = 1;
 }
+
+
+namespace KpVelocity{
+    constexpr uint32_t MOTOR1 = 0;
+    constexpr uint32_t MOTOR2 = 0;
+    constexpr uint32_t MOTOR3 = 0;
+    constexpr uint32_t MOTOR4 = 0;
+    constexpr uint32_t MOTOR5 = 0;
+    constexpr uint32_t MOTOR6 = 0;
+    constexpr uint32_t MOTOR7 = 0;
+    constexpr uint32_t MOTOR8 = 0;
+} // namespace KpVelocity   
+
+namespace KiVelocity{
+    constexpr uint32_t MOTOR1 = 0;
+    constexpr uint32_t MOTOR2 = 0;
+    constexpr uint32_t MOTOR3 = 0;
+    constexpr uint32_t MOTOR4 = 0;
+    constexpr uint32_t MOTOR5 = 0;
+    constexpr uint32_t MOTOR6 = 0;
+    constexpr uint32_t MOTOR7 = 0;
+    constexpr uint32_t MOTOR8 = 0;
+} // namespace KiVelocity
+
+
+namespace KpPosition{
+    constexpr uint32_t MOTOR1 = 0;
+    constexpr uint32_t MOTOR2 = 0;
+    constexpr uint32_t MOTOR3 = 5;
+    constexpr uint32_t MOTOR4 = 5;
+    constexpr uint32_t MOTOR5 = 5;
+    constexpr uint32_t MOTOR6 = 5;
+    constexpr uint32_t MOTOR7 = 5;
+    constexpr uint32_t MOTOR8 = 5;
+} // namespace KpPosition
+
+namespace KiPosition{
+    constexpr uint32_t MOTOR1 = 0;
+    constexpr uint32_t MOTOR2 = 0;
+    constexpr uint32_t MOTOR3 = 0;
+    constexpr uint32_t MOTOR4 = 0;
+    constexpr uint32_t MOTOR5 = 0;
+    constexpr uint32_t MOTOR6 = 0;
+    constexpr uint32_t MOTOR7 = 0;
+    constexpr uint32_t MOTOR8 = 0;
+} // namespace KiPosition
+
+namespace KdPosition{
+    constexpr uint32_t MOTOR1 = 0;
+    constexpr uint32_t MOTOR2 = 0;
+    constexpr uint32_t MOTOR3 = 15000;
+    constexpr uint32_t MOTOR4 = 15000;
+    constexpr uint32_t MOTOR5 = 15000;
+    constexpr uint32_t MOTOR6 = 15000;
+    constexpr uint32_t MOTOR7 = 15000;
+    constexpr uint32_t MOTOR8 = 15000;
+
+
+} // namespace KdPosition
 
 
 

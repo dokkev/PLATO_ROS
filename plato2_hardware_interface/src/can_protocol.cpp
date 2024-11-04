@@ -25,6 +25,23 @@ void MsgEncoder::set_zero_position(TPCANMsg &msg, const float zero_position) {
     msg.DATA[7] = (pos_int >> 24) & 0xFF;
 }
 
+void MsgEncoder::set_default_gain(TPCANMsg &msg, const uint32_t &gain_val, const uint8_t conf_id) {
+    msg.DATA[0] = CommandByte::MODIFY_CONFIGURATION;
+    msg.DATA[1] = ConfigType::INT32;
+    msg.DATA[2] = conf_id;
+    encode_param_int_(msg, gain_val);
+}
+
+
+void MsgEncoder::calibrate_encoder(TPCANMsg &msg) {
+    msg.DATA[0] = CommandByte::CALIBRATE;
+    msg.DATA[1] = CalibrationID::ENCODER;
+}
+
+void MsgEncoder::calibrate_phase_order(TPCANMsg &msg) {
+    msg.DATA[0] = CommandByte::CALIBRATE;
+    msg.DATA[1] = CalibrationID::PHASE_ORDER;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,6 +108,13 @@ void MsgEncoder::retrieve_position(TPCANMsg &msg) {
     msg.DATA[0] = CommandByte::RETRIVE_INDICATOR;
     msg.DATA[1] = IndicatorID::SHAFT_ANGLE;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MsgEncoder::retrieve_gain(TPCANMsg &msg, const uint8_t param_id) {
+    msg.DATA[0] = CommandByte::RETRIVE_PARAMETER;
+    msg.DATA[1] = param_id;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////
 

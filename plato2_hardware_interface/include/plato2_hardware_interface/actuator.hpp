@@ -23,20 +23,17 @@ struct States{
 };
 
 struct Gains{
-    uint32_t kp_velocity;
-    uint32_t ki_velocity;
-    uint32_t kp_position;
-    uint32_t ki_position;
-    uint32_t kd_position;
+    uint32_t kp_velocity = 0;
+    uint32_t ki_velocity = 0;
+    uint32_t kp_position = 0;
+    uint32_t ki_position = 0;
+    uint32_t kd_position = 0;
 
-    // unordered map for gain parameters
-    std::unordered_map<uint8_t, uint32_t*> gain_map = {
-        {ParamID::KP_SPEED, &kp_velocity},
-        {ParamID::KI_SPEED, &ki_velocity},
-        {ParamID::KP_POSITION, &kp_position},
-        {ParamID::KI_POSITION, &ki_position},
-        {ParamID::KD_POSITION, &kd_position}
-    };
+    bool b_kp_velocity_updated = false;
+    bool b_ki_velocity_updated = false;
+    bool b_kp_position_updated = false;
+    bool b_ki_position_updated = false;
+    bool b_kd_position_updated = false;
 };
 
 struct Status{
@@ -67,6 +64,10 @@ private:
 
     can_protocol::MsgEncoder encoder_;
     can_protocol::MsgDecoder decoder_;
+
+    /// @brief Motor Enable Status
+    bool b_motor_enabled_;
+
 
     // unordered map for gain parameters
     std::unordered_map<uint8_t, uint32_t*> gain_map_ = {
@@ -119,15 +120,21 @@ public:
     /// @param duration uint32_t execution time in ms 
     void set_joint_position(const float &joint_position, const uint32_t &duration);
 
-    /// @brief Send a modify gain parameter command to the motor
+    /// @brief Send a modify runtime gain parameter command to the motor
     /// @param gains Gains struct containing the new gains 
     void set_gains(const Gains &gains);
+
+    /// @brief Send a command message to modify default gains of the motor
+    void set_default_gains(const Gains &gains);
 
     /// @brief set zero position of the output shaft of the motor
     void set_zero_position(const float &zero_position);
 
     /// @brief Send a command to retrieve the position of the motor
-    void retrieve_position();    
+    void retrieve_position();
+
+    /// @brief Send a command to retrieve the gains of the motor
+    void retrieve_gains();    
 
     /// @brief Given the received message, identify the type of message and process it to store the data in the buffer
     /// @param msg 
@@ -144,6 +151,13 @@ public:
     /// @brief Get the motor position without offset
     /// @return float motor position
     float get_motor_position() { return motor_position_; }
+
+    void calibrate_encoder();
+
+    void calibrate_phase_order();
+
+    /// @brief Get the motor enable status
+    bool b_is_enabled() { return b_motor_enabled_; }
 
 
 
@@ -181,9 +195,6 @@ private:
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
         if (apply_offset) {
             motor_value = (joint_value * config_.direction) + config_.position_offset;
-            std::cout << "motor_value: " << motor_value << std::endl;
-            std::cout << "direction: " << config_.direction << std::endl;
-            std::cout << "position_offset: " << config_.position_offset << std::endl;
         } else {
             motor_value = joint_value * config_.direction;
         }

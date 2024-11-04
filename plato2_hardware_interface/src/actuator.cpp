@@ -11,7 +11,8 @@ Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, Config& config
     :   pcan_interface_(pcan_interface), 
         config_(config),
         encoder_(config.gear_ratio, config.torque_constant),
-        decoder_(config.gear_ratio, config.torque_constant){
+        decoder_(config.gear_ratio, config.torque_constant),
+        b_motor_enabled_(false) {   
 
     // Initialize the command message
     onoff_msg_ = init_message_();
@@ -30,15 +31,25 @@ Actuator::~Actuator(){
 ////////////////////////////////////////////////////////////////////////////
 
 void Actuator::enable_motor(){
-    encoder_.start_motor(onoff_msg_);
-    pcan_interface_.send_message(onoff_msg_);
+
+    // while (!b_motor_enabled_){
+        encoder_.start_motor(onoff_msg_);
+        pcan_interface_.send_message(onoff_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+    // }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////
 
 void Actuator::disable_motor(){
+
     encoder_.stop_motor(onoff_msg_);
     pcan_interface_.send_message(onoff_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+    
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -109,25 +120,25 @@ void Actuator::set_gains(const Gains &new_gains){
         // Compare each gain component and send the gain if it has changed
     if (new_gains.kp_velocity != gains_.kp_velocity) {
         encoder_.set_gain(gain_msg_, new_gains.kp_velocity, ParamID::KP_SPEED);
-        pcan_interface_.send_message(trq_msg_);
+        pcan_interface_.send_message(gain_msg_);
         gains_.kp_velocity = new_gains.kp_velocity;  // Update cached gain
     }
 
     if (new_gains.ki_velocity != gains_.ki_velocity) {
         encoder_.set_gain(gain_msg_, new_gains.ki_velocity, ParamID::KI_SPEED);
-        pcan_interface_.send_message(trq_msg_);
+        pcan_interface_.send_message(gain_msg_);
         gains_.ki_velocity = new_gains.ki_velocity;  // Update cached gain
     }
 
     if (new_gains.kp_position != gains_.kp_position) {
         encoder_.set_gain(gain_msg_, new_gains.kp_position, ParamID::KP_POSITION);
-        pcan_interface_.send_message(trq_msg_);
+        pcan_interface_.send_message(gain_msg_);
         gains_.kp_position = new_gains.kp_position;  // Update cached gain
     }
 
     if (new_gains.ki_position != gains_.ki_position) {
         encoder_.set_gain(gain_msg_, new_gains.ki_position, ParamID::KI_POSITION);
-        pcan_interface_.send_message(trq_msg_);
+        pcan_interface_.send_message(gain_msg_);
         gains_.ki_position = new_gains.ki_position;  // Update cached gain
     }
 
@@ -140,6 +151,46 @@ void Actuator::set_gains(const Gains &new_gains){
 
 ////////////////////////////////////////////////////////////////////////////
 
+void Actuator::set_default_gains(const Gains &new_default_gains){
+    
+
+        encoder_.set_default_gain(gain_msg_, new_default_gains.kp_velocity, IntConfigID::KP_SPEED);
+        pcan_interface_.send_message(gain_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+
+
+
+        encoder_.set_default_gain(gain_msg_, new_default_gains.ki_velocity, IntConfigID::KI_SPEED);
+        pcan_interface_.send_message(gain_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+ 
+
+
+        encoder_.set_default_gain(gain_msg_, new_default_gains.kp_position, IntConfigID::KP_POSITION);
+        pcan_interface_.send_message(gain_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+   
+
+
+        encoder_.set_default_gain(gain_msg_, new_default_gains.ki_position, IntConfigID::KI_POSITION);
+        pcan_interface_.send_message(gain_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+    
+
+ 
+        encoder_.set_default_gain(gain_msg_, new_default_gains.kd_position, IntConfigID::KD_POSITION);
+        pcan_interface_.send_message(gain_msg_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        pcan_interface_.receive_message();
+   
+}
+
+////////////////////////////////////////////////////////////////////////////
+
 void Actuator::retrieve_position(){
     encoder_.retrieve_position(ind_msg_);
     pcan_interface_.send_message(ind_msg_);
@@ -147,9 +198,56 @@ void Actuator::retrieve_position(){
 
 ////////////////////////////////////////////////////////////////////////////
 
+void Actuator::retrieve_gains(){
+    
+    encoder_.retrieve_gain(gain_msg_, ParamID::KP_SPEED);
+    pcan_interface_.send_message(gain_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+
+    encoder_.retrieve_gain(gain_msg_, ParamID::KI_SPEED);
+    pcan_interface_.send_message(gain_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+
+    encoder_.retrieve_gain(gain_msg_, ParamID::KP_POSITION);
+    pcan_interface_.send_message(gain_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+
+    encoder_.retrieve_gain(gain_msg_, ParamID::KI_POSITION);
+    pcan_interface_.send_message(gain_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+
+    encoder_.retrieve_gain(gain_msg_, ParamID::KD_POSITION);
+    pcan_interface_.send_message(gain_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+
 void Actuator::set_zero_position(const float &zero_position){
     encoder_.set_zero_position(config_msg_, zero_position);
     pcan_interface_.send_message(config_msg_);
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+void Actuator::calibrate_encoder(){
+    encoder_.calibrate_encoder(config_msg_);
+    pcan_interface_.send_message(config_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+}
+
+void Actuator::calibrate_phase_order(){
+    encoder_.calibrate_phase_order(config_msg_);
+    pcan_interface_.send_message(config_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -173,9 +271,14 @@ void Actuator::process_message(const TPCANMsg &msg){
                 // store motor_position without offset
                 motor_position_ = motor_position;
                 // apply the motor to joint conversion and store the states
+                // cover velocity units from RPM to rad/s
+                motor_velocity = motor_velocity * 2.0f * M_PI / 60.0f;
+
                 motor_to_joint_(motor_position, states_.position, true);
                 motor_to_joint_(motor_velocity, states_.velocity);
                 motor_to_joint_(motor_torque, states_.torque);
+            } else {
+                std::cerr << "Actuator ID: 0x" <<  std::hex <<config_.can_tx_id << " Control Failed" << std::endl;
             }
             
             break;
@@ -186,28 +289,76 @@ void Actuator::process_message(const TPCANMsg &msg){
             // uint8_t gain_byte = msg.DATA[1];
             // check if the parameter exists in the map
 
-            try {
-                decoder_.get_gain(msg, *gain_map_.at(msg.DATA[1]));
-            } catch (const std::out_of_range& e) {
-                std::cerr << "Gain Parameter Byte not found in gain_map_: " << +msg.DATA[1] << std::endl;
+            if (decoder_.get_result(msg.DATA[2])){
+
+                if (msg.DATA[1] == ParamID::KP_SPEED){
+                    decoder_.get_gain(msg, gains_.kp_velocity);
+        
+                } else if (msg.DATA[1] == ParamID::KI_SPEED){
+                    decoder_.get_gain(msg, gains_.ki_velocity);
+   
+                } else if (msg.DATA[1] == ParamID::KP_POSITION){
+                    decoder_.get_gain(msg, gains_.kp_position);
+     
+                } else if (msg.DATA[1] == ParamID::KI_POSITION){
+                    decoder_.get_gain(msg, gains_.ki_position);
+          
+                } else if (msg.DATA[1] == ParamID::KD_POSITION){
+                    decoder_.get_gain(msg, gains_.kd_position);
+
+                } else {
+                    std::cerr << "Unknown Gain Parameter Byte: " << +msg.DATA[1] << std::endl;
+                }
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to retrieve gains" << std::endl;
             }
+
+            // try {
+            //     decoder_.get_gain(msg, *gain_map_.at(msg.DATA[1]));
+            //     std::cout << "Gain Parameter Byte: " << +msg.DATA[1] << " Value: " << *gain_map_.at(msg.DATA[1]) << std::endl;
+            // } catch (const std::out_of_range& e) {
+            //     std::cerr << "Gain Parameter Byte not found in gain_map_: " << +msg.DATA[1] << std::endl;
+            // }
 
             break;
 
         case CommandByte::RETRIVE_INDICATOR:
             // get the position if there is a valid response without any error
             std::cerr << "Unimplemented Feature [Glitch found]" << std::endl;
-
-
             break;
 
-        /////////////////////////// RESPONSE MESSAGES WITHOUT SIGNIFICANT DATA ///////////////////////////
 
         // Response Message without encoder data; noting to read besides the result
         case CommandByte::START_MOTOR:  
-        case CommandByte::STOP_MOTOR: 
+            if(decoder_.get_result(msg.DATA[1])){
+                b_motor_enabled_ = true;
+                std::cout << "Actuator ID: 0x" << std::hex << msg.ID << " enabled!" << std::endl;
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to enable motor" << std::endl;
+            }
+            break;
+        case CommandByte::STOP_MOTOR:
+            if (decoder_.get_result(msg.DATA[1])){
+                std::cout << "Actuator ID: 0x" << std::hex << msg.ID << " Disabled!" << std::endl;
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to stop motor" << std::endl;
+            }
+            break; 
         case CommandByte::STOP_CONTROL:
-            decoder_.get_result(msg.DATA[1]);
+            if (decoder_.get_result(msg.DATA[1])){
+                b_motor_enabled_ = false;
+                std::cout << "Actuator ID: 0x" << std::hex << msg.ID << " Stop Control!" << std::endl;
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to disable motor" << std::endl;
+            }
+            break;
+
+        case CommandByte::CALIBRATE:
+            if (decoder_.get_result(msg.DATA[2])){
+                std::cout << "Actuator ID: 0x" << std::hex << msg.ID << " Calibrated!" << std::endl;
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to calibrate" << std::endl;
+            }
             break;
 
         // Gain message response upon setting the gains; noting to read besides the result
@@ -216,7 +367,37 @@ void Actuator::process_message(const TPCANMsg &msg){
             break;
 
         case CommandByte::MODIFY_CONFIGURATION:
-            decoder_.get_result(msg.DATA[1]);
+     
+            if (decoder_.get_result(msg.DATA[3]) && msg.DATA[1] == ConfigType::INT32){
+
+                std::cout << "Actuator ID: 0x" << std::hex << msg.ID;
+
+                if (msg.DATA[3] == IntConfigID::KP_SPEED){
+                    gains_.b_kp_velocity_updated = true;
+                    std::cout << " Kp Velocity ";
+
+                } else if (msg.DATA[3] == IntConfigID::KI_SPEED){
+                    gains_.b_ki_velocity_updated = true;
+                    std::cout << " Ki Velocity ";
+
+                } else if (msg.DATA[3] == IntConfigID::KP_POSITION){
+                    gains_.b_kp_position_updated = true;
+                    std::cout << " Kp Position ";
+
+                } else if (msg.DATA[3] == IntConfigID::KI_POSITION){
+                    gains_.b_ki_position_updated = true;
+                    std::cout << " Ki Position ";
+
+                } else if (msg.DATA[3] == IntConfigID::KD_POSITION){
+                    gains_.b_kd_position_updated = true;
+                    std::cout << " Kd Position ";
+                }
+
+                std:: cout <<" Initial Gain Modification Sucessful!" << std::endl;
+
+            } else {
+                std::cerr << "Actuator ID: 0x" << std::hex << msg.ID << " failed to modify configuration" << std::endl;
+            }
             break;
     }
 }

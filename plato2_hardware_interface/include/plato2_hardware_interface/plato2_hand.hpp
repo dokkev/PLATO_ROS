@@ -17,21 +17,12 @@ struct States{
     std::vector<float> torque;
 };
 
-struct ActuatorGains{
-    std::vector<uint32_t> kp_velocity;
-    std::vector<uint32_t> ki_velocity;
-    std::vector<uint32_t> kp_position;
-    std::vector<uint32_t> ki_position;
-    std::vector<uint32_t> kd_position;
-};
-
 enum class ControlMode {
     OFF,      // Sends Stop Control Cmd to the motors. Joint states are not updated
     IDLE,     // Send Zero Torque Command to the motors. Joint states are updated
     POSITION, // Send Position Command to the motors. Joint states are updated
     VELOCITY, // Send Velocity Command to the motors. Joint states are updated
     TORQUE,   // Send Torque Command to the motors. Joint states are updated
-    GRASP     // Send Grasp Command to the motors. Joint states are updated
 };
 
 class Hand{
@@ -55,15 +46,27 @@ public:
     /// @brief Stop the motion control
     void stop();
 
-    /// 
-    void set_control_mode(const ControlMode &control_mode);
+    /// @brief Off Command fuction
+    void set_off_command_();
+
+    /// @brief IDLE Command fuction
+    void set_idle_command();
+
+    /// @brief POSITION Command fuction
+    void set_position_command(const std::vector<double> &joint_position_command, const uint32_t &duration);
+
+    /// @brief VELOCITY Command fuction
+    void set_velocity_command(const std::vector<double> &joint_velocity_command, const uint32_t &duration);
+
+    /// @brief TORQUE Command fuction
+    void set_torque_command(const std::vector<double> &joint_torque_command, const uint32_t &duration);
+
+    void set_zero_motor_position();
+
 
     /// @brief update linkage kinematics to calculate the reduction ratios
     void update_linkage_kinematics();
 
-    /// @brief Send the command to the motors depending on the control mode
-    /// @param joint_command float joint command value (position, velocity, torque)
-    void set_commands(const std::vector<double> &joint_command, const uint32_t &duration);
 
     /// @brief Update the states of the motors
     void update_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
@@ -72,6 +75,15 @@ public:
     void print_motor_positions();
 
     void set_current_position_as_zero();
+
+    void set_default_gains();
+
+    void set_runtime_gains(std::vector<actuator::Gains> &new_gains);
+
+    void retrieve_runtime_gains();
+
+    void calibrate();
+
 
 
 
@@ -92,39 +104,11 @@ private:
     /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
 
-    /// @brief Control Mode of the Hand
-    ControlMode control_mode_;
-
-    /// @brief Off Command fuction
-    void set_off_command_();
-
-    /// @brief IDLE Command fuction
-    void set_idle_command_();
-
-    /// @brief POSITION Command fuction
-    void set_position_command_(const std::vector<double> &joint_position_command, const uint32_t &duration);
-
-    /// @brief VELOCITY Command fuction
-    void set_velocity_command_(const std::vector<double> &joint_velocity_command, const uint32_t &duration);
-
-    /// @brief TORQUE Command fuction
-    void set_torque_command_(const std::vector<double> &joint_torque_command, const uint32_t &duration);
-
-    /// @brief Grasp Command fuction
-    void set_grasp_command_();
-
-    /// Control Mode to Command Function Map
-    std::unordered_map<ControlMode, std::function<void(const std::vector<double>&, const uint32_t&)>> command_function_map_;
-
-    /// @brief Lambda function for motion control for different control mode
-    std::function<void(const std::vector<double> &joint_command, const uint32_t &duration)> command_mode_function_;
-
-    /// @brief Function to initialize the function map
-    void initialize_command_functions_();
-
     /// @brief Internal Counter
     uint32_t counter_ = 0;
 
+    /// @brief Actuator Gains
+    std::vector<actuator::Gains> gains_;
 
 
     ///////////////////////////////////////////////// PRIVATE FUNCTIONS //////////////////////////////////////////////
@@ -150,6 +134,18 @@ private:
         actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7, MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
+    std::vector<actuator::Gains> default_gains = {
+        actuator::Gains{KpVelocity::MOTOR1, KiVelocity::MOTOR1, KpPosition::MOTOR1, KiPosition::MOTOR1, KdPosition::MOTOR1},
+        actuator::Gains{KpVelocity::MOTOR2, KiVelocity::MOTOR2, KpPosition::MOTOR2, KiPosition::MOTOR2, KdPosition::MOTOR2},
+        actuator::Gains{KpVelocity::MOTOR4, KiVelocity::MOTOR3, KpPosition::MOTOR3, KiPosition::MOTOR3, KdPosition::MOTOR3},
+        actuator::Gains{KpVelocity::MOTOR3, KiVelocity::MOTOR4, KpPosition::MOTOR4, KiPosition::MOTOR4, KdPosition::MOTOR4},
+        actuator::Gains{KpVelocity::MOTOR6, KiVelocity::MOTOR5, KpPosition::MOTOR5, KiPosition::MOTOR5, KdPosition::MOTOR5},
+        actuator::Gains{KpVelocity::MOTOR5, KiVelocity::MOTOR6, KpPosition::MOTOR6, KiPosition::MOTOR6, KdPosition::MOTOR6},
+        actuator::Gains{KpVelocity::MOTOR8, KiVelocity::MOTOR7, KpPosition::MOTOR7, KiPosition::MOTOR7, KdPosition::MOTOR7},
+        actuator::Gains{KpVelocity::MOTOR7, KiVelocity::MOTOR8, KpPosition::MOTOR8, KiPosition::MOTOR8, KdPosition::MOTOR8}
+    };
+    
+
     ///@brief Five Bar Linkage Configuration
     FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_ = {
         PlatoLinkage::L1,
@@ -157,7 +153,9 @@ private:
         PlatoLinkage::L3,
         PlatoLinkage::L4,
         PlatoLinkage::L5,
+        PlatoLinkage::EEF_LENGTH,
         Plato::deg2rad(PlatoLinkage::PIP_MOTOR_ZERO_ANGLE_OFFSET)
+        
     };
 
 

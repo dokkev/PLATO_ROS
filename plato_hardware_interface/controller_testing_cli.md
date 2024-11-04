@@ -31,8 +31,8 @@ ros2 topic pub /plato/plato_joint_controller/joint_trajectory trajectory_msgs/ms
 }"
 
 
-  ros2 topic pub /plato/plato_position_controller/commands std_msgs/msg/Float64MultiArray "{
-  data: [0.00, 0.02, 0.02, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]}"
+ros2 topic pub /plato2/plato_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [0.0, 0.0, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]}"
 
 
     ros2 topic pub /plato/plato_position_controller/commands std_msgs/msg/Float64MultiArray "{

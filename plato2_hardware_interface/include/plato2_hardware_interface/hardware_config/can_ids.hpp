@@ -33,6 +33,8 @@ namespace CommandByte{
     constexpr uint8_t GET_FAULT = 0xB2;
     constexpr uint8_t ACKNOWLEDGE_FAULT = 0xB3;
     constexpr uint8_t RETRIVE_INDICATOR = 0xB4;
+    constexpr uint8_t CALIBRATE = 0xB5;
+
     // Update
     // constexpr uint8_t UPDATE_FIRMWARE = 0xC1; // Don't use it
 } // namespace CommandByte

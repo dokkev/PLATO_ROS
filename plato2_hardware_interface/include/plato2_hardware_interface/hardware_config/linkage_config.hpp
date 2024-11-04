@@ -12,6 +12,8 @@ namespace PlatoLinkage{
     constexpr float L4 = 60.0f; // MCP Linkage (Input=Output) 
     constexpr float L5 = 44.0f; // MCP motor to PIP motor Distance
 
+    constexpr float EEF_LENGTH = 30.0f; // End Effector Length
+
     
     // Respective to the xy origin, the PIP Motor angle is at 135 deg when the PIP Joint and MCP Joint are at 0 deg.
     // However, PIP Motor angles are zeroed at the position where PIP Joint is at its 0 degree position (parallel proximal phalange)

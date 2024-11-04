@@ -25,8 +25,18 @@ public:
     /////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////// CONFIG MESSAGE ///////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////
+    // BYTE0   | BYTE1    | BYTE2  | BYTE3 | BYTE4  | BYTE5 | BYTE6 | BYTE7 |
+    // COMMAND | ConfType | ConfID | NULL  | DATA0  | DATA1 | DATA2 | DATA3 |
+
     /// @brief Set the zero position ID to the message
     void set_zero_position(TPCANMsg &msg, const float zero_position);
+
+    /// @brief Set the default gain ID to the message
+    void set_default_gain(TPCANMsg &msg, const uint32_t &gain_val, const uint8_t param_id);
+
+    void calibrate_encoder(TPCANMsg &msg);
+
+    void calibrate_phase_order(TPCANMsg &msg);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
@@ -78,9 +88,13 @@ public:
     /// @param msg TPCANMsg reference to store the command message
     void retrieve_position(TPCANMsg &msg);
 
-    /// @brief Senc command message to retrieve the gains of the motor
+    
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////// PARAM MESSAGE //////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// @brief Send command message to retrieve the gains of the motor
     /// @param msg 
-    void retrieve_gains(TPCANMsg &msg);
+    void retrieve_gain(TPCANMsg &msg, const uint8_t param_id);
 
 private:
     /// @brief gear ratio of the motor initialized in the actuator constructor
@@ -185,6 +199,10 @@ public:
     /// @param msg 
     /// @param position 
     void retrieve_position(const TPCANMsg &msg, float &position) const;
+
+
+
+
 
 
 private:

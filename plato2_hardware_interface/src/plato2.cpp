@@ -54,8 +54,12 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
 hardware_interface::CallbackReturn PLATO2Hardware::on_configure(
     const rclcpp_lifecycle::State & /*previous_state*/) {
 
+  for (size_t i=0; i < joint_position_commands_.size(); ++i){
+    joint_position_commands_[i] = 0.0;
+  }
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
-              "Configuring ...setting all joint state to 0..");
+              "Configuring .... Setting All Joint Position Commands to Zero");
+  }
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully configured!");
@@ -137,26 +141,17 @@ hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &time,
                     const rclcpp::Duration &period) {
 
-  // Parameters for sine wave
 
-  // Set the first two joint position commands to zero
-  for (size_t i=0; i < joint_position_commands_.size(); ++i){
-    joint_position_commands_[i] = 0.0;
-  }
 
+  // Use when to calibrate the zero position of the motors
   // hand_->set_idle_command();
   // hand_->print_motor_positions();
 
-  hand_->set_impedance_command(joint_position_commands_, 1000, joint_position_states_, joint_velocity_states_);
+  hand_->set_impedance_command(joint_position_commands_, 10, joint_position_states_, joint_velocity_states_);
 
   // Update hand states
-  // hand_->set_idle_command();
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
-  joint_effort_states_ = joint_position_commands_;
-
-  // normalize the joint position states
-
-
+  
   return hardware_interface::return_type::OK;
 }
 

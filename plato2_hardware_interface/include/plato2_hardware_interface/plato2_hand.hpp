@@ -6,6 +6,7 @@
 
 #include "plato2_hardware_interface/actuator.hpp"
 #include "plato2_hardware_interface/five_bar_linkage.hpp"
+#include "plato2_hardware_interface/karnopp_compensator.hpp"
 
 
 namespace plato2_hand{
@@ -61,6 +62,10 @@ public:
     /// @brief TORQUE Command fuction
     void set_torque_command(const std::vector<double> &joint_torque_command, const uint32_t &duration);
 
+    /// @brief  Send TORQUE command using PD controller
+    /// @param joint_impedance position mann
+    void set_impedance_command(const std::vector<double> &joint_impedance_command, const uint32_t& servo_current, const std::vector<double> &joint_position_states, const std::vector<double> &joint_velocity_states);
+
     void set_zero_motor_position();
 
 
@@ -110,6 +115,9 @@ private:
     /// @brief Actuator Gains
     std::vector<actuator::Gains> gains_;
 
+    /// @brief Karnopp Friction Compensator
+    std::vector<KarnoppCompensator> friction_compensators_;
+
 
     ///////////////////////////////////////////////// PRIVATE FUNCTIONS //////////////////////////////////////////////
 
@@ -124,14 +132,14 @@ private:
 
     /// @brief Predefined Actuator Configurations
     std::vector<actuator::Config> actuator_configs_ = {
-        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1, CommandOffset::MOTOR1, MotorDirection::MOTOR1, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2, CommandOffset::MOTOR2, MotorDirection::MOTOR2, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4, CommandOffset::MOTOR4, MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3, CommandOffset::MOTOR3, MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6, CommandOffset::MOTOR6, MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5, CommandOffset::MOTOR5, MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8, CommandOffset::MOTOR8, MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
-        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7, CommandOffset::MOTOR7, MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
+        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1,  MotorDirection::MOTOR1, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2,  MotorDirection::MOTOR2, XM430::TORQUE_CONSTANT, XM430::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4,  MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3,  MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6,  MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5,  MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8,  MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO},
+        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
     std::vector<actuator::Gains> default_gains = {
@@ -144,6 +152,18 @@ private:
         actuator::Gains{KpVelocity::MOTOR8, KiVelocity::MOTOR8, KpPosition::MOTOR8, KiPosition::MOTOR8, KdPosition::MOTOR8},
         actuator::Gains{KpVelocity::MOTOR7, KiVelocity::MOTOR7, KpPosition::MOTOR7, KiPosition::MOTOR7, KdPosition::MOTOR7}
     };
+    
+    std::vector<actuator::Impedance> impedance = {
+        actuator::Impedance{0,0},
+        actuator::Impedance{0,0},
+        actuator::Impedance{ImpKp::MOTOR4, ImpKd::MOTOR4},
+        actuator::Impedance{ImpKp::MOTOR3, ImpKd::MOTOR3},
+        actuator::Impedance{ImpKp::MOTOR6, ImpKd::MOTOR6},
+        actuator::Impedance{ImpKp::MOTOR5, ImpKd::MOTOR5},
+        actuator::Impedance{ImpKp::MOTOR8, ImpKd::MOTOR8},
+        actuator::Impedance{ImpKp::MOTOR7, ImpKd::MOTOR7}
+    };
+
     
 
     ///@brief Five Bar Linkage Configuration

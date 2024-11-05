@@ -36,6 +36,11 @@ struct Gains{
     bool b_kd_position_updated = false;
 };
 
+struct Impedance{
+    float kp;
+    float kd;
+};
+
 struct Status{
     float voltage;
     float current;
@@ -47,7 +52,6 @@ struct Config{
     const uint8_t can_rx_id;
     
     const float position_offset;
-    const float command_offset;
     const char direction; // 1 for counter-clockwise, -1 for clockwise
 
     const float torque_constant;
@@ -196,7 +200,7 @@ private:
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
         if (apply_offset) {
-            motor_value = (joint_value * config_.direction) + config_.position_offset - config_.command_offset;
+            motor_value = (joint_value * config_.direction) + config_.position_offset;
             // std::cout << "Joint Cmd: " << joint_value << std::endl;
 
         } else {
@@ -208,7 +212,7 @@ private:
     /// @param motor_value Motor State Value from the motor
     /// @param joint_value reference to store the joint state value
     /// @param apply_offset boolean to apply the offset or not (only for position)
-    void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
+    inline void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
         if (apply_offset) {
             joint_value = (motor_value - config_.position_offset) * config_.direction;
 

@@ -263,24 +263,27 @@ void Actuator::process_message(const TPCANMsg &msg){
         case CommandByte::POSITION_CONTROL:
         case CommandByte::SPEED_CONTROL:
         case CommandByte::TORQUE_CONTROL:
-            // get the states if there is a valid response without any error
+            // Get the states if there is a valid response without any error
             if (decoder_.get_result(msg.DATA[1])) {
-                // decode the states
+                // Decode the states
                 float motor_position, motor_velocity, motor_torque;
                 decoder_.get_states(msg, status_.temperature, motor_position, motor_velocity, motor_torque);
-                // store motor_position without offset
+                
+                // Store motor_position without offset
                 motor_position_ = motor_position;
-                // apply the motor to joint conversion and store the states
-                // cover velocity units from RPM to rad/s
+
+                
+                // Convert velocity units from RPM to rad/s
                 motor_velocity = motor_velocity * 2.0f * M_PI / 60.0f;
 
+                // Apply the motor-to-joint conversion and store the states
                 motor_to_joint_(motor_position, states_.position, true);
                 motor_to_joint_(motor_velocity, states_.velocity);
                 motor_to_joint_(motor_torque, states_.torque);
             } else {
                 std::cerr << "Actuator ID: 0x" <<  std::hex <<config_.can_tx_id << " Control Failed" << std::endl;
             }
-            
+
             break;
 
         // Gain message reponse upon request to get the gains from the motor

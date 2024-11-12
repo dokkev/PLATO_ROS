@@ -146,8 +146,13 @@ PLATO2Hardware::read(const rclcpp::Time &time,
 
   // Set the first two joint position commands to zero
   // hand_->set_idle_command();
+  // hand_->print_motor_positions();
 
-  hand_->set_impedance_command(joint_position_commands_, 200, joint_position_states_, joint_velocity_states_);
+  joint_position_commands_[4] = 0.0;
+  joint_position_commands_[5] = 0.0;
+
+
+  hand_->set_impedance_command(joint_position_commands_, 1, joint_position_states_, joint_velocity_states_);
 
 
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);

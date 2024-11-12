@@ -70,21 +70,21 @@ namespace MotorDirection{
 }
 
 namespace ImpKp{
-    constexpr uint32_t MOTOR3 = 500;
-    constexpr uint32_t MOTOR4 = 500;
-    constexpr uint32_t MOTOR5 = 500;
-    constexpr uint32_t MOTOR6 = 500;
-    constexpr uint32_t MOTOR7 = 500;
-    constexpr uint32_t MOTOR8 = 500;
+    constexpr uint32_t MOTOR3 = 5000;
+    constexpr uint32_t MOTOR4 = 5000;
+    constexpr uint32_t MOTOR5 = 5000;
+    constexpr uint32_t MOTOR6 = 5000;
+    constexpr uint32_t MOTOR7 = 5000;
+    constexpr uint32_t MOTOR8 = 5000;
 } // kp
 
 namespace ImpKd{
-    constexpr uint32_t MOTOR3 = 200;
-    constexpr uint32_t MOTOR4 = 200;
-    constexpr uint32_t MOTOR5 = 200;
-    constexpr uint32_t MOTOR6 = 200;
-    constexpr uint32_t MOTOR7 = 200;
-    constexpr uint32_t MOTOR8 = 200;
+    constexpr uint32_t MOTOR3 = 2800;
+    constexpr uint32_t MOTOR4 = 2800;
+    constexpr uint32_t MOTOR5 = 2800;
+    constexpr uint32_t MOTOR6 = 2800;
+    constexpr uint32_t MOTOR7 = 2800;
+    constexpr uint32_t MOTOR8 = 2800;
 }
 
 

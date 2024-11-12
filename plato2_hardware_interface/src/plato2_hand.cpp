@@ -111,7 +111,7 @@ void Hand::stop(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_idle_command() {
-    if (counter_ % 10 == 0){
+    if (counter_ % 50 == 0){
         actuators_[0].set_joint_torque(0.0, 0);
         actuators_[1].set_joint_torque(0.0, 0);
     }
@@ -179,7 +179,16 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
         // PD controller
         float compensator_force = friction_compensators_[i].Update(joint_velocity_states[i]);
         float actuator_cmd = (impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001;
+        // clamp the actuator_cmd to the maximum torque
+        actuator_cmd = std::clamp(actuator_cmd, -0.8f, 0.8f);
+
         actuators_[i].set_joint_torque(actuator_cmd, 0);
+
+
+        
+     
+     
+    //  std::cout << "Actuator " << i << " Impedance Command: " << actuator_cmd << std::endl;
     }
    
 }

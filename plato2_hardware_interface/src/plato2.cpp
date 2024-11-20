@@ -145,15 +145,15 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   // Parameters for sine wave
 
   // Set the first two joint position commands to zero
-  // hand_->set_idle_command();
+  hand_->set_idle_command();
   // hand_->print_motor_positions();
 
   // joint_position_commands_[4] = 0.0;
   // joint_position_commands_[5] = 0.0;
 
 
-  hand_->set_impedance_command(joint_position_commands_,10, joint_position_states_, joint_velocity_states_);
-
+  // hand_->set_impedance_command(joint_position_commands_,10, joint_position_states_, joint_velocity_states_);
+  
 
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
 

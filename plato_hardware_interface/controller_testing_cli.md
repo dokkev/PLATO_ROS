@@ -57,3 +57,9 @@ data: [-0.029, -0.327, 0.338, -0.747, -0.323, 0.808, -0.6, 1.035]}"
 <!-- Power Grasp Close -->
 ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
 data: [-0.033, -0.34, -0.243, -0.679, 1.285, 0.549, 0.667, 1.297]}"
+
+-------------------
+
+<!-- Point-->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [0.0, 0.0, -0.176, -1.227, 0.0, 0.0, 1.085, 1.054]}"

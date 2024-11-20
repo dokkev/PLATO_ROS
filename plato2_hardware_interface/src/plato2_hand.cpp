@@ -21,17 +21,14 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // Print the actuator info
     print_actuator_info_();
 
-    // calibrate();
+    // Initialize friction compensators with sample values 
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        friction_compensators_.emplace_back(KarnoppCompensator(0.04, 0.01, 0.05)); // Example values
+    }
 
-    // set default gains
-    set_default_gains();
-    
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // get current gains
-    retrieve_runtime_gains();
 
-    // Enable the motors
+
     enable();
 
     // Empty the CAN buffer
@@ -114,8 +111,15 @@ void Hand::stop(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_idle_command() {
+<<<<<<< HEAD
     actuators_[0].set_joint_torque(0.0, 0);
     actuators_[1].set_joint_torque(0.0, 0);
+=======
+    if (counter_ % 50 == 0){
+        actuators_[0].set_joint_torque(0.0, 0);
+        actuators_[1].set_joint_torque(0.0, 0);
+    }
+>>>>>>> origin/feature/plato_v2
     actuators_[2].set_joint_torque(0.0, 0);
     actuators_[3].set_joint_torque(0.0, 0);
     actuators_[4].set_joint_torque(0.0, 0);
@@ -145,10 +149,53 @@ void Hand::set_velocity_command(const std::vector<double>& joint_velocity_comman
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_torque_command(const std::vector<double>& joint_torque_command, const uint32_t& duration) {
-    for (size_t i = 0; i < num_actuators_; ++i) {
+    
+
+    // update J1 and J2 once every 10 loops
+    if (counter_ % 10 == 0){
+        // Dynamixel
+        actuators_[0].set_joint_torque(joint_torque_command[0], duration);
+        actuators_[1].set_joint_torque(joint_torque_command[1], duration);
+    }
+
+    
+    for (size_t i = 2; i < num_actuators_; ++i) {
         float actuator_cmd = joint_torque_command[i];
         actuators_[i].set_joint_torque(actuator_cmd, duration);
     }
+
+    
+}
+
+////////////////////////////////////////////////////////////////////////
+
+void Hand::set_impedance_command(const std::vector<double> &joint_impedance_command, 
+                                 const uint32_t& servo_current, 
+                                 const std::vector<double> &joint_position_states, 
+                                 const std::vector<double> &joint_velocity_states){ 
+
+    if (counter_ % 10 == 0){ // update J1 and J2 once every 10 loops 
+        // Dynamixel only accepts position control
+        actuators_[0].set_joint_position(joint_impedance_command[0], servo_current);
+        actuators_[1].set_joint_position(joint_impedance_command[1], servo_current);
+    }
+
+    for (size_t i = 2; i < num_actuators_; ++i) {
+        // PD controller
+        float compensator_force = friction_compensators_[i].Update(joint_velocity_states[i]);
+        float actuator_cmd = (impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001;
+        // clamp the actuator_cmd to the maximum torque
+        actuator_cmd = std::clamp(actuator_cmd, -0.8f, 0.8f);
+
+        actuators_[i].set_joint_torque(actuator_cmd, 0);
+
+
+        
+     
+     
+    //  std::cout << "Actuator " << i << " Impedance Command: " << actuator_cmd << std::endl;
+    }
+   
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -182,6 +229,8 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
     // update the linkage kinematics to calculate the reduction ratios
     update_linkage_kinematics();
 
+    
+
     // update the joint states for each actuator
     for (size_t i = 0; i < num_actuators_; ++i){
         joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(linkage_reduction_ratios_[i]));
@@ -189,26 +238,22 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
         joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
         joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
     }
-
+    counter_++;
 
 }
 
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::print_motor_positions(){
-    // disable the motors
-    // disable();
-    // print actuator 5 and 6 positions
-
+    // useful function for offset calibration
     std::cout << "J 1 Position: " << actuators_[0].get_motor_position() << std::endl;
     std::cout << "J 2 Position: " << actuators_[1].get_motor_position() << std::endl;
-    std::cout << "J 3 Position: " << actuators_[3].get_motor_position() << std::endl;
-    std::cout << "J 4 Position: " << actuators_[2].get_motor_position() << std::endl;
-    std::cout << "J 5 Position: " << actuators_[5].get_motor_position() << std::endl;
-    std::cout << "J 6 Position: " << actuators_[4].get_motor_position() << std::endl;
-    std::cout << "J 7 Position: " << actuators_[7].get_motor_position() << std::endl;
-    std::cout << "J 8 Position: " << actuators_[6].get_motor_position() << std::endl;
-
+    std::cout << "J 3 Position: " << actuators_[2].get_motor_position() << std::endl;
+    std::cout << "J 4 Position: " << actuators_[3].get_motor_position() << std::endl;
+    std::cout << "J 5 Position: " << actuators_[4].get_motor_position() << std::endl;
+    std::cout << "J 6 Position: " << actuators_[5].get_motor_position() << std::endl;
+    std::cout << "J 7 Position: " << actuators_[6].get_motor_position() << std::endl;
+    std::cout << "J 8 Position: " << actuators_[7].get_motor_position() << std::endl;
 
 }
 
@@ -240,6 +285,11 @@ void Hand::print_actuator_info_() {
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
     }
     
+    // Impedance Gains
+    std::cout << "[INFO] Joint Impedance Gains: " << std::endl;
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        std::cout << "  Actuator " << i + 1 << " Kp: " << impedance[i].kp << " Kd: " << impedance[i].kd << std::endl;
+    }
 
 
     std::cout << "====================================================" << std::endl;

@@ -41,48 +41,49 @@ namespace XM430{
 namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
-    constexpr float MOTOR3 = 0.0f;
-    constexpr float MOTOR4 = 0.0f;
-    constexpr float MOTOR5 = 0.0f;
-    constexpr float MOTOR6 = 0.0f;
-    constexpr float MOTOR7 = 0.0f;
-    constexpr float MOTOR8 = 0.0f;
 
+    constexpr float MOTOR4 = -0.158122f;
+    constexpr float MOTOR3 = -1.3304f;
 
+    constexpr float MOTOR6 = -1.78664f;
+    constexpr float MOTOR5 =  1.63672f;
+   
+    constexpr float MOTOR8 = 2.04948f;
+    constexpr float MOTOR7 = -0.407226f;
     
-    // constexpr float MOTOR4 = -5.73987f;
-    // constexpr float MOTOR3 = -5.72614f;
-    // constexpr float MOTOR6 = -11.7702f;
-    // constexpr float MOTOR5 = -9.29942f;
-    // constexpr float MOTOR8 = -5.45224f;
-    // constexpr float MOTOR7 = -0.174525f;
-
+    
 }
 
-namespace CommandOffset{
-    constexpr float MOTOR1 = 0.0f;
-    constexpr float MOTOR2 = 0.0f;
-    constexpr float MOTOR3 = 0.0f;
-    constexpr float MOTOR4 = 0.0f;
-    // constexpr float MOTOR5 = 5.79328f;
-    // constexpr float MOTOR6 = 5.76429f;
-    // constexpr float MOTOR7 = -5.8338;
-    // constexpr float MOTOR8 = -5.84033f;
-    constexpr float MOTOR5 = 0.0f;
-    constexpr float MOTOR6 = 0.0f;
-    constexpr float MOTOR7 = 0.0f;
-    constexpr float MOTOR8 = 0.0f;
-}
 
 namespace MotorDirection{
     constexpr char MOTOR1 = 1;
     constexpr char MOTOR2 = 1;
-    constexpr char MOTOR3 = 1;
-    constexpr char MOTOR4 = 1;
-    constexpr char MOTOR5 = 1;
-    constexpr char MOTOR6 = 1;
+    constexpr char MOTOR3 = -1;
+    constexpr char MOTOR4 = -1;
+    constexpr char MOTOR5 = -1;
+    constexpr char MOTOR6 = -1;
     constexpr char MOTOR7 = 1;
     constexpr char MOTOR8 = 1;
+}
+
+namespace ImpKp{
+    constexpr uint32_t KP = 1500;
+    constexpr uint32_t MOTOR3 = KP;
+    constexpr uint32_t MOTOR4 = KP;
+    constexpr uint32_t MOTOR5 = KP;
+    constexpr uint32_t MOTOR6 = KP;
+    constexpr uint32_t MOTOR7 = KP; 
+    constexpr uint32_t MOTOR8 = KP;
+} // kp
+
+namespace ImpKd{
+    constexpr uint32_t KD = 1000;
+    constexpr uint32_t MOTOR3 = KD;
+    constexpr uint32_t MOTOR4 = KD;
+    constexpr uint32_t MOTOR5 = KD;
+    constexpr uint32_t MOTOR6 = KD;
+    constexpr uint32_t MOTOR7 = KD;
+    constexpr uint32_t MOTOR8 = KD;
 }
 
 

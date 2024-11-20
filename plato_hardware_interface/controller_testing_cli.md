@@ -30,10 +30,36 @@ ros2 topic pub /plato/plato_joint_controller/joint_trajectory trajectory_msgs/ms
   ]
 }"
 
+<!-- Pinch Open -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [0.0, 0.0, 0.518, -0.46, 0.864, -0.005, 1.067, 0.655]}"
 
-ros2 topic pub /plato2/plato_position_controller/commands std_msgs/msg/Float64MultiArray "{
-data: [0.0, 0.0, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]}"
+<!-- Pinch Close -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [0.0, 0.0, -0.03, -0.209, 1.422, -0.635, 1.067, 0.655]}"
 
+-------------------
 
-    ros2 topic pub /plato/plato_position_controller/commands std_msgs/msg/Float64MultiArray "{
-  data: [200.0,  200., 200., 200., 200., 200., 200., 200., 200.]}"
+<!-- Open -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [-0.048, -0.206, 0.367,-0.557, 0.397, 0.684, 0.201, 0.667]}"
+
+<!-- Close -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [-0.057, -0.224, 0.054, -0.386, 0.863, 0.507, 0.67, 0.337]}"
+
+-------------------
+
+<!-- Power Grasp Open -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [-0.029, -0.327, 0.338, -0.747, -0.323, 0.808, -0.6, 1.035]}"
+
+<!-- Power Grasp Close -->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [-0.033, -0.34, -0.243, -0.679, 1.285, 0.549, 0.667, 1.297]}"
+
+-------------------
+
+<!-- Point-->
+ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
+data: [0.0, 0.0, -0.176, -1.227, 0.0, 0.0, 1.085, 1.054]}"

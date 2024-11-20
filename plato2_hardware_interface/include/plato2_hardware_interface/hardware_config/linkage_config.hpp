@@ -20,7 +20,7 @@ namespace PlatoLinkage{
     // making inconsistency in between MCP Motor Angles and PIP Motor Angle coordinate system. 
     // Therefore, we apply an offset to the PIP Motor angle to make it consistent  with the PIP Joint angle for Five Bar Linkage kinematics calculation.
     // TODO: Use coordinate transformation to avoid confusion
-    constexpr float PIP_MOTOR_ZERO_ANGLE_OFFSET = -135.0f; // deg
+    constexpr float PIP_MOTOR_ZERO_ANGLE_OFFSET = 135.0f; // deg
 }
 
 #endif // PLATO_HARDWARE_INTERFACE__LINKAGE_CONFIG_HPP_

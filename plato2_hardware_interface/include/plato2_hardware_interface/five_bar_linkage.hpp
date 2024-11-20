@@ -14,7 +14,7 @@ struct FiveBarLinkageConfig{
     const float L4;
     const float L5;
 
-    const float eef_angle_offset;
+    const float eef_linkage_angle;
     const float eef_length;
 };
 

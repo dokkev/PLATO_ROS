@@ -114,8 +114,8 @@ void Hand::stop(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_idle_command() {
-    actuators_[0].set_joint_torque(0.0, 1);
-    actuators_[1].set_joint_torque(0.0, 1);
+    actuators_[0].set_joint_torque(0.0, 0);
+    actuators_[1].set_joint_torque(0.0, 0);
     actuators_[2].set_joint_torque(0.0, 0);
     actuators_[3].set_joint_torque(0.0, 0);
     actuators_[4].set_joint_torque(0.0, 0);
@@ -210,57 +210,6 @@ void Hand::print_motor_positions(){
     std::cout << "J 8 Position: " << actuators_[6].get_motor_position() << std::endl;
 
 
-}
-
-////////////////////////////////////////////////////////////////////////
-
-void Hand::set_default_gains(){
-    for (size_t i=2; i < num_actuators_; ++i){
-
-        actuators_[i].set_default_gains(default_gains[i]);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    // receive the message from the CAN bus
-    
-}
-
-
-void Hand::retrieve_runtime_gains(){
-    // Send a command message to retrieve the gains of the motor
-    for (size_t i=2; i < num_actuators_; ++i){
-        actuators_[i].retrieve_gains();
-    }
-
-    // receive the message from the CAN bus
-    
-
-    // get gains from each actuator and store them in the gains_ vector
-    for (size_t i=0; i < num_actuators_; ++i){
-        gains_[i] = actuators_[i].get_gains();
-    } 
-
-    // Actuator Initial Gains
-    // Change the output to decimal
-    std::cout << std::dec << std::endl;
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        std::cout << "[INFO] Actuator " << i + 1 << " Gains: " << std::endl;
-        std::cout << "  Kp Velocity: " << gains_[i].kp_velocity << std::endl;
-        std::cout << "  Ki Velocity: " << gains_[i].ki_velocity << std::endl;
-        std::cout << "  Kp Position: " << gains_[i].kp_position << std::endl;
-        std::cout << "  Ki Position: " << gains_[i].ki_position << std::endl;
-        std::cout << "  Kd Position: " << gains_[i].kd_position << std::endl;
-
-    }
-}
-
-////////////////////////////////////////////////////////////////////////
-
-void Hand::calibrate(){
-    // Don't Use this function. It is not working properly
-    // for (size_t i=2; i < num_actuators_; ++i){
-        // actuators_[i].calibrate_encoder();
-
-    // }
 }
 
 

@@ -111,15 +111,10 @@ void Hand::stop(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_idle_command() {
-<<<<<<< HEAD
-    actuators_[0].set_joint_torque(0.0, 0);
-    actuators_[1].set_joint_torque(0.0, 0);
-=======
     if (counter_ % 50 == 0){
         actuators_[0].set_joint_torque(0.0, 0);
         actuators_[1].set_joint_torque(0.0, 0);
     }
->>>>>>> origin/feature/plato_v2
     actuators_[2].set_joint_torque(0.0, 0);
     actuators_[3].set_joint_torque(0.0, 0);
     actuators_[4].set_joint_torque(0.0, 0);

@@ -71,11 +71,22 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
     
-    # Foxglove websocket
     foxglove_websocket = Node(
         package='foxglove_bridge',
         executable='foxglove_bridge',
         parameters=[{'port': 8765}],
+        namespace=plato_ns,
+    )
+    
+    foxglove_graph = Node(
+        package='plato2_foxglove',
+        executable='foxglove_graph.py',
+        namespace=plato_ns,
+    )
+    
+    foxglove_commands = Node(
+        package='plato2_foxglove',
+        executable='foxglove_commands.py',
         namespace=plato_ns,
     )
 
@@ -114,6 +125,8 @@ def generate_launch_description():
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        foxglove_graph,
+        foxglove_commands,
         # optimo_plato_transform_broadcaster,
     ]
 

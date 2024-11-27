@@ -43,7 +43,11 @@ float FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const floa
 
     float reduction_ratio = pip_joint_angle / pip_motor_angle;
 
-    return reduction_ratio;
+    // added dummy_ration back for testing
+    float dummy_ratio = (pip_motor_angle - mcp_motor_angle) / pip_motor_angle;
+    return dummy_ratio;
+
+    // return reduction_ratio;
 }
 
 } // namespace FiveBarLinkage

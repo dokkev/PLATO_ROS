@@ -39,17 +39,18 @@ namespace XM430{
 } // namespace XM430
 
 namespace MotorOffset{
+
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
 
-    constexpr float MOTOR4 = -0.158122f;
-    constexpr float MOTOR3 = -1.3304f;
+    constexpr float MOTOR4 = -0.329022f;
+    constexpr float MOTOR3 = -0.822652f;
 
-    constexpr float MOTOR6 = -1.78664f;
-    constexpr float MOTOR5 =  1.63672f;
+    constexpr float MOTOR6 = -1.6104f;
+    constexpr float MOTOR5 = 1.29416f;
    
-    constexpr float MOTOR8 = 2.04948f;
-    constexpr float MOTOR7 = -0.407226f;
+    constexpr float MOTOR8 = 0.90505f;
+    constexpr float MOTOR7 = -0.961127f;
     
     
 }

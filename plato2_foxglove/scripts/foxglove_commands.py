@@ -66,8 +66,10 @@ class JointStateRecorder(Node):
             # Prepare data to save
             data_to_save = {self.joint_state_name: list(self.joint_state_data)}
 
-            file_path = os.path.join(os.getcwd(), 'joint_states.yaml')
-
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+            file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'joint_states.yaml')
+                
             # Check if the file exists and update the content
             if os.path.exists(file_path):
                 with open(file_path, 'r') as file:
@@ -88,7 +90,10 @@ class JointStateRecorder(Node):
 
     def fetch_callback(self, msg):
         requested_name = msg.data
-        file_path = os.path.join(os.getcwd(), 'joint_states.yaml')
+        
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+        file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'joint_states.yaml')
 
         # Check if the YAML file exists
         if not os.path.exists(file_path):

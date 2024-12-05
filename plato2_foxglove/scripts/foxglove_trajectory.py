@@ -10,7 +10,7 @@ import yaml
 import os
 import time
 
-# Custom representer for OrderedDict
+# Custom representer for OrderedDict to ensure correct YAML output
 def represent_ordereddict(dumper, data):
     return dumper.represent_mapping('tag:yaml.org,2002:map', data.items())
 
@@ -20,108 +20,44 @@ class TrajectoryManager(Node):
     def __init__(self):
         super().__init__('trajectory_manager')
 
-        # (Initialization code remains the same)
+        # Subscriber for Trajectory messages to save
+        self.trajectory_subscriber = self.create_subscription(
+            Trajectory,
+            '/plato2/trajectory_save',
+            self.trajectory_callback,
+            10
+        )
 
-    # (Other methods remain the same)
+        # Subscriber for trajectory execution commands
+        self.command_subscriber = self.create_subscription(
+            String,
+            '/plato2/trajectory_execute',
+            self.execute_callback,
+            10
+        )
 
-    def external_command_callback(self, msg):
-        self.get_logger().info("External command received. Interrupting trajectory execution.")
-        self.interrupted = True
-        self.external_command = msg.data  # Store the external command positions
+        # Publisher for the joint commands
+        self.commands_publisher = self.create_publisher(
+            Float64MultiArray,
+            '/plato2/plato2_position_controller/commands',
+            10
+        )
 
-    def execute_trajectory(self, trajectory_plan):
-        # Start from zero position
-        if 'zero_position' in self.joint_states:
-            current_positions = self.joint_states['zero_position']
+        # Load joint states from joint_states.yaml
+        self.joint_states = self.load_yaml_file('joint_states.yaml')
+
+        # Load trajectories from trajectory.yaml
+        self.trajectories = self.load_yaml_file('trajectory.yaml')
+
+        # Get joint names (assuming all positions have the same number of joints)
+        self.joint_names = self.get_joint_names()
+
+        if not self.joint_names:
+            self.get_logger().error("No joint names found. Ensure joint_states.yaml has at least one position.")
         else:
-            current_positions = [0.0] * len(self.joint_names)
-            self.get_logger().warning("Zero position not found in joint_states.yaml. Using zeros.")
+            self.get_logger().info(f"Joint names: {self.joint_names}")
 
-        self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
-
-        # Move to zero position first (if not already there)
-        self.publish_position(current_positions)
-        time.sleep(0.5)  # Small delay to ensure the robot starts from zero
-
-        # Iterate over the trajectory plan
-        for step in trajectory_plan:
-            position_name = step['position_name']
-            motion_time = step.get('Motion_Time', 0.0)
-            hold_time = step.get('Hold_Time', 0.0)
-
-            if position_name not in self.joint_states:
-                self.get_logger().error(f"Position '{position_name}' not found in joint_states.yaml.")
-                return
-
-            target_positions = self.joint_states[position_name]
-
-            self.get_logger().info(f"Moving to '{position_name}' over {motion_time}s and holding for {hold_time}s.")
-
-            # Interpolate from current_positions to target_positions over motion_time
-            self.interpolate_and_publish(current_positions, target_positions, motion_time)
-
-            # Check for interruption after interpolation
-            if self.interrupted:
-                self.get_logger().info("Trajectory execution interrupted after interpolation.")
-                # Publish the external command
-                self.publish_position(self.external_command)
-                return  # Exit the trajectory execution
-
-            # Hold at target_positions for hold_time
-            if hold_time > 0.0:
-                self.publish_position(target_positions)
-                self.get_logger().info(f"Holding position '{position_name}' for {hold_time}s.")
-
-                # Hold position while checking for interruption
-                hold_steps = int(hold_time * 10)  # Check 10 times per second
-                sleep_duration = hold_time / hold_steps
-                for _ in range(hold_steps):
-                    if self.interrupted:
-                        self.get_logger().info("Trajectory execution interrupted during hold time.")
-                        # Publish the external command
-                        self.publish_position(self.external_command)
-                        return  # Exit the hold loop
-                    time.sleep(sleep_duration)
-
-                # Check for interruption after hold time
-                if self.interrupted:
-                    self.get_logger().info("Trajectory execution interrupted after hold time.")
-                    # Publish the external command
-                    self.publish_position(self.external_command)
-                    return  # Exit the trajectory execution
-
-            # Update current positions
-            current_positions = target_positions
-
-        # Reset the interrupt flag after the trajectory has completed
-        self.interrupted = False
-        self.get_logger().info("Trajectory execution completed.")
-
-    def interpolate_and_publish(self, start_positions, end_positions, duration):
-        if duration <= 0.0:
-            # Immediate move to the target position
-            self.publish_position(end_positions)
-            return
-
-        steps = max(int(duration * 10), 1)  # 10 steps per second
-        sleep_time = duration / steps
-
-        self.get_logger().debug(f"Interpolating over {steps} steps with {sleep_time}s between steps.")
-
-        for i in range(1, steps + 1):
-            # Check for interruption
-            if self.interrupted:
-                self.get_logger().info("Trajectory execution interrupted during interpolation.")
-                # Publish the external command
-                self.publish_position(self.external_command)
-                return  # Exit the interpolation
-
-            interpolated_positions = [
-                start + (end - start) * (i / steps)
-                for start, end in zip(start_positions, end_positions)
-            ]
-            self.publish_position(interpolated_positions)
-            time.sleep(sleep_time)
+        self.get_logger().info("Trajectory Manager Node initialized.")
 
     def load_yaml_file(self, file_name):
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -218,11 +154,6 @@ class TrajectoryManager(Node):
         trajectory_plan = self.trajectories[trajectory_name]
         self.execute_trajectory(trajectory_plan)
 
-    def external_command_callback(self, msg):
-        self.get_logger().info("External command received. Interrupting trajectory execution.")
-        self.interrupted = True
-        self.external_command = msg.data  # Store the external command positions
-
     def execute_trajectory(self, trajectory_plan):
         # Start from zero position
         if 'zero_position' in self.joint_states:
@@ -233,24 +164,12 @@ class TrajectoryManager(Node):
 
         self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
 
-        # Initialize time accumulator
-        total_time = 0.0
-
         # Move to zero position first (if not already there)
         self.publish_position(current_positions)
         time.sleep(0.5)  # Small delay to ensure the robot starts from zero
 
         # Iterate over the trajectory plan
         for step in trajectory_plan:
-            # Check for interruption
-            if self.interrupted:
-                self.get_logger().info("Trajectory execution interrupted by external command.")
-                # Publish the external command
-                self.publish_position(self.external_command)
-                # Reset the interrupt flag
-                self.interrupted = False
-                return  # Exit the trajectory execution
-
             position_name = step['position_name']
             motion_time = step.get('Motion_Time', 0.0)
             hold_time = step.get('Hold_Time', 0.0)
@@ -270,19 +189,7 @@ class TrajectoryManager(Node):
             if hold_time > 0.0:
                 self.publish_position(target_positions)
                 self.get_logger().info(f"Holding position '{position_name}' for {hold_time}s.")
-
-                # Hold position while checking for interruption
-                hold_steps = int(hold_time * 10)  # Check 10 times per second
-                sleep_duration = hold_time / hold_steps
-                for _ in range(hold_steps):
-                    if self.interrupted:
-                        self.get_logger().info("Trajectory execution interrupted during hold time.")
-                        # Publish the external command
-                        self.publish_position(self.external_command)
-                        # Reset the interrupt flag
-                        self.interrupted = False
-                        return  # Exit the hold loop
-                    time.sleep(sleep_duration)
+                time.sleep(hold_time)
 
             # Update current positions
             current_positions = target_positions
@@ -295,21 +202,12 @@ class TrajectoryManager(Node):
             self.publish_position(end_positions)
             return
 
-        steps = max(int(duration * 10), 1)  # 10 steps per second
+        steps = max(int(duration * 200), 1)  # 10 steps per second
         sleep_time = duration / steps
 
         self.get_logger().debug(f"Interpolating over {steps} steps with {sleep_time}s between steps.")
 
         for i in range(1, steps + 1):
-            # Check for interruption
-            if self.interrupted:
-                self.get_logger().info("Trajectory execution interrupted during interpolation.")
-                # Publish the external command
-                self.publish_position(self.external_command)
-                # Reset the interrupt flag
-                self.interrupted = False
-                return  # Exit the interpolation
-
             interpolated_positions = [
                 start + (end - start) * (i / steps)
                 for start, end in zip(start_positions, end_positions)

@@ -1,27 +1,163 @@
 rom_test:
 - position_name: open
   Motion_Time: 0.5
-  Hold_Time: 2.0
-- position_name: close
-  Motion_Time: 0.5
-  Hold_Time: 2.0
-- position_name: '0'
-  Motion_Time: 0.5
-  Hold_Time: 2.0
-- position_name: pinch 1
-  Motion_Time: 0.5
-  Hold_Time: 2.0
+  Hold_Time: 1.5
 - position_name: neutral
   Motion_Time: 0.5
-  Hold_Time: 2.0
+  Hold_Time: 1.5
+- position_name: close
+  Motion_Time: 0.5
+  Hold_Time: 1.5
+- position_name: '0'
+  Motion_Time: 0.5
+  Hold_Time: 1.5
+- position_name: pinch 1
+  Motion_Time: 0.5
+  Hold_Time: 1.5
+- position_name: neutral
+  Motion_Time: 0.5
+  Hold_Time: 1.5
 - position_name: pinch 2
   Motion_Time: 0.5
-  Hold_Time: 2.0
+  Hold_Time: 1.5
 - position_name: '0'
+  Motion_Time: 0.5  
+  Hold_Time: 1.0
+- position_name: open
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: neutral
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: close
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: '0'
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: pinch 1
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: neutral
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: pinch 2
+  Motion_Time: 0.1
+  Hold_Time: 0.5
+- position_name: '0'
+  Motion_Time: 0.1  
+  Hold_Time: 1.0
+test:
+- position_name: open
   Motion_Time: 0.5
   Hold_Time: 2.0
 
-test:
-- position_name: open
-  Motion_Time: 5.0
-  Hold_Time: 2.0
+opposition:
+- position_name: neutral
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 1
+  Motion_Time: 0.0
+  Hold_Time: 0.15
+- position_name: pinch 2
+  Motion_Time: 0.00
+  Hold_Time: 0.15
+
+
+
+
+

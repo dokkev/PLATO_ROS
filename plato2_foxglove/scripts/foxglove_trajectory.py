@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from plato2_interfaces.msg import Trajectory
+from plato2_interfaces.msg import Trajectory, SavedNames
 from std_msgs.msg import Float64MultiArray
 from collections import OrderedDict
 import yaml
@@ -37,11 +37,32 @@ class TrajectoryManager(Node):
             10
         )
 
+        # Subscriber for trajectory deletion commands
+        self.delete_subscriber = self.create_subscription(
+            String,
+            '/plato2/trajectory_delete',
+            self.delete_callback,
+            10
+        )
+
         # Publisher for the joint commands
         self.commands_publisher = self.create_publisher(
             Float64MultiArray,
             '/plato2/plato2_position_controller/commands',
             10
+        )
+
+        # Publisher for SavedNames (trajectory names)
+        self.saved_trajectories_publisher = self.create_publisher(
+            SavedNames,
+            '/plato2/saved_trajectories',
+            10
+        )
+
+        # Timer to periodically publish saved trajectory names (optional)
+        self.saved_trajectories_timer = self.create_timer(
+            1.0,  # Publish every 1 seconds
+            self.publish_saved_trajectories
         )
 
         # Initial load of joint states and trajectories
@@ -143,6 +164,9 @@ class TrajectoryManager(Node):
 
         self.get_logger().info(f"Trajectory '{trajectory_name}' saved successfully.")
 
+        # Publish updated saved trajectories
+        self.publish_saved_trajectories()
+
     def execute_callback(self, msg):
         # Reload YAML files whenever a trajectory is executed
         self.joint_states = self.load_yaml_file('joint_states.yaml')
@@ -160,13 +184,9 @@ class TrajectoryManager(Node):
 
     def execute_trajectory(self, trajectory_plan):
         # Start from zero position
-        if 'zero_position' in self.joint_states:
-            current_positions = self.joint_states['zero_position']
-        else:
-            current_positions = [0.0] * len(self.joint_names)
-            self.get_logger().warning("Zero position not found in joint_states.yaml. Using zeros.")
+        current_positions = [0.0] * len(self.joint_names)
 
-        self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
+        # self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
 
         # Move to zero position first (if not already there)
         self.publish_position(current_positions)
@@ -234,7 +254,7 @@ class TrajectoryManager(Node):
             self.publish_position(end_positions)
             return
 
-        dt = 0.01 # Time step (seconds)
+        dt = 0.01  # Time step (seconds)
         interpolated_positions = self.minimum_jerk_trajectory(start_positions, end_positions, total_time=duration, dt=dt)
 
         self.get_logger().debug(f"Interpolating using minimum jerk over {len(interpolated_positions)} steps with {dt}s between steps.")
@@ -248,6 +268,80 @@ class TrajectoryManager(Node):
         msg.data = positions
         self.commands_publisher.publish(msg)
         self.get_logger().debug(f"Published positions: {positions}")
+
+    def publish_saved_trajectories(self):
+        """
+        Reads the trajectory.yaml file, extracts the trajectory names,
+        and publishes them as a SavedNames message formatted as a 1xn array.
+        """
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+        file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'trajectory.yaml')
+
+        # Check if the YAML file exists
+        if not os.path.exists(file_path):
+            self.get_logger().error(f"trajectory.yaml file not found at {file_path}. Cannot publish saved trajectories.")
+            return
+
+        # Read the YAML file
+        with open(file_path, 'r') as file:
+            try:
+                data = yaml.safe_load(file) or {}
+            except yaml.YAMLError:
+                self.get_logger().error("Error reading trajectory.yaml. Cannot publish saved trajectories.")
+                return
+
+        # Extract the trajectory names (keys)
+        saved_trajectories = list(data.keys())
+
+        # Create and populate the SavedNames message
+        saved_trajectories_msg = SavedNames()
+        saved_trajectories_msg.saved_names = saved_trajectories  # This is inherently a 1xn array in ROS2
+
+        # Publish the SavedNames message
+        self.saved_trajectories_publisher.publish(saved_trajectories_msg)
+        # self.get_logger().info(f"Published saved trajectory names: {saved_trajectories}")
+
+    def delete_callback(self, msg):
+        """
+        Callback function to delete a saved trajectory by name.
+        """
+        trajectory_to_delete = msg.data.strip()
+        self.get_logger().info(f"Received request to delete trajectory: '{trajectory_to_delete}'")
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+        file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'trajectory.yaml')
+
+        # Check if the YAML file exists
+        if not os.path.exists(file_path):
+            self.get_logger().error(f"trajectory.yaml file not found at {file_path}. Cannot delete trajectory.")
+            return
+
+        # Read the YAML file
+        with open(file_path, 'r') as file:
+            try:
+                data = yaml.safe_load(file) or {}
+            except yaml.YAMLError:
+                self.get_logger().error("Error reading trajectory.yaml. Cannot delete trajectory.")
+                return
+
+        # Check if the trajectory exists
+        if trajectory_to_delete in data:
+            # Delete the trajectory
+            del data[trajectory_to_delete]
+            self.get_logger().info(f"Deleted trajectory '{trajectory_to_delete}' from trajectory.yaml.")
+
+            # Write back the updated content
+            with open(file_path, 'w') as file:
+                yaml.dump(data, file, default_flow_style=False)
+
+            self.get_logger().info(f"Updated trajectory.yaml after deletion.")
+
+            # Publish the updated saved trajectories
+            self.publish_saved_trajectories()
+        else:
+            self.get_logger().error(f"Trajectory '{trajectory_to_delete}' does not exist in trajectory.yaml.")
 
 def main(args=None):
     rclpy.init(args=args)

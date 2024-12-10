@@ -94,7 +94,7 @@ class JointStateSplitter(Node):
             if len(msg.data) == self.joint_count:
                 self.latest_commands = list(msg.data)
                 self.new_command_received = True
-                self.get_logger().info("Received new position commands.")
+                # self.get_logger().info("Received new position commands.")
                 # Publish immediately
                 self.publish_commands()
             else:
@@ -117,7 +117,7 @@ class JointStateSplitter(Node):
             command_msg = Float64()
             command_msg.data = self.latest_commands[i]
             self.command_publishers[i].publish(command_msg)
-            self.get_logger().debug(f"Publishing command for joint{i+1}: {self.latest_commands[i]}")
+            # self.get_logger().debug(f"Publishing command for joint{i+1}: {self.latest_commands[i]}")
 
 
 def main(args=None):

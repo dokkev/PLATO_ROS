@@ -43,14 +43,14 @@ namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
 
-    constexpr float MOTOR4 = -0.14744f;
-    constexpr float MOTOR3 = -0.257305f;
+    constexpr float MOTOR4 = -0.141336f;
+    constexpr float MOTOR3 = -0.304608f;
 
-    constexpr float MOTOR6 = -0.795568f;
-    constexpr float MOTOR5 = 1.89307f;
+    constexpr float MOTOR6 = -0.0951786f;
+    constexpr float MOTOR5 = 3.58225f;
    
-    constexpr float MOTOR8 = 1.15225f;
-    constexpr float MOTOR7 = -1.3365f;
+    constexpr float MOTOR8 = 0.453383f;
+    constexpr float MOTOR7 = -0.788701f;
     
     
 }
@@ -78,7 +78,7 @@ namespace ImpKp{
 } // kp
 
 namespace ImpKd{
-    constexpr uint32_t KD = 500;
+    constexpr uint32_t KD = 600;
     constexpr uint32_t MOTOR3 = KD;
     constexpr uint32_t MOTOR4 = KD;
     constexpr uint32_t MOTOR5 = KD;

@@ -52,10 +52,10 @@ test:
   Motion_Time: 0.5
   Hold_Time: 2.0
 
-opposition:
+opposition_test:
 - position_name: neutral
   Motion_Time: 0.0
-  Hold_Time: 0.15
+  Hold_Time: 1.0
 - position_name: pinch 1
   Motion_Time: 0.0
   Hold_Time: 0.15
@@ -66,96 +66,217 @@ opposition:
   Motion_Time: 0.0
   Hold_Time: 0.15
 - position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-- position_name: pinch 1
   Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
   Hold_Time: 0.15
 
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
-
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 1
-  Motion_Time: 0.0
-  Hold_Time: 0.15
-- position_name: pinch 2
-  Motion_Time: 0.00
-  Hold_Time: 0.15
+# Define the sequence of opposition movements
+# Define the sequence of opposition movements
+opposition:
+  # Initial position
+  - position_name: neutral
+    Motion_Time: 0.1
+    Hold_Time: 1.0
+  
+  # Cycle 1
+  - position_name: pinch 1
+    Motion_Time: 0.093
+    Hold_Time: 0.943
+  - position_name: pinch 2
+    Motion_Time: 0.093
+    Hold_Time: 0.943
+  
+  # Cycle 2
+  - position_name: pinch 1
+    Motion_Time: 0.086
+    Hold_Time: 0.886
+  - position_name: pinch 2
+    Motion_Time: 0.086
+    Hold_Time: 0.886
+  
+  # Cycle 3
+  - position_name: pinch 1
+    Motion_Time: 0.079
+    Hold_Time: 0.829
+  - position_name: pinch 2
+    Motion_Time: 0.079
+    Hold_Time: 0.829
+  
+  # Cycle 4
+  - position_name: pinch 1
+    Motion_Time: 0.072
+    Hold_Time: 0.772
+  - position_name: pinch 2
+    Motion_Time: 0.072
+    Hold_Time: 0.772
+  
+  # Cycle 5
+  - position_name: pinch 1
+    Motion_Time: 0.065
+    Hold_Time: 0.715
+  - position_name: pinch 2
+    Motion_Time: 0.065
+    Hold_Time: 0.715
+  
+  # Cycle 6
+  - position_name: pinch 1
+    Motion_Time: 0.058
+    Hold_Time: 0.658
+  - position_name: pinch 2
+    Motion_Time: 0.058
+    Hold_Time: 0.658
+  
+  # Cycle 7
+  - position_name: pinch 1
+    Motion_Time: 0.051
+    Hold_Time: 0.601
+  - position_name: pinch 2
+    Motion_Time: 0.051
+    Hold_Time: 0.601
+  
+  # Cycle 8
+  - position_name: pinch 1
+    Motion_Time: 0.044
+    Hold_Time: 0.544
+  - position_name: pinch 2
+    Motion_Time: 0.044
+    Hold_Time: 0.544
+  
+  # Cycle 9
+  - position_name: pinch 1
+    Motion_Time: 0.037
+    Hold_Time: 0.487
+  - position_name: pinch 2
+    Motion_Time: 0.037
+    Hold_Time: 0.487
+  
+  # Cycle 10
+  - position_name: pinch 1
+    Motion_Time: 0.030
+    Hold_Time: 0.430
+  - position_name: pinch 2
+    Motion_Time: 0.030
+    Hold_Time: 0.430
+  
+  # Cycle 11
+  - position_name: pinch 1
+    Motion_Time: 0.023
+    Hold_Time: 0.373
+  - position_name: pinch 2
+    Motion_Time: 0.023
+    Hold_Time: 0.373
+  
+  # Cycle 12
+  - position_name: pinch 1
+    Motion_Time: 0.016
+    Hold_Time: 0.316
+  - position_name: pinch 2
+    Motion_Time: 0.016
+    Hold_Time: 0.316
+  
+  # Cycle 13
+  - position_name: pinch 1
+    Motion_Time: 0.009
+    Hold_Time: 0.259
+  - position_name: pinch 2
+    Motion_Time: 0.009
+    Hold_Time: 0.259
+  
+  # Cycle 14
+  - position_name: pinch 1
+    Motion_Time: 0.002
+    Hold_Time: 0.202
+  - position_name: pinch 2
+    Motion_Time: 0.002
+    Hold_Time: 0.202
+  
+  # Cycle 15 (Final decrease)
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Repeated Cycles (16-25) with constant values
+  # Cycle 16
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 17
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 18
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 19
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 20
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 21
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 22
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 23
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 24
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  
+  # Cycle 25 (Final)
+  - position_name: pinch 1
+    Motion_Time: 0.0
+    Hold_Time: 0.15
+  - position_name: pinch 2
+    Motion_Time: 0.0
+    Hold_Time: 0.15
 
 
 

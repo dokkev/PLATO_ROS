@@ -8,6 +8,8 @@ from std_msgs.msg import Float64MultiArray
 from collections import OrderedDict
 import yaml
 import os
+import threading
+import numpy as np  # Imported numpy for numerical operations
 import time
 
 # Custom representer for OrderedDict to ensure correct YAML output
@@ -20,36 +22,45 @@ class TrajectoryManager(Node):
     def __init__(self):
         super().__init__('trajectory_manager')
 
-        # Subscriber for Trajectory messages to save
+        # Declare and get parameters
+        self.declare_parameter('interpolation_rate', 100)  # Steps per second (dt = 0.01s)
+        self.interpolation_rate = self.get_parameter('interpolation_rate').value
+
+        # Subscribers and Publishers
         self.trajectory_subscriber = self.create_subscription(
             Trajectory,
             '/plato2/trajectory_save',
             self.trajectory_callback,
             10
         )
-
-        # Subscriber for trajectory execution commands
         self.command_subscriber = self.create_subscription(
             String,
             '/plato2/trajectory_execute',
             self.execute_callback,
             10
         )
-
-        # Publisher for the joint commands
         self.commands_publisher = self.create_publisher(
             Float64MultiArray,
             '/plato2/plato2_position_controller/commands',
             10
         )
 
-        # Load joint states from joint_states.yaml
-        self.joint_states = self.load_yaml_file('joint_states.yaml')
+        # Threading for trajectory execution
+        self.execution_thread = None
+        self.execution_lock = threading.Lock()
+        self.shutdown_flag = False
 
-        # Load trajectories from trajectory.yaml
-        self.trajectories = self.load_yaml_file('trajectory.yaml')
+        # Define hard-coded paths to YAML files
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
+        self.joint_states_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'joint_states.yaml')
+        self.trajectories_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', 'trajectory.yaml')
 
-        # Get joint names (assuming all positions have the same number of joints)
+        # Load configurations initially
+        self.joint_states = self.load_yaml_file(self.joint_states_path)
+        self.trajectories = self.load_yaml_file(self.trajectories_path)
+
+        # Extract joint names
         self.joint_names = self.get_joint_names()
 
         if not self.joint_names:
@@ -59,37 +70,55 @@ class TrajectoryManager(Node):
 
         self.get_logger().info("Trajectory Manager Node initialized.")
 
-    def load_yaml_file(self, file_name):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
-        file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', file_name)
+    def load_yaml_file(self, file_path):
+        """
+        Loads a YAML file from the specified hard-coded path.
 
+        Args:
+            file_path (str): Absolute path to the YAML file to load.
+
+        Returns:
+            dict: Parsed YAML data, or empty dict if loading fails.
+        """
         if not os.path.exists(file_path):
-            if file_name == 'trajectory.yaml':
-                self.get_logger().info(f"{file_name} not found. It will be created upon saving a trajectory.")
+            if os.path.basename(file_path) == 'trajectory.yaml':
+                self.get_logger().info(f"{os.path.basename(file_path)} not found at {file_path}. It will be created upon saving a trajectory.")
             else:
-                self.get_logger().error(f"{file_name} not found at {file_path}. Please ensure it exists.")
+                self.get_logger().error(f"{os.path.basename(file_path)} not found at {file_path}. Please ensure it exists.")
             return {}
 
         with open(file_path, 'r') as file:
             try:
                 data = yaml.safe_load(file) or {}
-                self.get_logger().info(f"Loaded data from {file_name}")
+                self.get_logger().info(f"Loaded data from {os.path.basename(file_path)}")
                 return data
             except yaml.YAMLError as e:
-                self.get_logger().error(f"Error reading {file_name}: {e}")
+                self.get_logger().error(f"Error reading {os.path.basename(file_path)}: {e}")
                 return {}
 
-    def save_yaml_file(self, file_name, data):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        ws_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))))
-        file_path = os.path.join(ws_dir, 'src', 'PLATO_ROS', 'plato2_foxglove', 'config', file_name)
+    def save_yaml_file(self, file_path, data):
+        """
+        Saves data to a YAML file at the specified hard-coded path.
+
+        Args:
+            file_path (str): Absolute path to the YAML file to save.
+            data (dict): Data to save into the YAML file.
+        """
+        # Ensure the directory exists
+        directory = os.path.dirname(file_path)
+        os.makedirs(directory, exist_ok=True)
+
         with open(file_path, 'w') as file:
             yaml.dump(data, file, default_flow_style=False)
-        self.get_logger().info(f"Saved data to {file_name}")
+        self.get_logger().info(f"Saved data to {os.path.basename(file_path)}")
 
     def get_joint_names(self):
-        # Extract joint names from the first entry in joint_states
+        """
+        Extracts joint names from the first entry in joint_states.
+
+        Returns:
+            list: List of joint names.
+        """
         if self.joint_states:
             first_key = next(iter(self.joint_states))
             positions = self.joint_states[first_key]
@@ -102,6 +131,16 @@ class TrajectoryManager(Node):
         return []
 
     def trajectory_callback(self, msg):
+        """
+        Callback function to handle incoming Trajectory messages for saving.
+
+        Args:
+            msg (plato2_interfaces.msg.Trajectory): The Trajectory message.
+        """
+        # Reload joint_states.yaml and trajectory.yaml to get the latest data
+        self.joint_states = self.load_yaml_file(self.joint_states_path)
+        self.trajectories = self.load_yaml_file(self.trajectories_path)
+
         trajectory_name = msg.trajectory_name.strip()
         position_names = msg.position_name
         motion_times = msg.motion_time
@@ -134,16 +173,22 @@ class TrajectoryManager(Node):
 
             self.get_logger().debug(f"Added step: {trajectory_steps[-1]}")
 
-        # Load existing trajectories
-        self.trajectories = self.load_yaml_file('trajectory.yaml')
-
         # Save the new trajectory
         self.trajectories[trajectory_name] = trajectory_steps
-        self.save_yaml_file('trajectory.yaml', self.trajectories)
+        self.save_yaml_file(self.trajectories_path, self.trajectories)
 
         self.get_logger().info(f"Trajectory '{trajectory_name}' saved successfully.")
 
     def execute_callback(self, msg):
+        """
+        Callback function to handle incoming execute commands.
+
+        Args:
+            msg (std_msgs.msg.String): The execute command message containing the trajectory name.
+        """
+        # Reload trajectory.yaml to get the latest trajectories
+        self.trajectories = self.load_yaml_file(self.trajectories_path)
+
         trajectory_name = msg.data.strip()
         self.get_logger().info(f"Received command to execute trajectory: '{trajectory_name}'")
 
@@ -152,74 +197,147 @@ class TrajectoryManager(Node):
             return
 
         trajectory_plan = self.trajectories[trajectory_name]
-        self.execute_trajectory(trajectory_plan)
+
+        with self.execution_lock:
+            if self.execution_thread and self.execution_thread.is_alive():
+                self.get_logger().warn("A trajectory is already being executed. Ignoring the new execute command.")
+                return
+            self.execution_thread = threading.Thread(target=self.execute_trajectory, args=(trajectory_plan,))
+            self.execution_thread.start()
 
     def execute_trajectory(self, trajectory_plan):
-        # Start from zero position
-        if 'zero_position' in self.joint_states:
-            current_positions = self.joint_states['zero_position']
-        else:
-            current_positions = [0.0] * len(self.joint_names)
-            self.get_logger().warning("Zero position not found in joint_states.yaml. Using zeros.")
+        """
+        Executes the given trajectory plan using minimum jerk trajectory planning.
 
-        self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
+        Args:
+            trajectory_plan (list of dict): List of trajectory steps containing position names, motion times, and hold times.
+        """
+        try:
+            # Reload joint_states.yaml to get the latest joint states
+            self.joint_states = self.load_yaml_file(self.joint_states_path)
 
-        # Move to zero position first (if not already there)
-        self.publish_position(current_positions)
-        time.sleep(0.5)  # Small delay to ensure the robot starts from zero
+            # Start from zero position
+            if 'zero_position' in self.joint_states:
+                current_positions = self.joint_states['zero_position']
+            else:
+                current_positions = [0.0] * len(self.joint_names)
+                self.get_logger().warning("Zero position not found in joint_states.yaml. Using zeros.")
 
-        # Iterate over the trajectory plan
-        for step in trajectory_plan:
-            position_name = step['position_name']
-            motion_time = step.get('Motion_Time', 0.0)
-            hold_time = step.get('Hold_Time', 0.0)
+            self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
 
-            if position_name not in self.joint_states:
-                self.get_logger().error(f"Position '{position_name}' not found in joint_states.yaml.")
-                return
+            # Move to zero position first (if not already there)
+            self.publish_position(current_positions)
+            self.sleep(0.5)  # Non-blocking sleep
 
-            target_positions = self.joint_states[position_name]
+            # Iterate over the trajectory plan
+            for step in trajectory_plan:
+                if self.shutdown_flag:
+                    self.get_logger().info("Trajectory execution interrupted by shutdown.")
+                    break
 
-            self.get_logger().info(f"Moving to '{position_name}' over {motion_time}s and holding for {hold_time}s.")
+                position_name = step['position_name']
+                motion_time = step.get('Motion_Time', 0.0)
+                hold_time = step.get('Hold_Time', 0.0)
 
-            # Interpolate from current_positions to target_positions over motion_time
-            self.interpolate_and_publish(current_positions, target_positions, motion_time)
+                # Reload joint_states.yaml to get the latest target position
+                self.joint_states = self.load_yaml_file(self.joint_states_path)
 
-            # Hold at target_positions for hold_time
-            if hold_time > 0.0:
-                self.publish_position(target_positions)
-                self.get_logger().info(f"Holding position '{position_name}' for {hold_time}s.")
-                time.sleep(hold_time)
+                if position_name not in self.joint_states:
+                    self.get_logger().error(f"Position '{position_name}' not found in joint_states.yaml.")
+                    return
 
-            # Update current positions
-            current_positions = target_positions
+                target_positions = self.joint_states[position_name]
 
-        self.get_logger().info("Trajectory execution completed.")
+                self.get_logger().info(f"Moving to '{position_name}' over {motion_time}s and holding for {hold_time}s.")
 
-    def interpolate_and_publish(self, start_positions, end_positions, duration):
-        if duration <= 0.0:
-            # Immediate move to the target position
-            self.publish_position(end_positions)
-            return
+                # Generate minimum jerk trajectories
+                list_t, list_x = self.minimum_jerk_trajectory(current_positions, target_positions, total_time=motion_time, dt=1.0/self.interpolation_rate)
 
-        steps = max(int(duration * 200), 1)  # 10 steps per second
-        sleep_time = duration / steps
+                # Publish each step
+                for pos in list_x:
+                    if self.shutdown_flag:
+                        self.get_logger().info("Trajectory execution interrupted by shutdown.")
+                        break
+                    self.publish_position(pos.tolist())
+                    self.sleep(1.0/self.interpolation_rate)
 
-        self.get_logger().debug(f"Interpolating over {steps} steps with {sleep_time}s between steps.")
+                # Hold at target_positions for hold_time
+                if hold_time > 0.0:
+                    self.publish_position(target_positions)
+                    self.get_logger().info(f"Holding position '{position_name}' for {hold_time}s.")
+                    self.sleep(hold_time)
 
-        for i in range(1, steps + 1):
-            interpolated_positions = [
-                start + (end - start) * (i / steps)
-                for start, end in zip(start_positions, end_positions)
-            ]
-            self.publish_position(interpolated_positions)
-            time.sleep(sleep_time)
+                # Update current positions
+                current_positions = target_positions
+
+            self.get_logger().info("Trajectory execution completed.")
+        except Exception as e:
+            self.get_logger().error(f"An error occurred during trajectory execution: {e}")
+
+    def minimum_jerk_trajectory(self, init_pos, target_pos, total_time=0.5, dt=0.01):
+        """
+        Generates minimum jerk trajectories for multiple joints.
+
+        Args:
+            init_pos (list of float): Initial joint positions.
+            target_pos (list of float): Target joint positions.
+            total_time (float): Total time for the trajectory.
+            dt (float): Time step.
+
+        Returns:
+            tuple: (list of time steps, numpy array of joint positions)
+        """
+        xi = np.array(init_pos)
+        xf = np.array(target_pos)
+        d = total_time
+        list_t = []
+        list_x = []
+        t = 0.0
+        while t < d:
+            factor = 10*(t/d)**3 - 15*(t/d)**4 + 6*(t/d)**5
+            x = xi + (xf - xi) * factor
+            list_t.append(t)
+            list_x.append(x)
+            t += dt
+        # Ensure the final position is exactly the target
+        list_t.append(d)
+        list_x.append(xf)
+        return np.array(list_t), np.array(list_x)
 
     def publish_position(self, positions):
+        """
+        Publishes the given joint positions.
+
+        Args:
+            positions (list of float): Joint positions to publish.
+        """
         msg = Float64MultiArray()
         msg.data = positions
         self.commands_publisher.publish(msg)
         self.get_logger().debug(f"Published positions: {positions}")
+
+    def sleep(self, duration):
+        """
+        Non-blocking sleep using ROS 2's timing mechanisms.
+
+        Args:
+            duration (float): Duration to sleep in seconds.
+        """
+        end_time = self.get_clock().now() + rclpy.time.Duration(seconds=duration)
+        while self.get_clock().now() < end_time:
+            if self.shutdown_flag:
+                break
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+    def destroy_node(self):
+        """
+        Overrides the destroy_node method to ensure threads are properly terminated.
+        """
+        self.shutdown_flag = True
+        with self.execution_lock:
+            if self.execution_thread and self.execution_thread.is_alive():
+                self.execution_thread.join()
+        super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)

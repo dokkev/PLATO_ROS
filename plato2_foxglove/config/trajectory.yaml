@@ -49,9 +49,9 @@ rom_test:
   Hold_Time: 1.0
 test:
 - position_name: open
-  Motion_Time: 0.5
+  Motion_Time: 5.0
   Hold_Time: 2.0
-
+  
 opposition_test:
 - position_name: neutral
   Motion_Time: 0.0

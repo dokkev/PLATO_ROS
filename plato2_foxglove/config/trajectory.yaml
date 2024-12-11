@@ -156,16 +156,16 @@ opposition_test:
 - Hold_Time: 1.0
   Motion_Time: 0.0
   position_name: neutral
-- Hold_Time: 0.15
+- Hold_Time: 0.1
   Motion_Time: 0.0
   position_name: pinch 1
-- Hold_Time: 0.15
+- Hold_Time: 0.1
   Motion_Time: 0.0
   position_name: pinch 2
-- Hold_Time: 0.15
+- Hold_Time: 0.1
   Motion_Time: 0.0
   position_name: pinch 1
-- Hold_Time: 0.15
+- Hold_Time: 0.1
   Motion_Time: 0.0
   position_name: pinch 2
 rom_test:
@@ -231,3 +231,12 @@ test 1:
 - position_name: close
   Motion_Time: 2.0
   Hold_Time: 1.0
+
+tool:
+- position_name: toolo
+  Motion_Time: 0.5
+  Hold_Time: 1.0
+- position_name: toolc
+  Motion_Time: 0.5
+  Hold_Time: 1.0
+

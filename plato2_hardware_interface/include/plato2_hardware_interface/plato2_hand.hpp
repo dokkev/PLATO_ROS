@@ -2,8 +2,6 @@
 #define PLATO_HARDWARE_INTERFACE__PLATO2_HAND_HPP_
 
 
-#include "plato2_hardware_interface/hardware_config/linkage_config.hpp"
-
 #include "plato2_hardware_interface/actuator.hpp"
 #include "plato2_hardware_interface/five_bar_linkage.hpp"
 #include "plato2_hardware_interface/karnopp_compensator.hpp"
@@ -99,6 +97,8 @@ private:
     /// @brief Actuator Vector
     std::vector<actuator::Actuator> actuators_;
 
+    /// @brief Linkage Configuration
+    FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_; 
 
     /// @brief Five bar linkage object
     FiveBarLinkage::FiveBarLinkage linkage_;
@@ -164,22 +164,7 @@ private:
         actuator::Impedance{ImpKp::MOTOR7, ImpKd::MOTOR7}
     };
 
-    
 
-    ///@brief Five Bar Linkage Configuration
-    FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_ = {
-        PlatoLinkage::L1,
-        PlatoLinkage::L2,
-        PlatoLinkage::L3,
-        PlatoLinkage::L4,
-        PlatoLinkage::L5,
-        PlatoLinkage::EEF_LENGTH,
-        Plato::deg2rad(PlatoLinkage::PIP_MOTOR_ZERO_ANGLE_OFFSET)
-        
-    };
-
-
-    
     std::vector<float> linkage_reduction_ratios_ = {
         1.0f, // MOTOR1 // JOINT1: Thumb CMC Roll (const)
         1.0f, // MOTOR2 // JOINT2: Thumb CMC Yaw (const)

@@ -26,9 +26,7 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
         friction_compensators_.emplace_back(KarnoppCompensator(0.04, 0.01, 0.05)); // Example values
     }
 
-
-
-
+    // enable the motors
     enable();
 
     // Empty the CAN buffer

@@ -1,9 +1,22 @@
 #include "plato2_hardware_interface/five_bar_linkage.hpp"
-
+#include "plato2_hardware_interface/hardware_config/linkage_config.hpp"
+#include <iostream>
 
 namespace FiveBarLinkage{
 
-FiveBarLinkage::FiveBarLinkage(const FiveBarLinkageConfig &config) : config_(config){
+FiveBarLinkage::FiveBarLinkage(FiveBarLinkageConfig &config) : config_(config){
+
+    // print the linkage configuration
+    std::cout << "\nInitializing FiveBarLinkage with configuration:\n";
+    std::cout << "Passed values:\n";
+    std::cout << "L1: " << config_.L1 << "\n";
+    std::cout << "L2: " << config_.L2 << "\n";
+    std::cout << "L3: " << config_.L3 << "\n";
+    std::cout << "L4: " << config_.L4 << "\n";
+    std::cout << "L5: " << config_.L5 << "\n";
+    std::cout << "eef_length: " << config.eef_length << "\n";
+    std::cout << "eef_linkage_angle: " << config.eef_linkage_angle << "\n";
+
 
 }
 
@@ -45,7 +58,7 @@ float FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const floa
 
     // added dummy_ration back for testing
     float dummy_ratio = (pip_motor_angle - mcp_motor_angle) / pip_motor_angle;
-    return dummy_ratio;
+    return reduction_ratio;
 
     // return reduction_ratio;
 }

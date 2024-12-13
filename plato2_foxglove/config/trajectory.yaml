@@ -1,3 +1,19 @@
+card:
+- position_name: neutral
+  Motion_Time: 1.0
+  Hold_Time: 1.0
+- position_name: card open
+  Motion_Time: 1.0
+  Hold_Time: 2.0
+- position_name: card
+  Motion_Time: 2.0
+  Hold_Time: 3.0
+- position_name: card open
+  Motion_Time: 0.5
+  Hold_Time: 2.0
+- position_name: neutral
+  Motion_Time: 0.25
+  Hold_Time: 1.0
 opposition:
 - Hold_Time: 1.0
   Motion_Time: 0.1
@@ -222,21 +238,35 @@ test:
   Motion_Time: 5.0
   position_name: open
 test 1:
-- position_name: open
+- Hold_Time: 1.0
   Motion_Time: 2.0
-  Hold_Time: 1.0
-- position_name: neutral
+  position_name: open
+- Hold_Time: 1.0
   Motion_Time: 2.0
-  Hold_Time: 1.0
-- position_name: close
+  position_name: neutral
+- Hold_Time: 1.0
   Motion_Time: 2.0
-  Hold_Time: 1.0
-
+  position_name: close
 tool:
-- position_name: toolo
+- Hold_Time: 1.0
   Motion_Time: 0.5
-  Hold_Time: 1.0
-- position_name: toolc
+  position_name: toolo
+- Hold_Time: 1.0
   Motion_Time: 0.5
-  Hold_Time: 1.0
-
+  position_name: toolc
+wide:
+- Hold_Time: 1.0
+  Motion_Time: 1.0
+  position_name: neutral
+- Hold_Time: 2.0
+  Motion_Time: 1.0
+  position_name: wide open
+- Hold_Time: 3.0
+  Motion_Time: 2.0
+  position_name: wide
+- Hold_Time: 2.0
+  Motion_Time: 0.5
+  position_name: wide open
+- Hold_Time: 1.0
+  Motion_Time: 0.25
+  position_name: neutral

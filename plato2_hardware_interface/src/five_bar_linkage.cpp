@@ -28,39 +28,44 @@ FiveBarLinkage::~FiveBarLinkage(){
 /////////////////////////////////////////////////////////////////////////////////////
 
 float FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const float &pip_motor_angle) {
-    float theta1 = pip_motor_angle + 2.35619; // PIP Motor Position
+    float theta1 = (pip_motor_angle + config_.eef_linkage_angle); // PIP Motor Position
     float theta4 = mcp_motor_angle; // MCP Motor Position
 
-    // Corner points calculation
-    // float Xb_x = config_.L1 * std::cos(theta1);
-    // float Xb_y = config_.L1 * std::sin(theta1);
-    // float Xd_x = config_.L5 + config_.L4 * std::cos(theta4);
-    // float Xd_y = config_.L4 * std::sin(theta4);
+    // print the motor angles
+    // std::cout << "MCP Motor Angle: " << Plato::rad2deg(theta4) << "\n";
+    // std::cout << "PIP Motor Angle: " << Plato::rad2deg(theta1) << "\n";
 
-    // Calculate theta3 and theta2 using linkage kinematics
-    float A = 2 * config_.L3 * config_.L4 * std::sin(theta4) - 2 * config_.L3 * config_.L1 * std::sin(theta1);
-    float B = 2 * config_.L3 * config_.L5 - 2 * config_.L1 * config_.L3 * std::cos(theta1) + 2 * config_.L3 * config_.L4 * std::cos(theta4);
-    float C = (std::pow(config_.L1, 2) - std::pow(config_.L2, 2) + std::pow(config_.L3, 2) + std::pow(config_.L4, 2) + std::pow(config_.L5, 2)
-              - 2 * config_.L1 * config_.L4 * std::sin(theta1) * std::sin(theta4)
-              - 2 * config_.L1 * config_.L5 * std::cos(theta1)
-              + 2 * config_.L4 * config_.L5 * std::cos(theta4)
-              - 2 * config_.L1 * config_.L4 * std::cos(theta1) * std::cos(theta4));
+    // Calculate corner points
+    float x1 = config_.L1 * std::cos(theta1);
+    float y1 = config_.L1 * std::sin(theta1);
+    float x4 = config_.L5 + config_.L4 * std::cos(theta4);
+    float y4 = config_.L4 * std::sin(theta4);
 
-    float tan_x = A + std::sqrt(std::pow(A, 2) + std::pow(B, 2) - std::pow(C, 2));
-    float tan_y = B - C;
+    // Calculate distance between points
+    float d = std::sqrt(std::pow(x4 - x1, 2) + std::pow(y4 - y1, 2));
+    
+    // Calculate intersection point using cosine law
+    float a = (std::pow(config_.L2, 2) - std::pow(config_.L3, 2) + std::pow(d, 2)) / (2 * d);
+    float h = std::sqrt(std::pow(config_.L2, 2) - std::pow(a, 2));
+    
+    // Calculate point 3 coordinates
+    float x3 = x1 + a * (x4 - x1) / d - h * (y4 - y1) / d;
+    float y3 = y1 + a * (y4 - y1) / d + h * (x4 - x1) / d;
 
-    float theta3 = M_PI - 2 * std::atan2(tan_y, tan_x);
-    float theta2 = std::asin((config_.L3 * std::sin(theta3) + config_.L4 * std::sin(theta4) - config_.L1 * std::sin(theta1)) / config_.L2);
+    // Calculate theta3
+    float theta3 = std::atan2(y3 - y4, x3 - x4);
 
+    // Calculate PIP joint angle and reduction ratio
     float pip_joint_angle = theta3 - config_.eef_linkage_angle - theta4;
-
     float reduction_ratio = pip_joint_angle / pip_motor_angle;
 
-    // added dummy_ration back for testing
-    float dummy_ratio = (pip_motor_angle - mcp_motor_angle) / pip_motor_angle;
-    return reduction_ratio;
+    // print the calculated values
+    // std::cout << "Output Linkage Angle: " << Plato::rad2deg(theta3) << "\n";
+    // std::cout << "PIP Joint Angle: " << Plato::rad2deg(pip_joint_angle) << "\n";
 
-    // return reduction_ratio;
+    return reduction_ratio;
+    // float dummy_ratio = (pip_motor_angle - mcp_motor_angle) / pip_motor_angle;
+    // return dummy_ratio;
 }
 
 } // namespace FiveBarLinkage

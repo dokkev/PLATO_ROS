@@ -204,8 +204,8 @@ void Hand::set_zero_motor_position(){
 void Hand::update_linkage_kinematics(){
     // Update the linkage kinematics to calculate the reduction ratios for Motor 3, 5, 7
     linkage_reduction_ratios_[3] = linkage_.update_kinematics(actuators_[2].get_states().position, actuators_[3].get_states().position);
-    linkage_reduction_ratios_[5] = linkage_.update_kinematics(actuators_[4].get_states().position, actuators_[5].get_states().position);
-    linkage_reduction_ratios_[7] = linkage_.update_kinematics(actuators_[6].get_states().position, actuators_[7].get_states().position);
+    linkage_reduction_ratios_[5] = linkage_.update_kinematics(-actuators_[4].get_states().position, -actuators_[5].get_states().position);
+    linkage_reduction_ratios_[7] = linkage_.update_kinematics(-actuators_[6].get_states().position, -actuators_[7].get_states().position);
     // the rest of the motors are 1:1 reduction ratio
 }
 

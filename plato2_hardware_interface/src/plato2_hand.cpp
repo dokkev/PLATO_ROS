@@ -55,7 +55,6 @@ void Hand::init_actuators(){
     actuators_.reserve(actuator_configs_.size());
     gains_.resize(num_actuators_);
 
-
     
     // Initialize the actuator instances and push them to the actuators_ vector
     for (size_t i = 0; i < actuator_configs_.size(); ++i) {

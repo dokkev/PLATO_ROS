@@ -12,4 +12,4 @@ float64[] position
 float64[] velocity
 
 # Array of feedforward torques for all joints
-float64[] torque
+float64[] torque_ff

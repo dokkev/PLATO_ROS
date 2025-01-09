@@ -17,13 +17,22 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   realtime_tools
   std_msgs
+  plato2_interfaces
 )
 
+# Add this dependency
+find_package(generate_parameter_library REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(backward_ros REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
+
+# Generate parameter library
+generate_parameter_library(
+  plato2_controllers_parameters
+  src/joint_impedance_controller_parameters.yaml
+)
 
 # Add the library
 add_library(plato2_controllers SHARED
@@ -32,36 +41,20 @@ add_library(plato2_controllers SHARED
 target_compile_features(plato2_controllers PUBLIC cxx_std_17)
 target_include_directories(plato2_controllers PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   $<INSTALL_INTERFACE:include/plato2_controllers>
 )
 ament_target_dependencies(plato2_controllers PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+target_link_libraries(plato2_controllers
+  PUBLIC plato2_controllers_parameters
+)
+
 pluginlib_export_plugin_description_file(controller_interface joint_impedance_command_plugin.xml)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gmock REQUIRED)
   find_package(controller_manager REQUIRED)
   find_package(ros2_control_test_assets REQUIRED)
-
-  # Test for loading the controller
-  # ament_add_gmock(test_load_joint_impedance_controller
-  #   test/test_load_joint_impedance_controller.cpp
-  # )
-  # target_link_libraries(test_load_joint_impedance_controller
-  #   plato2_controllers
-  # )
-  # ament_target_dependencies(test_load_joint_impedance_controller
-  #   controller_manager
-  #   hardware_interface
-  #   ros2_control_test_assets
-  # )
-
-  # Test the controller functionality
-  # ament_add_gmock(test_joint_impedance_controller
-  #   test/test_joint_impedance_controller.cpp
-  # )
-  # target_link_libraries(test_joint_impedance_controller
-  #   plato2_controllers
-  # )
 endif()
 
 install(
@@ -71,12 +64,14 @@ install(
 install(
   TARGETS
     plato2_controllers
+    plato2_controllers_parameters
   EXPORT export_plato2_controllers
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   INCLUDES DESTINATION include
 )
+
 install(
   FILES joint_impedance_command_plugin.xml
   DESTINATION share/plato2_controllers

@@ -21,6 +21,7 @@
   <depend>realtime_tools</depend>
   <depend>std_msgs</depend>
   <depend>pluginlib</depend>
+  <depend>plato2_interfaces</depend>
 
   <!-- Runtime dependencies -->
   <exec_depend>controller_manager</exec_depend>

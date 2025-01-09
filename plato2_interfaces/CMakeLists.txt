@@ -11,6 +11,12 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+
+set(msg_files
+  "msg/ImpedanceCommands.msg"
+)
+
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   msg/Trajectory.msg
   msg/SavedNames.msg

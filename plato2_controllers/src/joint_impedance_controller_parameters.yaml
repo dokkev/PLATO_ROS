@@ -1,0 +1,23 @@
+plato2_controllers:
+  joints: {
+    type: string_array,
+    default_value: [],
+    description: "Name of the joints to control",
+  }
+  interface_name: {
+    type: string,
+    default_value: "",
+    description: "Name of the interface to command",
+  }
+  impedance:
+    __map_joints:  # Dynamic mapping for joint-specific impedance parameters
+      stiffness: {
+        type: double,
+        default_value: 0.1,
+        description: "Stiffness for the joint."
+      }
+      damping: {
+        type: double,
+        default_value: 0.02,
+        description: "Damping for the joint."
+      }

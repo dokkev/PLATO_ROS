@@ -68,7 +68,7 @@ namespace MotorDirection{
 }
 
 namespace ImpKp{
-    constexpr uint32_t KP = 5000;
+    constexpr uint32_t KP = 500;
     constexpr uint32_t MOTOR3 = KP;
     constexpr uint32_t MOTOR4 = KP;
     constexpr uint32_t MOTOR5 = KP;
@@ -78,7 +78,7 @@ namespace ImpKp{
 } // kp
 
 namespace ImpKd{
-    constexpr uint32_t KD = 2500;
+    constexpr uint32_t KD = 200;
     constexpr uint32_t MOTOR3 = KD;
     constexpr uint32_t MOTOR4 = KD;
     constexpr uint32_t MOTOR5 = KD;

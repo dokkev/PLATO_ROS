@@ -1,0 +1,10 @@
+<library path="plato2_controllers">
+  <class name="plato2_controllers/JointImpedanceController"
+         type="plato2_controllers::JointImpedanceController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      A joint impedance controller that uses effort commands and feedback from position,
+      velocity, and effort states.
+    </description>
+  </class>
+</library>

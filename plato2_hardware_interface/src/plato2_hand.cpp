@@ -177,13 +177,11 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
         float compensator_force = friction_compensators_[i].Update(joint_velocity_states[i]);
         float actuator_cmd = (impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001;
         // clamp the actuator_cmd to the maximum torque
-        actuator_cmd = std::clamp(actuator_cmd, -0.8f, 0.8f);
+        actuator_cmd = std::clamp(actuator_cmd, -1.0f, 1.0f);
 
         actuators_[i].set_joint_torque(actuator_cmd, 0);
 
 
-        
-     
      
     //  std::cout << "Actuator " << i << " Impedance Command: " << actuator_cmd << std::endl;
     }
@@ -228,7 +226,9 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
         joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(linkage_reduction_ratios_[i]));
         // TODO: Implement the velocity and effort states reduction ratios
         joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
-        joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
+
+        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque); // assume perfect torque tracking
+        // joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
     }
     counter_++;
 

@@ -102,6 +102,14 @@ public:
     /// @return  Gains struct containing the current gains
     Gains get_gains() const { return gains_; }
 
+    /// @brief Get the cached joint commands of the actuator
+    /// @return  Commands struct containing the cached joint commands
+    Commands get_commands() const { return commands_; }
+
+    /// @brief Get the status of the motor
+    /// @return  Status struct containing the current voltage, current and temperature
+    Status get_status() const { return status_; }
+
     /// @brief enable the motor 
     void enable_motor();
 
@@ -157,6 +165,7 @@ public:
     /// @brief Get the motor position without offset
     /// @return float motor position
     float get_motor_position() { return motor_position_; }
+
 
     void calibrate_encoder();
 

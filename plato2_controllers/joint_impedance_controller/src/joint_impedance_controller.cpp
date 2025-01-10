@@ -1,4 +1,4 @@
-#include "plato2_controllers/joint_impedance_controller.hpp"
+#include "joint_impedance_controller/joint_impedance_controller.hpp"
 
 #include <memory>
 #include <string>
@@ -9,7 +9,7 @@
 #include "rclcpp/logging.hpp"
 #include "rclcpp/qos.hpp"
 
-namespace plato2_controllers
+namespace joint_impedance_controller
 {
 
 JointImpedanceController::JointImpedanceController()
@@ -21,7 +21,7 @@ controller_interface::CallbackReturn JointImpedanceController::on_init()
 {
   try
   {
-    param_listener_ = std::make_shared<plato2_controllers::ParamListener>(get_node());
+    param_listener_ = std::make_shared<joint_impedance_controller::ParamListener>(get_node());
     params_ = param_listener_->get_params();
   }
   catch (const std::exception &e)
@@ -151,8 +151,8 @@ controller_interface::return_type JointImpedanceController::update(
   return controller_interface::return_type::OK;
 }
 
-}  // namespace plato2_controllers
+}  // namespace joint_impedance_controller
 
 #include "pluginlib/class_list_macros.hpp"
 
-PLUGINLIB_EXPORT_CLASS(plato2_controllers::JointImpedanceController, controller_interface::ControllerInterface)
+PLUGINLIB_EXPORT_CLASS(joint_impedance_controller::JointImpedanceController, controller_interface::ControllerInterface)

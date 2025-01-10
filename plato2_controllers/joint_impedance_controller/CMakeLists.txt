@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(plato2_controllers)
+project(joint_impedance_controller)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
   add_compile_options(-Wall -Wextra -Wpedantic -Werror=conversion -Werror=unused-but-set-variable
@@ -30,23 +30,23 @@ endforeach()
 
 # Generate parameter library
 generate_parameter_library(
-  plato2_controllers_parameters
+  joint_impedance_controller_parameters
   src/joint_impedance_controller_parameters.yaml
 )
 
 # Add the library
-add_library(plato2_controllers SHARED
+add_library(joint_impedance_controller SHARED
   src/joint_impedance_controller.cpp
 )
-target_compile_features(plato2_controllers PUBLIC cxx_std_17)
-target_include_directories(plato2_controllers PUBLIC
+target_compile_features(joint_impedance_controller PUBLIC cxx_std_17)
+target_include_directories(joint_impedance_controller PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include/plato2_controllers>
+  $<INSTALL_INTERFACE:include/joint_impedance_controller>
 )
-ament_target_dependencies(plato2_controllers PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
-target_link_libraries(plato2_controllers
-  PUBLIC plato2_controllers_parameters
+ament_target_dependencies(joint_impedance_controller PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+target_link_libraries(joint_impedance_controller
+  PUBLIC joint_impedance_controller_parameters
 )
 
 pluginlib_export_plugin_description_file(controller_interface joint_impedance_command_plugin.xml)
@@ -59,13 +59,13 @@ endif()
 
 install(
   DIRECTORY include/
-  DESTINATION include/plato2_controllers
+  DESTINATION include/joint_impedance_controller
 )
 install(
   TARGETS
-    plato2_controllers
-    plato2_controllers_parameters
-  EXPORT export_plato2_controllers
+    joint_impedance_controller
+    joint_impedance_controller_parameters
+  EXPORT export_joint_impedance_controller
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -74,9 +74,9 @@ install(
 
 install(
   FILES joint_impedance_command_plugin.xml
-  DESTINATION share/plato2_controllers
+  DESTINATION share/joint_impedance_controller
 )
 
-ament_export_targets(export_plato2_controllers HAS_LIBRARY_TARGET)
+ament_export_targets(export_joint_impedance_controller HAS_LIBRARY_TARGET)
 ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()

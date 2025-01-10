@@ -1,4 +1,4 @@
-plato2_controllers:
+joint_impedance_controller:
   joints: {
     type: string_array,
     default_value: [],
@@ -21,3 +21,8 @@ plato2_controllers:
         default_value: 0.02,
         description: "Damping for the joint."
       }
+      torque_ff: {
+        type: double,
+        default_value: 0.0,
+        description: "Torque feedforward for the joint."
+      } 

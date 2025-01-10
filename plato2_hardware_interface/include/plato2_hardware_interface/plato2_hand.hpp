@@ -79,13 +79,7 @@ public:
 
     void set_current_position_as_zero();
 
-    void set_default_gains();
 
-    void set_runtime_gains(std::vector<actuator::Gains> &new_gains);
-
-    void retrieve_runtime_gains();
-
-    void calibrate();
 
 
 
@@ -94,17 +88,34 @@ private:
     /// @brief PCAN Interface to communicate with motors
     pcan_interface::PCANInterface &pcan_interface_;
 
+    /// @brief const actuator size for loop iteration
+    const size_t num_actuators_;
+
+
     /// @brief Actuator Vector
     std::vector<actuator::Actuator> actuators_;
 
     /// @brief Linkage Configuration
     FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_; 
 
-    /// @brief Five bar linkage object
-    FiveBarLinkage::FiveBarLinkage linkage_;
+    /// @brief Five bar linkage objects
+    FiveBarLinkage::FiveBarLinkage linkage1_;
+    FiveBarLinkage::FiveBarLinkage linkage2_;
+    FiveBarLinkage::FiveBarLinkage linkage3_;
 
-    /// @brief const actuator size for loop iteration
-    const size_t num_actuators_;
+    // MOTOR1 // JOINT1: Thumb CMC Roll (const)
+    // MOTOR2 // JOINT2: Thumb CMC Yaw (const)
+    // MOTOR4 // JOINT3: Thumb MCP (const)
+    // MOTOR3 // JOINT4: Thumb IP  
+    // MOTOR6 // JOINT5: Index MCP (const)
+    // MOTOR5 // JOINT6: Index PIP 
+    // MOTOR8 // JOINT7: Middle MCP (const)  
+    // MOTOR7 // JOINT8: Middle PIP
+    /// @brief Reduction Ratios
+    std::vector<float> pos_ratios_;
+    std::vector<float> vel_ratios_;
+    std::vector<float> trq_ratios_;
+
 
     /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
@@ -142,17 +153,6 @@ private:
         actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
-    std::vector<actuator::Gains> default_gains = {
-        actuator::Gains{KpVelocity::MOTOR1, KiVelocity::MOTOR1, KpPosition::MOTOR1, KiPosition::MOTOR1, KdPosition::MOTOR1},
-        actuator::Gains{KpVelocity::MOTOR2, KiVelocity::MOTOR2, KpPosition::MOTOR2, KiPosition::MOTOR2, KdPosition::MOTOR2},
-        actuator::Gains{KpVelocity::MOTOR4, KiVelocity::MOTOR4, KpPosition::MOTOR4, KiPosition::MOTOR4, KdPosition::MOTOR4},
-        actuator::Gains{KpVelocity::MOTOR3, KiVelocity::MOTOR3, KpPosition::MOTOR3, KiPosition::MOTOR3, KdPosition::MOTOR3},
-        actuator::Gains{KpVelocity::MOTOR6, KiVelocity::MOTOR6, KpPosition::MOTOR6, KiPosition::MOTOR6, KdPosition::MOTOR6},
-        actuator::Gains{KpVelocity::MOTOR5, KiVelocity::MOTOR5, KpPosition::MOTOR5, KiPosition::MOTOR5, KdPosition::MOTOR5},
-        actuator::Gains{KpVelocity::MOTOR8, KiVelocity::MOTOR8, KpPosition::MOTOR8, KiPosition::MOTOR8, KdPosition::MOTOR8},
-        actuator::Gains{KpVelocity::MOTOR7, KiVelocity::MOTOR7, KpPosition::MOTOR7, KiPosition::MOTOR7, KdPosition::MOTOR7}
-    };
-    
     std::vector<actuator::Impedance> impedance = {
         actuator::Impedance{0,0},
         actuator::Impedance{0,0},
@@ -165,17 +165,11 @@ private:
     };
 
 
-    std::vector<float> linkage_reduction_ratios_ = {
-        1.0f, // MOTOR1 // JOINT1: Thumb CMC Roll (const)
-        1.0f, // MOTOR2 // JOINT2: Thumb CMC Yaw (const)
-        1.0f, // MOTOR4 // JOINT3: Thumb MCP (const)
-        1.0f, // MOTOR3 // JOINT4: Thumb IP  
-        1.0f, // MOTOR6 // JOINT5: Index MCP (const)
-        1.0f, // MOTOR5 // JOINT6: Index PIP 
-        1.0f, // MOTOR8 // JOINT7: Middle MCP (const)  
-        1.0f, // MOTOR7 // JOINT8: Middle PIP 
-        
-    };
+
+
+
+
+
 };
 
 

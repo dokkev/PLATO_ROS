@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>plato2_controllers</name>
+  <name>joint_impedance_controller</name>
   <version>0.1.0</version>
   <description>
     A ROS 2 controller plugin for joint impedance control using effort commands and
@@ -36,9 +36,9 @@
   <export>
     <build_type>ament_cmake</build_type>
     <pluginlib plugin="controller_interface">
-      <library path="libplato2_controllers">
-        <class name="plato2_controllers/JointImpedanceController"
-               type="plato2_controllers::JointImpedanceController"
+      <library path="libjoint_impedance_controller">
+        <class name="joint_impedance_controller/JointImpedanceController"
+               type="joint_impedance_controller::JointImpedanceController"
                base_class_type="controller_interface::ControllerInterface">
           <description>
             A joint impedance controller that uses effort commands and feedback from

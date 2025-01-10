@@ -5,9 +5,18 @@ namespace plato2_hand{
 
 Hand::Hand(pcan_interface::PCANInterface &pcan_interface) 
     :          pcan_interface_(pcan_interface),
-               linkage_(five_bar_linkage_config_),
-               num_actuators_(8){
+               num_actuators_(8),
+               linkage1_(five_bar_linkage_config_),
+               linkage2_(five_bar_linkage_config_),
+               linkage3_(five_bar_linkage_config_){
 
+
+    // initialize the all reduction ratios to 1
+    for (size_t i = 0; i < num_actuators_; ++i){
+        pos_ratios_.push_back(1.0);
+        vel_ratios_.push_back(1.0);
+        trq_ratios_.push_back(1.0);
+    }
 
     // set the callback function of the read_car of the PCANInterface to process the received CAN message
     pcan_interface_.set_read_callback(
@@ -122,22 +131,6 @@ void Hand::set_idle_command() {
 }
 
 
-void Hand::set_position_command(const std::vector<double>& joint_position_command, const uint32_t& duration) {
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        float actuator_cmd = joint_position_command[i] / linkage_reduction_ratios_[i];
-        actuators_[i].set_joint_position(actuator_cmd, duration);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////
-
-void Hand::set_velocity_command(const std::vector<double>& joint_velocity_command, const uint32_t& duration) {
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        float actuator_cmd = joint_velocity_command[i];
-        actuators_[i].set_joint_velocity(actuator_cmd, duration);
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_torque_command(const std::vector<double>& joint_torque_command, const uint32_t& duration) {
@@ -174,8 +167,8 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
 
     for (size_t i = 2; i < num_actuators_; ++i) {
         // PD controller
-        float compensator_force = friction_compensators_[i].Update(joint_velocity_states[i]);
-        float actuator_cmd = (impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001;
+
+        float actuator_cmd = ((impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001);
         // clamp the actuator_cmd to the maximum torque
         actuator_cmd = std::clamp(actuator_cmd, -1.0f, 1.0f);
 
@@ -200,9 +193,32 @@ void Hand::set_zero_motor_position(){
 
 void Hand::update_linkage_kinematics(){
     // Update the linkage kinematics to calculate the reduction ratios for Motor 3, 5, 7
-    linkage_reduction_ratios_[3] = linkage_.update_kinematics(actuators_[2].get_states().position, actuators_[3].get_states().position);
-    linkage_reduction_ratios_[5] = linkage_.update_kinematics(-actuators_[4].get_states().position, -actuators_[5].get_states().position);
-    linkage_reduction_ratios_[7] = linkage_.update_kinematics(-actuators_[6].get_states().position, -actuators_[7].get_states().position);
+    linkage1_.update_kinematics(actuators_[2].get_states().position, actuators_[3].get_states().position);
+    linkage2_.update_kinematics(-actuators_[4].get_states().position, -actuators_[5].get_states().position);
+    linkage3_.update_kinematics(-actuators_[6].get_states().position, -actuators_[7].get_states().position);
+
+
+    pos_ratios_[3] = linkage1_.get_position_amplification();
+    pos_ratios_[5] = linkage2_.get_position_amplification();
+    pos_ratios_[7] = linkage3_.get_position_amplification();
+
+    // vel_ratios_[3] = 1 / linkage1_.get_torque_amplification();
+    // vel_ratios_[5] = 1 / linkage2_.get_torque_amplification();
+    // vel_ratios_[7] = 1 / linkage3_.get_torque_amplification();
+
+    trq_ratios_[3] = linkage1_.get_torque_amplification();
+    trq_ratios_[5] = linkage2_.get_torque_amplification();
+    trq_ratios_[7] = linkage3_.get_torque_amplification();
+
+    // print the pos ratios
+    // for (size_t i = 0; i < num_actuators_; ++i){
+    //     std::cout << "Pos Ratios: " << pos_ratios_[i] << std::endl;
+    // }
+
+
+
+
+
     // the rest of the motors are 1:1 reduction ratio
 }
 
@@ -223,11 +239,11 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
 
     // update the joint states for each actuator
     for (size_t i = 0; i < num_actuators_; ++i){
-        joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(linkage_reduction_ratios_[i]));
+        joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(pos_ratios_[i]));
         // TODO: Implement the velocity and effort states reduction ratios
-        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
+        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity); //* static_cast<double>(vel_ratios_[i]));
 
-        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque); // assume perfect torque tracking
+        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque);   //* static_cast<double>(trq_ratios_[i])); // assume perfect torque tracking
         // joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
     }
     counter_++;

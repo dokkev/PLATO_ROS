@@ -37,11 +37,23 @@ public:
     /// @brief Destructor
     ~FiveBarLinkage();
 
-    float update_kinematics(const float &mcp_motor_angle, const float &pip_motor_angle);
+    void update_kinematics(const float &mcp_motor_angle, const float &pip_motor_angle);
+
+    float get_position_amplification(){ return {position_amplification_};};
+
+    float get_torque_amplification(){ return {torque_amplification_};};
 
 
 private:
+    /// @brief linkage lengths and end-effector (distal) link length with the angle offset
     const FiveBarLinkageConfig config_;
+
+    /// 
+    float theta1_, theta2_, theta3_, theta4_;
+    float position_amplification_;
+
+    /// @brief  Torque Amplification Factor (Mechanical Advantage)
+    float torque_amplification_;
      
 };
 

@@ -86,6 +86,8 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {

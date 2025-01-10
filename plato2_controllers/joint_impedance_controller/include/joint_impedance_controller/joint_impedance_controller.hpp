@@ -64,7 +64,7 @@ protected:
   /// @brief List of allowed interface types
   const std::vector<std::string> command_interface_types_;
 
-
+  ///
   /// @brief Variables used in realtime update function
 
   /// @brief degree of freedom

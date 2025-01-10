@@ -17,6 +17,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   realtime_tools
   std_msgs
+  control_msgs
+  trajectory_msgs
   plato2_interfaces
 )
 

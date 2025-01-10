@@ -6,8 +6,16 @@
 
 #include "controller_interface/helpers.hpp"
 #include "hardware_interface/loaned_command_interface.hpp"
+
+#include "lifecycle_msgs/msg/state.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/time.hpp"
+#include "rclcpp_action/create_server.hpp"
+#include "rclcpp_action/server_goal_handle.hpp"
+#include "rclcpp_lifecycle/state.hpp"
+
+#include "rclcpp/version.h"
 
 namespace joint_impedance_controller
 {
@@ -16,6 +24,8 @@ JointImpedanceController::JointImpedanceController()
 : controller_interface::ControllerInterface(), rt_command_ptr_(nullptr), joints_command_subscriber_(nullptr)
 {
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 controller_interface::CallbackReturn JointImpedanceController::on_init()
 {
@@ -33,6 +43,8 @@ controller_interface::CallbackReturn JointImpedanceController::on_init()
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 controller_interface::CallbackReturn JointImpedanceController::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
@@ -43,8 +55,6 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
   }
 
   dof_ = params_.joints.size();
-  current_positions_.resize(dof_, 0.0);
-  current_velocities_.resize(dof_, 0.0);
 
   joints_command_subscriber_ = get_node()->create_subscription<CmdType>(
     "~/commands", rclcpp::SystemDefaultsQoS(),
@@ -53,6 +63,8 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
   RCLCPP_INFO(get_node()->get_logger(), "Configuration successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 controller_interface::CallbackReturn JointImpedanceController::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
@@ -81,72 +93,25 @@ controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::InterfaceConfiguration JointImpedanceController::command_interface_configuration() const
-{
-  controller_interface::InterfaceConfiguration command_interfaces_config;
-  command_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
+// controller_interface::InterfaceConfiguration JointImpedanceController::command_interface_configuration() const
+// {
 
-  for (const auto &joint_name : params_.joints)
-  {
-    command_interfaces_config.names.push_back(joint_name + "/effort");
-  }
 
-  return command_interfaces_config;
-}
+//   return command_interfaces_config;
+// }
 
-controller_interface::InterfaceConfiguration JointImpedanceController::state_interface_configuration() const
-{
-  controller_interface::InterfaceConfiguration state_interfaces_config;
-  state_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
+// controller_interface::InterfaceConfiguration JointImpedanceController::state_interface_configuration() const
+// {
 
-  for (const auto &joint_name : params_.joints)
-  {
-    state_interfaces_config.names.push_back(joint_name + "/position");
-    state_interfaces_config.names.push_back(joint_name + "/velocity");
-  }
 
-  return state_interfaces_config;
-}
+
+//   return conf;
+// }
 
 controller_interface::return_type JointImpedanceController::update(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  auto joint_commands = rt_command_ptr_.readFromRT();
 
-  if (!joint_commands || !(*joint_commands))
-  {
-    return controller_interface::return_type::OK;
-  }
-
-  if ((*joint_commands)->position.size() != dof_ ||
-      (*joint_commands)->velocity.size() != dof_ ||
-      (*joint_commands)->stiffness.size() != dof_ ||
-      (*joint_commands)->damping.size() != dof_ ||
-      (*joint_commands)->torque_ff.size() != dof_)
-  {
-    RCLCPP_ERROR_THROTTLE(
-      get_node()->get_logger(), *(get_node()->get_clock()), 1000,
-      "Command size mismatch. Expected size: %zu, received: position (%zu), velocity (%zu), stiffness (%zu), damping (%zu), torque_ff (%zu)",
-      dof_,
-      (*joint_commands)->position.size(),
-      (*joint_commands)->velocity.size(),
-      (*joint_commands)->stiffness.size(),
-      (*joint_commands)->damping.size(),
-      (*joint_commands)->torque_ff.size());
-    return controller_interface::return_type::ERROR;
-  }
-
-  for (size_t index = 0; index < dof_; ++index)
-  {
-    double position_error = (*joint_commands)->position[index] - current_positions_[index];
-    double velocity_error = (*joint_commands)->velocity[index] - current_velocities_[index];
-    double torque_command =
-      (*joint_commands)->stiffness[index] * position_error +
-      (*joint_commands)->damping[index] * velocity_error +
-      (*joint_commands)->torque_ff[index];
-
-    command_interfaces_[index].set_value(torque_command);
-  }
 
   return controller_interface::return_type::OK;
 }

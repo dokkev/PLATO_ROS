@@ -67,6 +67,15 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
   velocities_.resize(num_joints, 0.0);
   efforts_.resize(num_joints, 0.0);
 
+  stiffness_.resize(num_joints, 0.0);
+  damping_.resize(num_joints, 0.0);
+  effort_ff_.resize(num_joints, 0.0);
+
+  // Assign Impedance parameters from the parameter server
+  
+
+
+
   // Log parameters
   RCLCPP_INFO(get_node()->get_logger(), "Configured joints: ");
   for (size_t i = 0; i < joint_names_.size(); ++i)
@@ -147,7 +156,6 @@ controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
 controller_interface::return_type JointImpedanceController::update(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // Get the currently commanded values
   auto impedance_commands = rt_command_ptr_.readFromRT();
 
   // Read current states
@@ -183,24 +191,13 @@ controller_interface::return_type JointImpedanceController::update(
     }
     else  // Other joints: impedance control
     {
-      // Calculate impedance control terms
       const double position_error = (*impedance_commands)->position[i] - positions_[i];
-      const double velocity_error = (*impedance_commands)->velocity.empty() ? 
-        -velocities_[i] : (*impedance_commands)->velocity[i] - velocities_[i];
+      const double velocity_error = (*impedance_commands)->velocity[i] - velocities_[i];
       
-      // Get stiffness and damping values (use defaults if not provided)
-      const double stiffness = (*impedance_commands)->stiffness.empty() ? 
-        params_.impedance.joints_map[joint_names_[i]].stiffness : (*impedance_commands)->stiffness[i];
-      const double damping = (*impedance_commands)->damping.empty() ? 
-        params_.impedance.joints_map[joint_names_[i]].damping : (*impedance_commands)->damping[i];
-      const double effort_ff = (*impedance_commands)->effort_ff.empty() ? 
-        0.0 : (*impedance_commands)->effort_ff[i];
-      
-      // Compute control command
       const double effort_cmd = 
-        stiffness * position_error +  // Spring term
-        damping * velocity_error +    // Damper term
-        effort_ff;                    // Feedforward term
+        (*impedance_commands)->stiffness[i] * position_error +  // Spring term
+        (*impedance_commands)->damping[i] * velocity_error +    // Damper term
+        (*impedance_commands)->effort_ff[i];                    // Feedforward term
 
       command_interfaces_[i].set_value(effort_cmd);
     }

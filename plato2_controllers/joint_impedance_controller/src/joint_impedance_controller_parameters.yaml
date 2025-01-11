@@ -13,12 +13,12 @@ joint_impedance_controller:
     __map_joints:  # Dynamic mapping for joint-specific impedance parameters
       stiffness: {
         type: double,
-        default_value: 0.1,
+        default_value: 0.3,
         description: "Stiffness for the joint."
       }
       damping: {
         type: double,
-        default_value: 0.02,
+        default_value: 5.0,
         description: "Damping for the joint."
       }
 

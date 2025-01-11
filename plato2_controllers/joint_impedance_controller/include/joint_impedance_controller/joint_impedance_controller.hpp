@@ -49,10 +49,18 @@ protected:
   std::vector<double> positions_;
   std::vector<double> velocities_;
   std::vector<double> efforts_;
+
+  // Command interfaces
+  std::vector<double> stiffness_;
+  std::vector<double> damping_;
+  std::vector<double> effort_ff_;
   
   // Real-time buffer for commands
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
   rclcpp::Subscription<CmdType>::SharedPtr joints_command_subscriber_;
+
+  //QoS
+  
 
   // Parameters
   std::shared_ptr<ParamListener> param_listener_;

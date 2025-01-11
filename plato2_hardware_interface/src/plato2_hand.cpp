@@ -170,7 +170,7 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
 
         float actuator_cmd = joint_impedance_command[i] / trq_ratios_[i]; // apply the amplification ratio from the linkage kinematics
         // clamp the actuator_cmd to the maximum torque
-        actuator_cmd = std::clamp(actuator_cmd, -1.0f, 1.0f);
+        actuator_cmd = std::clamp(actuator_cmd, -0.8f, 0.8f);
 
         actuators_[i].set_joint_torque(actuator_cmd, 0);
 

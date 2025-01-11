@@ -9,25 +9,16 @@
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
-#include "std_msgs/msg/float64_multi_array.hpp"
+#include "plato2_interfaces/msg/impedance_commands.hpp"
 
+// Include generated parameter header
 #include "joint_impedance_controller_parameters.hpp"
 
 namespace joint_impedance_controller
 {
 
-using CmdType = std_msgs::msg::Float64MultiArray;
+using CmdType = plato2_interfaces::msg::ImpedanceCommands;
 
-/**
- * \brief Joint impedance controller for a set of joints.
- *
- * This class implements impedance control for a set of joints.
- *
- * \param joints Names of the joints to control.
- *
- * Subscribes to:
- * - \b commands (std_msgs::msg::Float64MultiArray) : The commands to apply.
- */
 class JointImpedanceController : public controller_interface::ControllerInterface
 {
 public:
@@ -53,6 +44,11 @@ public:
 protected:
   std::vector<std::string> joint_names_;
   std::vector<std::string> command_interface_types_;
+
+  // State interfaces
+  std::vector<double> positions_;
+  std::vector<double> velocities_;
+  std::vector<double> efforts_;
   
   // Real-time buffer for commands
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;

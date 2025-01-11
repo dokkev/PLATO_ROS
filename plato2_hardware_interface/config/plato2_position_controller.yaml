@@ -30,3 +30,13 @@ plato2:
         - position
         - velocity
         - effort
+
+      # impedance:
+      #   joint1: {stiffness: 0.0, damping: 0.00}
+      #   joint2: {stiffness: 0.0, damping: 0.00}
+      #   joint3: {stiffness: 0.1, damping: 0.01}
+      #   joint4: {stiffness: 0.1, damping: 0.01}
+      #   joint5: {stiffness: 0.1, damping: 0.01}
+      #   joint6: {stiffness: 0.1, damping: 0.01}
+      #   joint7: {stiffness: 0.1, damping: 0.01}
+      #   joint8: {stiffness: 0.1, damping: 0.01}

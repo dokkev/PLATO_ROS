@@ -9,20 +9,30 @@ joint_impedance_controller:
     default_value: "",
     description: "Name of the interface to command",
   }
+  impedance:
+    __map_joints:  # Dynamic mapping for joint-specific impedance parameters
+      stiffness: {
+        type: double,
+        default_value: 0.1,
+        description: "Stiffness for the joint."
+      }
+      damping: {
+        type: double,
+        default_value: 0.02,
+        description: "Damping for the joint."
+      }
+
   # impedance:
-  #   __map_joints:  # Dynamic mapping for joint-specific impedance parameters
+  #   __map_joints: joints
+  #   type: struct
+  #   joints_map:
   #     stiffness: {
   #       type: double,
   #       default_value: 0.1,
-  #       description: "Stiffness for the joint."
+  #       description: "Stiffness gain for this joint"
   #     }
   #     damping: {
   #       type: double,
   #       default_value: 0.02,
-  #       description: "Damping for the joint."
+  #       description: "Damping gain for this joint"
   #     }
-  #     torque_ff: {
-  #       type: double,
-  #       default_value: 0.0,
-  #       description: "Torque feedforward for the joint."
-  #     } 

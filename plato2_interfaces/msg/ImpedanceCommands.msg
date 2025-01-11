@@ -1,5 +1,4 @@
 
-
 # Stiffness
 float64[] stiffness
 

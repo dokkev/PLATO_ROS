@@ -123,3 +123,4 @@ controller_interface::return_type JointImpedanceController::update(
 #include "pluginlib/class_list_macros.hpp"
 
 PLUGINLIB_EXPORT_CLASS(joint_impedance_controller::JointImpedanceController, controller_interface::ControllerInterface)
+

@@ -168,7 +168,7 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
     for (size_t i = 2; i < num_actuators_; ++i) {
         // PD controller
 
-        float actuator_cmd = ((impedance[i].kp * (joint_impedance_command[i] - joint_position_states[i]) - impedance[i].kd * joint_velocity_states[i]) * 0.001);
+        float actuator_cmd = joint_impedance_command[i] / trq_ratios_[i]; // apply the amplification ratio from the linkage kinematics
         // clamp the actuator_cmd to the maximum torque
         actuator_cmd = std::clamp(actuator_cmd, -1.0f, 1.0f);
 
@@ -202,9 +202,9 @@ void Hand::update_linkage_kinematics(){
     pos_ratios_[5] = linkage2_.get_position_amplification();
     pos_ratios_[7] = linkage3_.get_position_amplification();
 
-    // vel_ratios_[3] = 1 / linkage1_.get_torque_amplification();
-    // vel_ratios_[5] = 1 / linkage2_.get_torque_amplification();
-    // vel_ratios_[7] = 1 / linkage3_.get_torque_amplification();
+    vel_ratios_[3] = 1 / linkage1_.get_torque_amplification();
+    vel_ratios_[5] = 1 / linkage2_.get_torque_amplification();
+    vel_ratios_[7] = 1 / linkage3_.get_torque_amplification();
 
     trq_ratios_[3] = linkage1_.get_torque_amplification();
     trq_ratios_[5] = linkage2_.get_torque_amplification();
@@ -241,9 +241,9 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
     for (size_t i = 0; i < num_actuators_; ++i){
         joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(pos_ratios_[i]));
         // TODO: Implement the velocity and effort states reduction ratios
-        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity); //* static_cast<double>(vel_ratios_[i]));
+        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity * static_cast<double>(vel_ratios_[i]));
 
-        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque);   //* static_cast<double>(trq_ratios_[i])); // assume perfect torque tracking
+        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque   * static_cast<double>(trq_ratios_[i])); // assume perfect torque tracking
         // joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
     }
     counter_++;

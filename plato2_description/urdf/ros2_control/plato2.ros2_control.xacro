@@ -11,7 +11,7 @@
             </hardware>
 
             <joint name="joint1">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -19,7 +19,7 @@
             </joint>
 
             <joint name="joint2">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -27,7 +27,7 @@
             </joint>
 
             <joint name="joint3">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -35,7 +35,7 @@
             </joint>
 
             <joint name="joint4">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -44,7 +44,7 @@
 
 
             <joint name="joint5">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -52,7 +52,7 @@
             </joint>
 
             <joint name="joint6">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -60,7 +60,7 @@
             </joint>
 
             <joint name="joint7">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -68,7 +68,7 @@
             </joint>
 
             <joint name="joint8">
-                <command_interface name="position"/>
+                <command_interface name="effort"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>

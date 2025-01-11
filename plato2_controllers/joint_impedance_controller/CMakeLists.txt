@@ -12,6 +12,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   controller_interface
+  generate_parameter_library
   pluginlib
   rclcpp
   rclcpp_lifecycle
@@ -20,6 +21,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   control_msgs
   trajectory_msgs
   plato2_interfaces
+  realtime_tools
+  std_srvs
 )
 
 # Add this dependency
@@ -31,8 +34,7 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
 endforeach()
 
 # Generate parameter library
-generate_parameter_library(
-  joint_impedance_controller_parameters
+generate_parameter_library(joint_impedance_controller_parameters
   src/joint_impedance_controller_parameters.yaml
 )
 
@@ -43,15 +45,16 @@ add_library(joint_impedance_controller SHARED
 target_compile_features(joint_impedance_controller PUBLIC cxx_std_17)
 target_include_directories(joint_impedance_controller PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   $<INSTALL_INTERFACE:include/joint_impedance_controller>
 )
-ament_target_dependencies(joint_impedance_controller PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
-target_link_libraries(joint_impedance_controller
-  PUBLIC joint_impedance_controller_parameters
-)
 
-pluginlib_export_plugin_description_file(controller_interface joint_impedance_command_plugin.xml)
+target_link_libraries(joint_impedance_controller PUBLIC 
+  joint_impedance_controller_parameters
+)
+ament_target_dependencies(joint_impedance_controller PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+
+pluginlib_export_plugin_description_file(controller_interface joint_impedance_controller_plugin.xml)
+
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gmock REQUIRED)
@@ -71,12 +74,7 @@ install(
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  INCLUDES DESTINATION include
-)
 
-install(
-  FILES joint_impedance_command_plugin.xml
-  DESTINATION share/joint_impedance_controller
 )
 
 ament_export_targets(export_joint_impedance_controller HAS_LIBRARY_TARGET)

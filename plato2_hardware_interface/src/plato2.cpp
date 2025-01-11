@@ -47,6 +47,15 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
                               std::numeric_limits<double>::quiet_NaN());
 
 
+  for (const hardware_interface::ComponentInfo & joint : info_.joints){
+    if (!(joint.command_interfaces[0].name == "effort")) {
+      RCLCPP_FATAL(rclcpp::get_logger("PLATO2Hardware"),
+                  "[ERROR] PLATO Hand V2 hardware interface only supports effort interface");
+      
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
+
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -87,17 +96,21 @@ PLATO2Hardware::export_command_interfaces() {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(info_.joints.size());
   effort_command_interface_names_.reserve(info_.joints.size());
-  position_command_interface_names_.reserve(info_.joints.size());
+
+
+
 
 
   // Position Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_POSITION,
-        &joint_position_commands_[i]));
-    position_command_interface_names_.push_back(
+        info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
+        &joint_effort_commands_[i]));
+    effort_command_interface_names_.push_back(
         command_interfaces.back().get_name());
   }
+
+
 
   return command_interfaces;
 }
@@ -113,12 +126,10 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");
 
-  //set initial joint positions command to 0
-  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
-    joint_position_commands_[i] = 0.0;
+  //set initial joint effort command to 0
+  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
+    joint_effort_commands_[i] = 0.0;
   }
-
-
 
 
 
@@ -145,10 +156,10 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   // Parameters for sine wave
 
   // Set the first two joint position commands to zero
-  // hand_->set_idle_command();
+  hand_->set_idle_command();
   // hand_->print_motor_positions();
 
-  hand_->set_impedance_command(joint_position_commands_, 50, joint_position_states_, joint_velocity_states_);
+  // hand_->set_impedance_command(joint_effort_commands_, 50, joint_position_states_, joint_velocity_states_);
   
 
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);

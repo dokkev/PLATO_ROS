@@ -9,7 +9,10 @@
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
+#include "realtime_tools/realtime_publisher.hpp"
+#include "realtime_tools/realtime_server_goal_handle.hpp"
 #include "plato2_interfaces/msg/impedance_commands.hpp"
+#include "plato2_interfaces/msg/impedance_controller_state.hpp"
 
 // Include generated parameter header
 #include "joint_impedance_controller_parameters.hpp"
@@ -41,6 +44,8 @@ public:
   controller_interface::InterfaceConfiguration command_interface_configuration() const override;
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
 
+  void publish_state(const rclcpp::Time & time, const std::shared_ptr<CmdType>& command);
+
 protected:
   std::vector<std::string> joint_names_;
   std::vector<std::string> command_interface_types_;
@@ -51,15 +56,43 @@ protected:
   std::vector<double> efforts_;
 
   // Command interfaces
-  std::vector<double> stiffness_;
-  std::vector<double> damping_;
   std::vector<double> effort_ff_;
+  std::vector<double> effort_fb_;
+  std::vector<double> effort_cmd_;
+
+  std::vector<double> position_error_;
+  std::vector<double> velocity_error_;
   
   // Real-time buffer for commands
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
   rclcpp::Subscription<CmdType>::SharedPtr joints_command_subscriber_;
 
+  // State Publisher
+  using ControllerStateMsg = plato2_interfaces::msg::ImpedanceControllerState;
+  using StatePublisher = realtime_tools::RealtimePublisher<ControllerStateMsg>;
+  using StatePublisherPtr = std::unique_ptr<StatePublisher>;
+  rclcpp::Publisher<ControllerStateMsg>::SharedPtr publisher_;
+  StatePublisherPtr state_publisher_;
+
   //QoS
+  // Link Parameters for finger jacobian
+
+  const double L1 = 0.06;
+  const double L2 = 0.06;
+
+  struct Jacobian{
+    double j11, j12;
+    double j21, j22;
+  };
+
+  Jacobian get_J(double theta1, double theta2) const;
+  Jacobian get_Jinv(double theta1, double theta2) const;
+
+
+
+  // jacobian matrix
+
+
   
 
   // Parameters

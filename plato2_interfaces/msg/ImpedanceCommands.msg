@@ -13,4 +13,3 @@ float64[] velocity
 
 # Array of feedforward torques for all joints
 float64[] effort_ff
-

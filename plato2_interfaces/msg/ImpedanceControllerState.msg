@@ -2,20 +2,26 @@
 std_msgs/Header header
 string[] joint_names
 
-# JointTrajectoryPoint
-trajectory_msgs/JointTrajectoryPoint desired
-trajectory_msgs/JointTrajectoryPoint actual
-trajectory_msgs/JointTrajectoryPoint error  
+# Direct state vectors instead of JointTrajectoryPoints
+float64[] position_desired
+float64[] velocity_desired
+float64[] position_actual
+float64[] velocity_actual
+float64[] position_error
+float64[] velocity_error
 
-# Stiffness
+# Control parameters
 float64[] stiffness
-# Damping
 float64[] damping
 
-# total effort
-float64[] effort
-# feedforward components
+# Efforts
+float64[] effort_desired
+float64[] effort_actual
 float64[] effort_ff
-# feedback components
 float64[] effort_fb
 
+# End-effector force
+float64[] force_x
+float64[] force_y
+float64[] force_z
+float64[] force_norm

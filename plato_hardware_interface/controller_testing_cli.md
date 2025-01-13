@@ -64,4 +64,9 @@ data: [-0.033, -0.34, -0.243, -0.679, 1.285, 0.549, 0.667, 1.297]}"
 ros2 topic pub /plato2/plato2_position_controller/commands std_msgs/msg/Float64MultiArray "{
 data: [0.0, 0.0, -0.176, -1.227, 0.0, 0.0, 1.085, 1.054]}"
 
-ros2 topic pub  /plato2/joint_impedance_controller/commands plato2_interfaces/msg/ImpedanceCommands "{position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], stiffness: [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8], damping: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
+ros2 topic pub  /plato2/joint_impedance_controller/commands plato2_interfaces/msg/ImpedanceCommands "
+{position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+stiffness: [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0], 
+damping: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 
+effort_ff: [0.0, 0.0, 0.0, -0.6, 0.0, 0.6, 0.0, 0.0]}"

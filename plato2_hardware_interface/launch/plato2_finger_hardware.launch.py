@@ -119,6 +119,21 @@ def generate_launch_description():
             on_exit=[robot_controller_spawner],
         )
     )
+    
+    position_control_node = Node(
+        package='joint_position_controller',  # 
+        executable='position_control_node',
+        name='position_control_node',
+        namespace=plato_ns,  # Use the same namespace as other nodes
+        output='screen'
+    )
+    
+    delay_position_control_node_after_controller_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=robot_controller_spawner,
+            on_exit=[position_control_node],
+        )
+    )
 
     nodes = [
         control_node,
@@ -126,6 +141,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
     ]
 

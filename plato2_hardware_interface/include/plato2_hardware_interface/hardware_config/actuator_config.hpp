@@ -43,15 +43,14 @@ namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
 
-    constexpr float MOTOR4 = -0.303082f;
-    constexpr float MOTOR3 = 1.31895f;
+    constexpr float MOTOR4 = 0.454146f;
+    constexpr float MOTOR3 = -1.34222f;
 
-    constexpr float MOTOR6 = 0.321393f;
-    constexpr float MOTOR5 = 0.107767f;
+    constexpr float MOTOR6 = 4.84379f;
+    constexpr float MOTOR5 = 2.12577f;
    
-    constexpr float MOTOR8 = -1.16712f;
-    constexpr float MOTOR7 = -2.64725f;
-    
+    constexpr float MOTOR8 = -1.99989f;
+    constexpr float MOTOR7 = -3.42279f;
     
 }
 
@@ -65,28 +64,6 @@ namespace MotorDirection{
     constexpr char MOTOR7 = 1;
     constexpr char MOTOR8 = 1;
 }
-
-namespace ImpKp{
-    constexpr uint32_t KP = 1500;
-    constexpr uint32_t MOTOR3 = KP;
-    constexpr uint32_t MOTOR4 = KP;
-    constexpr uint32_t MOTOR5 = KP;
-    constexpr uint32_t MOTOR6 = KP;
-    constexpr uint32_t MOTOR7 = KP; 
-    constexpr uint32_t MOTOR8 = KP;
-} // kp
-
-namespace ImpKd{
-    constexpr uint32_t KD = 800;
-    constexpr uint32_t MOTOR3 = KD;
-    constexpr uint32_t MOTOR4 = KD;
-    constexpr uint32_t MOTOR5 = KD;
-    constexpr uint32_t MOTOR6 = KD;
-    constexpr uint32_t MOTOR7 = KD;
-    constexpr uint32_t MOTOR8 = KD;
-}
-
-
 
 
 #endif // PLATO_HARDWARE_INTERFACE__ACTUATOR_CONFIG_HPP_

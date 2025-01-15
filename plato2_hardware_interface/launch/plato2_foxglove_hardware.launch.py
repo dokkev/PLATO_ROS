@@ -107,7 +107,7 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["plato2_position_controller", "--controller-manager", "/plato2/controller_manager"],
+        arguments=["joint_impedance_controller", "--controller-manager", "/plato2/controller_manager"],
         namespace=plato_ns,  
     )
 
@@ -124,6 +124,21 @@ def generate_launch_description():
             on_exit=[robot_controller_spawner],
         )
     )
+    
+    position_control_node = Node(
+        package='joint_position_controller',  
+        executable='position_control_node',
+        name='position_control_node',
+        namespace=plato_ns,  # Use the same namespace as other nodes
+        output='screen'
+    )
+    
+    delay_position_control_node_after_controller_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=robot_controller_spawner,
+            on_exit=[position_control_node],
+        )
+    )
 
 
     nodes = [
@@ -135,6 +150,7 @@ def generate_launch_description():
         foxglove_graph,
         foxglove_commands,
         foxglove_trajectory,
+        # delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
     ]
 

@@ -95,6 +95,7 @@
     std::vector<double> joint_effort_states_;
 
     std::vector<double> ft_sensor_states_;
+    std::vector<double> actuator_temperature_states_;
 
     std::vector<std::string> effort_command_interface_names_;
     std::vector<std::string> velocity_command_interface_names_;

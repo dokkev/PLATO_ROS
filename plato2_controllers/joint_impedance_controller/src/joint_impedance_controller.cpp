@@ -87,15 +87,15 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
         "Joint '%s': DIRECT POSITION CONTROL", 
         joint_names_[i].c_str());
     }
-    else
-    {
-      RCLCPP_INFO(
-        get_node()->get_logger(), 
-        "Joint '%s': stiffness=%.2f, damping=%.2f", 
-        joint_names_[i].c_str(),
-        params_.impedance.joints_map[joint_names_[i]].stiffness,
-        params_.impedance.joints_map[joint_names_[i]].damping);
-    }
+    // else
+    // {
+    //   RCLCPP_INFO(
+    //     // get_node()->get_logger(), 
+    //     "Joint '%s': stiffness=%.2f, damping=%.2f", 
+    //     joint_names_[i].c_str(),
+    //     params_.impedance.joints_map[joint_names_[i]].stiffness,
+    //     params_.impedance.joints_map[joint_names_[i]].damping);
+    // }
   }
 
   // Create command subscriber

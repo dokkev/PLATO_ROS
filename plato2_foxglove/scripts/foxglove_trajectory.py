@@ -183,14 +183,13 @@ class TrajectoryManager(Node):
         self.execute_trajectory(trajectory_plan)
 
     def execute_trajectory(self, trajectory_plan):
-        # Start from zero position
-        current_positions = [0.0] * len(self.joint_names)
+        # Validate that there are trajectory steps to execute
+        if not trajectory_plan:
+            self.get_logger().error("No steps in the trajectory plan to execute.")
+            return
 
-        # self.get_logger().info(f"Starting trajectory execution from zero position: {current_positions}")
-
-        # Move to zero position first (if not already there)
-        self.publish_position(current_positions)
-        time.sleep(0.5)  # Small delay to ensure the robot starts from zero
+        # Use the initial position from the first step in the trajectory plan
+        current_positions = self.joint_states[trajectory_plan[0]['position_name']]
 
         # Iterate over the trajectory plan
         for step in trajectory_plan:

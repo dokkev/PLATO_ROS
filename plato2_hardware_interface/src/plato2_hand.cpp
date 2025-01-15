@@ -18,6 +18,9 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
         trq_ratios_.push_back(1.0);
     }
 
+    // set actuator temperature vector size
+    actuators_temperature_.resize(num_actuators_);
+
     // set the callback function of the read_car of the PCANInterface to process the received CAN message
     pcan_interface_.set_read_callback(
     [this](const TPCANMsg &msg) {
@@ -228,26 +231,33 @@ void Hand::update_linkage_kinematics(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::update_states(std::vector<double>&joint_position_states, std::vector<double>&joint_velocity_states, std::vector<double> &joint_effort_states){
-
     // recevie the message from the CAN bus every loop
     pcan_interface_.receive_message();
 
     // update the linkage kinematics to calculate the reduction ratios
     update_linkage_kinematics();
 
-    
-
     // update the joint states for each actuator
     for (size_t i = 0; i < num_actuators_; ++i){
         joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(pos_ratios_[i]));
-        // TODO: Implement the velocity and effort states reduction ratios
         joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity * static_cast<double>(vel_ratios_[i]));
 
-        joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque   * static_cast<double>(trq_ratios_[i])); // assume perfect torque tracking
-        // joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
+        // Update effort only for joints 3-7
+        if (i >= 2) {
+            joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque * static_cast<double>(trq_ratios_[i]));
+        }
     }
-    counter_++;
 
+    if (counter_ % 500 == 0){
+        for (size_t i = 0; i < num_actuators_; ++i){
+        actuators_temperature_[i] = static_cast<double>(actuators_[i].get_status().temperature) / 10.0;
+        }
+        // among the 8 actuator, get the highest temperature
+        // set effort of joint 0 is highest tempature of actuator
+        joint_effort_states[0] = *std::max_element(actuators_temperature_.begin(), actuators_temperature_.end());
+    }
+
+    counter_++;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -293,16 +303,30 @@ void Hand::print_actuator_info_() {
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
     }
     
-    // Impedance Gains
-    std::cout << "[INFO] Joint Impedance Gains: " << std::endl;
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        std::cout << "  Actuator " << i + 1 << " Kp: " << impedance[i].kp << " Kd: " << impedance[i].kd << std::endl;
+    if (counter_ % 10 == 0){
+        // set effort of joint 0 is highest tempature of actuator
+    
+
+
     }
 
 
     std::cout << "====================================================" << std::endl;
 }
 
+
 ////////////////////////////////////////////////////////////////////////
+
+void Hand::get_actuators_temperature(){
+    for (size_t i = 0; i < num_actuators_; ++i){
+        actuators_temperature_[i] = static_cast<double>(actuators_[i].get_status().temperature) / 10.0;
+    }
+
+    // among the 8 actuator, get the highest temperature
+    double max_temp = *std::max_element(actuators_temperature_.begin(), actuators_temperature_.end());
+}
+
+////////////////////////////////////////////////////////////////////////
+
 
 } // namespace plato2_hand

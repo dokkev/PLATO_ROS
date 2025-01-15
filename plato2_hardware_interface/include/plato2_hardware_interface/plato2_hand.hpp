@@ -77,6 +77,8 @@ public:
     /// @brief  
     void print_motor_positions();
 
+    void get_actuators_temperature();
+
     void set_current_position_as_zero();
 
 
@@ -116,6 +118,8 @@ private:
     std::vector<float> vel_ratios_;
     std::vector<float> trq_ratios_;
 
+    std::vector<double> actuators_temperature_;
+
 
     /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
@@ -153,22 +157,7 @@ private:
         actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
-    std::vector<actuator::Impedance> impedance = {
-        actuator::Impedance{0,0},
-        actuator::Impedance{0,0},
-        actuator::Impedance{ImpKp::MOTOR4, ImpKd::MOTOR4},
-        actuator::Impedance{ImpKp::MOTOR3, ImpKd::MOTOR3},
-        actuator::Impedance{ImpKp::MOTOR6, ImpKd::MOTOR6},
-        actuator::Impedance{ImpKp::MOTOR5, ImpKd::MOTOR5},
-        actuator::Impedance{ImpKp::MOTOR8, ImpKd::MOTOR8},
-        actuator::Impedance{ImpKp::MOTOR7, ImpKd::MOTOR7}
-    };
-
-
-
-
-
-
+    std::vector<double> acutators_tempetature_;
 
 };
 

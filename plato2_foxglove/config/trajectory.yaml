@@ -1,19 +1,26 @@
 card:
-- position_name: neutral
+- Hold_Time: 0.5
   Motion_Time: 1.0
-  Hold_Time: 1.0
-- position_name: card open
+  position_name: card 1
+- Hold_Time: 0.5
   Motion_Time: 1.0
-  Hold_Time: 2.0
-- position_name: card
-  Motion_Time: 2.0
-  Hold_Time: 3.0
-- position_name: card open
+  position_name: card 2
+- Hold_Time: 0.5
+  Motion_Time: 1.0
+  position_name: card 3
+- Hold_Time: 0.5
+  Motion_Time: 1.0
+  position_name: card 4
+coin:
+- position_name: coin 1
   Motion_Time: 0.5
-  Hold_Time: 2.0
-- position_name: neutral
-  Motion_Time: 0.25
-  Hold_Time: 1.0
+  Hold_Time: 0.20000000298023224
+- position_name: coin 2
+  Motion_Time: 0.5
+  Hold_Time: 0.20000000298023224
+- position_name: coin 3
+  Motion_Time: 0.5
+  Hold_Time: 0.20000000298023224
 opposition:
 - Hold_Time: 1.0
   Motion_Time: 0.1

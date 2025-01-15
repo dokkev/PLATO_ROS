@@ -70,3 +70,11 @@ velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 stiffness: [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0], 
 damping: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 
 effort_ff: [0.0, 0.0, 0.0, -0.6, 0.0, 0.6, 0.0, 0.0]}"
+
+ros2 topic pub  /plato2/joint_impedance_controller/commands plato2_interfaces/msg/ImpedanceCommands "
+{position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+stiffness: [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0], 
+damping: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
+effort_ff: [0.0, 0.0, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4]}"
+

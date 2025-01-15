@@ -45,6 +45,9 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
 
   joint_effort_states_.resize(info_.joints.size(),
                               std::numeric_limits<double>::quiet_NaN());
+  
+  actuator_temperature_states_.resize(info_.joints.size(),
+                              std::numeric_limits<double>::quiet_NaN());
 
 
   for (const hardware_interface::ComponentInfo & joint : info_.joints){
@@ -75,7 +78,7 @@ std::vector<hardware_interface::StateInterface>
 PLATO2Hardware::export_state_interfaces() {
   std::vector<hardware_interface::StateInterface> state_interfaces;
 
-  state_interfaces.reserve(info_.joints.size() * 3);
+  state_interfaces.reserve(info_.joints.size() * 4);
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION,
@@ -86,7 +89,11 @@ PLATO2Hardware::export_state_interfaces() {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
         &joint_effort_states_[i]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        info_.joints[i].name, "temperature",  // Use "temperature" as the interface type
+        &actuator_temperature_states_[i])); 
   }
+
 
   return state_interfaces;
 }
@@ -96,9 +103,6 @@ PLATO2Hardware::export_command_interfaces() {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(info_.joints.size());
   effort_command_interface_names_.reserve(info_.joints.size());
-
-
-
 
 
   // Position Command Interface
@@ -163,9 +167,6 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   
 
   hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
-
-
-
 
 
   return hardware_interface::return_type::OK;

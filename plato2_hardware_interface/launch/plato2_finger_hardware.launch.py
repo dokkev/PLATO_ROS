@@ -128,12 +128,12 @@ def generate_launch_description():
         output='screen'
     )
     
-    delay_position_control_node_after_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=robot_controller_spawner,
-            on_exit=[position_control_node],
-        )
-    )
+    # delay_position_control_node_after_controller_spawner = RegisterEventHandler(
+    #     event_handler=OnProcessExit(
+    #         target_action=robot_controller_spawner,
+    #         on_exit=[position_control_node],
+    #     )
+    # )
 
     nodes = [
         control_node,
@@ -141,7 +141,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        delay_position_control_node_after_controller_spawner
+        # delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
     ]
 

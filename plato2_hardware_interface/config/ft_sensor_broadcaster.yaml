@@ -1,0 +1,33 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    ft_sensor_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+ft_sensor_broadcaster:
+  ros__parameters:
+    frame_id: "index_ft_sensor"  # Required, cannot be empty
+    sensor_name: "ft_sensor"    # Using standard interface names with sensor_name prefix
+    
+    # Optional: If you want to specify custom interface names instead of using sensor_name
+    interface_names:
+      force:
+        x: "ft_sensor/force.x"
+        y: "ft_sensor/force.y"
+        z: "ft_sensor/force.z"
+      torque:
+        x: "ft_sensor/torque.x"
+        y: "ft_sensor/torque.y"
+        z: "ft_sensor/torque.z"
+    
+    # Optional: Define offsets if your sensor needs calibration
+    offset:
+      force:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+      torque:
+        x: 0.0
+        y: 0.0
+        z: 0.0

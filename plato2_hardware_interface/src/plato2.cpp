@@ -1,24 +1,9 @@
-// Copyright 2020 ros2_control Development Team
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include <pluginlib/class_list_macros.hpp>
 
 #include "plato2_hardware_interface/plato2.hpp"
 
 namespace plato2_hardware_interface {
-
 
 hardware_interface::CallbackReturn
 PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
@@ -32,43 +17,49 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
 
   // Initialize all Joint Vectors
   joint_position_commands_.resize(info_.joints.size(),
-                                  std::numeric_limits<double>::quiet_NaN());
+                                std::numeric_limits<double>::quiet_NaN());
 
   joint_effort_commands_.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
+                              std::numeric_limits<double>::quiet_NaN());
 
   joint_position_states_.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
+                              std::numeric_limits<double>::quiet_NaN());
 
   joint_velocity_states_.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
+                              std::numeric_limits<double>::quiet_NaN());
 
   joint_effort_states_.resize(info_.joints.size(),
-                              std::numeric_limits<double>::quiet_NaN());
+                            std::numeric_limits<double>::quiet_NaN());
   
   actuator_temperature_states_.resize(info_.joints.size(),
-                              std::numeric_limits<double>::quiet_NaN());
+                            std::numeric_limits<double>::quiet_NaN());
 
+  // Initialize FT sensor states
+  ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
 
-  for (const hardware_interface::ComponentInfo & joint : info_.joints){
+  for (const hardware_interface::ComponentInfo & joint : info_.joints) {
     if (!(joint.command_interfaces[0].name == "effort")) {
       RCLCPP_FATAL(rclcpp::get_logger("PLATO2Hardware"),
                   "[ERROR] PLATO Hand V2 hardware interface only supports effort interface");
-      
       return hardware_interface::CallbackReturn::ERROR;
     }
   }
 
+  // Initialize FT sensor
+  ft_sensor_ = std::make_unique<FTSensorCAN>("can0");
+  if (!ft_sensor_->init()) {
+    RCLCPP_ERROR(rclcpp::get_logger("PLATO2Hardware"), 
+                 "Failed to initialize FT sensor");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-hardware_interface::CallbackReturn PLATO2Hardware::on_configure(
-    const rclcpp_lifecycle::State & /*previous_state*/) {
-
+hardware_interface::CallbackReturn
+PLATO2Hardware::on_configure(const rclcpp_lifecycle::State & /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
               "Configuring ...setting all joint state to 0..");
-
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully configured!");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -78,7 +69,10 @@ std::vector<hardware_interface::StateInterface>
 PLATO2Hardware::export_state_interfaces() {
   std::vector<hardware_interface::StateInterface> state_interfaces;
 
-  state_interfaces.reserve(info_.joints.size() * 4);
+  // Reserve space for joint and FT sensor interfaces
+  state_interfaces.reserve(info_.joints.size() * 4 + 6);
+
+  // Joint state interfaces
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_POSITION,
@@ -90,10 +84,24 @@ PLATO2Hardware::export_state_interfaces() {
         info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
         &joint_effort_states_[i]));
     state_interfaces.emplace_back(hardware_interface::StateInterface(
-        info_.joints[i].name, "temperature",  // Use "temperature" as the interface type
+        info_.joints[i].name, "temperature",
         &actuator_temperature_states_[i])); 
   }
 
+  // FT sensor state interfaces
+  const std::string ft_sensor_name = "ft_sensor";
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "force.x", &ft_sensor_states_[0]));
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "force.y", &ft_sensor_states_[1]));
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "force.z", &ft_sensor_states_[2]));
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "torque.x", &ft_sensor_states_[3]));
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "torque.y", &ft_sensor_states_[4]));
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+      ft_sensor_name, "torque.z", &ft_sensor_states_[5]));
 
   return state_interfaces;
 }
@@ -104,7 +112,6 @@ PLATO2Hardware::export_command_interfaces() {
   command_interfaces.reserve(info_.joints.size());
   effort_command_interface_names_.reserve(info_.joints.size());
 
-
   // Position Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
@@ -114,19 +121,13 @@ PLATO2Hardware::export_command_interfaces() {
         command_interfaces.back().get_name());
   }
 
-
-
   return command_interfaces;
 }
 
 hardware_interface::CallbackReturn
 PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) {
-
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
               "Activating ...please wait...");
-
-
-
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");
 
@@ -135,54 +136,43 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
     joint_effort_commands_[i] = 0.0;
   }
 
-
-
-
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-hardware_interface::CallbackReturn PLATO2Hardware::on_deactivate(
-    const rclcpp_lifecycle::State & /*previous_state*/) {
-
-
+hardware_interface::CallbackReturn
+PLATO2Hardware::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/) {
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully deactivated!");
-
-
   return hardware_interface::CallbackReturn::SUCCESS;
 }
-
-#include <cmath> // Include for sin and M_PI
 
 hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &time,
                     const rclcpp::Duration &period) {
+  // Update hand state
+  hand_->set_impedance_command(joint_effort_commands_, 100, 
+                             joint_position_states_, joint_velocity_states_);
+  hand_->update_states(joint_position_states_, joint_velocity_states_, 
+                      joint_effort_states_);
 
-  // Parameters for sine wave
-
-  // Set the first two joint position commands to zero
-  // hand_->set_idle_command();
-  // hand_->print_motor_positions();
-
-  hand_->set_impedance_command(joint_effort_commands_, 100, joint_position_states_, joint_velocity_states_);
-  
-
-  hand_->update_states(joint_position_states_, joint_velocity_states_, joint_effort_states_);
-
+  // Read FT sensor data
+  auto wrench = ft_sensor_->getLatestWrench();
+  ft_sensor_states_[0] = wrench.fx;
+  ft_sensor_states_[1] = wrench.fy;
+  ft_sensor_states_[2] = wrench.fz;
+  ft_sensor_states_[3] = wrench.tx;
+  ft_sensor_states_[4] = wrench.ty;
+  ft_sensor_states_[5] = wrench.tz;
 
   return hardware_interface::return_type::OK;
 }
 
-
 hardware_interface::return_type
 PLATO2Hardware::write(const rclcpp::Time &time,
                      const rclcpp::Duration & /*period*/) {
-   
   return hardware_interface::return_type::OK;
 }
 
 } // namespace plato2_hardware_interface
 
-#include "pluginlib/class_list_macros.hpp"
-
 PLUGINLIB_EXPORT_CLASS(plato2_hardware_interface::PLATO2Hardware,
-                       hardware_interface::SystemInterface)
+                      hardware_interface::SystemInterface)

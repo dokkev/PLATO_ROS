@@ -125,14 +125,16 @@
 </inertial>
 </link>
 
-<link name="index_fingertip">
+<!-- <link name="index_fingertip">
 </link>
 <joint name="index_fingertip_frame" type="fixed">
 <origin xyz="-0.076100000000000417311 -0.0050000000000001570966 -0.0024999999998208122243" rpy="1.57079632679491632 1.0729310576333032043e-14 -3.141592653589793116" />
 <parent link="thumb_distal" />
 <child link="index_fingertip" />
 <axis xyz="0 0 0"/>
-</joint>
+</joint> -->
+
+
 
 
 <link name="index_proximal">
@@ -181,7 +183,18 @@
 </inertial>
 </link>
 
-<link name="thumb_fingertip">
+
+<link name="index_ft_sensor">
+</link>
+
+<joint name="index_ft_sensor_frame" type="fixed">
+<origin xyz = "-0.0494 0.0 0.0" rpy = "-1.57 0 1.57"/>
+<parent link="index_distal"/>
+<child link="index_ft_sensor"/>
+</joint>
+
+
+<!-- <link name="thumb_fingertip">
 <inertial>
 <origin xyz="0 0 0" rpy="0 0 0" />
 <mass value="1e-9" />
@@ -193,7 +206,7 @@
 <parent link="index_distal" />
 <child link="thumb_fingertip" />
 <axis xyz="0 0 0"/>
-</joint>
+</joint> -->
 
 <link name="middle_proximal">
 <visual>
@@ -205,17 +218,6 @@
 <color rgba="0.85676347476547665138 0.85684628218728142723 0.85689596664036427054 1.0"/>
 </material>
 </visual>
-<collision>
-<origin xyz="0 0 0" rpy="0 -0 0" />
-<geometry>
-<mesh filename="file://$(find plato2_description)/meshes/middle_proximal_collision.stl"/>
-</geometry>
-</collision>
-<inertial>
-<origin xyz="0.041723592555954480687 0.00015325900345948331445 -0.0024652665929218429454" rpy="0 0 0"/>
-<mass value="0.046493308366953339794" />
-<inertia ixx="5.9693787373143511043e-06" ixy="-3.1828148640349575716e-08"  ixz="1.0284240810849584112e-08" iyy="2.0043167951845242434e-05" iyz="2.6933150995912662265e-10" izz="1.9050463454403372931e-05" />
-</inertial>
 </link>
 
 <link name="middle_distal">
@@ -241,7 +243,7 @@
 </inertial>
 </link>
 
-<link name="middle_fingertip">
+<!-- <link name="middle_fingertip">
 <inertial>
 <origin xyz="0 0 0" rpy="0 0 0" />
 <mass value="1e-9" />
@@ -253,7 +255,7 @@
 <parent link="middle_distal" />
 <child link="middle_fingertip" />
 <axis xyz="0 0 0"/>
-</joint>
+</joint> -->
 
 
 <joint name="joint1" type="revolute">

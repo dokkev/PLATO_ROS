@@ -38,6 +38,8 @@
   #include <sensor_msgs/msg/joint_state.h>
 
   #include "plato2_hardware_interface/plato2_hand.hpp"
+  #include "plato2_hardware_interface/ft_sensor_can.hpp" 
+  
 
 
   #include "plato2_hardware_interface/utils/visibility_control.h"
@@ -102,6 +104,7 @@
     std::vector<std::string> position_command_interface_names_;
 
     pcan_interface::PCANInterface pcan_interface_;
+    std::unique_ptr<FTSensorCAN> ft_sensor_;
 
     // Plato Hand V2 Object
     std::unique_ptr<plato2_hand::Hand> hand_;

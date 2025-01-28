@@ -60,14 +60,24 @@ def generate_launch_description():
     rviz_config_file = PathJoinSubstitution(
         [FindPackageShare("plato2_description"), "rviz", "plato2.rviz"]
     )
+    
+    ft_sensor_controller = PathJoinSubstitution(
+    [
+        FindPackageShare("plato2_hardware_interface"),
+        "config",
+        "ft_sensor_broadcaster_controller.yaml",
+    ]
+)
 
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, robot_controllers],
+        parameters=[robot_description, robot_controllers, ft_sensor_controller],
         output="both",
         namespace=plato_ns,  
     )
+    
+    
     robot_state_pub_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -90,6 +100,13 @@ def generate_launch_description():
         arguments=["plato2_joint_state_broadcaster", "--controller-manager", "/plato2/controller_manager"],
         namespace=plato_ns,  
     )
+
+    ft_sensor_broadcaster_spawner = Node(
+    package="controller_manager",
+    executable="spawner",
+    arguments=["ft_sensor_broadcaster", "--controller-manager", "/plato2/controller_manager"],
+    namespace=plato_ns,
+)
 
     robot_controller_spawner = Node(
         package="controller_manager",
@@ -138,6 +155,7 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_state_pub_node,
+        joint_state_broadcaster_spawner,
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,

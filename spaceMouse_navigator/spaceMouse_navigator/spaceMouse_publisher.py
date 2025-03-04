@@ -11,8 +11,8 @@ class SpaceMousePublisher(Node):
         if not success:
             self.get_logger().error('Failed to open SpaceMouse')
             exit(1)
-        # Create a timer with a callback frequency of 100 Hz
-        self.timer = self.create_timer(0.01, self.publish_space_mouse_data)
+        # Create a timer with a callback frequency of 1000 Hz
+        self.timer = self.create_timer(0.0011, self.publish_space_mouse_data)
 
     def publish_space_mouse_data(self):
         state = pyspacemouse.read()

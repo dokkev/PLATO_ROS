@@ -6,10 +6,11 @@ plato2:
       plato2_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster
 
-
       joint_impedance_controller:
         type: joint_impedance_controller/JointImpedanceController
 
+      ft_sensor_broadcaster:
+        type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
   joint_impedance_controller:
     ros__parameters:
@@ -31,12 +32,8 @@ plato2:
         - velocity
         - effort
 
-      # impedance:
-      #   joint1: {stiffness: 0.0, damping: 0.00}
-      #   joint2: {stiffness: 0.0, damping: 0.00}
-      #   joint3: {stiffness: 0.1, damping: 0.01}
-      #   joint4: {stiffness: 0.1, damping: 0.01}
-      #   joint5: {stiffness: 0.1, damping: 0.01}
-      #   joint6: {stiffness: 0.1, damping: 0.01}
-      #   joint7: {stiffness: 0.1, damping: 0.01}
-      #   joint8: {stiffness: 0.1, damping: 0.01}
+  ft_sensor_broadcaster:
+    ros__parameters:
+      frame_id: "index_ft_sensor"  # Required
+      sensor_name: "ft_sensor"  # Use sensor_name for standard mappings
+      state_publish_rate: 100.0

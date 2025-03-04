@@ -1,105 +1,49 @@
-// Copyright 2024 Your Organization
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+#ifndef PLATO2_HARDWARE_INTERFACE_FT_SENSOR_CAN_HPP_
+#define PLATO2_HARDWARE_INTERFACE_FT_SENSOR_CAN_HPP_
 
-#ifndef PLATO2_HARDWARE_INTERFACE__FT_SENSOR_CAN_HPP_
-#define PLATO2_HARDWARE_INTERFACE__FT_SENSOR_CAN_HPP_
-
+#include <iostream>
+#include <string>
+#include <linux/can.h>
+#include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <linux/can.h>
-#include <linux/can/raw.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <thread>
-#include <mutex>
-#include <atomic>
-#include <cstring>
-#include <string>
-#include <errno.h>
-#include <chrono>
-#include <memory>
+#include <functional>
 
-#include "rclcpp/rclcpp.hpp"
+#define FORCE_CAN_ID 0x01A
+#define TORQUE_CAN_ID 0x01B
 
-namespace plato2_hardware_interface
-{
+// Convert raw force output to Newtons (D15 Model)
+inline double convert_force(uint16_t raw) {
+    return (static_cast<double>(raw) / 1000.0) - 30.0;
+}
+
+// Convert raw torque output to Nm (D15 Model)
+inline double convert_torque(uint16_t raw) {
+    return (static_cast<double>(raw) / 100000.0) - 0.3;
+}
 
 class FTSensorCAN {
 public:
-  // Struct to hold 6-axis force/torque data
-  struct Wrench {
-    double fx;
-    double fy;
-    double fz;
-    double tx;
-    double ty;
-    double tz;
-    uint64_t timestamp;  // Microseconds since start
-  };
+    using Callback = std::function<void(double, double, double, double, double, double)>;
 
-  /**
-   * @brief Constructor for FTSensorCAN
-   * @param interface CAN interface name (default: "can0")
-   */
-  explicit FTSensorCAN(const std::string& interface = "can0");
-
-  /**
-   * @brief Destructor ensures proper cleanup of resources
-   */
-  ~FTSensorCAN();
-
-  /**
-   * @brief Initialize the CAN communication
-   * @return true if initialization successful, false otherwise
-   */
-  bool init();
-
-  /**
-   * @brief Get the latest wrench data without blocking
-   * @return Wrench struct containing latest force/torque data
-   */
-  Wrench getLatestWrench();
-
-  /**
-   * @brief Get the latest wrench data with age checking
-   * @param wrench Reference to store the wrench data
-   * @param max_age_us Maximum age of data in microseconds
-   * @return true if fresh data available, false if data too old
-   */
-  bool getLatestWrench(Wrench& wrench, uint64_t max_age_us = 10000);
+    explicit FTSensorCAN(const std::string& interface_name);
+    ~FTSensorCAN();
+    
+    void set_callback(Callback cb);
 
 private:
-  // CAN IDs for force and torque messages
-  static constexpr canid_t FORCE_MSG_ID = 0x01A;
-  static constexpr canid_t TORQUE_MSG_ID = 0x01B;
+    int sock_;
+    struct sockaddr_can addr_;
+    struct ifreq ifr_;
+    std::string if_name_;
+    std::thread listener_thread_;
+    Callback callback_;
+    bool running_;
 
-  int socket_;
-  std::string interface_;
-  std::thread read_thread_;
-  std::atomic<bool> running_;
-  std::mutex wrench_mutex_;
-  Wrench latest_wrench_;
-  bool have_force_;
-  bool have_torque_;
-
-  /**
-   * @brief Background thread for reading CAN messages
-   */
-  void readLoop();
+    void listen();
 };
 
-}  // namespace plato2_hardware_interface
-
-#endif  // PLATO2_HARDWARE_INTERFACE__FT_SENSOR_CAN_HPP_
+#endif // PLATO2_HARDWARE_INTERFACE_FT_SENSOR_CAN_HPP_

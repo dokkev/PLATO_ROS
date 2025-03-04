@@ -171,9 +171,9 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
     for (size_t i = 2; i < num_actuators_; ++i) {
         // PD controller
 
-        float actuator_cmd = joint_impedance_command[i] / trq_ratios_[i]; // apply the amplification ratio from the linkage kinematics
+        float actuator_cmd = joint_impedance_command[i] / trq_ratios_[i] * 8.0; // apply the amplification ratio from the linkage kinematics
         // clamp the actuator_cmd to the maximum torque
-        actuator_cmd = std::clamp(actuator_cmd, -0.8f, 0.8f);
+        actuator_cmd = std::clamp(actuator_cmd, -9.8f, 9.8f);
 
         actuators_[i].set_joint_torque(actuator_cmd, 0);
 
@@ -244,7 +244,8 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
 
         // Update effort only for joints 3-7
         if (i >= 2) {
-            joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque * static_cast<double>(trq_ratios_[i]));
+            // joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque * static_cast<double>(trq_ratios_[i]));
+            joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque / 8.0 * static_cast<double>(trq_ratios_[i]));
         }
     }
 

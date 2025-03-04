@@ -1,0 +1,27 @@
+Launch:
+ros2 launch plato2_hardware_interface plato2_finger_hardware.launch.py 
+ros2 run joint_position_controller position_control_node
+	this is to set gains
+	keep on soft or normal stiffness
+
+Configure Zero:
+open plato2.cpp
+comment out 
+	hand_->set_impedance_command(joint_effort_commands_, 100, 
+		joint_position_states_, joint_velocity_states_);
+
+uncomment
+  // hand_->set_idle_command();
+  // hand_->print_motor_positions();
+
+rebuild package
+
+rerun plato2_finger_hardware.launch.py
+kill launch file
+
+open actuator_config.hpp
+edit motor offset in-order (hpp file numbering is not correct)
+	no need to edit motor 1&2
+
+recomment and uncomment in plato2.cpp
+and rebuild

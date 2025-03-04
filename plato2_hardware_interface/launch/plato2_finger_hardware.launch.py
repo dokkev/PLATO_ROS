@@ -60,24 +60,14 @@ def generate_launch_description():
     rviz_config_file = PathJoinSubstitution(
         [FindPackageShare("plato2_description"), "rviz", "plato2.rviz"]
     )
-    
-    ft_sensor_controller = PathJoinSubstitution(
-    [
-        FindPackageShare("plato2_hardware_interface"),
-        "config",
-        "ft_sensor_broadcaster_controller.yaml",
-    ]
-)
 
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, robot_controllers, ft_sensor_controller],
+        parameters=[robot_description, robot_controllers],
         output="both",
         namespace=plato_ns,  
     )
-    
-    
     robot_state_pub_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -101,13 +91,6 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
 
-    ft_sensor_broadcaster_spawner = Node(
-    package="controller_manager",
-    executable="spawner",
-    arguments=["ft_sensor_broadcaster", "--controller-manager", "/plato2/controller_manager"],
-    namespace=plato_ns,
-)
-
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -119,7 +102,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
+            arguments=['0', '0', '0', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato2_base_link'],
         )  
 
     # Event handlers remain unchanged
@@ -145,20 +128,29 @@ def generate_launch_description():
         output='screen'
     )
     
-    # delay_position_control_node_after_controller_spawner = RegisterEventHandler(
-    #     event_handler=OnProcessExit(
-    #         target_action=robot_controller_spawner,
-    #         on_exit=[position_control_node],
-    #     )
-    # )
+    delay_position_control_node_after_controller_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=robot_controller_spawner,
+            on_exit=[position_control_node],
+        )
+    )
+    
+    ft_sensor_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["ft_sensor_broadcaster", "--controller-manager", "/plato2/controller_manager"],
+        namespace=plato_ns,  
+    )
+    
+    
 
     nodes = [
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
-        joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        ft_sensor_broadcaster_spawner,
         # delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
     ]

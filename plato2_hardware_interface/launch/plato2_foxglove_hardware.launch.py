@@ -115,7 +115,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
+            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato2/base_link'],
         )  
 
     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
@@ -139,6 +139,13 @@ def generate_launch_description():
             on_exit=[position_control_node],
         )
     )
+    
+    ft_sensor_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["ft_sensor_broadcaster", "--controller-manager", "/plato2/controller_manager"],
+        namespace=plato_ns,  
+    )
 
 
     nodes = [
@@ -146,12 +153,13 @@ def generate_launch_description():
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
+        # ft_sensor_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
         foxglove_graph,
         foxglove_commands,
         foxglove_trajectory,
         # delay_position_control_node_after_controller_spawner
-        # optimo_plato_transform_broadcaster,
+        optimo_plato_transform_broadcaster,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

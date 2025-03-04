@@ -17,7 +17,7 @@ public:
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "spaceMouseMotion", 10,
             std::bind(&OptimoSpaceMouseController::space_mouse_motion_callback, this, std::placeholders::_1));
-        twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/servo_node/delta_twist_cmds", 10);
+        twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/optimo/servo/twist_cmd", 10);
     }
 
     void initialize_move_group()

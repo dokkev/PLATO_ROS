@@ -104,10 +104,12 @@
     std::vector<std::string> position_command_interface_names_;
 
     pcan_interface::PCANInterface pcan_interface_;
-    std::unique_ptr<FTSensorCAN> ft_sensor_;
+    // std::unique_ptr<FTSensorCAN> ft_sensor_;
 
     // Plato Hand V2 Object
     std::unique_ptr<plato2_hand::Hand> hand_;
+
+    std::unique_ptr<FTSensorCAN> ft_sensor_;
 
     uint64_t counter_ = 0;
 

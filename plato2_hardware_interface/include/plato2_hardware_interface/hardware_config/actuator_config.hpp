@@ -30,7 +30,7 @@ namespace MotorRxID{
 
 namespace GIM3505{
     constexpr float GEAR_RATIO = 8.0f;
-    constexpr float TORQUE_CONSTANT = 0.41f / 8.0f;
+    constexpr float TORQUE_CONSTANT = 0.41f;
 } // namespace GIM3505
 
 namespace XM430{
@@ -43,14 +43,14 @@ namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f;
     constexpr float MOTOR2 = 0.0f;
 
-    constexpr float MOTOR4 = 3.11341f;
-    constexpr float MOTOR3 = 1.33535f;
+    constexpr float MOTOR4 = -3.71996f;
+    constexpr float MOTOR3 = -3.12181f;
 
-    constexpr float MOTOR6 = 2.78306f;
-    constexpr float MOTOR5 = -3.8714f;
+    constexpr float MOTOR6 = 3.01652f;
+    constexpr float MOTOR5 = -3.41287f;
    
-    constexpr float MOTOR8 = -1.005f;
-    constexpr float MOTOR7 = -2.73995f;
+    constexpr float MOTOR8 = 2.66213f;
+    constexpr float MOTOR7 = 2.54425f;
     
 }
 

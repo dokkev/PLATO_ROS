@@ -35,7 +35,20 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
                             std::numeric_limits<double>::quiet_NaN());
 
   // Initialize FT sensor states
-  ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
+  // ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
+
+  // ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
+
+  // ft_sensor_ = std::make_unique<FTSensorCAN>("can0");
+
+  // ft_sensor_->set_callback([this](double fx, double fy, double fz, double tx, double ty, double tz) {
+  //     ft_sensor_states_[0] = fx;
+  //     ft_sensor_states_[1] = fy;
+  //     ft_sensor_states_[2] = fz;
+  //     ft_sensor_states_[3] = tx;
+  //     ft_sensor_states_[4] = ty;
+  //     ft_sensor_states_[5] = tz;
+  //   });
 
   for (const hardware_interface::ComponentInfo & joint : info_.joints) {
     if (!(joint.command_interfaces[0].name == "effort")) {
@@ -45,13 +58,7 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
     }
   }
 
-  // Initialize FT sensor
-  ft_sensor_ = std::make_unique<FTSensorCAN>("can0");
-  if (!ft_sensor_->init()) {
-    RCLCPP_ERROR(rclcpp::get_logger("PLATO2Hardware"), 
-                 "Failed to initialize FT sensor");
-    return hardware_interface::CallbackReturn::ERROR;
-  }
+
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -89,19 +96,12 @@ PLATO2Hardware::export_state_interfaces() {
   }
 
   // FT sensor state interfaces
-  const std::string ft_sensor_name = "ft_sensor";
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "force.x", &ft_sensor_states_[0]));
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "force.y", &ft_sensor_states_[1]));
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "force.z", &ft_sensor_states_[2]));
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "torque.x", &ft_sensor_states_[3]));
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "torque.y", &ft_sensor_states_[4]));
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-      ft_sensor_name, "torque.z", &ft_sensor_states_[5]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.x", &ft_sensor_states_[0]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.y", &ft_sensor_states_[1]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.z", &ft_sensor_states_[2]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.x", &ft_sensor_states_[3]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.y", &ft_sensor_states_[4]));
+    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.z", &ft_sensor_states_[5]));
 
   return state_interfaces;
 }
@@ -151,17 +151,16 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   // Update hand state
   hand_->set_impedance_command(joint_effort_commands_, 100, 
                              joint_position_states_, joint_velocity_states_);
+
+
+  // hand_->set_idle_command();
+  // hand_->print_motor_positions();
+
   hand_->update_states(joint_position_states_, joint_velocity_states_, 
                       joint_effort_states_);
 
   // Read FT sensor data
-  auto wrench = ft_sensor_->getLatestWrench();
-  ft_sensor_states_[0] = wrench.fx;
-  ft_sensor_states_[1] = wrench.fy;
-  ft_sensor_states_[2] = wrench.fz;
-  ft_sensor_states_[3] = wrench.tx;
-  ft_sensor_states_[4] = wrench.ty;
-  ft_sensor_states_[5] = wrench.tz;
+
 
   return hardware_interface::return_type::OK;
 }

@@ -32,6 +32,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   tf2_ros
   
 )
+find_package(srdfdom REQUIRED)
 
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
@@ -43,10 +44,12 @@ add_executable(controller_PlatoHand src/controller_PlatoHand.cpp)
 add_executable(controller_spaceMouse src/controller_spaceMouse.cpp)
 
 target_include_directories(controller_PlatoHand
-    PUBLIC include)
+    PUBLIC include
+     ${srdfdom_LIBRARIES})
 
 target_include_directories(controller_spaceMouse
-    PUBLIC include)
+    PUBLIC include
+     ${srdfdom_LIBRARIES})
 
 ament_target_dependencies(controller_PlatoHand
     ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)

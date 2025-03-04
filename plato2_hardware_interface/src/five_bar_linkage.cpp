@@ -69,6 +69,7 @@ void FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const float
     // position_amplification_ = 1.0;
 
     torque_amplification_ = std::abs( (-config_.L3 * std::sin(theta2_ - theta3_) )  / (config_.L1 * std::sin(theta1_ - theta2_)) );
+    // torque_amplification_ = 1.0;
    
 
     

@@ -75,14 +75,16 @@
                 <state_interface name="effort"/>
             </joint>
 
-        <sensor name="ft_sensor">
+
+            <!-- FT Sensor -->
+        <!-- <sensor name="ft_sensor" type="force_torque">
             <state_interface name="force.x"/>
             <state_interface name="force.y"/>
             <state_interface name="force.z"/>
             <state_interface name="torque.x"/>
             <state_interface name="torque.y"/>
             <state_interface name="torque.z"/>
-        </sensor>
+        </sensor> -->
 
 
 

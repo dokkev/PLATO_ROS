@@ -65,15 +65,24 @@ public:
 private:
     void initializePresets() {
         // Stiffness presets
-        stiffness_presets_["soft"] = std::vector<double>(8, 0.0);
-        stiffness_presets_["normal"] = std::vector<double>(8, 1.2);
+        stiffness_presets_["zero"] = std::vector<double>(8, 0.0);
+        stiffness_presets_["soft"] = std::vector<double>(8, 1.7);
+        stiffness_presets_["normal"] = std::vector<double>{0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
         stiffness_presets_["stiff"] = std::vector<double>(8, 2.4);
 
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
         effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
-        effort_presets_["high"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 1.2, 1.2, 0.0, 0.0};
+        effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
         effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
+
+
+        // thumb: 3,4   index 5,6 
+        stiffness_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 5.0, 5.0, 1.0, 1.0, 0.0, 0.0};
+        effort_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
+
+        stiffness_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.5, 0.5, 5.0, 5.0, 0.0, 0.0};
+        effort_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
     }
 
     void updateStiffnessFromPreset(const std::string& preset) {
@@ -97,8 +106,11 @@ private:
             auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
             
             impedance_msg->stiffness = stiffness_;
+            
+            for (size_t i=0; i <stiffness_.size(); i++) {
+                impedance_msg->damping[i] = stiffness_[i]/2.0;
+            }
   
-            impedance_msg->damping = stiffness_;
             impedance_msg->position = last_position_;
             impedance_msg->velocity = std::vector<double>(8, 0.0);
             impedance_msg->effort_ff = effort_ff_;
@@ -110,12 +122,13 @@ private:
 
     void printHelp() {
         RCLCPP_INFO(this->get_logger(), "Keyboard Controls:");
+        RCLCPP_INFO(this->get_logger(), "0: Zero stiffness");
         RCLCPP_INFO(this->get_logger(), "1: Soft stiffness");
         RCLCPP_INFO(this->get_logger(), "2: Normal stiffness");
         RCLCPP_INFO(this->get_logger(), "3: Stiff stiffness");
-        RCLCPP_INFO(this->get_logger(), "4: Zero effort feedforward");
-        RCLCPP_INFO(this->get_logger(), "5: Low effort feedforward");
-        RCLCPP_INFO(this->get_logger(), "6: High effort feedforward");
+        RCLCPP_INFO(this->get_logger(), "4: Flick Ready");
+        RCLCPP_INFO(this->get_logger(), "5: Flick");
+        RCLCPP_INFO(this->get_logger(), "6: Power grasp");
         RCLCPP_INFO(this->get_logger(), "7: MCP Low effort feedforward");
         RCLCPP_INFO(this->get_logger(), "h: Show this help");
         RCLCPP_INFO(this->get_logger(), "q: Quit");
@@ -126,6 +139,10 @@ private:
         char c;
         while (running_ && read(STDIN_FILENO, &c, 1) == 1) {
             switch (c) {
+                case '0':
+                    updateStiffnessFromPreset("zero");
+                    updateEffortFromPreset("zero");
+                    break;
                 case '1':
                     updateStiffnessFromPreset("soft");
                     break;
@@ -136,13 +153,15 @@ private:
                     updateStiffnessFromPreset("stiff");
                     break;
                 case '4':
-                    updateEffortFromPreset("zero");
+                    updateEffortFromPreset("flick_ready");
+                    updateStiffnessFromPreset("flick_ready");
                     break;
                 case '5':
-                    updateEffortFromPreset("low");
+                    updateEffortFromPreset("flick");
+                    updateStiffnessFromPreset("flick");
                     break;
                 case '6':
-                    updateEffortFromPreset("high");
+                    updateEffortFromPreset("power_grasp");
                     break;
                 case '7':
                     updateEffortFromPreset("mcp");
@@ -167,7 +186,12 @@ private:
         auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
         
         impedance_msg->stiffness = stiffness_;
-        impedance_msg->damping = std::vector<double>(8, 1.0);  // Fixed damping
+        impedance_msg->damping = stiffness_; // Fixed damping
+
+        // for (size_t i=0; i <stiffness_.size(); i++) {
+        //     impedance_msg->damping[i] = stiffness_[i]/2.0;
+        // }   
+
         impedance_msg->position = last_position_;
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;

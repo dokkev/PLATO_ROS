@@ -21,6 +21,7 @@ ament_target_dependencies(position_control_node
   rclcpp
   std_msgs
   plato2_interfaces
+  sensor_msgs
 )
 
 install(TARGETS position_control_node

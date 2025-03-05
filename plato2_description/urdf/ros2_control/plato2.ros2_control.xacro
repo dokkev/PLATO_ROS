@@ -76,7 +76,7 @@
             </joint>
 
 
-            <!-- FT Sensor -->
+        <!-- FT Sensor -->
         <!-- <sensor name="ft_sensor" type="force_torque">
             <state_interface name="force.x"/>
             <state_interface name="force.y"/>

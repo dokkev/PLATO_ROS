@@ -304,14 +304,6 @@ void Hand::print_actuator_info_() {
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
     }
     
-    if (counter_ % 10 == 0){
-        // set effort of joint 0 is highest tempature of actuator
-    
-
-
-    }
-
-
     std::cout << "====================================================" << std::endl;
 }
 

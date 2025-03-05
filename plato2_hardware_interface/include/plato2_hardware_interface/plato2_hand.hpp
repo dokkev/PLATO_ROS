@@ -14,7 +14,14 @@ struct States{
     std::vector<float> position;
     std::vector<float> velocity;
     std::vector<float> torque;
+
+    std::vector<float> force_raw;
+    std::vector<float> torque_raw;
+    std::vector<float> force_filtered;
+    std::vector<float> torque_filtered;
 };
+
+
 
 enum class ControlMode {
     OFF,      // Sends Stop Control Cmd to the motors. Joint states are not updated
@@ -80,9 +87,6 @@ public:
     void get_actuators_temperature();
 
     void set_current_position_as_zero();
-
-
-
 
 
 
@@ -157,7 +161,6 @@ private:
         actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
-    std::vector<double> acutators_tempetature_;
 
 };
 

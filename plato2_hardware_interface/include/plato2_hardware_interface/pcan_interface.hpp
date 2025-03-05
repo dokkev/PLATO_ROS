@@ -25,7 +25,7 @@ private:
     const bool b_fd = false;
 
     /// @brief Sets PCANHanddle (Hardware Chaneel)
-    const TPCANHandle pcan_handle = PCAN_USBBUS1;
+    const TPCANHandle pcan_handle = PCAN_PCIBUS1 ;
 
     /// @brief Sets PCANBaudrate (Baudrate)
     const TPCANBaudrate bitrate = PCAN_BAUD_1M;

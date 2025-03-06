@@ -10,7 +10,7 @@ controller_manager:
       type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
     ft_sensor_broadcaster_3:
-      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+      # type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
       
 
 # Force-Torque Sensor Configurations
@@ -21,13 +21,13 @@ ft_sensor_broadcaster_1:
     state_publish_rate: 100.0
     interface_names:
       force:
-        x: "force.x"
-        y: "force.y"
-        z: "force.z"
+        x: "ft_sensor1/force.x"
+        y: "ft_sensor1/force.y"
+        z: "ft_sensor1/force.z"
       torque:
-        x: "torque.x"
-        y: "torque.y"
-        z: "torque.z"
+        x: "ft_sensor1/torque.x"
+        y: "ft_sensor1/torque.y"
+        z: "ft_sensor1/torque.z"
 
 ft_sensor_broadcaster_2:
   ros__parameters:

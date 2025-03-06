@@ -18,7 +18,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(Eigen3 REQUIRED PATHS /usr/include/eigen3 /usr/local/include/eigen3 NO_DEFAULT_PATH)
+find_package(Eigen3 REQUIRED)
+
 
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)

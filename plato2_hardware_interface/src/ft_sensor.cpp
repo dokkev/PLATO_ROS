@@ -13,7 +13,7 @@ FTSensor::FTSensor(pcan_interface::PCANInterface &pcan_interface, const Config &
       bias_accum_force_(Eigen::Vector3f::Zero()),
       bias_accum_torque_(Eigen::Vector3f::Zero()),
       bias_samples_(0),
-      calibration_samples_(100), 
+      calibration_samples_(500), 
       bias_calibrated_(false) {}
 
 

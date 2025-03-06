@@ -39,7 +39,7 @@ PCANInterface::~PCANInterface() {
 TPCANStatus PCANInterface::write_can(TPCANMsg msg) {
 	
 	TPCANStatus status = CAN_Write(pcan_handle, &msg);
-	std::this_thread::sleep_for(std::chrono::microseconds(300));
+	std::this_thread::sleep_for(std::chrono::microseconds(150));
 
     return status;
 }

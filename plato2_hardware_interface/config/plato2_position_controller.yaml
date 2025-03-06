@@ -9,8 +9,6 @@ plato2:
       joint_impedance_controller:
         type: joint_impedance_controller/JointImpedanceController
 
-      ft_sensor_broadcaster:
-        type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
   joint_impedance_controller:
     ros__parameters:

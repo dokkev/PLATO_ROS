@@ -196,6 +196,10 @@ private:
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;
 
+        //set the position of 0 and 1 to the desired position to 0.0
+        impedance_msg->position[0] = 0.0;
+        impedance_msg->position[1] = 0.0;
+
         impedance_pub_->publish(*impedance_msg);
         
         RCLCPP_DEBUG(this->get_logger(), "Published impedance command");

@@ -185,9 +185,11 @@ void MsgDecoder::retrieve_position(const TPCANMsg &msg, float &position) const {
 // FORCE[0]| FORCE[1]| FORCE[2]| FORCE[3]| FORCE[4]| FORCE[5]|   -   |   -   |
 void MsgDecoder::retrieve_force(const TPCANMsg &msg, float &force_x, float &force_y, float &force_z){
 
-    int16_t fx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[1]) << 8 | msg.DATA[0]);
-    int16_t fy_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[3]) << 8 | msg.DATA[2]);
-    int16_t fz_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[5]) << 8 | msg.DATA[4]);
+    int16_t fx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[0]) << 8 | msg.DATA[1]);
+    int16_t fy_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[2]) << 8 | msg.DATA[3]);
+    int16_t fz_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[4]) << 8 | msg.DATA[5]);
+
+    
     
     force_x = (fx_int / 1000.0f) - 30.0f;
     force_y = (fy_int / 1000.0f) - 30.0f;

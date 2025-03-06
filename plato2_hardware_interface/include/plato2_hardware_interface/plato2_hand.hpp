@@ -99,7 +99,6 @@ public:
     size_t get_num_ft_sensors() const { return num_ft_sensors_; }
 
 
-
 private:
     /// @brief PCAN Interface to communicate with motors
     pcan_interface::PCANInterface &pcan_interface_;

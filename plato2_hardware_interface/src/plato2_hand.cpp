@@ -273,12 +273,12 @@ void Hand::update_ft_sensor_states(std::vector<geometry_msgs::msg::Wrench> &ft_s
 
     for (size_t i = 0; i < ft_sensors_.size(); ++i) {
         auto states = ft_sensors_[i].get_states();
-        ft_sensor_states[i].force.x = states.force_filtered.x();
-        ft_sensor_states[i].force.y = states.force_filtered.y();
-        ft_sensor_states[i].force.z = states.force_filtered.z();
-        ft_sensor_states[i].torque.x = states.torque_filtered.x();
-        ft_sensor_states[i].torque.y = states.torque_filtered.y();
-        ft_sensor_states[i].torque.z = states.torque_filtered.z();
+        ft_sensor_states[i].force.x = states.force_raw.x();
+        ft_sensor_states[i].force.y = states.force_raw.y();
+        ft_sensor_states[i].force.z = states.force_raw.z();
+        ft_sensor_states[i].torque.x = states.torque_raw.x();
+        ft_sensor_states[i].torque.y = states.torque_raw.y();
+        ft_sensor_states[i].torque.z = states.torque_raw.z();
     }
 
     // update the FT sensor states

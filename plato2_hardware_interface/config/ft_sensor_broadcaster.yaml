@@ -1,60 +1,36 @@
-controller_manager:
-  ros__parameters:
-    update_rate: 100  # Hz
+plato2:
+  controller_manager:
+    ros__parameters:
+      update_rate: 100  # Hz
 
-    # Force-Torque Sensor Broadcasters
-    ft_sensor_broadcaster_1:
-      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+      # Force-Torque Sensor Broadcasters
+      ft_sensor_broadcaster_1:
+        type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+        
+      ft_sensor_broadcaster_2:
+        type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
-    ft_sensor_broadcaster_2:
-      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+      ft_sensor_broadcaster_3:
+        type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+        
 
-    ft_sensor_broadcaster_3:
-      # type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
-      
+  # Force-Torque Sensor Configurations
+  ft_sensor_broadcaster_1:
+    ros__parameters:
+      frame_id: "thumb_ft_sensor"
+      sensor_name: "ft_sensor1"
+      state_publish_rate: 100.0
 
-# Force-Torque Sensor Configurations
-ft_sensor_broadcaster_1:
-  ros__parameters:
-    frame_id: "thumb_ft_sensor"
-    sensor_name: "ft_sensor1"
-    state_publish_rate: 100.0
-    interface_names:
-      force:
-        x: "ft_sensor1/force.x"
-        y: "ft_sensor1/force.y"
-        z: "ft_sensor1/force.z"
-      torque:
-        x: "ft_sensor1/torque.x"
-        y: "ft_sensor1/torque.y"
-        z: "ft_sensor1/torque.z"
 
-ft_sensor_broadcaster_2:
-  ros__parameters:
-    frame_id: "index_ft_sensor"
-    sensor_name: "ft_sensor2"
-    state_publish_rate: 100.0
-    interface_names:
-      force:
-        x: "force.x"
-        y: "force.y"
-        z: "force.z"
-      torque:
-        x: "torque.x"
-        y: "torque.y"
-        z: "torque.z"
+  ft_sensor_broadcaster_2:
+    ros__parameters:
+      frame_id: "index_ft_sensor"
+      sensor_name: "ft_sensor2"
+      state_publish_rate: 100.0
 
-ft_sensor_broadcaster_3:
-  ros__parameters:
-    frame_id: "middle_ft_sensor"
-    sensor_name: "ft_sensor3"
-    state_publish_rate: 100.0
-    interface_names:
-      force:
-        x: "force.x"
-        y: "force.y"
-        z: "force.z"
-      torque:
-        x: "torque.x"
-        y: "torque.y"
-        z: "torque.z"
+
+  ft_sensor_broadcaster_3:
+    ros__parameters:
+      frame_id: "middle_ft_sensor"
+      sensor_name: "ft_sensor3"
+      state_publish_rate: 100.0

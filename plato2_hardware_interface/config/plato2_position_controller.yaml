@@ -32,8 +32,4 @@ plato2:
         - velocity
         - effort
 
-  ft_sensor_broadcaster:
-    ros__parameters:
-      frame_id: "index_ft_sensor"  # Required
-      sensor_name: "ft_sensor"  # Use sensor_name for standard mappings
-      state_publish_rate: 100.0
+

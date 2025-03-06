@@ -135,13 +135,27 @@ def generate_launch_description():
         )
     )
     
-    ft_sensor_broadcaster_spawner = Node(
+    ft_sensor_broadcaster_spawner_1 = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["ft_sensor_broadcaster", "--controller-manager", "/plato2/controller_manager"],
+        arguments=["ft_sensor_broadcaster_1", "--controller-manager", "/plato2/controller_manager"],
         namespace=plato_ns,  
     )
-    
+
+    # ft_sensor_broadcaster_spawner_2 = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=["ft_sensor_broadcaster_2", "--controller-manager", "/plato2/controller_manager"],
+    #     namespace=plato_ns,  
+    # )
+
+    # ft_sensor_broadcaster_spawner_3 = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=["ft_sensor_broadcaster_3", "--controller-manager", "/plato2/controller_manager"],
+    #     namespace=plato_ns,  
+    # )
+
     
 
     nodes = [
@@ -150,7 +164,9 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        ft_sensor_broadcaster_spawner,
+        ft_sensor_broadcaster_spawner_1,
+        # ft_sensor_broadcaster_spawner_2,
+        # ft_sensor_broadcaster_spawner_3,
         # delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
     ]

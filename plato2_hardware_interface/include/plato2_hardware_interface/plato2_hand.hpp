@@ -94,9 +94,9 @@ public:
 
     void set_current_position_as_zero();
 
-        /// @brief Return function for num of actuators and sensors
-        size_t get_num_actuators();
-        size_t get_num_ft_sensors();
+    /// @brief Return function for num of actuators and sensors
+    size_t get_num_actuators() const { return num_actuators_; }
+    size_t get_num_ft_sensors() const { return num_ft_sensors_; }
 
 
 

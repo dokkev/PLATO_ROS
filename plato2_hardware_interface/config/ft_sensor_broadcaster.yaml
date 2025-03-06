@@ -2,6 +2,7 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
+    # Force-Torque Sensor Broadcasters
     ft_sensor_broadcaster_1:
       type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
@@ -10,7 +11,9 @@ controller_manager:
 
     ft_sensor_broadcaster_3:
       type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+      
 
+# Force-Torque Sensor Configurations
 ft_sensor_broadcaster_1:
   ros__parameters:
     frame_id: "thumb_ft_sensor"

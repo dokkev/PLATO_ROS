@@ -128,7 +128,7 @@
 <link name="thumb_ft_sensor">
 </link>
 
-<joint name="middle_ft_sensor_frame" type="fixed">
+<joint name="thumb_ft_sensor_joint" type="fixed">
 <origin xyz = "-0.0494 0.0 0.0" rpy = "-1.57 0 1.57"/>
 <parent link="thumb_distal"/>
 <child link="thumb_ft_sensor"/>
@@ -187,7 +187,7 @@
 <link name="index_ft_sensor">
 </link>
 
-<joint name="index_ft_sensor_frame" type="fixed">
+<joint name="index_ft_sensor_joint" type="fixed">
 <origin xyz = "-0.0494 0.0 0.0" rpy = "-1.57 0 1.57"/>
 <parent link="index_distal"/>
 <child link="index_ft_sensor"/>
@@ -260,10 +260,10 @@
 <link name="middle_ft_sensor">
 </link>
 
-<joint name="middle_ft_sensor_frame" type="fixed">
+<joint name="middle_ft_sensor_joint" type="fixed">
 <origin xyz = "-0.0494 0.0 0.0" rpy = "-1.57 0 1.57"/>
 <parent link="middle_distal"/>
-<child link="index_ft_sensor"/>
+<child link="middle_ft_sensor"/>
 </joint>
 
 

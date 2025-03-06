@@ -17,11 +17,6 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   control_msgs
   Eigen3
   interactive_markers
-  moveit_core
-  moveit_msgs
-  moveit_ros_planning
-  moveit_ros_planning_interface
-  moveit_servo
   # moveit_task_constructor_core
   # moveit_visual_tools
   pluginlib
@@ -40,26 +35,18 @@ endforeach()
 
 include_directories(${THIS_PACKAGE_INCLUDE_DIRS})
 
-add_executable(controller_PlatoHand src/controller_PlatoHand.cpp)
 add_executable(controller_spaceMouse src/controller_spaceMouse.cpp)
 
-target_include_directories(controller_PlatoHand
-    PUBLIC include
-     ${srdfdom_LIBRARIES})
 
 target_include_directories(controller_spaceMouse
     PUBLIC include
      ${srdfdom_LIBRARIES})
 
-ament_target_dependencies(controller_PlatoHand
-    ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
 ament_target_dependencies(controller_spaceMouse
     ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
 
 
-install(TARGETS controller_PlatoHand
-  DESTINATION lib/${PROJECT_NAME}
-)
+
 install(TARGETS controller_spaceMouse
   DESTINATION lib/${PROJECT_NAME}
 )

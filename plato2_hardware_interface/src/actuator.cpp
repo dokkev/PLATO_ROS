@@ -7,7 +7,7 @@ namespace actuator{
 ////////////////////////////// ACTUATOR CLASS //////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, Config& config) 
+Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, const Config& config) 
     :   pcan_interface_(pcan_interface), 
         config_(config),
         encoder_(config.gear_ratio, config.torque_constant),

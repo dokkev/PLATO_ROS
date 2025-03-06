@@ -21,14 +21,9 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // set actuator temperature vector size
     actuators_temperature_.resize(num_actuators_);
 
-    // set the callback function of the read_car of the PCANInterface to process the received CAN message
-    pcan_interface_.set_read_callback(
-    [this](const TPCANMsg &msg) {
-        this->sort_can_rx_id_(msg);  // Set the callback to process CAN messages
-    });
 
     // Initialize the actuators
-    init_actuators();
+    init_can_hardware();
 
     // Print the actuator info
     print_actuator_info_();
@@ -61,27 +56,53 @@ Hand::~Hand(){
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::init_actuators(){
-
-    // Reserve space in the vector to avoid reallocation
+void Hand::init_can_hardware() {
+    // Reserve space to avoid reallocation
     actuators_.reserve(actuator_configs_.size());
-    gains_.resize(num_actuators_);
+    ft_sensors_.reserve(ft_sensor_configs_.size());
 
-    
-    // Initialize the actuator instances and push them to the actuators_ vector
-    for (size_t i = 0; i < actuator_configs_.size(); ++i) {
-        // 'push back' the actuator to the vector of actuators
-        actuators_.emplace_back(pcan_interface_, actuator_configs_[i]);
-        
+    // Initialize actuators
+    for (const auto &config : actuator_configs_) {
+        actuators_.emplace_back(pcan_interface_, config);
     }
 
-    // Create a map of actuator Rx IDs to the corresponding Actuator object
+    // Initialize force-torque sensors
+    for (const auto &config : ft_sensor_configs_) {
+        ft_sensors_.emplace_back(pcan_interface_, config);
+    }
+
+    // Create a unified map for sorting CAN messages
     for (auto &actuator : actuators_) {
         actuator_rx_id_map_[actuator.get_rx_id()] = &actuator;
     }
 
+    for (auto &sensor : ft_sensors_) {
+        ft_sensor_rx_id_map_[sensor.get_force_rx_id()] = &sensor;
+        ft_sensor_rx_id_map_[sensor.get_torque_rx_id()] = &sensor;
+    }
 
+    // Register a single callback for processing all CAN messages
+    pcan_interface_.set_read_callback(
+        [this](const TPCANMsg &msg) {
+            auto act_it = actuator_rx_id_map_.find(msg.ID);
+            if (act_it != actuator_rx_id_map_.end()) {
+                act_it->second->process_message(msg);
+                return;
+            }
+
+            auto sensor_it = ft_sensor_rx_id_map_.find(msg.ID);
+            if (sensor_it != ft_sensor_rx_id_map_.end()) {
+                sensor_it->second->process_message(msg);
+                return;
+            }
+
+            std::cerr << "Unknown CAN message ID: 0x" << std::hex << msg.ID << std::dec << std::endl;
+        }
+    );
+
+    std::cout << "Hardware initialization completed: Actuators and FT sensors initialized." << std::endl;
 }
+
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -304,7 +325,16 @@ void Hand::print_actuator_info_() {
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
     }
     
-    std::cout << "====================================================" << std::endl;
+    std::cout << "===================FT Sensors Info ==================" << std::endl;
+
+    // Total number of FT sensors
+    std::cout << "[INFO] Total Number of FT Sensors: " << ft_sensors_.size() << " are initialized!" << std::endl;
+
+    // FT Sensor force and torque RX IDs
+    for (size_t i = 0; i < ft_sensors_.size(); ++i) {
+        std::cout << "[INFO] FT Sensor " << i + 1 << " Force RX ID: 0x" << std::hex << (int)ft_sensors_[i].get_force_rx_id()
+                  << " Torque RX ID: 0x" << std::hex << (int)ft_sensors_[i].get_torque_rx_id() << std::endl;
+    }
 }
 
 

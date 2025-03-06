@@ -42,19 +42,19 @@ public:
     ////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// @brief Set the motor enable ID to the message
-    void start_motor(TPCANMsg &msg);
+    static void start_motor(TPCANMsg &msg);
 
     /// @brief Set the motor disable ID to the message
-    void stop_motor(TPCANMsg &msg);
+    static void stop_motor(TPCANMsg &msg);
 
     /// @brief Set the stop control ID to the message. Current ongoing control command should be stopped immediately
-    void stop_control(TPCANMsg &msg);
+    static void stop_control(TPCANMsg &msg);
 
     /// @brief Set the torque command ID, torque value and duration to the message
     /// @param torque desired torque value
     /// @param duration execution time in ms
     /// @param msg TPCANMsg reference to store the command message
-    void set_torque(TPCANMsg &msg, const float torque, const uint32_t duration);
+    static void set_torque(TPCANMsg &msg, const float torque, const uint32_t duration);
 
     /// @brief Set the speed command ID, speed value and duration to the message
     /// @param speed desired speed value
@@ -114,7 +114,7 @@ private:
     /// @param value target command value
     /// @param msg buffer to store the encoded value
     /// @details BYTE0   | BYTE1 | BYTE2 | BYTE3 | BYTE4 | BYTE5 | BYTE6 | BYTE7 |
-    inline void encode_command_float_(TPCANMsg &msg, const float value) const {
+    static inline void encode_command_float_(TPCANMsg &msg, const float value){
         // Copy the float value to the buffer using little-endian byte order
         // most CPU architectures are little-endian, but make sure that the byte order is correct
         std::memcpy(&msg.DATA[1], &value, sizeof(float));
@@ -123,7 +123,7 @@ private:
     /// @brief encode 24-bit unsigned integer indicating control execution time in unit of ms.
     /// @param duration control execution time in unit of ms
     /// @param msg buffer to store the encoded value
-    inline void encode_duration_int_( TPCANMsg &msg, const uint32_t duration) const {
+    static inline void encode_duration_int_( TPCANMsg &msg, const uint32_t duration){
         // Copy the 24-bit unsigned integer value to the buffer using little-endian byte order
         msg.DATA[5] = duration & 0xFF;
         msg.DATA[6] = (duration >> 8) & 0xFF;
@@ -133,7 +133,7 @@ private:
     /// @brief encode 32-bit unsigned integer value to the message buffer's BYTE4 to BYTE7 for the gain parameter
     /// @param msg reference  TPCANMsg to store the encoded value
     /// @param value desired 32-bit unsigned integer value of the gain parameter
-    inline void encode_param_int_(TPCANMsg &msg, const uint32_t value) const {
+    static inline void encode_param_int_(TPCANMsg &msg, const uint32_t value) {
         // Copy the 32-bit unsigned integer value to the buffer using little-endian byte order
         msg.DATA[4] = value & 0xFF;
         msg.DATA[5] = (value >> 8) & 0xFF;
@@ -156,7 +156,7 @@ public:
     /// @param msg 
     /// @param error_byte
     /// @return  true if the response message is successful
-    inline bool get_result(const uint8_t error_byte) const{
+    static inline bool get_result(const uint8_t error_byte){
         switch (error_byte){
 
             case ResultByte::SUCCESS:

@@ -1,29 +1,21 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <sensor_msgs/msg/joy.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
 using namespace std::chrono_literals;
-using moveit::planning_interface::MoveGroupInterface;
 
 class OptimoSpaceMouseController : public rclcpp::Node
 {
 public:
     OptimoSpaceMouseController() : Node("optimo_space_mouse_controller")
     {
-        this->declare_parameter<std::string>("planning_group", "optimo_arm");
+
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "spaceMouseMotion", 10,
             std::bind(&OptimoSpaceMouseController::space_mouse_motion_callback, this, std::placeholders::_1));
         twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/optimo/servo/twist_cmd", 10);
-    }
-
-    void initialize_move_group()
-    {
-        auto planning_group = this->get_parameter("planning_group").as_string();
-        move_group_interface_ = std::make_shared<MoveGroupInterface>(shared_from_this(), planning_group);
     }
 
 private:
@@ -162,8 +154,6 @@ private:
     {
         return std::sqrt(std::pow(msg->axes[3], 2) + std::pow(msg->axes[4], 2) + std::pow(msg->axes[5], 2));
     }
-
-    std::shared_ptr<MoveGroupInterface> move_group_interface_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
 

@@ -1,19 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(plato2_hardware_interface LANGUAGES CXX)
 
-
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
   add_compile_options(-Wall -Wextra)
 endif()
-
-# if (NOT TARGET sockcanpp)
-#     add_subdirectory(libsockcanpp ${CMAKE_CURRENT_BUILD_DIR}/libsockcanpp)
-# endif()
-
-# target_link_libraries(
-
-#     sockcanpp
-# )
 
 # find dependencies
 set(THIS_PACKAGE_INCLUDE_DEPENDS
@@ -23,10 +13,12 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   sensor_msgs
   can_msgs
+  Eigen3
 )
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(Eigen3 REQUIRED PATHS /usr/include/eigen3 /usr/local/include/eigen3 NO_DEFAULT_PATH)
 
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
@@ -47,7 +39,6 @@ endif()
 message(STATUS "PCANBasic library found at: ${PCAN_LIB}")
 message(STATUS "PCANBasic include directory found at: ${PCAN_INCLUDE_DIR}")
 
-
 ## COMPILE
 add_library(
   plato2_hardware_interface
@@ -55,6 +46,7 @@ add_library(
   src/utils/ring_buf.cpp
   src/pcan_interface.cpp
   src/ft_sensor_can.cpp
+  src/ft_sensor.cpp
   src/can_protocol.cpp
   src/actuator.cpp
   src/karnopp_compensator.cpp
@@ -68,6 +60,8 @@ target_include_directories(plato2_hardware_interface PUBLIC
 $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include/plato2_hardware_interface>
 ${PCAN_INCLUDE_DIR}
+/usr/include/eigen3
+/usr/local/include/eigen3
 )
 include_directories("/include/plato2_hardware_interface") 
 
@@ -92,8 +86,6 @@ install(
   DESTINATION include/plato2_hardware_interface
 )
 
-
-
 install(DIRECTORY 
   launch 
   config
@@ -107,18 +99,9 @@ install(TARGETS plato2_hardware_interface
   RUNTIME DESTINATION bin
 )
 
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()

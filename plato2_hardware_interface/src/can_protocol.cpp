@@ -183,7 +183,7 @@ void MsgDecoder::retrieve_position(const TPCANMsg &msg, float &position) const {
 
 // BYTE0   | BYTE1   |   BYTE2 |   BYTE3 |   BYTE4 |   BYTE5 | BYTE6 | BYTE7 |
 // FORCE[0]| FORCE[1]| FORCE[2]| FORCE[3]| FORCE[4]| FORCE[5]|   -   |   -   |
-static void MsgDecoder::retrieve_force(const TPCANMsg &msg, float &force_x, float &force_y, float &force_z){
+void MsgDecoder::retrieve_force(const TPCANMsg &msg, float &force_x, float &force_y, float &force_z){
 
     int16_t fx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[1]) << 8 | msg.DATA[0]);
     int16_t fy_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[3]) << 8 | msg.DATA[2]);
@@ -198,7 +198,7 @@ static void MsgDecoder::retrieve_force(const TPCANMsg &msg, float &force_x, floa
 
 // BYTE0   | BYTE1   |   BYTE2 |   BYTE3 |   BYTE4 |   BYTE5 | BYTE6 | BYTE7 |
 // TORQUE[0]| TORQUE[1]| TORQUE[2]| TORQUE[3]| TORQUE[4]| TORQUE[5]|   -   |   -   |
-static void MsgDecoder::retrieve_torque(const TPCANMsg &msg, float &torque_x, float &torque_y, float &torque_z) {
+void MsgDecoder::retrieve_torque(const TPCANMsg &msg, float &torque_x, float &torque_y, float &torque_z) {
 
     int16_t tx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[1]) << 8 | msg.DATA[0]);
     int16_t ty_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[3]) << 8 | msg.DATA[2]);

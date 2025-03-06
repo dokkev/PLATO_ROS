@@ -3,6 +3,7 @@
 
 
 #include "plato2_hardware_interface/actuator.hpp"
+#include "plato2_hardware_interface/ft_sensor.hpp"
 #include "plato2_hardware_interface/five_bar_linkage.hpp"
 #include "plato2_hardware_interface/karnopp_compensator.hpp"
 
@@ -40,8 +41,8 @@ public:
     /// @brief  Destructor for the Hand. It stops the motion control
     ~Hand();
 
-    /// @brief Initialize the actuators. Called in the constructor
-    void init_actuators();
+    /// @brief Initialize the actuator and sensors communicating via CAN bus. Called in the constructor
+    void init_can_hardware();
 
     /// @brief Enable the motors
     void enable();
@@ -100,6 +101,7 @@ private:
 
     /// @brief Actuator Vector
     std::vector<actuator::Actuator> actuators_;
+    std::vector<sensor::FTSensor> ft_sensors_;
 
     /// @brief Linkage Configuration
     FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_; 
@@ -127,12 +129,11 @@ private:
 
     /// @brief Predefined Actuator Vector Map to corresponding RX CAN ID
     std::unordered_map<uint32_t, actuator::Actuator*> actuator_rx_id_map_;
+    std::unordered_map<uint32_t, sensor::FTSensor*> ft_sensor_rx_id_map_;
 
     /// @brief Internal Counter
     uint32_t counter_ = 0;
 
-    /// @brief Actuator Gains
-    std::vector<actuator::Gains> gains_;
 
     /// @brief Karnopp Friction Compensator
     std::vector<KarnoppCompensator> friction_compensators_;
@@ -161,6 +162,11 @@ private:
         actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO}
     };
 
+    std::vector<sensor::Config> ft_sensor_configs_ = {
+        sensor::Config{FTSensorID::THUMB_FORCE, FTSensorID::THUMB_TORQUE},
+        sensor::Config{FTSensorID::INDEX_FORCE, FTSensorID::INDEX_TORQUE},
+        sensor::Config{FTSensorID::MIDDLE_FORCE, FTSensorID::MIDDLE_TORQUE}
+    };
 
 };
 

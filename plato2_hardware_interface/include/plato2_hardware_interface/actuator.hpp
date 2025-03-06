@@ -89,7 +89,7 @@ public:
     /// @brief Constructor
     /// @param pcan_interface pcan_interface::PCANInterface object
     /// @param config Actuator configuration
-    Actuator(pcan_interface::PCANInterface& pcan_interface, Config& config);
+    Actuator(pcan_interface::PCANInterface& pcan_interface, const Config& config);
 
     /// @brief Destructor
     ~Actuator();

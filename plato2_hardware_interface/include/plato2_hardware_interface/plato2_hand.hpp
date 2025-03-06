@@ -7,6 +7,8 @@
 #include "plato2_hardware_interface/five_bar_linkage.hpp"
 #include "plato2_hardware_interface/karnopp_compensator.hpp"
 
+#include <geometry_msgs/msg/wrench.hpp>
+
 
 namespace plato2_hand{
 
@@ -79,8 +81,11 @@ public:
     void update_linkage_kinematics();
 
 
-    /// @brief Update the states of the motors
-    void update_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
+    /// @brief Update the joint states of from the actuators
+    void update_joint_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
+
+    /// @brief Update the force-torque sensor states
+    void update_ft_sensor_states(std::vector<geometry_msgs::msg::Wrench> &ft_sensor_states);
 
     /// @brief  
     void print_motor_positions();
@@ -88,6 +93,10 @@ public:
     void get_actuators_temperature();
 
     void set_current_position_as_zero();
+
+        /// @brief Return function for num of actuators and sensors
+        size_t get_num_actuators();
+        size_t get_num_ft_sensors();
 
 
 
@@ -97,6 +106,8 @@ private:
 
     /// @brief const actuator size for loop iteration
     const size_t num_actuators_;
+
+    const size_t num_ft_sensors_;
 
 
     /// @brief Actuator Vector
@@ -146,6 +157,8 @@ private:
 
     /// @brief read RX CAN messages from the Bus using the PCAN Interface and sort the messages to the corresponding actuators
     void sort_can_rx_id_(const TPCANMsg &msg);
+
+    
 
     
     ///////////////////////////////////////////////// CONFIGURATIONS //////////////////////////////////////////////

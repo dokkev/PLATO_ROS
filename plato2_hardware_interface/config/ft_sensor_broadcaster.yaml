@@ -2,17 +2,20 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-
-    ft_sensor_broadcaster:
+    ft_sensor_broadcaster_1:
       type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
-ft_sensor_broadcaster:
+    ft_sensor_broadcaster_2:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+    ft_sensor_broadcaster_3:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+ft_sensor_broadcaster_1:
   ros__parameters:
-    frame_id: "index_ft_sensor"  # Required
-    sensor_name: "ft_sensor"
-
-    state_publish_rate: 100.0  # 
-
+    frame_id: "thumb_ft_sensor"
+    sensor_name: "ft_sensor1"
+    state_publish_rate: 100.0
     interface_names:
       force:
         x: "force.x"
@@ -23,12 +26,32 @@ ft_sensor_broadcaster:
         y: "torque.y"
         z: "torque.z"
 
-    offset:
+ft_sensor_broadcaster_2:
+  ros__parameters:
+    frame_id: "index_ft_sensor"
+    sensor_name: "ft_sensor2"
+    state_publish_rate: 100.0
+    interface_names:
       force:
-        x: 0.0
-        y: 0.0
-        z: 0.0
+        x: "force.x"
+        y: "force.y"
+        z: "force.z"
       torque:
-        x: 0.0
-        y: 0.0
-        z: 0.0
+        x: "torque.x"
+        y: "torque.y"
+        z: "torque.z"
+
+ft_sensor_broadcaster_3:
+  ros__parameters:
+    frame_id: "middle_ft_sensor"
+    sensor_name: "ft_sensor3"
+    state_publish_rate: 100.0
+    interface_names:
+      force:
+        x: "force.x"
+        y: "force.y"
+        z: "force.z"
+      torque:
+        x: "torque.x"
+        y: "torque.y"
+        z: "torque.z"

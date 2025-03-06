@@ -6,6 +6,7 @@ namespace plato2_hand{
 Hand::Hand(pcan_interface::PCANInterface &pcan_interface) 
     :          pcan_interface_(pcan_interface),
                num_actuators_(8),
+               num_ft_sensors_(3),
                linkage1_(five_bar_linkage_config_),
                linkage2_(five_bar_linkage_config_),
                linkage3_(five_bar_linkage_config_){
@@ -221,7 +222,6 @@ void Hand::update_linkage_kinematics(){
     linkage2_.update_kinematics(-actuators_[4].get_states().position, -actuators_[5].get_states().position);
     linkage3_.update_kinematics(-actuators_[6].get_states().position, -actuators_[7].get_states().position);
 
-
     pos_ratios_[3] = linkage1_.get_position_amplification();
     pos_ratios_[5] = linkage2_.get_position_amplification();
     pos_ratios_[7] = linkage3_.get_position_amplification();
@@ -234,13 +234,6 @@ void Hand::update_linkage_kinematics(){
     trq_ratios_[5] = linkage2_.get_torque_amplification();
     trq_ratios_[7] = linkage3_.get_torque_amplification();
 
-    // print the pos ratios
-    // for (size_t i = 0; i < num_actuators_; ++i){
-    //     std::cout << "Pos Ratios: " << pos_ratios_[i] << std::endl;
-    // }
-
-
-
 
 
     // the rest of the motors are 1:1 reduction ratio
@@ -251,7 +244,7 @@ void Hand::update_linkage_kinematics(){
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::update_states(std::vector<double>&joint_position_states, std::vector<double>&joint_velocity_states, std::vector<double> &joint_effort_states){
+void Hand::update_joint_states(std::vector<double>&joint_position_states, std::vector<double>&joint_velocity_states, std::vector<double> &joint_effort_states){
     // recevie the message from the CAN bus every loop
     pcan_interface_.receive_message();
 
@@ -269,31 +262,43 @@ void Hand::update_states(std::vector<double>&joint_position_states, std::vector<
             joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque / 8.0 * static_cast<double>(trq_ratios_[i]));
         }
     }
+}
 
-    if (counter_ % 500 == 0){
-        for (size_t i = 0; i < num_actuators_; ++i){
-        actuators_temperature_[i] = static_cast<double>(actuators_[i].get_status().temperature) / 10.0;
-        }
-        // among the 8 actuator, get the highest temperature
-        // set effort of joint 0 is highest tempature of actuator
-        joint_effort_states[0] = *std::max_element(actuators_temperature_.begin(), actuators_temperature_.end());
+
+////////////////////////////////////////////////////////////////////////
+
+void Hand::update_ft_sensor_states(std::vector<geometry_msgs::msg::Wrench> &ft_sensor_states){
+    // receive the message from the CAN bus every loop
+    pcan_interface_.receive_message();
+
+    for (size_t i = 0; i < ft_sensors_.size(); ++i) {
+        auto states = ft_sensors_[i].get_states();
+        ft_sensor_states[i].force.x = states.force_filtered.x();
+        ft_sensor_states[i].force.y = states.force_filtered.y();
+        ft_sensor_states[i].force.z = states.force_filtered.z();
+        ft_sensor_states[i].torque.x = states.torque_filtered.x();
+        ft_sensor_states[i].torque.y = states.torque_filtered.y();
+        ft_sensor_states[i].torque.z = states.torque_filtered.z();
     }
 
-    counter_++;
+    // update the FT sensor states
+    
+    
 }
+
 
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::print_motor_positions(){
     // useful function for offset calibration
-    std::cout << "J 1 Position: " << actuators_[0].get_motor_position() << std::endl;
-    std::cout << "J 2 Position: " << actuators_[1].get_motor_position() << std::endl;
-    std::cout << "J 3 Position: " << actuators_[2].get_motor_position() << std::endl;
-    std::cout << "J 4 Position: " << actuators_[3].get_motor_position() << std::endl;
-    std::cout << "J 5 Position: " << actuators_[4].get_motor_position() << std::endl;
-    std::cout << "J 6 Position: " << actuators_[5].get_motor_position() << std::endl;
-    std::cout << "J 7 Position: " << actuators_[6].get_motor_position() << std::endl;
-    std::cout << "J 8 Position: " << actuators_[7].get_motor_position() << std::endl;
+    std::cout << "J1 Motor Position: " << actuators_[0].get_motor_position() << std::endl;
+    std::cout << "J2 Motor Position: " << actuators_[1].get_motor_position() << std::endl;
+    std::cout << "J3 Motor Position: " << actuators_[2].get_motor_position() << std::endl;
+    std::cout << "J4 Motor Position: " << actuators_[3].get_motor_position() << std::endl;
+    std::cout << "J5 Motor Position: " << actuators_[4].get_motor_position() << std::endl;
+    std::cout << "J6 Motor Position: " << actuators_[5].get_motor_position() << std::endl;
+    std::cout << "J7 Motor Position: " << actuators_[6].get_motor_position() << std::endl;
+    std::cout << "J8 Motor Position: " << actuators_[7].get_motor_position() << std::endl;
 
 }
 
@@ -337,17 +342,6 @@ void Hand::print_actuator_info_() {
     }
 }
 
-
-////////////////////////////////////////////////////////////////////////
-
-void Hand::get_actuators_temperature(){
-    for (size_t i = 0; i < num_actuators_; ++i){
-        actuators_temperature_[i] = static_cast<double>(actuators_[i].get_status().temperature) / 10.0;
-    }
-
-    // among the 8 actuator, get the highest temperature
-    double max_temp = *std::max_element(actuators_temperature_.begin(), actuators_temperature_.end());
-}
 
 ////////////////////////////////////////////////////////////////////////
 

@@ -31,24 +31,8 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
   joint_effort_states_.resize(info_.joints.size(),
                             std::numeric_limits<double>::quiet_NaN());
   
-  actuator_temperature_states_.resize(info_.joints.size(),
-                            std::numeric_limits<double>::quiet_NaN());
+  ft_sensor_states_.resize(hand_->get_num_ft_sensors());                   
 
-  // Initialize FT sensor states
-  // ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
-
-  // ft_sensor_states_.resize(6, std::numeric_limits<double>::quiet_NaN());
-
-  // ft_sensor_ = std::make_unique<FTSensorCAN>("can0");
-
-  // ft_sensor_->set_callback([this](double fx, double fy, double fz, double tx, double ty, double tz) {
-  //     ft_sensor_states_[0] = fx;
-  //     ft_sensor_states_[1] = fy;
-  //     ft_sensor_states_[2] = fz;
-  //     ft_sensor_states_[3] = tx;
-  //     ft_sensor_states_[4] = ty;
-  //     ft_sensor_states_[5] = tz;
-  //   });
 
   for (const hardware_interface::ComponentInfo & joint : info_.joints) {
     if (!(joint.command_interfaces[0].name == "effort")) {
@@ -90,18 +74,19 @@ PLATO2Hardware::export_state_interfaces() {
     state_interfaces.emplace_back(hardware_interface::StateInterface(
         info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
         &joint_effort_states_[i]));
-    state_interfaces.emplace_back(hardware_interface::StateInterface(
-        info_.joints[i].name, "temperature",
-        &actuator_temperature_states_[i])); 
   }
 
-  // FT sensor state interfaces
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.x", &ft_sensor_states_[0]));
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.y", &ft_sensor_states_[1]));
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "force.z", &ft_sensor_states_[2]));
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.x", &ft_sensor_states_[3]));
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.y", &ft_sensor_states_[4]));
-    // state_interfaces.emplace_back(hardware_interface::StateInterface("ft_sensor", "torque.z", &ft_sensor_states_[5]));
+
+  // Initialize FT sensor states
+  for (size_t i = 0; i < hand_->get_num_ft_sensors(); ++i) {
+    std::string sensor_name = "ft_sensor" + std::to_string(i + 1);
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "force.x", &ft_sensor_states_[i].force.x));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "force.y", &ft_sensor_states_[i].force.y));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "force.z", &ft_sensor_states_[i].force.z));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "torque.x", &ft_sensor_states_[i].torque.x));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "torque.y", &ft_sensor_states_[i].torque.y));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(sensor_name, "torque.z", &ft_sensor_states_[i].torque.z));
+}
 
   return state_interfaces;
 }
@@ -156,10 +141,12 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   // hand_->set_idle_command();
   // hand_->print_motor_positions();
 
-  hand_->update_states(joint_position_states_, joint_velocity_states_, 
+  hand_->update_joint_states(joint_position_states_, joint_velocity_states_, 
                       joint_effort_states_);
 
   // Read FT sensor data
+  hand_->update_ft_sensor_states(ft_sensor_states_);
+
 
 
   return hardware_interface::return_type::OK;

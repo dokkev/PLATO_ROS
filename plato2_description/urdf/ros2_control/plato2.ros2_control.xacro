@@ -76,15 +76,34 @@
             </joint>
 
 
-        <!-- FT Sensor -->
-        <!-- <sensor name="ft_sensor" type="force_torque">
+      <!-- FT Sensors -->
+        <sensor name="ft_sensor1" type="force_torque">
             <state_interface name="force.x"/>
             <state_interface name="force.y"/>
             <state_interface name="force.z"/>
             <state_interface name="torque.x"/>
             <state_interface name="torque.y"/>
             <state_interface name="torque.z"/>
-        </sensor> -->
+        </sensor>
+
+        <sensor name="ft_sensor2" type="force_torque">
+            <state_interface name="force.x"/>
+            <state_interface name="force.y"/>
+            <state_interface name="force.z"/>
+            <state_interface name="torque.x"/>
+            <state_interface name="torque.y"/>
+            <state_interface name="torque.z"/>
+        </sensor>
+
+        <sensor name="ft_sensor3" type="force_torque">
+            <state_interface name="force.x"/>
+            <state_interface name="force.y"/>
+            <state_interface name="force.z"/>
+            <state_interface name="torque.x"/>
+            <state_interface name="torque.y"/>
+            <state_interface name="torque.z"/>
+        </sensor>
+
 
 
 

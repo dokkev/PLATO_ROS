@@ -35,6 +35,7 @@
   #include "rclcpp/rclcpp.hpp"
 
   #include <can_msgs/msg/frame.hpp>
+  #include <geometry_msgs/msg/wrench.hpp>
   #include <sensor_msgs/msg/joint_state.h>
 
   #include "plato2_hardware_interface/plato2_hand.hpp"
@@ -96,20 +97,18 @@
     std::vector<double> joint_velocity_states_;
     std::vector<double> joint_effort_states_;
 
-    std::vector<double> ft_sensor_states_;
-    std::vector<double> actuator_temperature_states_;
+    std::vector<geometry_msgs::msg::Wrench> ft_sensor_states_;
 
     std::vector<std::string> effort_command_interface_names_;
     std::vector<std::string> velocity_command_interface_names_;
     std::vector<std::string> position_command_interface_names_;
 
     pcan_interface::PCANInterface pcan_interface_;
-    // std::unique_ptr<FTSensorCAN> ft_sensor_;
 
     // Plato Hand V2 Object
     std::unique_ptr<plato2_hand::Hand> hand_;
 
-    std::unique_ptr<FTSensorCAN> ft_sensor_;
+
 
     uint64_t counter_ = 0;
 

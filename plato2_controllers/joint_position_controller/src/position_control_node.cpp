@@ -7,6 +7,8 @@
 #include "plato2_interfaces/msg/impedance_commands.hpp"
 #include <termios.h>
 #include <unistd.h>
+#include <mutex>
+
 
 // Function to configure terminal for immediate keyboard input
 void configureTerminal() {
@@ -73,6 +75,8 @@ private:
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
         effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
+        effort_presets_["index_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
+        effort_presets_["middle_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.0, 0.0, 0.4};
         effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
         effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
 
@@ -126,10 +130,9 @@ private:
         RCLCPP_INFO(this->get_logger(), "1: Soft stiffness");
         RCLCPP_INFO(this->get_logger(), "2: Normal stiffness");
         RCLCPP_INFO(this->get_logger(), "3: Stiff stiffness");
-        RCLCPP_INFO(this->get_logger(), "4: Flick Ready");
-        RCLCPP_INFO(this->get_logger(), "5: Flick");
+        RCLCPP_INFO(this->get_logger(), "4: Index Pinch");
+        RCLCPP_INFO(this->get_logger(), "5: Middle Pinch");
         RCLCPP_INFO(this->get_logger(), "6: Power grasp");
-        RCLCPP_INFO(this->get_logger(), "7: MCP Low effort feedforward");
         RCLCPP_INFO(this->get_logger(), "h: Show this help");
         RCLCPP_INFO(this->get_logger(), "q: Quit");
     }
@@ -138,6 +141,8 @@ private:
         configureTerminal();
         char c;
         while (running_ && read(STDIN_FILENO, &c, 1) == 1) {
+            std::lock_guard<std::mutex> lock(mutex_);  // Lock mutex before modifying shared variables
+    
             switch (c) {
                 case '0':
                     updateStiffnessFromPreset("zero");
@@ -145,26 +150,26 @@ private:
                     break;
                 case '1':
                     updateStiffnessFromPreset("soft");
+                    updateEffortFromPreset("zero");
                     break;
                 case '2':
                     updateStiffnessFromPreset("normal");
+                    updateEffortFromPreset("zero");
                     break;
                 case '3':
                     updateStiffnessFromPreset("stiff");
+                    updateEffortFromPreset("zero");
                     break;
                 case '4':
-                    updateEffortFromPreset("flick_ready");
-                    updateStiffnessFromPreset("flick_ready");
+                    updateEffortFromPreset("index_pinch");
                     break;
                 case '5':
-                    updateEffortFromPreset("flick");
-                    updateStiffnessFromPreset("flick");
+                    updateEffortFromPreset("middle_pinch");
                     break;
                 case '6':
                     updateEffortFromPreset("power_grasp");
                     break;
                 case '7':
-                    updateEffortFromPreset("mcp");
                     break;
                 case 'h':
                     printHelp();
@@ -177,36 +182,38 @@ private:
             }
         }
     }
+    
 
     void position_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-        // Store the last received position
+        std::lock_guard<std::mutex> lock(mutex_);  // Lock mutex
+    
         last_position_ = msg->data;
         has_received_command_ = true;
-
+    
         auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
-        
+    
         impedance_msg->stiffness = stiffness_;
         impedance_msg->damping = stiffness_; // Fixed damping
-
-        // for (size_t i=0; i <stiffness_.size(); i++) {
-        //     impedance_msg->damping[i] = stiffness_[i]/2.0;
-        // }   
-
+    
         impedance_msg->position = last_position_;
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;
-
-        //set the position of 0 and 1 to the desired position to 0.0
-        impedance_msg->position[0] = 0.0;
-        impedance_msg->position[1] = 0.0;
-
+    
+        // Ensure the vector has at least 2 elements before modifying
+        if (impedance_msg->position.size() >= 2) {
+            impedance_msg->position[0] = 0.0;
+            impedance_msg->position[1] = 0.0;
+        }
+    
         impedance_pub_->publish(*impedance_msg);
         
         RCLCPP_DEBUG(this->get_logger(), "Published impedance command");
     }
+    
 
     std::atomic<bool> running_;
     std::atomic<bool> has_received_command_;
+    std::mutex mutex_;
     std::thread keyboard_thread_;
     std::vector<double> stiffness_;
     std::vector<double> effort_ff_;

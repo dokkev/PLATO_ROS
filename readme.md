@@ -1,8 +1,6 @@
-# PLATO ROS 2 PACKAGE
+# PLATO ROS PACKAGE
 
-Welcome to PLATO ROS 2 Project Documentation! This readme file will guide you through the installation and usage of the PLATO ROS 2 package.
-
-
+Welcome to PLATO ROS Project Documentation! This readme file will guide you through the installation and usage of the PLATO ROS package.
 
 
 ## Installation

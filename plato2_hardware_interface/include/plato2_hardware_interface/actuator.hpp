@@ -22,24 +22,6 @@ struct States{
     float torque;
 };
 
-struct Gains{
-    uint32_t kp_velocity = 0;
-    uint32_t ki_velocity = 0;
-    uint32_t kp_position = 0;
-    uint32_t ki_position = 0;
-    uint32_t kd_position = 0;
-
-    bool b_kp_velocity_updated = false;
-    bool b_ki_velocity_updated = false;
-    bool b_kp_position_updated = false;
-    bool b_ki_position_updated = false;
-    bool b_kd_position_updated = false;
-};
-
-struct Impedance{
-    float kp;
-    float kd;
-};
 
 struct Status{
     float voltage;
@@ -56,6 +38,9 @@ struct Config{
 
     const float torque_constant;
     const float gear_ratio;
+
+    const float joint_limit_max;
+    const float joint_limit_min;
 };
 
 class Actuator{
@@ -64,7 +49,6 @@ private:
 
     Commands commands_;
     States states_;
-    Gains gains_;
     Status status_;
     Config config_;
 
@@ -74,15 +58,6 @@ private:
     /// @brief Motor Enable Status
     bool b_motor_enabled_;
 
-
-    // unordered map for gain parameters
-    std::unordered_map<uint8_t, uint32_t*> gain_map_ = {
-        {ParamID::KP_SPEED,    &gains_.kp_velocity},
-        {ParamID::KI_SPEED,    &gains_.ki_velocity},
-        {ParamID::KP_POSITION, &gains_.kp_position},
-        {ParamID::KI_POSITION, &gains_.ki_position},
-        {ParamID::KD_POSITION, &gains_.kd_position}
-    };
 
 
 public:
@@ -98,9 +73,6 @@ public:
     /// @return  States struct containing the current position, velocity and torque
     States get_states() const { return states_; }
 
-    /// @brief Get the current gains of the motor
-    /// @return  Gains struct containing the current gains
-    Gains get_gains() const { return gains_; }
 
     /// @brief Get the cached joint commands of the actuator
     /// @return  Commands struct containing the cached joint commands
@@ -134,21 +106,6 @@ public:
     /// @param duration uint32_t execution time in ms 
     void set_joint_position(const float &joint_position, const uint32_t &duration);
 
-    /// @brief Send a modify runtime gain parameter command to the motor
-    /// @param gains Gains struct containing the new gains 
-    void set_gains(const Gains &gains);
-
-    /// @brief Send a command message to modify default gains of the motor
-    void set_default_gains(const Gains &gains);
-
-    /// @brief set zero position of the output shaft of the motor
-    void set_zero_position(const float &zero_position);
-
-    /// @brief Send a command to retrieve the position of the motor
-    void retrieve_position();
-
-    /// @brief Send a command to retrieve the gains of the motor
-    void retrieve_gains();    
 
     /// @brief Given the received message, identify the type of message and process it to store the data in the buffer
     /// @param msg 
@@ -231,7 +188,46 @@ private:
         }
         
     }
+
+    /// @brief Safety margin (in radians) to begin limiting torque near joint limits
+    static constexpr float JOINT_LIMIT_SAFETY_MARGIN = 0.05f;
     
+    /// @brief Precalculated limit thresholds (calculated once in constructor)
+    float min_limit_threshold_;
+    float max_limit_threshold_;
+    
+    /// @brief Fast approximation for quadratic falloff near limits
+    /// @param norm_dist Normalized distance from limit (0-1)
+    /// @return Quadratic scale factor
+    inline float fast_quad_scale_(float norm_dist) const {
+        // Clamp input between 0-1
+        norm_dist = norm_dist < 0.0f ? 0.0f : (norm_dist > 1.0f ? 1.0f : norm_dist);
+
+        return norm_dist * norm_dist;
+    }
+
+    /// @brief Limits torque commands to prevent pressing against hard stops
+    /// @param joint_torque Original torque command
+    /// @param current_position Current joint position
+    /// @return Modified torque that won't push against limits
+    inline float limit_torque_near_bounds_(const float &joint_torque, const float &current_position) const {
+        // Check minimum limit - negative torque would push toward min limit
+        if (current_position < min_limit_threshold_ && joint_torque < 0) {
+            // Fast math: linear mapping + quadratic scale
+            const float norm_dist = (current_position - config_.joint_limit_min) / JOINT_LIMIT_SAFETY_MARGIN;
+            return joint_torque * fast_quad_scale_(norm_dist);
+        } 
+        
+        // Check maximum limit - positive torque would push toward max limit
+        if (current_position > max_limit_threshold_ && joint_torque > 0) {
+            // Fast math: linear mapping + quadratic scale
+            const float norm_dist = (config_.joint_limit_max - current_position) / JOINT_LIMIT_SAFETY_MARGIN;
+            return joint_torque * fast_quad_scale_(norm_dist);
+        }
+        
+        // Default: no limiting needed
+        return joint_torque;
+    }
 };
 
 } // namespace actuator

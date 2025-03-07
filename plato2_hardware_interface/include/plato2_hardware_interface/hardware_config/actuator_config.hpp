@@ -4,7 +4,10 @@
 // TODO: Change this to yaml file
 
 #include <cstdint>
+#include <plato2_hardware_interface/utils/useful_functions.hpp>
 
+
+using namespace Plato;
 
 namespace MotorTxID{
     constexpr uint8_t MOTOR1 = 0x11;
@@ -65,5 +68,13 @@ namespace MotorDirection{
     constexpr char MOTOR8 = 1;
 }
 
+namespace MotorJointLimit{
+    constexpr float XM430_MAX = 3.14159f; // joint limits of XM430 are handled inside OpenRB-150 frimware
+    constexpr float XM430_MIN = -3.14159f;
+    constexpr float MCP_MAX = deg2rad(60.0f);
+    constexpr float MCP_MIN = deg2rad(-60.0f);
+    constexpr float PIP_MAX = deg2rad(130.0f);
+    constexpr float PIP_MIN = deg2rad(-45.0f);
+}
 
 #endif // PLATO_HARDWARE_INTERFACE__ACTUATOR_CONFIG_HPP_

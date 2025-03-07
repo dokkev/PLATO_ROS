@@ -12,14 +12,14 @@ namespace Plato{
     /// @brief Convert degrees to radians
     /// @param degrees angle in degree
     /// @return angle in radians
-    inline float deg2rad(float degrees){
+    constexpr float deg2rad(float degrees){
         return degrees * PI / 180.0f;
     }
 
     /// @brief Convert radians to degrees
     /// @param radians input angle in radians
     /// @return output angle in degrees
-    inline float rad2deg(float radians){
+    constexpr float rad2deg(float radians){
         return radians * 180.0f / PI;
     }
 

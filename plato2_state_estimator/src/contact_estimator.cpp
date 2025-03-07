@@ -2,63 +2,59 @@
 
 using std::placeholders::_1;
 
-ContactEstimator::ContactEstimator() : Node("contact_estimator")
+ContactEstimator::ContactEstimator()
+: Node("contact_estimator")
 {
-  // Declare parameters for topic names in order: thumb, index, middle
-  this->declare_parameter("ft_sensor_thumb_topic", "/plato2/ft_sensor1_wrench");
-  this->declare_parameter("ft_sensor_index_topic", "/plato2/ft_sensor2_wrench");
-  this->declare_parameter("ft_sensor_middle_topic", "/plato2/ft_sensor3_wrench");
-  
-
-  // Declare threshold and filter parameters
+  // Declare and get parameters
   this->declare_parameter("force_threshold", 1.0);
   this->declare_parameter("derivative_threshold", 5.0);
-  this->declare_parameter("buffer_size", 50);           // e.g., 0.5 seconds at 100Hz
-  this->declare_parameter("filter_alpha", 0.3);           // Low-pass filter coefficient
-  this->declare_parameter("derivative_time_window", 0.05);  // 50ms time window
+  this->declare_parameter("buffer_size", 50);
+  this->declare_parameter("filter_alpha", 0.2);
+  this->declare_parameter("derivative_time_window", 0.05);
+  this->declare_parameter("ft_sensor_index_topic", "ft_index");
+  this->declare_parameter("ft_sensor_middle_topic", "ft_middle");
+  this->declare_parameter("ft_sensor_thumb_topic", "ft_thumb");
 
-  // Get parameters
   force_threshold_ = this->get_parameter("force_threshold").as_double();
   derivative_threshold_ = this->get_parameter("derivative_threshold").as_double();
   buffer_size_ = this->get_parameter("buffer_size").as_int();
   filter_alpha_ = this->get_parameter("filter_alpha").as_double();
   derivative_time_window_ = this->get_parameter("derivative_time_window").as_double();
 
-  // Get topic names (order:  thumb, index, middle)
+  // Set up FT topics
   std::vector<std::string> ft_topics = {
-    this->get_parameter("ft_sensor_thumb_topic").as_string()
     this->get_parameter("ft_sensor_index_topic").as_string(),
     this->get_parameter("ft_sensor_middle_topic").as_string(),
-    
+    this->get_parameter("ft_sensor_thumb_topic").as_string()
   };
 
-  // Initialize buffers, filtered forces, and contact states for 3 fingers
+  // Initialize data structures
   force_time_buffers_.resize(3);
   filtered_forces_.resize(3, 0.0);
   contact_states_.fill(false);
 
-  // Create subscribers for each FT sensor using lambda callbacks
+  // Create subscribers for all FT sensors
   for (size_t i = 0; i < ft_topics.size(); ++i) {
-    auto sub = this->create_subscription<geometry_msgs::msg::WrenchStamped>(
-      ft_topics[i], 10,
-      [this, i](const geometry_msgs::msg::WrenchStamped::SharedPtr msg)
-      {
-        this->processFTData(msg, i);
-      }
+    ft_subs_.push_back(
+      this->create_subscription<geometry_msgs::msg::WrenchStamped>(
+        ft_topics[i],
+        10,
+        [this, i](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
+          this->process_ft_data(msg, static_cast<int>(i));
+        }
+      )
     );
-    ft_subs_.push_back(sub);
   }
 
-  // Create publishers for individual contact states (order: thumb, index, middle)
+  // Create publishers for individual contact states
   contact_pubs_.push_back(this->create_publisher<std_msgs::msg::Bool>("plato2/b_contact_thumb", 10));
   contact_pubs_.push_back(this->create_publisher<std_msgs::msg::Bool>("plato2/b_contact_index", 10));
   contact_pubs_.push_back(this->create_publisher<std_msgs::msg::Bool>("plato2/b_contact_middle", 10));
 
-
-  // Create publisher for combined contact states
+  // Create publisher for combined contact state
   combined_contact_pub_ = this->create_publisher<std_msgs::msg::ByteMultiArray>("b_array_contact", 10);
 
-  // Create timer for publishing combined contact state at 100Hz
+  // Create timer for publishing combined state
   timer_ = this->create_wall_timer(
     std::chrono::milliseconds(10),
     std::bind(&ContactEstimator::timer_callback, this)

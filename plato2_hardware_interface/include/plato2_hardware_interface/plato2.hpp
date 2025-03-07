@@ -39,7 +39,7 @@
   #include <sensor_msgs/msg/joint_state.h>
 
   #include "plato2_hardware_interface/plato2_hand.hpp"
-  #include "plato2_hardware_interface/ft_sensor_can.hpp" 
+
   
 
 

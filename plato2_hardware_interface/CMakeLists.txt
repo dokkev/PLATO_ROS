@@ -46,7 +46,6 @@ add_library(
   SHARED
   src/utils/ring_buf.cpp
   src/pcan_interface.cpp
-  src/ft_sensor_can.cpp
   src/ft_sensor.cpp
   src/can_protocol.cpp
   src/actuator.cpp

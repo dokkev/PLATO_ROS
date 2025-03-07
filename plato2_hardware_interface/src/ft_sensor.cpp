@@ -5,8 +5,8 @@ namespace sensor {
 
 FTSensor::FTSensor(pcan_interface::PCANInterface &pcan_interface, const Config &config)
     : pcan_interface_(pcan_interface),
-      config_(config),   // Order matches header file
-      alpha_(0.1f),
+      config_(config),   
+      alpha_(0.01f),
       states_(),
       bias_force_(Eigen::Vector3f::Zero()),
       bias_torque_(Eigen::Vector3f::Zero()),
@@ -14,7 +14,11 @@ FTSensor::FTSensor(pcan_interface::PCANInterface &pcan_interface, const Config &
       bias_accum_torque_(Eigen::Vector3f::Zero()),
       bias_samples_(0),
       calibration_samples_(500), 
-      bias_calibrated_(false) {}
+      bias_calibrated_(false) 
+      {
+        std::cout << "FT Sensor Initialized with Force ID: " << config_.force_rx_id 
+                  << " Torque ID: " << config_.torque_rx_id << std::endl;
+    }
 
 
 

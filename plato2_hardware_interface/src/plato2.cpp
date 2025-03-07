@@ -61,7 +61,7 @@ PLATO2Hardware::export_state_interfaces() {
   std::vector<hardware_interface::StateInterface> state_interfaces;
 
   // Reserve space for joint and FT sensor interfaces
-  state_interfaces.reserve(info_.joints.size() * 4 + 6);
+  state_interfaces.reserve(info_.joints.size() * 3 + (hand_->get_num_ft_sensors() * 6));
 
   // Joint state interfaces
   for (size_t i = 0; i < info_.joints.size(); ++i) {

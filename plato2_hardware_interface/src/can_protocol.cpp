@@ -206,9 +206,9 @@ void MsgDecoder::retrieve_torque(const TPCANMsg &msg, float &torque_x, float &to
     int16_t ty_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[3]) << 8 | msg.DATA[2]);
     int16_t tz_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[5]) << 8 | msg.DATA[4]);
 
-    torque_x = (tx_int / 100000.0f); - 0.3f;
-    torque_y = (ty_int / 100000.0f); - 0.3f;
-    torque_z = (tz_int / 100000.0f); - 0.3f;
+    torque_x = (tx_int / 100000.0f) - 0.3f;
+    torque_y = (ty_int / 100000.0f) - 0.3f;
+    torque_z = (tz_int / 100000.0f) - 0.3f;
     
 }
 

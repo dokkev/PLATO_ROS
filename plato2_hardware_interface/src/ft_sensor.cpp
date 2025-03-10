@@ -6,7 +6,7 @@ namespace sensor {
 FTSensor::FTSensor(pcan_interface::PCANInterface &pcan_interface, const Config &config)
     : pcan_interface_(pcan_interface),
       config_(config),   
-      alpha_(0.01f),
+      alpha_(0.1f),
       states_(),
       bias_force_(Eigen::Vector3f::Zero()),
       bias_torque_(Eigen::Vector3f::Zero()),
@@ -34,6 +34,7 @@ void FTSensor::apply_low_pass_filter(States &states) {
 void FTSensor::update_bias() {
     if (!bias_calibrated_) {
         if (bias_samples_ >= calibration_samples_) {
+
             // Compute final bias values
             bias_force_ = bias_accum_force_ / static_cast<float>(bias_samples_);
             bias_torque_ = bias_accum_torque_ / static_cast<float>(bias_samples_);

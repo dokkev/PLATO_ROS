@@ -40,6 +40,10 @@ public:
         updateStiffnessFromPreset(current_stiffness_preset_);
         updateEffortFromPreset(current_effort_preset_);
 
+        // Initialize filter parameters
+        filter_alpha_ = this->declare_parameter("filter_alpha", 0.0);
+        filtered_position_ = std::vector<double>(8, 0.0);
+        
         // Create subscription for position commands
         position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
             "/plato2/plato2_position_controller/commands", 10,
@@ -53,6 +57,7 @@ public:
         keyboard_thread_ = std::thread(&PositionToImpedanceConverter::keyboardInput, this);
 
         RCLCPP_INFO(this->get_logger(), "Position to Impedance Converter Node started");
+        RCLCPP_INFO(this->get_logger(), "Low-Pass Filter enabled with alpha: %f", filter_alpha_);
         printHelp();
     }
 
@@ -89,6 +94,20 @@ private:
         effort_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
     }
 
+    // Apply low-pass filter to position data
+    void applyLowPassFilter(const std::vector<double>& new_position) {
+        // Initialize filtered_position_ if first command
+        if (!has_received_command_) {
+            filtered_position_ = new_position;
+            return;
+        }
+
+        // Apply the filter: y[n] = alpha*x[n] + (1-alpha)*y[n-1]
+        for (size_t i = 0; i < new_position.size() && i < filtered_position_.size(); i++) {
+            filtered_position_[i] = filter_alpha_ * new_position[i] + (1.0 - filter_alpha_) * filtered_position_[i];
+        }
+    }
+
     void updateStiffnessFromPreset(const std::string& preset) {
         if (stiffness_presets_.find(preset) != stiffness_presets_.end()) {
             stiffness_ = stiffness_presets_[preset];
@@ -114,10 +133,10 @@ private:
             // Resize damping to match the size of stiffness
             impedance_msg->damping.resize(stiffness_.size());
             for (size_t i = 0; i < stiffness_.size(); i++) {
-                impedance_msg->damping[i] = stiffness_[i] / 0.9;
+                impedance_msg->damping[i] = stiffness_[i] * 1.2;
             }
     
-            impedance_msg->position = last_position_;
+            impedance_msg->position = filtered_position_;  // Use filtered position
             impedance_msg->velocity = std::vector<double>(8, 0.0);
             impedance_msg->effort_ff = effort_ff_;
     
@@ -126,7 +145,6 @@ private:
         }
     }
     
-
     void printHelp() {
         RCLCPP_INFO(this->get_logger(), "Keyboard Controls:");
         RCLCPP_INFO(this->get_logger(), "0: Zero stiffness");
@@ -136,6 +154,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "4: Index Pinch");
         RCLCPP_INFO(this->get_logger(), "5: Middle Pinch");
         RCLCPP_INFO(this->get_logger(), "6: Power grasp");
+        RCLCPP_INFO(this->get_logger(), "f: Adjust filter alpha (cycles through presets)");
         RCLCPP_INFO(this->get_logger(), "h: Show this help");
         RCLCPP_INFO(this->get_logger(), "q: Quit");
     }
@@ -172,7 +191,14 @@ private:
                 case '6':
                     updateEffortFromPreset("power_grasp");
                     break;
-                case '7':
+                case 'f':
+                    // Cycle through filter alpha presets
+                    if (filter_alpha_ == 0.8) filter_alpha_ = 0.1;
+                    else if (filter_alpha_ == 0.5) filter_alpha_ = 0.8;
+                    else if (filter_alpha_ == 0.2) filter_alpha_ = 0.5;
+                    else if (filter_alpha_ == 0.1) filter_alpha_ = 0.2;
+                    else filter_alpha_ = 0.2; // Default
+                    RCLCPP_INFO(this->get_logger(), "Changed filter alpha to: %f", filter_alpha_);
                     break;
                 case 'h':
                     printHelp();
@@ -186,31 +212,33 @@ private:
         }
     }
     
-
     void position_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(mutex_);  // Lock mutex
     
         last_position_ = msg->data;
+        
+        // Apply low-pass filter
+        applyLowPassFilter(last_position_);
+        
         has_received_command_ = true;
     
         auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
     
         impedance_msg->stiffness = stiffness_;
-        for (size_t i = 0; i < 8; i++) {
-            impedance_msg->damping.push_back(stiffness_[i] * 1.6 );
+        impedance_msg->damping.resize(stiffness_.size());
+        for (size_t i = 0; i < stiffness_.size(); i++) {
+            impedance_msg->damping[i] = stiffness_[i] * 1.2;
         }
     
-        impedance_msg->position = last_position_;
+        impedance_msg->position = filtered_position_;  // Use filtered position
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;
     
-    
         impedance_pub_->publish(*impedance_msg);
         
-        RCLCPP_DEBUG(this->get_logger(), "Published impedance command");
+        RCLCPP_DEBUG(this->get_logger(), "Published impedance command with filtered position");
     }
     
-
     std::atomic<bool> running_;
     std::atomic<bool> has_received_command_;
     std::mutex mutex_;
@@ -218,6 +246,8 @@ private:
     std::vector<double> stiffness_;
     std::vector<double> effort_ff_;
     std::vector<double> last_position_;
+    std::vector<double> filtered_position_;  // Store filtered position
+    double filter_alpha_;  // Filter coefficient: 0 (no new data) to 1 (no filtering)
     std::string current_stiffness_preset_;
     std::string current_effort_preset_;
     std::map<std::string, std::vector<double>> stiffness_presets_;

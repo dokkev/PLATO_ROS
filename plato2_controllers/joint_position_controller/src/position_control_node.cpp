@@ -66,9 +66,9 @@ private:
     void initializePresets() {
         // Stiffness presets
         stiffness_presets_["zero"] = std::vector<double>(8, 0.0);
-        stiffness_presets_["soft"] = std::vector<double>(8, 1.7);
-        stiffness_presets_["normal"] = std::vector<double>{0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
-        stiffness_presets_["stiff"] = std::vector<double>(8, 2.4);
+        stiffness_presets_["soft"] = std::vector<double>(8, 0.5);
+        stiffness_presets_["normal"] = std::vector<double>(8, 1.5);
+        stiffness_presets_["stiff"] = std::vector<double>(8, 2.5);
 
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
@@ -196,9 +196,6 @@ private:
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;
 
-        //set the position of 0 and 1 to the desired position to 0.0
-        impedance_msg->position[0] = 0.0;
-        impedance_msg->position[1] = 0.0;
 
         impedance_pub_->publish(*impedance_msg);
         

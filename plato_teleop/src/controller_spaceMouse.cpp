@@ -24,7 +24,7 @@ private:
     {
         auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
         twist_msg->header.stamp = this->now();
-        twist_msg->header.frame_id = "link0"; // Adjust if necessary
+        twist_msg->header.frame_id = "world"; // Adjust if necessary
         twist_msg->twist.linear.x = x * translation_scale_;
         twist_msg->twist.linear.y = y * translation_scale_;
         twist_msg->twist.linear.z = z * translation_scale_;
@@ -32,14 +32,14 @@ private:
     }
 
     // Function to publish twist for rotation control
-    void publish_rotation_twist(double roll, double yaw, double pitch)
+    void publish_rotation_twist(double roll, double pitch, double yaw)
     {
         auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
         twist_msg->header.stamp = this->now();
-        twist_msg->header.frame_id = "link0"; // Adjust if necessary
-        twist_msg->twist.angular.x = - roll * rotation_scale_;
+        twist_msg->header.frame_id = "world"; // Adjust if necessary
+        twist_msg->twist.angular.x = roll * rotation_scale_;
         twist_msg->twist.angular.y = pitch * rotation_scale_;
-        twist_msg->twist.angular.z = - yaw * rotation_scale_;
+        twist_msg->twist.angular.z = yaw * rotation_scale_;
         twist_pub_->publish(std::move(twist_msg));
     }
     /* This function decides whether to translate or rotate */
@@ -86,61 +86,12 @@ private:
         {
             // Apply rotation logic here
             RCLCPP_INFO(this->get_logger(), "Performing rotation.");
-            RCLCPP_INFO(this->get_logger(), "Roll: [%f], Yaw: [%f], Pitch[%f]",
-                        msg->axes[5],
+            RCLCPP_INFO(this->get_logger(), "RX: [%f], RY: [%f], RZ [%f]",
+                        msg->axes[3],
                         msg->axes[4],
-                        msg->axes[3]);
-            publish_rotation_twist(msg->axes[5], msg->axes[4], msg->axes[3]);
+                        msg->axes[5]);
+            publish_rotation_twist(msg->axes[3], msg->axes[4], msg->axes[5]);
         }
-
-        /*         // Get the current pose
-                geometry_msgs::msg::PoseStamped current_pose = move_group_interface_->getCurrentPose();
-
-                // Initialize target_pose based on current_pose
-                geometry_msgs::msg::Pose target_pose = current_pose.pose;
-
-                // Apply translation adjustments directly to target_pose based on SpaceMouse input
-                target_pose.position.x += msg->axes[0] * translation_scale_;
-                target_pose.position.y += msg->axes[1] * translation_scale_;
-                target_pose.position.z += msg->axes[2] * translation_scale_;
-
-                // Obtain current orientation in RPY
-                tf2::Quaternion current_orientation;
-                tf2::fromMsg(current_pose.pose.orientation, current_orientation);
-                double current_roll, current_pitch, current_yaw;
-                tf2::Matrix3x3(current_orientation).getRPY(current_roll, current_pitch, current_yaw);
-
-                // Adjust orientation based on the SpaceMouse input and update target_pose
-                current_roll += msg->axes[3] * rotation_scale_;
-                current_pitch += msg->axes[4] * rotation_scale_;
-                current_yaw += msg->axes[5] * rotation_scale_;
-
-                // Convert the updated RPY back to a quaternion
-                tf2::Quaternion new_orientation;
-                new_orientation.setRPY(current_roll, current_pitch, current_yaw);
-                target_pose.orientation = tf2::toMsg(new_orientation.normalize());
-
-                // Compute the Cartesian path using waypoints from current_pose to target_pose
-                std::vector<geometry_msgs::msg::Pose> waypoints;
-                waypoints.push_back(current_pose.pose); // Start with current pose
-                waypoints.push_back(target_pose);       // Target pose based on SpaceMouse input
-
-                moveit_msgs::msg::RobotTrajectory trajectory;
-                const double jump_threshold = 0.0; // Threshold for discontinuities in the path
-                const double eef_step = 0.01;      // Resolution of the path
-                double fraction = move_group_interface_->computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
-
-                RCLCPP_INFO(this->get_logger(), "Visualizing plan (Cartesian path) (%.2f%% achieved)", fraction * 100.0);
-
-                // Execute the trajectory if a complete path was computed
-                if (fraction == 1.0)
-                {
-                    move_group_interface_->execute(trajectory);
-                }
-                else
-                {
-                    RCLCPP_ERROR(this->get_logger(), "Failed to compute a complete Cartesian path");
-                } */
     }
 
     // Function to calculate the magnitude of translation

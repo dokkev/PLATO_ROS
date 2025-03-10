@@ -68,15 +68,15 @@ private:
     void initializePresets() {
         // Stiffness presets
         stiffness_presets_["zero"] = std::vector<double>(8, 0.0);
-        stiffness_presets_["soft"] = std::vector<double>(8, 1.7);
-        stiffness_presets_["normal"] = std::vector<double>{0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
-        stiffness_presets_["stiff"] = std::vector<double>(8, 2.4);
+        stiffness_presets_["soft"] = std::vector<double>(8, 0.5);
+        stiffness_presets_["normal"] = std::vector<double>(8, 1.5);
+        stiffness_presets_["stiff"] = std::vector<double>(8, 2.5);
 
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
         effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
-        effort_presets_["index_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
-        effort_presets_["middle_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.0, 0.0, 0.4};
+        effort_presets_["index_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.6, 0.0, 0.6, 0.0, 0.0};
+        effort_presets_["middle_pinch"] = std::vector<double>{0.0, 0.0, 0.0, -0.6, 0.0, 0.0, 0.0, 0.6};
         effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
         effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
 
@@ -108,21 +108,24 @@ private:
     void republishCommand() {
         if (has_received_command_) {
             auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
-            
+    
             impedance_msg->stiffness = stiffness_;
-            
-            for (size_t i=0; i <stiffness_.size(); i++) {
-                impedance_msg->damping[i] = stiffness_[i]/2.0;
+    
+            // Resize damping to match the size of stiffness
+            impedance_msg->damping.resize(stiffness_.size());
+            for (size_t i = 0; i < stiffness_.size(); i++) {
+                impedance_msg->damping[i] = stiffness_[i] / 0.9;
             }
-  
+    
             impedance_msg->position = last_position_;
             impedance_msg->velocity = std::vector<double>(8, 0.0);
             impedance_msg->effort_ff = effort_ff_;
-
+    
             impedance_pub_->publish(*impedance_msg);
             RCLCPP_DEBUG(this->get_logger(), "Republished impedance command with updated parameters");
         }
     }
+    
 
     void printHelp() {
         RCLCPP_INFO(this->get_logger(), "Keyboard Controls:");
@@ -193,17 +196,14 @@ private:
         auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
     
         impedance_msg->stiffness = stiffness_;
-        impedance_msg->damping = stiffness_; // Fixed damping
+        for (size_t i = 0; i < 8; i++) {
+            impedance_msg->damping.push_back(stiffness_[i] * 1.6 );
+        }
     
         impedance_msg->position = last_position_;
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;
     
-        // Ensure the vector has at least 2 elements before modifying
-        if (impedance_msg->position.size() >= 2) {
-            impedance_msg->position[0] = 0.0;
-            impedance_msg->position[1] = 0.0;
-        }
     
         impedance_pub_->publish(*impedance_msg);
         

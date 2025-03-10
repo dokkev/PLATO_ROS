@@ -158,8 +158,6 @@ private:
     void sort_can_rx_id_(const TPCANMsg &msg);
 
     
-
-    
     ///////////////////////////////////////////////// CONFIGURATIONS //////////////////////////////////////////////
 
     /// @brief Predefined Actuator Configurations

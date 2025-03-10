@@ -25,3 +25,8 @@ edit motor offset in-order (hpp file numbering is not correct)
 
 recomment and uncomment in plato2.cpp
 and rebuild
+
+
+To run contact estimator:
+
+ros2 run plato2_state_estimator contact_estimator 

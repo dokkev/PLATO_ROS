@@ -17,7 +17,7 @@ class SpaceMousePublisher(Node):
     def publish_space_mouse_data(self):
         state = pyspacemouse.read()
         joy_msg = Joy()
-        joy_msg.axes = [float(state.x), float(state.y), float(state.z), float(state.roll), float(state.yaw), float(state.pitch)]
+        joy_msg.axes = [float(state.x), float(state.y), float(state.z), float(-state.pitch), float(state.roll), float(-state.yaw)]
         joy_msg.header.stamp = self.get_clock().now().to_msg()
         self.publisher.publish(joy_msg)
         # self.get_logger().info(f'Published: {joy_msg.axes}')

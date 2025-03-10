@@ -109,7 +109,7 @@ void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &durat
     
     // Convert the joint torque to motor torque
     float motor_torque;
-    joint_to_motor_(safe_joint_torque, motor_torque);
+    joint_to_motor_(joint_torque, motor_torque);
 
     // Encode and send the torque command over CAN
     encoder_.set_torque(trq_msg_, motor_torque, duration);

@@ -1,19 +1,20 @@
 #include "plato2_state_estimator/contact_estimator.hpp"
-
+# include <iostream>
 using std::placeholders::_1;
 
 ContactEstimator::ContactEstimator()
 : Node("contact_estimator")
 {
   // Declare and get parameters
-  this->declare_parameter("force_threshold", 1.0);
+  this->declare_parameter("force_threshold", 2.0);
   this->declare_parameter("derivative_threshold", 5.0);
   this->declare_parameter("buffer_size", 50);
   this->declare_parameter("filter_alpha", 0.2);
   this->declare_parameter("derivative_time_window", 0.05);
-  this->declare_parameter("ft_sensor_index_topic", "ft_index");
-  this->declare_parameter("ft_sensor_middle_topic", "ft_middle");
-  this->declare_parameter("ft_sensor_thumb_topic", "ft_thumb");
+  this->declare_parameter("ft_sensor_thumb_topic", "/plato2/ft_sensor_broadcaster_1/wrench");
+  this->declare_parameter("ft_sensor_index_topic", "/plato2/ft_sensor_broadcaster_2/wrenchx");
+  this->declare_parameter("ft_sensor_middle_topic", "/plato2/ft_sensor_broadcaster_3/wrenchx");
+
 
   force_threshold_ = this->get_parameter("force_threshold").as_double();
   derivative_threshold_ = this->get_parameter("derivative_threshold").as_double();
@@ -23,9 +24,9 @@ ContactEstimator::ContactEstimator()
 
   // Set up FT topics
   std::vector<std::string> ft_topics = {
+    this->get_parameter("ft_sensor_thumb_topic").as_string(),
     this->get_parameter("ft_sensor_index_topic").as_string(),
-    this->get_parameter("ft_sensor_middle_topic").as_string(),
-    this->get_parameter("ft_sensor_thumb_topic").as_string()
+    this->get_parameter("ft_sensor_middle_topic").as_string()
   };
 
   // Initialize data structures
@@ -111,13 +112,18 @@ double ContactEstimator::calculate_force_magnitude(const geometry_msgs::msg::Wre
 
 bool ContactEstimator::detect_contact(const std::deque<std::pair<rclcpp::Time, double>> & force_buffer)
 {
-  if (force_buffer.size() < 2) {
+  if (force_buffer.empty()) {
     return false;
   }
-  double derivative = calculate_force_derivative(force_buffer, derivative_time_window_);
+  
+  // Use the most recent force measurement
   double current_force = force_buffer.back().second;
-  return (current_force > force_threshold_ && std::abs(derivative) > derivative_threshold_);
+  std::cout << "Current force: " << current_force << std::endl;
+  
+  // Contact is detected if the force exceeds the threshold
+  return (current_force > force_threshold_);
 }
+
 
 double ContactEstimator::calculate_force_derivative(const std::deque<std::pair<rclcpp::Time, double>> & force_buffer, double time_window)
 {

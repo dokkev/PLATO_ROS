@@ -188,10 +188,6 @@ private:
         impedance_msg->stiffness = stiffness_;
         impedance_msg->damping = stiffness_; // Fixed damping
 
-        // for (size_t i=0; i <stiffness_.size(); i++) {
-        //     impedance_msg->damping[i] = stiffness_[i]/2.0;
-        // }   
-
         impedance_msg->position = last_position_;
         impedance_msg->velocity = std::vector<double>(8, 0.0);
         impedance_msg->effort_ff = effort_ff_;

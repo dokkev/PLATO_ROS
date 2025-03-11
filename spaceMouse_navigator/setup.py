@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'spaceMouse_motionTest = spaceMouse_navigator.spaceMouse_motionTest:main',
-            'spaceMouse_publisher = spaceMouse_navigator.spaceMouse_publisher:main'
+            'spaceMouse_publisher = spaceMouse_navigator.spaceMouse_publisher:main',
+             'spaceMouse_state_machine = spaceMouse_navigator.spaceMouse_state_machine:main'
         ],
     },
 )

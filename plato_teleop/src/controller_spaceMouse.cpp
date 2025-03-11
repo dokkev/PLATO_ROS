@@ -109,7 +109,7 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
 
     const double translation_scale_ = 1; // Adjust to control sensitivity
-    const double rotation_scale_ = 0.5;    // Adjust to control sensitivity
+    const double rotation_scale_ = 0.3;    // Adjust to control sensitivity
 
     const double translation_threshold_ = 0.3; // Set appropriate translation threshold
     const double rotation_threshold_ = 0.3;    // Set appropriate rotation threshold

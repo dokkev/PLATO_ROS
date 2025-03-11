@@ -2,6 +2,7 @@
 #include <thread>
 #include <atomic>
 #include <map>
+#include <mutex>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "plato2_interfaces/msg/impedance_commands.hpp"
@@ -35,8 +36,10 @@ public:
         // Set initial values
         current_stiffness_preset_ = "normal";
         current_effort_preset_ = "zero";
-        updateStiffnessFromPreset(current_stiffness_preset_);
-        updateEffortFromPreset(current_effort_preset_);
+        
+        // Initialize stiffness and effort vectors with default values
+        stiffness_ = stiffness_presets_["normal"];
+        effort_ff_ = effort_presets_["zero"];
 
         // Create subscription for position commands
         position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -76,7 +79,6 @@ private:
         effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
         effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
 
-
         // thumb: 3,4   index 5,6 
         stiffness_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 5.0, 5.0, 1.0, 1.0, 0.0, 0.0};
         effort_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
@@ -86,37 +88,20 @@ private:
     }
 
     void updateStiffnessFromPreset(const std::string& preset) {
+        std::lock_guard<std::mutex> lock(param_mutex_);
         if (stiffness_presets_.find(preset) != stiffness_presets_.end()) {
             stiffness_ = stiffness_presets_[preset];
+            current_stiffness_preset_ = preset;
             RCLCPP_INFO(this->get_logger(), "Switched stiffness to preset: %s", preset.c_str());
-            republishCommand();
         }
     }
 
     void updateEffortFromPreset(const std::string& preset) {
+        std::lock_guard<std::mutex> lock(param_mutex_);
         if (effort_presets_.find(preset) != effort_presets_.end()) {
             effort_ff_ = effort_presets_[preset];
+            current_effort_preset_ = preset;
             RCLCPP_INFO(this->get_logger(), "Switched effort feedforward to preset: %s", preset.c_str());
-            republishCommand();
-        }
-    }
-
-    void republishCommand() {
-        if (has_received_command_) {
-            auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
-            
-            impedance_msg->stiffness = stiffness_;
-            
-            for (size_t i=0; i <stiffness_.size(); i++) {
-                impedance_msg->damping[i] = stiffness_[i]/2.0;
-            }
-  
-            impedance_msg->position = last_position_;
-            impedance_msg->velocity = std::vector<double>(8, 0.0);
-            impedance_msg->effort_ff = effort_ff_;
-
-            impedance_pub_->publish(*impedance_msg);
-            RCLCPP_DEBUG(this->get_logger(), "Republished impedance command with updated parameters");
         }
     }
 
@@ -180,19 +165,32 @@ private:
 
     void position_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         // Store the last received position
-        last_position_ = msg->data;
-        has_received_command_ = true;
+        {
+            std::lock_guard<std::mutex> lock(param_mutex_);
+            last_position_ = msg->data;
+            has_received_command_ = true;
+        }
 
+        // Create and populate the impedance message
         auto impedance_msg = std::make_unique<plato2_interfaces::msg::ImpedanceCommands>();
         
-        impedance_msg->stiffness = stiffness_;
-        impedance_msg->damping = stiffness_; // Fixed damping
-
-        impedance_msg->position = last_position_;
-        impedance_msg->velocity = std::vector<double>(8, 0.0);
-        impedance_msg->effort_ff = effort_ff_;
-
-
+        // Lock while accessing the shared variables
+        {
+            std::lock_guard<std::mutex> lock(param_mutex_);
+            impedance_msg->stiffness = stiffness_;
+            
+            // Calculate damping based on stiffness
+            impedance_msg->damping.resize(stiffness_.size());
+            for (size_t i = 0; i < stiffness_.size(); i++) {
+                impedance_msg->damping[i] = stiffness_[i] / 2.0;
+            }
+            
+            impedance_msg->position = last_position_;
+            impedance_msg->velocity = std::vector<double>(8, 0.0);
+            impedance_msg->effort_ff = effort_ff_;
+        }
+        
+        // Publish the message
         impedance_pub_->publish(*impedance_msg);
         
         RCLCPP_DEBUG(this->get_logger(), "Published impedance command");
@@ -201,13 +199,18 @@ private:
     std::atomic<bool> running_;
     std::atomic<bool> has_received_command_;
     std::thread keyboard_thread_;
+    std::mutex param_mutex_;  // Mutex to protect shared data
+    
     std::vector<double> stiffness_;
     std::vector<double> effort_ff_;
     std::vector<double> last_position_;
+    
     std::string current_stiffness_preset_;
     std::string current_effort_preset_;
+    
     std::map<std::string, std::vector<double>> stiffness_presets_;
     std::map<std::string, std::vector<double>> effort_presets_;
+    
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr position_sub_;
     rclcpp::Publisher<plato2_interfaces::msg::ImpedanceCommands>::SharedPtr impedance_pub_;
 };

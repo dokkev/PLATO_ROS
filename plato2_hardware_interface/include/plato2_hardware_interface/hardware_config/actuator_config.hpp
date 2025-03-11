@@ -49,8 +49,8 @@ namespace MotorOffset{
     constexpr float MOTOR4 = -2.3188f;
     constexpr float MOTOR3 = 2.48474f;
 
-    constexpr float MOTOR6 = 0.864996f;
-    constexpr float MOTOR5 = -8.48459f;
+    constexpr float MOTOR6 = 1.5589f;
+    constexpr float MOTOR5 = -8.6677f;
    
     constexpr float MOTOR8 = 4.70722f;
     constexpr float MOTOR7 = -2.01629f;

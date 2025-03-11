@@ -11,6 +11,14 @@ card:
 - Hold_Time: 0.5
   Motion_Time: 1.0
   position_name: card 4
+close:
+- position_name: close
+  Motion_Time: 3.0
+  Hold_Time: 0.0
+open:
+- position_name: open
+  Motion_Time: 3.0
+  Hold_Time: 0.0
 coin:
 - Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
@@ -77,10 +85,10 @@ opposition:
   Motion_Time: 0.037
   position_name: pinch2
 - Hold_Time: 0.394
-  Motion_Time: 0.030
+  Motion_Time: 0.03
   position_name: pinch1
 - Hold_Time: 0.394
-  Motion_Time: 0.030
+  Motion_Time: 0.03
   position_name: pinch2
 - Hold_Time: 0.333
   Motion_Time: 0.023
@@ -106,80 +114,80 @@ opposition:
 - Hold_Time: 0.152
   Motion_Time: 0.002
   position_name: pinch2
-- Hold_Time: 0.150
-  Motion_Time: 0.000
+- Hold_Time: 0.15
+  Motion_Time: 0.0
   position_name: pinch1
-- Hold_Time: 0.150
-  Motion_Time: 0.000
+- Hold_Time: 0.15
+  Motion_Time: 0.0
   position_name: pinch2
-- Hold_Time: 0.150
-  Motion_Time: 0.000
+- Hold_Time: 0.15
+  Motion_Time: 0.0
   position_name: pinch1
-- Hold_Time: 0.150
-  Motion_Time: 0.000
-  position_name: pinch2
-- Hold_Time: 0.0
-  Motion_Time: 0.000
-  position_name: pinch1
-- Hold_Time: 0.0
-  Motion_Time: 0.000
+- Hold_Time: 0.15
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch1
 - Hold_Time: 0.0
-  Motion_Time: 0.000
+  Motion_Time: 0.0
   position_name: pinch2
-- Hold_Time: 0.150
-  Motion_Time: 0.000
+- Hold_Time: 0.0
+  Motion_Time: 0.0
+  position_name: pinch1
+- Hold_Time: 0.0
+  Motion_Time: 0.0
+  position_name: pinch2
+- Hold_Time: 0.15
+  Motion_Time: 0.0
   position_name: zero
 opposition_test:
 - Hold_Time: 1.0
@@ -226,57 +234,57 @@ rom:
   Motion_Time: 1.0
   position_name: zero
 rom_fast:
-- position_name: zero
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: open
+  position_name: zero
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: zero
+  position_name: open
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: close
+  position_name: zero
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: zero
+  position_name: close
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: pinch1
+  position_name: zero
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: zero
+  position_name: pinch1
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: pinch2
+  position_name: zero
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: zero
+  position_name: pinch2
+- Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
-  Hold_Time: 0.20000000298023224
-- position_name: open
+  position_name: zero
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: zero
+  position_name: open
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: close
+  position_name: zero
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: zero
+  position_name: close
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: pinch1
+  position_name: zero
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: zero
+  position_name: pinch1
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: pinch2
+  position_name: zero
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
-- position_name: zero
+  position_name: pinch2
+- Hold_Time: 0.10000000149011612
   Motion_Time: 0.10000000149011612
-  Hold_Time: 0.10000000149011612
+  position_name: zero
 rom_test:
 - Hold_Time: 1.5
   Motion_Time: 0.5

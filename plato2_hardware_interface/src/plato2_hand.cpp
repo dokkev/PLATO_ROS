@@ -184,7 +184,7 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
                                  const std::vector<double> &joint_position_states, 
                                  const std::vector<double> &joint_velocity_states){ 
 
-    if (counter_ % 10 == 0){ // update J1 and J2 once every 10 loops 
+    if (counter_ % 50 == 0){ // update J1 and J2 once every 10 loops 
         // Dynamixel only accepts position control
         actuators_[0].set_joint_position(joint_impedance_command[0], servo_current);
         actuators_[1].set_joint_position(joint_impedance_command[1], servo_current);

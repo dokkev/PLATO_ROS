@@ -21,18 +21,18 @@ class SpaceMouseStateMachine(Node):
                 0.00286102294921875,
                 0.00133514404296875,
                 0.032806396484375,
-                -0.3251476303239258,
-                0.203707754611969,
-                1.1454594488293424,
+                -0.1251476303239258,
+                0.083707754611969,
+                0.754594488293424,
                 0.9632225036621094,
                 1.4037198694571629
             ]),
             1: np.array([  # close
                 0.00133514404296875,
                 -0.00019073486328125,
-                0.002969017028808594,
-                -0.5540302844949266,
-                0.8857861161231995,
+                -0.202969017028808594,
+                -0.3540302844949266,
+                0.9857861161231995,
                 0.4223854347322685,
                 0.9754295349121094,
                 1.418108409490415
@@ -68,8 +68,8 @@ class SpaceMouseStateMachine(Node):
         self.received_joint_states = False
         
         # Interpolation parameters
-        self.interpolation_duration = 0.5  # Duration in seconds
-        self.interpolation_steps = 50      # Number of steps for interpolation
+        self.interpolation_duration = 0.8  # Duration in seconds
+        self.interpolation_steps = 500      # Number of steps for interpolation
         self.step_time = self.interpolation_duration / self.interpolation_steps
         
         # Create a subscription to SpaceMouse Joy messages

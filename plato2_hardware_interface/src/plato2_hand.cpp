@@ -262,6 +262,8 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
             joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque / 8.0 * static_cast<double>(trq_ratios_[i]));
         }
     }
+
+    counter_++;
 }
 
 

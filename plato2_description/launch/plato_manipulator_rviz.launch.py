@@ -15,21 +15,21 @@ def generate_launch_description():
     # Arguments
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_gui = LaunchConfiguration('use_gui')
-    plato_ns = LaunchConfiguration("plato_ns")
 
     # getting the package path
     pkg_name = 'plato2_description'
     pkg_share= get_package_share_directory(pkg_name)
 
     # URDF file path
-    urdf_path = 'urdf/finger.urdf.xacro'
+    urdf_path = 'urdf/plato2.urdf.xacro'
 
     # RVIZ config file path
-    rviz_config_file = pkg_share + '/rviz/plato.rviz'
+    rviz_config_file = pkg_share + '/rviz/plato_description.rviz'
     
     # extracting the robot deffinition from the xacro file
     xacro_file = os.path.join(pkg_share, urdf_path)
     robot_description_content = xacro.process_file(xacro_file).toxml()
+
 
 
     # Run the nodes
@@ -48,12 +48,6 @@ def generate_launch_description():
             default_value='true',
             description='Use joint_state_publisher_gui'
         ),
-        
-        DeclareLaunchArgument(
-            'plato_ns',
-            default_value='plato',
-            description='Namespace for Plato hand'
-        ),
 
 
         ##################### Nodes #####################
@@ -64,7 +58,6 @@ def generate_launch_description():
             executable='joint_state_publisher_gui',
             name='joint_state_publisher_gui',
             condition=IfCondition(use_gui),
-            namespace=plato_ns,
         ),
 
         # Joint state publisher
@@ -73,7 +66,6 @@ def generate_launch_description():
             executable='joint_state_publisher',
             name='joint_state_publisher',
             condition=UnlessCondition(use_gui),
-            namespace=plato_ns,
         ),
         
         # Robot state publisher
@@ -81,10 +73,7 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',
-            parameters=[{'robot_description': robot_description_content, 'use_sim_time': use_sim_time}],
-            namespace=plato_ns,
-            
-            
+            parameters=[{'robot_description': robot_description_content, 'use_sim_time': use_sim_time}]
         ),
         
         # Rviz2

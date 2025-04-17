@@ -25,7 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "gui",
             default_value="true",
-            description="Start RViz2 automatically with this launch file.",
+            description="Start RViz automatically with this launch file.",
         )
     )
     declared_arguments.append(
@@ -83,7 +83,7 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_impedance_controller", "--controller-manager", "/plato2/controller_manager"],
+        arguments=["plato_effort_controller", "--controller-manager", "/plato/controller_manager"],
         namespace=plato_ns,  
     )
 
@@ -93,6 +93,14 @@ def generate_launch_description():
             name='static_tf_broadcaster',
             arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato_base_link'],
         )  
+
+    # Event handlers remain unchanged
+    delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[rviz_node],
+        )
+    )
 
     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(

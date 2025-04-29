@@ -63,37 +63,31 @@ private:
 
     void space_mouse_motion_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
-
         std::string action = decide_movement(msg);
+    
         if (action == "none")
         {
-            RCLCPP_INFO(this->get_logger(), "No significant motion detected.");
+            // RCLCPP_INFO(this->get_logger(), "[none] No significant motion detected.");
             publish_translation_twist(0, 0, 0);
             publish_rotation_twist(0, 0, 0);
-            return; // Exit the callback if no significant motion is detected
+            return;
         }
         else if (action == "translation")
         {
-            // Apply translation logic here
-            RCLCPP_INFO(this->get_logger(), "Performing translation.");
-            RCLCPP_INFO(this->get_logger(), "x dir: [%f], y dir: [%f], z dir[%f]",
-                        msg->axes[0],
-                        msg->axes[1],
-                        msg->axes[2]);
             publish_translation_twist(msg->axes[0], msg->axes[1], msg->axes[2]);
+            // RCLCPP_INFO(this->get_logger(),
+            //     "[translation] x: %.3f, y: %.3f, z: %.3f",
+            //     msg->axes[0], msg->axes[1], msg->axes[2]);
         }
         else if (action == "rotation")
         {
-            // Apply rotation logic here
-            RCLCPP_INFO(this->get_logger(), "Performing rotation.");
-            RCLCPP_INFO(this->get_logger(), "RX: [%f], RY: [%f], RZ [%f]",
-                        msg->axes[3],
-                        msg->axes[4],
-                        msg->axes[5]);
             publish_rotation_twist(msg->axes[3], msg->axes[4], msg->axes[5]);
+            // RCLCPP_INFO(this->get_logger(),
+            //     "[rotation] rx: %.3f, ry: %.3f, rz: %.3f",
+            //     msg->axes[3], msg->axes[4], msg->axes[5]);
         }
     }
-
+    
     // Function to calculate the magnitude of translation
     double calculate_translation_magnitude(const sensor_msgs::msg::Joy::SharedPtr &msg)
     {

@@ -29,11 +29,6 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     // Print the actuator info
     print_actuator_info_();
 
-    // Initialize friction compensators with sample values 
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        friction_compensators_.emplace_back(KarnoppCompensator(0.04, 0.01, 0.05)); // Example values
-    }
-
     // enable the motors
     enable();
 

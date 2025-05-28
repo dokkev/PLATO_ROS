@@ -46,7 +46,19 @@ class SpaceMouseStateMachine(Node):
                 -0.017743468140821506,
                 1.100553035736084,
                 1.5071229671464579
+            ]),
+            
+            3: np.array([  # zero
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
             ])
+                    
         }
         
         # Current joint position (will be updated from joint_states)
@@ -164,15 +176,24 @@ class SpaceMouseStateMachine(Node):
                 self.target_state = 0  # close -> open
                 state_changed = True
                 self.get_logger().info('Left button clicked: Switching to state 0 (open)')
-            elif self.state == 2:
-                self.target_state = 0  # poke -> open
+            elif self.state == 2 or self.state == 3:
+                self.target_state = 0  # poke or zero -> open
                 state_changed = True
                 self.get_logger().info('Left button clicked: Switching to state 0 (open)')
-        
-        if right_click and self.state != 2:
-            self.target_state = 2  # any state -> poke
-            state_changed = True
-            self.get_logger().info('Right button clicked: Switching to state 2 (poke)')
+
+        if right_click:
+            if self.state == 2:
+                self.target_state = 3  # poke -> zero
+                state_changed = True
+                self.get_logger().info('Right button clicked: Switching to state 3 (zero)')
+            elif self.state == 3:
+                self.target_state = 2  # zero -> poke
+                state_changed = True
+                self.get_logger().info('Right button clicked: Switching to state 2 (poke)')
+            elif self.state in [0, 1]:
+                self.target_state = 2  # open or close -> poke
+                state_changed = True
+                self.get_logger().info('Right button clicked: Switching to state 2 (poke)')
         
         # Start interpolation if state changed
         if state_changed:
@@ -181,6 +202,7 @@ class SpaceMouseStateMachine(Node):
         # Update previous button states
         self.prev_left_button = left_button
         self.prev_right_button = right_button
+
 
     def start_interpolation(self, from_state, to_state):
         self.interpolating = True

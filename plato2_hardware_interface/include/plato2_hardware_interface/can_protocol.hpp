@@ -200,14 +200,14 @@ public:
     /// @param position 
     void retrieve_position(const TPCANMsg &msg, float &position) const;
 
-    /// @brief decode the 3D force value from the Aidin FT sensor
+    /// @brief decode the 3D force value from the Aidin FT sensor https://emanual.oopy.io/aft20-d15
     /// @param msg received TPCANMsg message 
     /// @param force_x reference to store the decoded force_x value
     /// @param force_y reference to store the decoded force_y value 
     /// @param force_z  reference to store the decoded force_z value
     static void retrieve_force(const TPCANMsg &msg, float &force_x, float &force_y, float &force_z);
 
-    /// @brief decode the 3D torque value from the Aidin FT sensor
+    /// @brief decode the 3D torque value from the Aidin FT sensor https://emanual.oopy.io/aft20-d15
     /// @param msg received TPCANMsg message 
     /// @param torque_x reference to store the decoded torque_x value 
     /// @param torque_y reference to store the decoded torque_y value 
@@ -239,6 +239,9 @@ private:
     inline void decode_ind_float_(const TPCANMsg &msg, float &value) const {
         std::memcpy(&value, &msg.DATA[4], sizeof(float));
     }
+
+
+
 };
 
 

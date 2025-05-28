@@ -144,6 +144,7 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   hand_->update_joint_states(joint_position_states_, joint_velocity_states_, 
                       joint_effort_states_);
 
+
   // Read FT sensor data
   hand_->update_ft_sensor_states(ft_sensor_states_);
 

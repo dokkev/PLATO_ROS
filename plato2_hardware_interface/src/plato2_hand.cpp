@@ -141,14 +141,19 @@ void Hand::set_idle_command() {
         actuators_[0].set_joint_torque(0.0, 0);
         actuators_[1].set_joint_torque(0.0, 0);
     }
-    actuators_[2].set_joint_torque(0.0, 0);
-    actuators_[3].set_joint_torque(0.0, 0);
-    actuators_[4].set_joint_torque(0.0, 0);
-    actuators_[5].set_joint_torque(0.0, 0);
-    actuators_[6].set_joint_torque(0.0, 0);
-    actuators_[7].set_joint_torque(0.0, 0);
-    
+
+    // viscous damping coefficient (N·m·s/rad)
+    const double b = 5.0;
+
+    // apply damping to actuators 2 through 7 (skip 0 and 1)
+    for (size_t i = 2; i < actuators_.size(); ++i) {
+        double vel = actuators_[i].get_states().velocity;
+        double tau_damp = -b * vel;
+        actuators_[i].set_joint_torque(tau_damp, 0);
+        }
 }
+    
+    
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -179,7 +184,7 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
                                  const std::vector<double> &joint_position_states, 
                                  const std::vector<double> &joint_velocity_states){ 
 
-    if (counter_ % 50 == 0){ // update J1 and J2 once every 10 loops 
+    if (counter_ % 100 == 0){ // update J1 and J2 once every 10 loops 
         // Dynamixel only accepts position control
         actuators_[0].set_joint_position(joint_impedance_command[0], servo_current);
         actuators_[1].set_joint_position(joint_impedance_command[1], servo_current);
@@ -266,16 +271,17 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
 
 void Hand::update_ft_sensor_states(std::vector<geometry_msgs::msg::Wrench> &ft_sensor_states){
     // receive the message from the CAN bus every loop
+
     pcan_interface_.receive_message();
 
     for (size_t i = 0; i < ft_sensors_.size(); ++i) {
         auto states = ft_sensors_[i].get_states();
-        ft_sensor_states[i].force.x = states.force_filtered.x();
-        ft_sensor_states[i].force.y = states.force_filtered.y();
-        ft_sensor_states[i].force.z = states.force_filtered.z();
-        ft_sensor_states[i].torque.x = states.torque_filtered.x();
-        ft_sensor_states[i].torque.y = states.torque_filtered.y();
-        ft_sensor_states[i].torque.z = states.torque_filtered.z();
+        ft_sensor_states[i].force.x = states.force_raw.x();
+        ft_sensor_states[i].force.y = states.force_raw.y();
+        ft_sensor_states[i].force.z = states.force_raw.z();
+        ft_sensor_states[i].torque.x = states.torque_raw.x();
+        ft_sensor_states[i].torque.y = states.torque_raw.y();
+        ft_sensor_states[i].torque.z = states.torque_raw.z();
     }
 
     // update the FT sensor states

@@ -1,7 +1,7 @@
 plato2:
   controller_manager:
     ros__parameters:
-      update_rate: 500  # Hz
+      update_rate: 300  # Hz
 
       # Force-Torque Sensor Broadcasters
       ft_sensor_broadcaster_1:
@@ -19,18 +19,18 @@ plato2:
     ros__parameters:
       frame_id: "thumb_ft_sensor"
       sensor_name: "ft_sensor1"
-      state_publish_rate: 100.0
+
 
 
   ft_sensor_broadcaster_2:
     ros__parameters:
       frame_id: "index_ft_sensor"
       sensor_name: "ft_sensor2"
-      state_publish_rate: 100.0
+
 
 
   ft_sensor_broadcaster_3:
     ros__parameters:
       frame_id: "middle_ft_sensor"
       sensor_name: "ft_sensor3"
-      state_publish_rate: 100.0
+

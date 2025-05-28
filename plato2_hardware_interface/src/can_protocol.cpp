@@ -183,33 +183,31 @@ void MsgDecoder::retrieve_position(const TPCANMsg &msg, float &position) const {
 
 // BYTE0   | BYTE1   |   BYTE2 |   BYTE3 |   BYTE4 |   BYTE5 | BYTE6 | BYTE7 |
 // FORCE[0]| FORCE[1]| FORCE[2]| FORCE[3]| FORCE[4]| FORCE[5]|   -   |   -   |
-void MsgDecoder::retrieve_force(const TPCANMsg &msg, float &force_x, float &force_y, float &force_z){
+void MsgDecoder::retrieve_force(const TPCANMsg &msg,
+    float &fx, float &fy, float &fz)
+{
+constexpr float F_SCALE = 0.001f;   // = 1/1000
+constexpr float F_BIAS  = -30.0f;
+const uint8_t* data = msg.DATA;
 
-    int16_t fx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[0]) << 8 | msg.DATA[1]);
-    int16_t fy_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[2]) << 8 | msg.DATA[3]);
-    int16_t fz_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[4]) << 8 | msg.DATA[5]);
-
-    
-    
-    force_x = (fx_int / 1000.0f) - 30.0f;
-    force_y = (fy_int / 1000.0f) - 30.0f;
-    force_z = (fz_int / 1000.0f) - 30.0f;
+// high-byte * 256 + low-byte
+fx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * F_SCALE + F_BIAS;
+fy = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * F_SCALE + F_BIAS;
+fz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * F_SCALE + F_BIAS;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////
+void MsgDecoder::retrieve_torque(const TPCANMsg &msg,
+     float &tx, float &ty, float &tz)
+{
+constexpr float T_SCALE = 1e-5f;   // = 1/100000
+constexpr float T_BIAS  = -0.3f;
+const uint8_t* data = msg.DATA;
 
-// BYTE0   | BYTE1   |   BYTE2 |   BYTE3 |   BYTE4 |   BYTE5 | BYTE6 | BYTE7 |
-// TORQUE[0]| TORQUE[1]| TORQUE[2]| TORQUE[3]| TORQUE[4]| TORQUE[5]|   -   |   -   |
-void MsgDecoder::retrieve_torque(const TPCANMsg &msg, float &torque_x, float &torque_y, float &torque_z) {
-
-    int16_t tx_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[1]) << 8 | msg.DATA[0]);
-    int16_t ty_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[3]) << 8 | msg.DATA[2]);
-    int16_t tz_int = static_cast<int16_t>(static_cast<int8_t>(msg.DATA[5]) << 8 | msg.DATA[4]);
-
-    torque_x = (tx_int / 100000.0f) - 0.3f;
-    torque_y = (ty_int / 100000.0f) - 0.3f;
-    torque_z = (tz_int / 100000.0f) - 0.3f;
-    
+tx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * T_SCALE + T_BIAS;
+ty = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * T_SCALE + T_BIAS;
+tz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * T_SCALE + T_BIAS;
 }
+
+
 
 } // namespace can_protocol

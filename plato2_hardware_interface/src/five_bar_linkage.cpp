@@ -48,7 +48,7 @@ void FiveBarLinkage::update_kinematics(const float &mcp_motor_angle, const float
 
     // Check for invalid configuration
     if (std::pow(A, 2) + std::pow(B, 2) - std::pow(C, 2) < 0) {
-        std::cerr << "Invalid configuration. A^2 + B^2 - C^2 < 0\n";
+        // std::cerr << "Invalid configuration. A^2 + B^2 - C^2 < 0\n";
         position_amplification_ = 1.0;
         torque_amplification_ = 1.0;
     }

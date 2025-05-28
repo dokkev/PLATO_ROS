@@ -62,16 +62,16 @@ void FTSensor::process_message(const TPCANMsg &msg) {
         return;
     }
     
-    // // Accumulate sample count for calibration
-    // if (!bias_calibrated_) {
-    //     bias_samples_++;
-    //     update_bias(); // Call once when needed
-    // }
+    // Accumulate sample count for calibration
+    if (!bias_calibrated_) {
+        bias_samples_++;
+        update_bias(); // Call once when needed
+    }
 
-    // // Apply low-pass filter only after bias calibration is complete
-    // if (bias_calibrated_) {
-    //     apply_low_pass_filter(states_);
-    // }
+    // Apply low-pass filter only after bias calibration is complete
+    if (bias_calibrated_) {
+        apply_low_pass_filter(states_);
+    }
 }
 
 } // namespace sensor

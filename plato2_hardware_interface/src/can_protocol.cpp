@@ -184,28 +184,28 @@ void MsgDecoder::retrieve_position(const TPCANMsg &msg, float &position) const {
 // BYTE0   | BYTE1   |   BYTE2 |   BYTE3 |   BYTE4 |   BYTE5 | BYTE6 | BYTE7 |
 // FORCE[0]| FORCE[1]| FORCE[2]| FORCE[3]| FORCE[4]| FORCE[5]|   -   |   -   |
 void MsgDecoder::retrieve_force(const TPCANMsg &msg,
-    float &fx, float &fy, float &fz)
+                                float &fx, float &fy, float &fz)
 {
-constexpr float F_SCALE = 0.001f;   // = 1/1000
-constexpr float F_BIAS  = -30.0f;
-const uint8_t* data = msg.DATA;
+    constexpr float F_SCALE = 0.001f;   // = 1/1000
+    constexpr float F_BIAS  = -30.0f;
+    const uint8_t* data = msg.DATA;
 
-// high-byte * 256 + low-byte
-fx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * F_SCALE + F_BIAS;
-fy = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * F_SCALE + F_BIAS;
-fz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * F_SCALE + F_BIAS;
+    // high-byte * 256 + low-byte
+    fx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * F_SCALE + F_BIAS;
+    fy = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * F_SCALE + F_BIAS;
+    fz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * F_SCALE + F_BIAS;
 }
 
 void MsgDecoder::retrieve_torque(const TPCANMsg &msg,
-     float &tx, float &ty, float &tz)
+                                 float &tx, float &ty, float &tz)
 {
-constexpr float T_SCALE = 1e-5f;   // = 1/100000
-constexpr float T_BIAS  = -0.3f;
-const uint8_t* data = msg.DATA;
+    constexpr float T_SCALE = 1e-5f;   // = 1/100000
+    constexpr float T_BIAS  = -0.3f;
+    const uint8_t* data = msg.DATA;
 
-tx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * T_SCALE + T_BIAS;
-ty = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * T_SCALE + T_BIAS;
-tz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * T_SCALE + T_BIAS;
+    tx = (uint16_t(data[0]) * 256u + uint16_t(data[1])) * T_SCALE + T_BIAS;
+    ty = (uint16_t(data[2]) * 256u + uint16_t(data[3])) * T_SCALE + T_BIAS;
+    tz = (uint16_t(data[4]) * 256u + uint16_t(data[5])) * T_SCALE + T_BIAS;
 }
 
 

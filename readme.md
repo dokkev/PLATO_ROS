@@ -1,6 +1,3 @@
-# Archived Branch
- This branch is for PLATO Hand V1 and V1.5. This branch is archived and will not be updated. The latest version of the project can be found in the `master` 
-
 ## Installation
 
 

@@ -1,7 +1,9 @@
-## Installation
+## Software Installation
 
 
-#### PCAN Installation
+### PCAN Installation
+
+#### 1. Install PCAN Driver
 
 If you are using Linux environments missing a driver (e.g. minimized Linux environments, older kernels) or you want to use our character-based driver (chardev) e.g. in connection with the PCAN-Basic API, you need our [PCAN-Linux driver package](https://www.peak-system.com/fileadmin/media/linux/index.php#Section_Driver-Proproetary) and compile the driver yourself.
 
@@ -47,6 +49,9 @@ sudo make install
 > ```
 > make -C driver NET=NETDEV_SUPPORT
 
+
+#### 2. Install PCAN-Basic API
+
 [Download PCAN-Basic API (Linux)](https://www.peak-system.com/PCAN-Basic.239.0.html?&L=1)
 
 Extract and `cd` into the directory
@@ -67,12 +72,31 @@ Being a module, the driver, however, can be loaded without rebooting the system 
 sudo modprobe pcan
 ```
 
-#### ROS 2 Installation
+### ROS 2 Installation
 
 This package uses ros `humble` distribution with Ubuntu 22.04. To install, follow the instructions on the [ROS 2 Humble Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
 
-#### Depedencies
+#### ROS 2 Depedencies
 
 TODO: Use Rosdep to install dependencies
 TODO: Add a build check for ROS 2
+
+```
+sudo apt install ros-humble-hardware-interface ros-humble-can-msgs ros-humble-xacro ros-humble-joint-state-publisher-gui ros-humble-controller-manager ros-humble-joint-state-broadcaster ros-humble-position-controllers
+
+```
+
+#### Eigen Installation
+We use Eigen3 for matrix operations. Install [Eigen3](https://eigen.tuxfamily.org/dox/GettingStarted.html)with you preferred method.
+I used apt to install Eigen3.
+```
+sudo apt install libeigen3-dev
+```
+
+## Hardware Configuration
+The GIM3505 Actuators are configured using [Steadywin Motor Wizard](https://steadywin.cn/en/col.jsp?id=124) which runs on Windows (We tested on Windows 10 and Windows 11) and CP2102 USB to UART Bridge which comes with GIM3505. GIM3505 can be configured via CAN, but I do not recommend it since Motor Wizard provide GUI to configure the motor parameters easily.
+
+> Warning: The CP20102 Board outputs voltage via VCCIO pin (either 3.3V or 5 V depending on the yellow jumper wire location) which may increase the chance of shorting the board if not careful. To prevent this, you can remove the yellow jumper wire to disable voltage output pin from the CP2102 board.
+
+![alt text](docs/img/motor_wizard.png)
 

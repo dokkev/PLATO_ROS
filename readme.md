@@ -93,10 +93,13 @@ I used apt to install Eigen3.
 sudo apt install libeigen3-dev
 ```
 
-## Hardware Configuration
+## Motor Configuration
 The GIM3505 Actuators are configured using [Steadywin Motor Wizard](https://steadywin.cn/en/col.jsp?id=124) which runs on Windows (We tested on Windows 10 and Windows 11) and CP2102 USB to UART Bridge which comes with GIM3505. GIM3505 can be configured via CAN, but I do not recommend it since Motor Wizard provide GUI to configure the motor parameters easily.
 
 > Warning: The CP20102 Board outputs voltage via VCCIO pin (either 3.3V or 5 V depending on the yellow jumper wire location) which may increase the chance of shorting the board if not careful. To prevent this, you can remove the yellow jumper wire to disable voltage output pin from the CP2102 board.
 
 ![alt text](docs/img/motor_wizard.png)
+Refer to the [GIM3505 Driver Drawing](https://14180476.s21i.faiusr.com/61/ABUIABA9GAAgkfLvpAYoz6y4oAU.pdf) for the detail pinout.
+
+
 

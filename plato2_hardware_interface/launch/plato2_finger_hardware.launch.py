@@ -92,6 +92,14 @@ def generate_launch_description():
         arguments=["-d", rviz_config_file],
         condition=IfCondition(gui),
     )
+    
+    contact_estimation_node = Node(
+        package="plato2_state_estimator",
+        executable="contact_estimator",
+        name="contact_estimator",
+        output="screen",
+    )
+        
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -179,6 +187,7 @@ def generate_launch_description():
         ft_sensor_broadcaster_spawner_3,
         # delay_position_control_node_after_controller_spawner
         # optimo_plato_transform_broadcaster,
+        contact_estimation_node,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

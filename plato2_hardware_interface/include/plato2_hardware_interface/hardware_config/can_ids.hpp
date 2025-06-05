@@ -141,10 +141,10 @@ namespace CalibrationID{
 namespace FTSensorID{
     constexpr uint8_t THUMB_FORCE = 0x2A;
     constexpr uint8_t THUMB_TORQUE = 0x2B;
-    constexpr uint8_t INDEX_FORCE = 0x1A;
-    constexpr uint8_t INDEX_TORQUE = 0x1B;
-    constexpr uint8_t MIDDLE_FORCE = 0x3A;
-    constexpr uint8_t MIDDLE_TORQUE = 0x3B;
+    constexpr uint8_t INDEX_FORCE = 0x3A;
+    constexpr uint8_t INDEX_TORQUE = 0x3B;
+    constexpr uint8_t MIDDLE_FORCE = 0x1A;
+    constexpr uint8_t MIDDLE_TORQUE = 0x1B;
 }
 
 #endif // PLATO_HARDWARE_INTERFACE__CAN_IDS_HPP_

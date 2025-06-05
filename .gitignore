@@ -8,3 +8,4 @@ plato_hardware_interface/log/latest_list
 .vscode/c_cpp_properties.json
 ros2_socketcan
 .qodo
+.pyc

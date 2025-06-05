@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             'spaceMouse_motionTest = spaceMouse_navigator.spaceMouse_motionTest:main',
             'spaceMouse_publisher = spaceMouse_navigator.spaceMouse_publisher:main',
-             'spaceMouse_state_machine = spaceMouse_navigator.spaceMouse_state_machine:main'
+            'spaceMouse_state_machine = spaceMouse_navigator.spaceMouse_state_machine:main',
+            'lambda_control_gripper = spaceMouse_navigator.lambda_control_gripper:main',
         ],
     },
 )

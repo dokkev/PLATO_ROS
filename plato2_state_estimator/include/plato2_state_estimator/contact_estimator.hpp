@@ -22,38 +22,29 @@ public:
 private:
   // Parameters
   double force_threshold_;
-  double derivative_threshold_;
   int buffer_size_;
   double filter_alpha_;
-  double derivative_time_window_;
 
-  // Containers for FT sensor subscriptions (order: index, middle, thumb)
+  // FT sensor subscribers and publishers
   std::vector<rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr> ft_subs_;
-
-  // Containers for individual finger contact publishers
   std::vector<rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr> contact_pubs_;
-
-  // Publisher for combined contact states
   rclcpp::Publisher<std_msgs::msg::ByteMultiArray>::SharedPtr combined_contact_pub_;
-
-  // Timer for publishing combined contact state
   rclcpp::TimerBase::SharedPtr timer_;
 
-  // Storage for force measurements and contact states
+  // Data buffers
   std::vector<std::deque<std::pair<rclcpp::Time, double>>> force_time_buffers_;
   std::vector<double> filtered_forces_;
   std::array<bool, 3> contact_states_;
 
+  // Bias calibration
+  std::vector<double> bias_force_;
+  std::vector<int> calibration_counter_;
+  bool calibration_done(int finger_idx) const;
+
   // Utility functions
   double calculate_force_magnitude(const geometry_msgs::msg::WrenchStamped::SharedPtr msg);
-  bool detect_contact(const std::deque<std::pair<rclcpp::Time, double>> & force_buffer);
-  double calculate_force_derivative(const std::deque<std::pair<rclcpp::Time, double>> & force_buffer, double time_window);
   double apply_filter(double new_value, double previous_filtered, double alpha);
-
-  // Process FT sensor data for a given finger index
   void process_ft_data(const geometry_msgs::msg::WrenchStamped::SharedPtr msg, int finger_idx);
-
-  // Timer callback to publish combined state
   void timer_callback();
 };
 

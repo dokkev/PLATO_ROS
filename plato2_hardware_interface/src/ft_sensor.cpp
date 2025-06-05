@@ -6,14 +6,14 @@ namespace sensor {
 FTSensor::FTSensor(pcan_interface::PCANInterface &pcan_interface, const Config &config)
     : pcan_interface_(pcan_interface),
       config_(config),   
-      alpha_(0.1f),
+      alpha_(0.06f),
       states_(),
       bias_force_(Eigen::Vector3f::Zero()),
       bias_torque_(Eigen::Vector3f::Zero()),
       bias_accum_force_(Eigen::Vector3f::Zero()),
       bias_accum_torque_(Eigen::Vector3f::Zero()),
       bias_samples_(0),
-      calibration_samples_(500), 
+      calibration_samples_(100), 
       bias_calibrated_(false) 
       {
         std::cout << "FT Sensor Initialized with Force ID: " << config_.force_rx_id 
@@ -32,43 +32,50 @@ void FTSensor::apply_low_pass_filter(States &states) {
 }
 
 void FTSensor::update_bias() {
-    if (!bias_calibrated_) {
-        if (bias_samples_ >= calibration_samples_) {
+    if (!bias_calibrated_
+        && bias_samples_force_  >= calibration_samples_
+        && bias_samples_torque_ >= calibration_samples_) {
 
-            // Compute final bias values
-            bias_force_ = bias_accum_force_ / static_cast<float>(bias_samples_);
-            bias_torque_ = bias_accum_torque_ / static_cast<float>(bias_samples_);
-            bias_calibrated_ = true; // Mark as calibrated
+        bias_force_  = bias_accum_force_  / static_cast<float>(bias_samples_force_);
+        bias_torque_ = bias_accum_torque_ / static_cast<float>(bias_samples_torque_);
+        bias_calibrated_ = true;
 
-            std::cout << "Sensor bias calibrated: Force bias=" << bias_force_.transpose() 
-                      << " Torque bias=" << bias_torque_.transpose() << std::endl;
-        }
+        std::cout << "Sensor bias calibrated:\n  Force  = "
+                  << bias_force_.transpose()
+                  << "\n  Torque = "
+                  << bias_torque_.transpose() << std::endl;
     }
 }
 
+// 3. Re-write process_message() so each accumulator has its own counter ------
+//    (the rest of the method is unchanged)
 void FTSensor::process_message(const TPCANMsg &msg) {
     if (msg.ID == config_.force_rx_id) {
-        can_protocol::MsgDecoder::retrieve_force(msg, states_.force_raw.x(), states_.force_raw.y(), states_.force_raw.z());
+        can_protocol::MsgDecoder::retrieve_force(
+            msg, states_.force_raw.x(), states_.force_raw.y(), states_.force_raw.z());
+
         if (!bias_calibrated_) {
             bias_accum_force_ += states_.force_raw;
+            ++bias_samples_force_;                      // << NEW
+            update_bias();
         }
-    } else if (msg.ID == config_.torque_rx_id) {
-        can_protocol::MsgDecoder::retrieve_torque(msg, states_.torque_raw.x(), states_.torque_raw.y(), states_.torque_raw.z());
+    }
+    else if (msg.ID == config_.torque_rx_id) {
+        can_protocol::MsgDecoder::retrieve_torque(
+            msg, states_.torque_raw.x(), states_.torque_raw.y(), states_.torque_raw.z());
+
         if (!bias_calibrated_) {
             bias_accum_torque_ += states_.torque_raw;
+            ++bias_samples_torque_;                     // << NEW
+            update_bias();
         }
-    } else {
-        std::cerr << "Unknown message ID received in FTSensor::process_message" << std::endl;
+    }
+    else {
+        std::cerr << "Unknown message ID received in FTSensor::process_message\n";
         return;
     }
-    
-    // Accumulate sample count for calibration
-    if (!bias_calibrated_) {
-        bias_samples_++;
-        update_bias(); // Call once when needed
-    }
 
-    // Apply low-pass filter only after bias calibration is complete
+    // Apply low-pass filter only after calibration is complete
     if (bias_calibrated_) {
         apply_low_pass_filter(states_);
     }

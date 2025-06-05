@@ -50,6 +50,9 @@ private:
     int bias_samples_;
     int calibration_samples_;  // **Add this variable**
     bool bias_calibrated_;
+
+    std::size_t bias_samples_force_{0};
+    std::size_t bias_samples_torque_{0};
 };
     
 

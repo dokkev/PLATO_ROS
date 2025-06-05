@@ -60,6 +60,9 @@ class SpaceMouseStateMachine(Node):
             ])
                     
         }
+        # Fully open : 0.26
+        # Fully closed : -0.00417
+        
         
         # Current joint position (will be updated from joint_states)
         self.current_position = self.joint_positions[0].copy()

@@ -2,7 +2,7 @@
 <robot name="plato2_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <!-- Set World Frame -->
-    <link name="world"/>
+    <!-- <link name="world"/> -->
 
     <!-- Include Robot Description Xacro -->
     <xacro:include filename="$(find plato2_description)/urdf/xacro/plato2_description.xacro"/>

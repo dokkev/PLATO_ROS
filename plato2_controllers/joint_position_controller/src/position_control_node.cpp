@@ -71,7 +71,7 @@ private:
         stiffness_presets_["zero"] = std::vector<double>(8, 0.0);
         stiffness_presets_["soft"] = std::vector<double>(8, 0.5);
         stiffness_presets_["normal"] = std::vector<double>(8, 1.5);
-        stiffness_presets_["stiff"] = std::vector<double>(8, 2.5);
+        stiffness_presets_["stiff"] = std::vector<double>(8, 3.5);
 
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
@@ -130,12 +130,15 @@ private:
                     break;
                 case '1':
                     updateStiffnessFromPreset("soft");
+                    updateEffortFromPreset("zero");
                     break;
                 case '2':
                     updateStiffnessFromPreset("normal");
+                    updateEffortFromPreset("zero");
                     break;
                 case '3':
                     updateStiffnessFromPreset("stiff");
+                    updateEffortFromPreset("zero");
                     break;
                 case '4':
                     updateEffortFromPreset("flick_ready");
@@ -147,6 +150,7 @@ private:
                     break;
                 case '6':
                     updateEffortFromPreset("power_grasp");
+                    updateStiffnessFromPreset("normal");
                     break;
                 case '7':
                     updateEffortFromPreset("mcp");

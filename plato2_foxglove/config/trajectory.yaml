@@ -12,13 +12,19 @@ card:
   Motion_Time: 1.0
   position_name: card 4
 close:
-- position_name: close
+- Hold_Time: 0.0
   Motion_Time: 3.0
-  Hold_Time: 0.0
-open:
-- position_name: open
-  Motion_Time: 3.0
-  Hold_Time: 0.0
+  position_name: close
+close_block:
+- Hold_Time: 0.0
+  Motion_Time: 1.0
+  position_name: zero
+- Hold_Time: 0.0
+  Motion_Time: 1.5
+  position_name: open_2
+- Hold_Time: 1.0
+  Motion_Time: 2.0
+  position_name: close
 coin:
 - Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
@@ -26,6 +32,17 @@ coin:
 - Hold_Time: 0.20000000298023224
   Motion_Time: 1.0
   position_name: coin 2
+open:
+- Hold_Time: 0.0
+  Motion_Time: 3.0
+  position_name: open
+open_block:
+- position_name: open_2
+  Motion_Time: 1.0
+  Hold_Time: 5.0
+- position_name: zero
+  Motion_Time: 1.0
+  Hold_Time: 0.0
 opposition:
 - Hold_Time: 1.0
   Motion_Time: 0.1
@@ -335,8 +352,14 @@ rom_test:
   Motion_Time: 0.1
   position_name: '0'
 test:
-- Hold_Time: 2.0
-  Motion_Time: 5.0
+- Hold_Time: 1.0
+  Motion_Time: 1.5
+  position_name: open
+- Hold_Time: 1.0
+  Motion_Time: 1.0
+  position_name: close
+- Hold_Time: 1.0
+  Motion_Time: 1.0
   position_name: open
 test 1:
 - Hold_Time: 1.0

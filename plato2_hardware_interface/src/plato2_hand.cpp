@@ -92,7 +92,7 @@ void Hand::init_can_hardware() {
                 return;
             }
 
-            std::cerr << "Unknown CAN message ID: 0x" << std::hex << msg.ID << std::dec << std::endl;
+            // std::cerr << "Unknown CAN message ID: 0x" << std::hex << msg.ID << std::dec << std::endl;
         }
     );
 

@@ -35,12 +35,19 @@ class SpaceMousePublisher(Node):
         # Set the axes values (x, y, z, pitch, roll, yaw)
         # Note: We negate pitch and yaw for a more intuitive mapping
         joy_msg.axes = [
-            float(state.y), 
-            float(-state.x), 
+            # float(state.y), 
+            # float(-state.x), 
+            float(state.y),  # No x axis in SpaceMouse
+            float(-state.x),  # Invert y for intuitive control
             float(state.z), 
             float(state.roll), 
             float(state.pitch), 
             float(-state.yaw)
+            # float(0.0),
+            # float(0.0),
+            # float(0.0)
+            
+            # float# Placeholder for a 7th axis if needed
         ]
         
         # Get button states and add them to the message

@@ -134,6 +134,10 @@ hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &time,
                     const rclcpp::Duration &period) {
   // Update hand state
+
+  // Comment out set_impedance_command and uncomment set_idle_command/print_motor_positions
+  // and rebuild/resource to manually rezero in actuator_config.hpp
+
   hand_->set_impedance_command(joint_effort_commands_, 300, 
                              joint_position_states_, joint_velocity_states_);
 

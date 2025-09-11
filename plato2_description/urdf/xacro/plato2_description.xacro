@@ -3,11 +3,11 @@
 <xacro:macro name="plato2_description" params="connector_link  xyz:='0 0 0'  rpy:='0 0 0' ">
 
 <!-- Connector Joint -->
-<joint name="connector_joint" type="fixed">
+<!-- <joint name="connector_joint" type="fixed">
     <parent link="${connector_link}"/>
     <child link="base_link"/>
     <origin xyz="${xyz}" rpy="${rpy}"/>
-</joint>
+</joint> -->
 
 
 <link name="base_link">

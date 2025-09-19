@@ -52,8 +52,8 @@ private:
     Status status_;
     Config config_;
 
-    can_protocol::MsgEncoder encoder_;
-    can_protocol::MsgDecoder decoder_;
+    mit_can_protocol::MsgEncoder encoder_;
+    mit_can_protocol::MsgDecoder decoder_;
 
     /// @brief Motor Enable Status
     bool b_motor_enabled_;

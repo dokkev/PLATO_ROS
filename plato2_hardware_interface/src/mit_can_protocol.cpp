@@ -6,7 +6,7 @@
 
 #include "plato2_hardware_interface/mit_can_protocol.hpp"
 
-namespace can_protocol
+namespace mit_can_protocol
 {
 
 // ===== Protocol constants (from documentation) =====

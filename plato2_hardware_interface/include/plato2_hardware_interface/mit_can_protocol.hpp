@@ -10,7 +10,7 @@
 
 #include "plato2_hardware_interface/hardware_config/can_ids.hpp"
 
-namespace can_protocol{
+namespace mit_can_protocol{
 
 
 /// @brief Runtime motor motion control command message. ControlMessage takes TPCANMsg message and encode the control command following
@@ -98,7 +98,7 @@ public:
     /// @param pos_max_rad reference to store the decoded position limit value
     /// @param vel_max_rps reference to store the decoded velocity limit value
     /// @param tq_max_nm reference to store the decoded torque limit value
-    void MsgDecoder::get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_max_rps, float &tq_max_nm) const;
+    void get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_max_rps, float &tq_max_nm) const;
 
 private:
     /// @brief gear ratio of the motor
@@ -108,6 +108,6 @@ private:
     const float &torque_constant_; 
 };
 
-} // namespace can_protocol
+} // namespace mit_can_protocol
 
 #endif // PLATO_HARDWARE_INTERFACE__CAN_PROTOCOL_HPP_

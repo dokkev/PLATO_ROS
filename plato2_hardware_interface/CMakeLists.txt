@@ -48,6 +48,7 @@ add_library(
   src/pcan_interface.cpp
   src/ft_sensor.cpp
   src/can_protocol.cpp
+  src/mit_can_protocol.cpp
   src/actuator.cpp
   src/karnopp_compensator.cpp
   src/five_bar_linkage.cpp

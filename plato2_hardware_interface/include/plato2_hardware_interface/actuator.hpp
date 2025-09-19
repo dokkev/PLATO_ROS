@@ -4,7 +4,7 @@
 #include "plato2_hardware_interface/hardware_config/actuator_config.hpp"
 
 #include "plato2_hardware_interface/pcan_interface.hpp"
-#include "plato2_hardware_interface/can_protocol.hpp"
+#include "plato2_hardware_interface/mit_can_protocol.hpp"
 
 namespace actuator{
 

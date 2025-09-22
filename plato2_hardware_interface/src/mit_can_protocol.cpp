@@ -25,9 +25,6 @@ static float 			  T_MAX  			 = 1.56f;   // Nm (doc default) // .52*3 Nm
 // StdID bit[10] must be 1 for operation-control command frames (no command byte)
 static constexpr uint32_t STDID_OC_BIT   	 = 0x400;
 
-// Default device address if you don’t override msg.ID elsewhere
-static constexpr uint32_t DEFAULT_DEV_ADDR   = 0x001;  // change if your app assigns IDs differently
-
 // ===== Scaling per documentation =====
 // Config limits (CMD 0xF0): Pos_Max=0.1 rad LSB; Vel_Max=0.01 rad/s LSB; T_Max=0.01 Nm LSB
 static inline uint16_t to_pos_max_u16(float rad)   { float v = rad / 0.1f;   if (v < 0) v = 0; if (v > 65535) v = 65535; return uint16_t(lroundf(v)); }
@@ -61,8 +58,8 @@ static inline float unmap_signed_12(uint16_t u, float x_max)
 }
 
 // ======= MsgEncoder ===============================================================
-MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant)
-: gear_ratio_(gear_ratio), torque_constant_(torque_constant) {}
+MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, const uint8_t &tx_id)
+: gear_ratio_(gear_ratio), torque_constant_(torque_constant), tx_id_(tx_id) {}
 
 void MsgEncoder::set_limits(TPCANMsg& msg,
                             float pos_max_rad,
@@ -91,7 +88,7 @@ void MsgEncoder::set_limits(TPCANMsg& msg,
     // Build the 0xF0 frame (big-endian “hi, lo” per field).
     // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
     std::memset(&msg, 0, sizeof(msg));
-    msg.ID      = DEFAULT_DEV_ADDR;
+    msg.ID      = tx_id_;
     msg.LEN     = 7;
     msg.DATA[0] = CMD_CFG_LIMITS;     // 0xF0
 
@@ -109,7 +106,7 @@ void MsgEncoder::set_limits(TPCANMsg& msg,
 void MsgEncoder::set_zero_position(TPCANMsg &msg)
 {
     // Documentation: send 0xB1 to set current position as origin.
-    msg.ID      = DEFAULT_DEV_ADDR;
+    msg.ID      = (tx_id_ | STDID_OC_BIT);
     msg.LEN     = 1;
     msg.DATA[0] = CMD_SET_ZERO;
 }
@@ -117,9 +114,18 @@ void MsgEncoder::set_zero_position(TPCANMsg &msg)
 void MsgEncoder::start_motor(TPCANMsg &msg)
 {
     // Enter operation-control mode by issuing an OC frame (bit10=1) with zeros.
-    std::memset(&msg, 0, sizeof(msg));
-    msg.ID  = (DEFAULT_DEV_ADDR | STDID_OC_BIT);
+    // std::memset(&msg, 0, sizeof(msg));
+    std::cout << "Starting motor with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    msg.ID  = (tx_id_ | STDID_OC_BIT);
     msg.LEN = 8; // full OC frame
+    msg.DATA[0] = 0;
+    msg.DATA[1] = 0;
+    msg.DATA[2] = 0;
+    msg.DATA[3] = 0;
+    msg.DATA[4] = 0;
+    msg.DATA[5] = 0;
+    msg.DATA[6] = 0;
+    msg.DATA[7] = 0;
 }
 
 void MsgEncoder::stop_motor(TPCANMsg &msg)
@@ -131,7 +137,7 @@ void MsgEncoder::stop_motor(TPCANMsg &msg)
 void MsgEncoder::stop_control(TPCANMsg &msg)
 {
     // Exit operation-control mode: 0xCF
-    msg.ID      = DEFAULT_DEV_ADDR;
+    msg.ID      = (tx_id_ | STDID_OC_BIT);
     msg.LEN     = 1;
     msg.DATA[0] = CMD_EXIT_OC_MODE;
 }
@@ -139,7 +145,7 @@ void MsgEncoder::stop_control(TPCANMsg &msg)
 void MsgEncoder::clear_fault(TPCANMsg &msg)
 {
     // Clear fault: 0xAF
-    msg.ID      = DEFAULT_DEV_ADDR;
+    msg.ID      = (tx_id_ | STDID_OC_BIT);
     msg.LEN     = 1;
     msg.DATA[0] = CMD_CLEAR_FAULT;
 }
@@ -150,10 +156,10 @@ static inline void pack_oc_frame(TPCANMsg& msg,
                                  float kp,      bool kp_set,
                                  float kd,      bool kd_set,
                                  float tq_nm,   bool tq_set,
-                                 float pos_max, float vel_max, float t_max)
+                                 float pos_max, float vel_max, float t_max, uint8_t tx_id)
 {
     std::memset(&msg, 0, sizeof(msg));
-    msg.ID  = (DEFAULT_DEV_ADDR | STDID_OC_BIT);
+    msg.ID  = (tx_id | STDID_OC_BIT);
     msg.LEN = 8;
 
     // Saturate to configured maxima
@@ -209,7 +215,7 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 				  /*kp*/kp, true,
 				  /*kd*/kd, true,
 				  /*tq*/torque_nm, true,
-				  POS_MAX, VEL_MAX, T_MAX);
+				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
 }
 
 

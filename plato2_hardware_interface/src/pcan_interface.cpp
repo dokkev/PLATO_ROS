@@ -63,7 +63,7 @@ void PCANInterface::send_message(const TPCANMsg &msg){
 	// print_message(msg);
 
 	if (status != PCAN_ERROR_OK){
-		std::cout << "PCANInterface::write_message:: ERROR! Failed to write message!" << std::endl;
+		std::cout << "PCANInterface::write_message:: ERROR! Failed to write message to ID: " << std::hex << msg.ID << std::dec << std::endl;
 		show_status(status);
 	}
 }

@@ -19,7 +19,7 @@ class MsgEncoder{
 
 public:
     /// @brief Default constructor
-    MsgEncoder(const float &gear_ratio, const float &torque_constant);
+    MsgEncoder(const float &gear_ratio, const float &torque_constant, const uint8_t &tx_id);
 
     // Build the 0xF0 frame (big-endian “hi, lo” per field).
     // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
@@ -36,13 +36,13 @@ public:
     ////////////////////////////////////// COMMAND MESSAGE //////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// @brief Set the motor enable ID to the message
-    static void start_motor(TPCANMsg &msg);
+    void start_motor(TPCANMsg &msg);
 
     /// @brief Set the motor disable ID to the message. This is equivalent to the stop motor command in this protocol.
-    static void stop_motor(TPCANMsg &msg);
+    void stop_motor(TPCANMsg &msg);
 
     /// @brief Set the stop control ID to the message. Current ongoing control command should be stopped immediately. 
-    static void stop_control(TPCANMsg &msg);
+    void stop_control(TPCANMsg &msg);
 
     /// @brief  Send command message to clear any fault and return to normal state
     /// @param msg TPCANMsg reference to store the command message
@@ -74,6 +74,9 @@ private:
 
     /// @brief torque constant of the motor initialized in the actuator constructor
     const float &torque_constant_;
+
+    /// @brief transmit ID for the motor
+    const uint8_t &tx_id_;
 
 };
 

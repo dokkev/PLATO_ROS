@@ -173,9 +173,9 @@ private:
     };
 
     std::vector<sensor::Config> ft_sensor_configs_ = {
-        sensor::Config{FTSensorID::THUMB_FORCE, FTSensorID::THUMB_TORQUE},
-        sensor::Config{FTSensorID::INDEX_FORCE, FTSensorID::INDEX_TORQUE},
-        sensor::Config{FTSensorID::MIDDLE_FORCE, FTSensorID::MIDDLE_TORQUE}
+        // sensor::Config{FTSensorID::THUMB_FORCE, FTSensorID::THUMB_TORQUE},
+        // sensor::Config{FTSensorID::INDEX_FORCE, FTSensorID::INDEX_TORQUE},
+        // sensor::Config{FTSensorID::MIDDLE_FORCE, FTSensorID::MIDDLE_TORQUE}
     };
 
 };

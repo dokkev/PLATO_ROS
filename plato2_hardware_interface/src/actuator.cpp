@@ -10,7 +10,7 @@ namespace actuator{
 Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, const Config& config) 
     :   pcan_interface_(pcan_interface), 
         config_(config),
-        encoder_(config.gear_ratio, config.torque_constant),
+        encoder_(config.gear_ratio, config.torque_constant, config.can_tx_id),
         decoder_(config.gear_ratio, config.torque_constant),
         b_motor_enabled_(false) {   
 

@@ -131,7 +131,30 @@ void Actuator::calibrate_phase_order(){}
 
 ////////////////////////////////////////////////////////////////////////////
 
-void Actuator::process_message(const TPCANMsg &msg){}
+void Actuator::process_message(const TPCANMsg &msg){
+
+    // Decode the received message
+    float position_rad = 0.0f;
+    float velocity_rps = 0.0f;
+    float kp = 0.0f;
+    float kd = 0.0f;
+    float torque_nm = 0.0f;
+    bool in_oc_mode = false;
+    bool has_fault = false;
+
+    decoder_.get_states(msg, position_rad, velocity_rps, kp, kd, torque_nm, in_oc_mode, has_fault);
+
+    // Convert motor states to joint states
+    motor_to_joint_(position_rad, states_.position, true);
+    motor_to_joint_(velocity_rps, states_.velocity);
+    motor_to_joint_(torque_nm, states_.torque);
+
+    states_.in_oc_mode = in_oc_mode;
+    states_.has_fault = has_fault;
+
+    // Update motor enabled status
+    b_motor_enabled_ = in_oc_mode && !has_fault;
+}
 
 
 

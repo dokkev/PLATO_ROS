@@ -211,8 +211,7 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 											  const float kd, 
 											  const float torque_nm)
 {
-    std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
-    std::cout << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
+    std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
 	pack_oc_frame(msg,
 				  /*pos*/position_rad, true,
 				  /*vel*/velocity_rps, true,
@@ -236,25 +235,25 @@ MsgDecoder::MsgDecoder(const float &gear_ratio, const float &torque_constant)
 // [6]: status bits (bit0: in OC mode, bit1: fault)
 void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocity, float &kp, float &kd, float &torque, bool &in_oc_mode, bool &has_fault) const
 {
-    std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << std::endl;
     if (msg.LEN < 7 || msg.DATA[0] != CMD_READ_STATES)
     {
         std::cerr << "MsgDecoder::get_states: unexpected frame\n";
         position = velocity = torque = 0.0f;
         return;
     }
-
+    
     uint16_t p16 = uint16_t(msg.DATA[1]) << 8 | uint16_t(msg.DATA[2]);
     uint16_t v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
     uint16_t t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
-
+    
     position = unmap_signed_16(p16, POS_MAX);
     velocity = unmap_signed_12(v12, VEL_MAX);
     torque   = unmap_signed_12(t12, T_MAX);
-
+    
     // Optional: interpret status in msg.DATA[6] if needed
     in_oc_mode = (msg.DATA[6] & 0x01) != 0;
     has_fault  = (msg.DATA[6] & 0x02) != 0;
+    std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << "  pos=" << position << " rad, vel=" << velocity << " rad/s, tq=" << torque << " Nm, oc=" << in_oc_mode << ", fault=" << has_fault << "\n";
 }
 
 void MsgDecoder::get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_max_rps, float &tq_max_nm) const

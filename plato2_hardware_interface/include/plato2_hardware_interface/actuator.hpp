@@ -20,6 +20,8 @@ struct States{
     float position;
     float velocity;
     float torque;
+    bool in_oc_mode;
+    bool has_fault;
 };
 
 

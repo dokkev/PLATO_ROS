@@ -10,25 +10,25 @@
 using namespace Plato;
 
 namespace MotorTxID{
-    constexpr uint8_t MOTOR1 = 0x10;
-    constexpr uint8_t MOTOR2 = 0x11;
-    constexpr uint8_t MOTOR3 = 0x12;
-    constexpr uint8_t MOTOR4 = 0x13;
-    constexpr uint8_t MOTOR5 = 0x14;
-    constexpr uint8_t MOTOR6 = 0x15;
-    constexpr uint8_t MOTOR7 = 0x16;
-    constexpr uint8_t MOTOR8 = 0x17;
+    constexpr uint8_t MOTOR1 = 0xa;
+    constexpr uint8_t MOTOR2 = 0xb;
+    constexpr uint8_t MOTOR3 = 0xc;
+    constexpr uint8_t MOTOR4 = 0xd;
+    constexpr uint8_t MOTOR5 = 0xe;
+    constexpr uint8_t MOTOR6 = 0xf;
+    constexpr uint8_t MOTOR7 = 0x10;
+    constexpr uint8_t MOTOR8 = 0x11;
 } // namespace MotorTxID
 
 namespace MotorRxID{
-    constexpr uint8_t MOTOR1 = 0x20;
-    constexpr uint8_t MOTOR2 = 0x21;
-    constexpr uint8_t MOTOR3 = 0x22;
-    constexpr uint8_t MOTOR4 = 0x23;
-    constexpr uint8_t MOTOR5 = 0x24;
-    constexpr uint8_t MOTOR6 = 0x25;
-    constexpr uint8_t MOTOR7 = 0x26;
-    constexpr uint8_t MOTOR8 = 0x27;
+    constexpr uint8_t MOTOR1 = 0xa;
+    constexpr uint8_t MOTOR2 = 0xb;
+    constexpr uint8_t MOTOR3 = 0xc;
+    constexpr uint8_t MOTOR4 = 0xd;
+    constexpr uint8_t MOTOR5 = 0xe;
+    constexpr uint8_t MOTOR6 = 0xf;
+    constexpr uint8_t MOTOR7 = 0x10;
+    constexpr uint8_t MOTOR8 = 0x11;
 } // namespace MotorRxID
 
 namespace GIM3505{

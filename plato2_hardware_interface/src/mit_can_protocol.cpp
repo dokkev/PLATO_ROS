@@ -107,6 +107,7 @@ void MsgEncoder::set_zero_position(TPCANMsg &msg)
 {
     // Documentation: send 0xB1 to set current position as origin.
     msg.ID      = (tx_id_ | STDID_OC_BIT);
+    std::cout << "Setting zero position with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_SET_ZERO;
 }
@@ -137,6 +138,7 @@ void MsgEncoder::stop_motor(TPCANMsg &msg)
 void MsgEncoder::stop_control(TPCANMsg &msg)
 {
     // Exit operation-control mode: 0xCF
+    std::cout << "Stopping control with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
     msg.ID      = (tx_id_ | STDID_OC_BIT);
     msg.LEN     = 1;
     msg.DATA[0] = CMD_EXIT_OC_MODE;
@@ -209,6 +211,8 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 											  const float kd, 
 											  const float torque_nm)
 {
+    std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    std::cout << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
 	pack_oc_frame(msg,
 				  /*pos*/position_rad, true,
 				  /*vel*/velocity_rps, true,
@@ -232,7 +236,7 @@ MsgDecoder::MsgDecoder(const float &gear_ratio, const float &torque_constant)
 // [6]: status bits (bit0: in OC mode, bit1: fault)
 void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocity, float &kp, float &kd, float &torque, bool &in_oc_mode, bool &has_fault) const
 {
-
+    std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << std::endl;
     if (msg.LEN < 7 || msg.DATA[0] != CMD_READ_STATES)
     {
         std::cerr << "MsgDecoder::get_states: unexpected frame\n";

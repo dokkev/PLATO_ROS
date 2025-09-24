@@ -100,6 +100,12 @@ install(TARGETS plato2_hardware_interface
   RUNTIME DESTINATION bin
 )
 
+# Diagnostic tool to verify motor replies on the bus
+add_executable(can_verify src/tools/can_verify.cpp)
+target_include_directories(can_verify PRIVATE ${PCAN_INCLUDE_DIR})
+target_link_libraries(can_verify plato2_hardware_interface ${PCAN_LIB})
+install(TARGETS can_verify RUNTIME DESTINATION lib/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

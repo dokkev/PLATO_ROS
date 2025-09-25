@@ -6,10 +6,7 @@ namespace plato2_hand{
 Hand::Hand(pcan_interface::PCANInterface &pcan_interface) 
     :          pcan_interface_(pcan_interface),
                num_actuators_(8),
-               num_ft_sensors_(3),
-               linkage1_(five_bar_linkage_config_),
-               linkage2_(five_bar_linkage_config_),
-               linkage3_(five_bar_linkage_config_){
+               num_ft_sensors_(3){
 
 
     // initialize the all reduction ratios to 1
@@ -112,11 +109,8 @@ void Hand::enable(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::disable(){
-    // Dynamixel
-    actuators_[0].set_joint_position(0.0, 0);
-    actuators_[1].set_joint_position(0.0, 0);
     // GIM3505
-    for (size_t i=2; i < num_actuators_; ++i){
+    for (size_t i=0; i < num_actuators_; ++i){
         actuators_[i].disable_motor();
     }
 }
@@ -125,11 +119,8 @@ void Hand::disable(){
 
 void Hand::stop(){
     // Don't use this function.
-    // Dynamixel
-    actuators_[0].set_joint_position(0.0, 0);
-    actuators_[1].set_joint_position(0.0, 0);
     // GIM3505
-     for (size_t i=2; i < num_actuators_; ++i){
+     for (size_t i=0; i < num_actuators_; ++i){
         actuators_[i].stop_control();
     }
 }
@@ -137,16 +128,12 @@ void Hand::stop(){
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_idle_command() {
-    if (counter_ % 50 == 0){
-        actuators_[0].set_joint_torque(0.0, 0);
-        actuators_[1].set_joint_torque(0.0, 0);
-    }
 
     // viscous damping coefficient (N·m·s/rad)
-    const double b = 5.0;
+    const double b = 0.0;
 
-    // apply damping to actuators 2 through 7 (skip 0 and 1)
-    for (size_t i = 2; i < actuators_.size(); ++i) {
+    // apply damping to actuators 0 through 7
+    for (size_t i = 0; i < actuators_.size(); ++i) {
         double vel = actuators_[i].get_states().velocity;
         double tau_damp = -b * vel;
         actuators_[i].set_joint_torque(tau_damp, 0);
@@ -159,22 +146,11 @@ void Hand::set_idle_command() {
 ////////////////////////////////////////////////////////////////////////
 
 void Hand::set_torque_command(const std::vector<double>& joint_torque_command, const uint32_t& duration) {
-    
 
-    // update J1 and J2 once every 10 loops
-    if (counter_ % 10 == 0){
-        // Dynamixel
-        actuators_[0].set_joint_torque(joint_torque_command[0], duration);
-        actuators_[1].set_joint_torque(joint_torque_command[1], duration);
-    }
-
-    
-    for (size_t i = 2; i < num_actuators_; ++i) {
+    for (size_t i = 0; i < num_actuators_; ++i) {
         float actuator_cmd = joint_torque_command[i];
         actuators_[i].set_joint_torque(actuator_cmd, duration);
     }
-
-    
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -184,17 +160,10 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
                                  const std::vector<double> &joint_position_states, 
                                  const std::vector<double> &joint_velocity_states){ 
 
-    if (counter_ % 100 == 0){ // update J1 and J2 once every 10 loops 
-        // Dynamixel only accepts position control
-        actuators_[0].set_joint_position(joint_impedance_command[0], servo_current);
-        actuators_[1].set_joint_position(joint_impedance_command[1], servo_current);
-    }
-
-    for (size_t i = 2; i < num_actuators_; ++i) {
-        // PD controller
-
-        float actuator_cmd = joint_impedance_command[i] / trq_ratios_[i] * 8.0; // apply the amplification ratio from the linkage kinematics
-        // clamp the actuator_cmd to the maximum torque
+    for (size_t i = 0; i < num_actuators_; ++i) {
+        // PD Controller
+        float actuator_cmd = static_cast<float>(joint_impedance_command[i]);
+        // Optional clamp to safe values
         actuator_cmd = std::clamp(actuator_cmd, -9.8f, 9.8f);
 
         actuators_[i].set_joint_torque(actuator_cmd, 0);
@@ -214,33 +183,6 @@ void Hand::set_zero_motor_position(){
     }
 }
 
-////////////////////////////////////////////////////////////////////////
-
-void Hand::update_linkage_kinematics(){
-    // Update the linkage kinematics to calculate the reduction ratios for Motor 3, 5, 7
-    linkage1_.update_kinematics(actuators_[2].get_states().position, actuators_[3].get_states().position);
-    linkage2_.update_kinematics(-actuators_[4].get_states().position, -actuators_[5].get_states().position);
-    linkage3_.update_kinematics(-actuators_[6].get_states().position, -actuators_[7].get_states().position);
-
-    pos_ratios_[3] = linkage1_.get_position_amplification();
-    pos_ratios_[5] = linkage2_.get_position_amplification();
-    pos_ratios_[7] = linkage3_.get_position_amplification();
-
-    vel_ratios_[3] = 1 / linkage1_.get_torque_amplification();
-    vel_ratios_[5] = 1 / linkage2_.get_torque_amplification();
-    vel_ratios_[7] = 1 / linkage3_.get_torque_amplification();
-
-    trq_ratios_[3] = linkage1_.get_torque_amplification();
-    trq_ratios_[5] = linkage2_.get_torque_amplification();
-    trq_ratios_[7] = linkage3_.get_torque_amplification();
-
-
-
-    // the rest of the motors are 1:1 reduction ratio
-}
-
-
-
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -248,19 +190,12 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
     // recevie the message from the CAN bus every loop
     pcan_interface_.receive_message();
 
-    // update the linkage kinematics to calculate the reduction ratios
-    update_linkage_kinematics();
-
     // update the joint states for each actuator
     for (size_t i = 0; i < num_actuators_; ++i){
-        joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position * static_cast<double>(pos_ratios_[i]));
-        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity * static_cast<double>(vel_ratios_[i]));
+    joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position);
+    joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
+    joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
 
-        // Update effort only for joints 3-7
-        if (i >= 2) {
-            // joint_effort_states[i] = static_cast<double>(actuators_[i].get_commands().torque * static_cast<double>(trq_ratios_[i]));
-            joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque / 8.0 * static_cast<double>(trq_ratios_[i]));
-        }
     }
 
     counter_++;

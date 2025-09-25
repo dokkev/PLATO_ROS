@@ -4,7 +4,6 @@
 
 #include "plato2_hardware_interface/actuator.hpp"
 #include "plato2_hardware_interface/ft_sensor.hpp"
-#include "plato2_hardware_interface/five_bar_linkage.hpp"
 #include "plato2_hardware_interface/karnopp_compensator.hpp"
 
 #include <geometry_msgs/msg/wrench.hpp>
@@ -76,11 +75,6 @@ public:
 
     void set_zero_motor_position();
 
-
-    /// @brief update linkage kinematics to calculate the reduction ratios
-    void update_linkage_kinematics();
-
-
     /// @brief Update the joint states of from the actuators
     void update_joint_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
 
@@ -113,22 +107,16 @@ private:
     std::vector<actuator::Actuator> actuators_;
     std::vector<sensor::FTSensor> ft_sensors_;
 
-    /// @brief Linkage Configuration
-    FiveBarLinkage::FiveBarLinkageConfig five_bar_linkage_config_; 
-
-    /// @brief Five bar linkage objects
-    FiveBarLinkage::FiveBarLinkage linkage1_;
-    FiveBarLinkage::FiveBarLinkage linkage2_;
-    FiveBarLinkage::FiveBarLinkage linkage3_;
-
     // MOTOR1 // JOINT1: Thumb CMC Roll (const)
     // MOTOR2 // JOINT2: Thumb CMC Yaw (const)
-    // MOTOR4 // JOINT3: Thumb MCP (const)
-    // MOTOR3 // JOINT4: Thumb IP  
-    // MOTOR6 // JOINT5: Index MCP (const)
-    // MOTOR5 // JOINT6: Index PIP 
-    // MOTOR8 // JOINT7: Middle MCP (const)  
-    // MOTOR7 // JOINT8: Middle PIP
+    // MOTOR3 // JOINT3: Thumb MCP (const)
+    // MOTOR4 // JOINT4: Thumb IP  
+    // MOTOR5 // JOINT5: Index MCP (const)
+    // MOTOR6 // JOINT6: Index PIP 
+    // MOTOR7 // JOINT7: Middle MCP (const)  
+    // MOTOR8 // JOINT8: Middle PIP
+
+    //TODO Figure out if we need this
     /// @brief Reduction Ratios
     std::vector<float> pos_ratios_;
     std::vector<float> vel_ratios_;
@@ -162,14 +150,14 @@ private:
 
     /// @brief Predefined Actuator Configurations
     std::vector<actuator::Config> actuator_configs_ = {
-        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1,  MotorDirection::MOTOR1, XM430::TORQUE_CONSTANT,   XM430::GEAR_RATIO,   MotorJointLimit::XM430_MAX, MotorJointLimit::XM430_MIN},
-        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2,  MotorDirection::MOTOR2, XM430::TORQUE_CONSTANT,   XM430::GEAR_RATIO,   MotorJointLimit::XM430_MAX, MotorJointLimit::XM430_MIN},
-        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4,  MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3,  MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
-        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6,  MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5,  MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
-        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8,  MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN}
+        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1,  MotorDirection::MOTOR1, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::THUMB_ROLL_MAX, MotorJointLimit::THUMB_ROLL_MIN},
+        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2,  MotorDirection::MOTOR2, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::THUMB_YAW_MAX, MotorJointLimit::THUMB_YAW_MIN},
+        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3,  MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4,  MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
+        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5,  MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6,  MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
+        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8,  MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN}
     };
 
     std::vector<sensor::Config> ft_sensor_configs_ = {

@@ -51,7 +51,6 @@ add_library(
   src/mit_can_protocol.cpp
   src/actuator.cpp
   src/karnopp_compensator.cpp
-  src/five_bar_linkage.cpp
   src/plato2_hand.cpp
   src/plato2.cpp
   

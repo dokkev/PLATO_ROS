@@ -27,7 +27,10 @@ public:
     /// @param pos_max_rad position in radians
     /// @param vel_max_rps velocity in radians per second
     /// @param t_max_nm torque in Newton-meters
-    void set_limits(TPCANMsg& msg, const float pos_max_rad, const float vel_max_rps, const float t_max_nm);
+    void set_limits(TPCANMsg& msg,
+                            float pos_max_rad,
+                            float vel_max_rps,
+                            float tq_max_nm, bool set_pos, bool set_vel, bool set_tq);
 
     /// @brief Set the zero position ID to the message
     void set_zero_position(TPCANMsg &msg);

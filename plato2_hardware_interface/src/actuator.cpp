@@ -41,6 +41,14 @@ void Actuator::enable_motor(){
         pcan_interface_.send_message(onoff_msg_);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         pcan_interface_.receive_message();
+        // encoder_.set_limits(config_msg_, 
+        //                             config_.joint_limit_max,
+        //                             0.0f,
+        //                             0.0f,
+        //                             true, false, false);
+        // pcan_interface_.send_message(config_msg_);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // pcan_interface_.receive_message();
     // }
 
 }

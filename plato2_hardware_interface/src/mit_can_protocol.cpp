@@ -36,14 +36,16 @@ static inline uint16_t map_signed_16(float x, float x_max)
 {
     // maps [-x_max, +x_max] -> [0..65535]
     float n = (x / (2.0f * x_max) + 0.5f) * 65535.0f;
-    if (n < 0) n = 0; if (n > 65535) n = 65535;
+    if (n < 0) n = 0; 
+    if (n > 65535) n = 65535;
     return uint16_t(lroundf(n));
 }
 static inline uint16_t map_signed_12(float x, float x_max)
 {
     // maps [-x_max, +x_max] -> [0..4095]
     float n = (x / (2.0f * x_max) + 0.5f) * 4095.0f;
-    if (n < 0) n = 0; if (n > 4095) n = 4095;
+    if (n < 0) n = 0; 
+    if (n > 4095) n = 4095;
     return uint16_t(lroundf(n));
 }
 static inline float unmap_signed_16(uint16_t u, float x_max)
@@ -64,7 +66,7 @@ MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, co
 void MsgEncoder::set_limits(TPCANMsg& msg,
                             float pos_max_rad,
                             float vel_max_rps,
-                            float tq_max_nm)
+                            float tq_max_nm, bool set_pos, bool set_vel, bool set_tq)
 {
     // Convert to protocol units (documented):
     //   Pos_Max: 0.1 rad / LSB
@@ -76,14 +78,18 @@ void MsgEncoder::set_limits(TPCANMsg& msg,
         if (v > 65535.0f) v = 65535.0f;
         return static_cast<uint16_t>(std::lround(v));
     };
-    
-    POS_MAX = pos_max_rad;
-    VEL_MAX = vel_max_rps;
-    T_MAX   = tq_max_nm;
 
-    const uint16_t pos_u16 = to_u16(pos_max_rad, 0.1f);
-    const uint16_t vel_u16 = to_u16(vel_max_rps, 0.01f);
-    const uint16_t tq_u16  = to_u16(tq_max_nm,   0.01f);
+    set_pos ? POS_MAX = pos_max_rad : POS_MAX = POS_MAX;
+    set_vel ? VEL_MAX = vel_max_rps : VEL_MAX = VEL_MAX;
+    set_tq  ? T_MAX   = tq_max_nm   : T_MAX   = T_MAX;
+
+    uint16_t pos_u16 = 0.0f;
+    uint16_t vel_u16 = 0.0f;
+    uint16_t tq_u16  = 0.0f;
+
+    set_pos ? pos_u16 = to_u16(pos_max_rad, 0.1f) : pos_u16 = to_u16(POS_MAX, 0.1f);
+    set_vel ? vel_u16 = to_u16(vel_max_rps, 0.01f) : vel_u16 = to_u16(VEL_MAX, 0.01f);
+    set_tq ? tq_u16  = to_u16(tq_max_nm,   0.01f) : tq_u16  = to_u16(T_MAX,   0.01f);
 
     // Build the 0xF0 frame (big-endian “hi, lo” per field).
     // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
@@ -135,12 +141,14 @@ static inline void pack_oc_frame(TPCANMsg& msg,
 
     // Kp 0..500 -> 12-bit
     if (!kp_set) kp = 0.0f;
-    if (kp < 0) kp = 0; if (kp > KP_MAX) kp = KP_MAX;
+    if (kp < 0) kp = 0; 
+    if (kp > KP_MAX) kp = KP_MAX;
     uint16_t kp12 = uint16_t(lroundf(kp / KP_MAX * 4095.0f));
 
     // Kd 0..5 -> 12-bit
     if (!kd_set) kd = 0.0f;
-    if (kd < 0) kd = 0; if (kd > KD_MAX) kd = KD_MAX;
+    if (kd < 0) kd = 0; 
+    if (kd > KD_MAX) kd = KD_MAX;
     uint16_t kd12 = uint16_t(lroundf(kd / KD_MAX * 4095.0f));
 
     // Bytes:
@@ -247,10 +255,10 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     uint16_t v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
     uint16_t t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
     
-    position = unmap_signed_16(p16, POS_MAX);
-    velocity = unmap_signed_12(v12, VEL_MAX);
-    torque   = unmap_signed_12(t12, T_MAX);
-    
+    position = unmap_signed_16(p16, POS_MAX) * gear_ratio_;
+    velocity = unmap_signed_12(v12, VEL_MAX) * gear_ratio_;
+    torque   = unmap_signed_12(t12, T_MAX) * torque_constant_;
+
     // Optional: interpret status in msg.DATA[6] if needed
     in_oc_mode = (msg.DATA[6] & 0x01) != 0;
     has_fault  = (msg.DATA[6] & 0x02) != 0;

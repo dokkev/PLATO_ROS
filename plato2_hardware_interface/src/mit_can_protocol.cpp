@@ -112,46 +112,6 @@ void MsgEncoder::set_zero_position(TPCANMsg &msg)
     msg.DATA[0] = CMD_SET_ZERO;
 }
 
-void MsgEncoder::start_motor(TPCANMsg &msg)
-{
-    // Enter operation-control mode by issuing an OC frame (bit10=1) with zeros.
-    // std::memset(&msg, 0, sizeof(msg));
-    std::cout << "Starting motor with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
-    msg.ID  = (tx_id_ | STDID_OC_BIT);
-    msg.LEN = 8; // full OC frame
-    msg.DATA[0] = 0;
-    msg.DATA[1] = 0;
-    msg.DATA[2] = 0;
-    msg.DATA[3] = 0;
-    msg.DATA[4] = 0;
-    msg.DATA[5] = 0;
-    msg.DATA[6] = 0;
-    msg.DATA[7] = 0;
-}
-
-void MsgEncoder::stop_motor(TPCANMsg &msg)
-{
-    // Same as stop_control in this protocol (exit OC mode).
-    stop_control(msg);
-}
-
-void MsgEncoder::stop_control(TPCANMsg &msg)
-{
-    // Exit operation-control mode: 0xCF
-    std::cout << "Stopping control with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
-    msg.ID      = (tx_id_ | STDID_OC_BIT);
-    msg.LEN     = 1;
-    msg.DATA[0] = CMD_EXIT_OC_MODE;
-}
-
-void MsgEncoder::clear_fault(TPCANMsg &msg)
-{
-    // Clear fault: 0xAF
-    msg.ID      = (tx_id_ | STDID_OC_BIT);
-    msg.LEN     = 1;
-    msg.DATA[0] = CMD_CLEAR_FAULT;
-}
-
 static inline void pack_oc_frame(TPCANMsg& msg,
                                  float pos_rad, bool pos_set,
                                  float vel_rps, bool vel_set,
@@ -205,6 +165,47 @@ static inline void pack_oc_frame(TPCANMsg& msg,
     msg.DATA[7]  = uint8_t(t12 & 0xFF);            // lo8
 }
 
+void MsgEncoder::start_motor(TPCANMsg &msg)
+{
+    // Enter operation-control mode by issuing an OC frame (bit10=1) with zeros.
+    // std::memset(&msg, 0, sizeof(msg));
+    std::cout << "Starting motor with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    pack_oc_frame(msg,
+				  /*pos*/0.0f, true,
+				  /*vel*/0.0f, true,
+				  /*kp*/0.0f, true,
+				  /*kd*/0.0f, true,
+				  /*tq*/0.0f, true,
+				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
+
+    
+}
+
+void MsgEncoder::stop_motor(TPCANMsg &msg)
+{
+    // Same as stop_control in this protocol (exit OC mode).
+    stop_control(msg);
+}
+
+void MsgEncoder::stop_control(TPCANMsg &msg)
+{
+    // Exit operation-control mode: 0xCF
+    std::cout << "Stopping control with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    msg.ID      = (tx_id_ | STDID_OC_BIT);
+    msg.LEN     = 1;
+    msg.DATA[0] = CMD_EXIT_OC_MODE;
+}
+
+void MsgEncoder::clear_fault(TPCANMsg &msg)
+{
+    // Clear fault: 0xAF
+    msg.ID      = (tx_id_ | STDID_OC_BIT);
+    msg.LEN     = 1;
+    msg.DATA[0] = CMD_CLEAR_FAULT;
+}
+
+
+
 void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad, 
 											  const float velocity_rps,
 											  const float kp, 
@@ -253,7 +254,7 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     // Optional: interpret status in msg.DATA[6] if needed
     in_oc_mode = (msg.DATA[6] & 0x01) != 0;
     has_fault  = (msg.DATA[6] & 0x02) != 0;
-    std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << "  pos=" << position << " rad, vel=" << velocity << " rad/s, tq=" << torque << " Nm, oc=" << in_oc_mode << ", fault=" << has_fault << "\n";
+    // std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << "  pos=" << position << " rad, vel=" << velocity << " rad/s, tq=" << torque << " Nm, oc=" << in_oc_mode << ", fault=" << has_fault << "\n";
 }
 
 void MsgDecoder::get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_max_rps, float &tq_max_nm) const

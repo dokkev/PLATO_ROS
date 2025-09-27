@@ -143,7 +143,7 @@ PLATO2Hardware::read(const rclcpp::Time &time,
 
 
   // hand_->set_idle_command();
-  // hand_->print_motor_positions();
+  hand_->print_motor_positions();
 
   hand_->update_joint_states(joint_position_states_, joint_velocity_states_, 
                       joint_effort_states_);

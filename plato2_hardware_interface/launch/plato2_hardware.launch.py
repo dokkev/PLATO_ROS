@@ -73,6 +73,15 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
 
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="log",
+        arguments=["-d", rviz_config_file],
+        condition=IfCondition(gui),
+    )
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -91,7 +100,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', '/optimo/ee', '/plato2/base_link'],
+            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'optimo/ee', 'hand_base'],
         )  
 
     # Event handlers remain unchanged

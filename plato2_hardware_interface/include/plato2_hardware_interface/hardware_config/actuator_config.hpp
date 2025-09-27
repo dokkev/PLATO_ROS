@@ -38,14 +38,14 @@ namespace GIM3505{
 
 namespace MotorOffset{
 
-    constexpr float MOTOR1 = 0.0f; // THUMB ROLL
-    constexpr float MOTOR2 = 0.0f; // THUMB YAW
-    constexpr float MOTOR3 = 0.0f; // THUMB MCP
-    constexpr float MOTOR4 = 0.0f; // THUMB PIP
-    constexpr float MOTOR5 = 0.0f; // INDEX MCP
-    constexpr float MOTOR6 = 0.0f; // INDEX PIP
-    constexpr float MOTOR7 = 0.0f; // MIDDLE MCP
-    constexpr float MOTOR8 = 0.0f; // MIDDLE PIP
+    constexpr float MOTOR1 = -12.25f; // THUMB ROLL
+    constexpr float MOTOR2 = 12.3608f; // THUMB YAW
+    constexpr float MOTOR3 = -12.4586f; // THUMB MCP
+    constexpr float MOTOR4 = 12.52f; // THUMB PIP
+    constexpr float MOTOR5 = -12.5169f; // INDEX MCP
+    constexpr float MOTOR6 = 12.4617f; // INDEX PIP
+    constexpr float MOTOR7 = -12.3298f; // MIDDLE MCP
+    constexpr float MOTOR8 = 12.5108f; // MIDDLE PIP
 
 }
 
@@ -63,8 +63,8 @@ namespace MotorDirection{
 namespace MotorJointLimit{
     constexpr float THUMB_ROLL_MAX = deg2rad(45.0f);
     constexpr float THUMB_ROLL_MIN = deg2rad(-45.0f);
-    constexpr float THUMB_YAW_MAX = deg2rad(90.0f);
-    constexpr float THUMB_YAW_MIN = deg2rad(-90.0f);
+    constexpr float THUMB_YAW_MAX = deg2rad(45.0f);
+    constexpr float THUMB_YAW_MIN = deg2rad(-45.0f);
     constexpr float MCP_MAX = deg2rad(60.0f);
     constexpr float MCP_MIN = deg2rad(-60.0f);
     constexpr float PIP_MAX = deg2rad(120.0f);

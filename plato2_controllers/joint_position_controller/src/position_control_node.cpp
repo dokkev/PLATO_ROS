@@ -75,14 +75,14 @@ private:
 
         // Effort feedforward presets
         effort_presets_["zero"] = std::vector<double>(8, 0.0);
-        effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, -0.4, 0.0, 0.4, 0.0, 0.0};
+        effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
         effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
         effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
 
         // thumb: 3,4   index 5,6 
         stiffness_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 5.0, 5.0, 1.0, 1.0, 0.0, 0.0};
         effort_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
-
+        
         stiffness_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.5, 0.5, 5.0, 5.0, 0.0, 0.0};
         effort_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
     }

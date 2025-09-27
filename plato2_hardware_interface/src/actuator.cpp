@@ -36,20 +36,25 @@ Actuator::~Actuator(){
 
 void Actuator::enable_motor(){
 
-    // while (!b_motor_enabled_){
-        encoder_.start_motor(onoff_msg_);
-        pcan_interface_.send_message(onoff_msg_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        pcan_interface_.receive_message();
-        // encoder_.set_limits(config_msg_, 
-        //                             config_.joint_limit_max,
-        //                             0.0f,
-        //                             0.0f,
-        //                             true, false, false);
-        // pcan_interface_.send_message(config_msg_);
-        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        // pcan_interface_.receive_message();
-    // }
+    encoder_.set_limits(config_msg_,
+                                12.566f,// config_.joint_limit_max,
+                                42.0f,
+                                1.56f,
+                                true, true, true);
+    pcan_interface_.send_message(config_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+
+    encoder_.set_zero_position(onoff_msg_);
+    pcan_interface_.send_message(onoff_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+    encoder_.start_motor(onoff_msg_);
+    pcan_interface_.send_message(onoff_msg_);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+    
+
 
 }
 
@@ -78,7 +83,7 @@ void Actuator::stop_control(){
 void Actuator::set_joint_position(const float &joint_position, const uint32_t &duration){
 
 
-    float position_gain = 100.0f; // Nm/rad
+    float position_gain = 1.0f; // Nm/rad
     // Convert the joint position to motor position
     float motor_position;
     joint_to_motor_(joint_position, motor_position, true);
@@ -96,7 +101,7 @@ void Actuator::set_joint_position(const float &joint_position, const uint32_t &d
 
 void Actuator::set_joint_velocity(const float &joint_velocity, const uint32_t &duration) {
 
-    float velocity_gain = 100.0f; // Nm/rad/s
+    float velocity_gain = .10f; // Nm/rad/s
     // Convert the joint velocity to motor velocity
     float motor_velocity;
     joint_to_motor_(joint_velocity, motor_velocity);
@@ -154,6 +159,7 @@ void Actuator::process_message(const TPCANMsg &msg){
 
     // Convert motor states to joint states
     motor_to_joint_(position_rad, states_.position, true);
+    motor_to_joint_(position_rad, motor_position_, true);
     motor_to_joint_(velocity_rps, states_.velocity);
     motor_to_joint_(torque_nm, states_.torque);
 

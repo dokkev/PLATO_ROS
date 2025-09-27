@@ -16,11 +16,11 @@ static constexpr uint8_t  CMD_CLEAR_FAULT    = 0xAF;   // clear fault
 static constexpr uint8_t  CMD_EXIT_OC_MODE   = 0xCF;   // exit operation control mode
 static constexpr uint8_t  CMD_SET_ZERO       = 0xB1;   // set current position as zero
 
-static float 			  KP_MAX			 = 500.0F;   // default max KP (rad)
-static float 			  KD_MAX			 = 5.0F;     // default max KD (rad/s)
+static float 			  KP_MAX			 = 0.0F;   // default max KP (rad)
+static float 			  KD_MAX			 = 0.1F;     // default max KD (rad/s) corresponds to 0 05
 static float 			  POS_MAX			 = 12.566f;   // rad (doc default) // 4pi rads
 static float 			  VEL_MAX			 = 42.0f;   // rad/s (doc default) // 42 rad/s
-static float 			  T_MAX  			 = 1.56f;   // Nm (doc default) // .52*3 Nm
+static float 			  T_MAX  			 = 1.04f;   // Nm (doc default) // .52*3 Nm
 
 // StdID bit[10] must be 1 for operation-control command frames (no command byte)
 static constexpr uint32_t STDID_OC_BIT   	 = 0x400;
@@ -224,7 +224,7 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 	pack_oc_frame(msg,
 				  /*pos*/position_rad, true,
 				  /*vel*/velocity_rps, true,
-				  /*kp*/kp, true,
+				  .10, true, ///*kp*/kp, true,
 				  /*kd*/kd, true,
 				  /*tq*/torque_nm, true,
 				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
@@ -246,7 +246,8 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
 {
     if (msg.LEN < 7 || msg.DATA[0] != CMD_READ_STATES)
     {
-        std::cerr << "MsgDecoder::get_states: unexpected frame\n";
+        std::cout << "MsgDecoder::get_states: unexpected frame" << "RX ID: " << std::hex << int(msg.ID) << std::dec << "  LEN: " << int(msg.LEN) << "  DATA: " << std::hex << int(msg.DATA[0]) << " " << int(msg.DATA[1]) << " " << int(msg.DATA[2]) << " " << int(msg.DATA[3]) << " " << int(msg.DATA[4]) << " " << int(msg.DATA[5]) << " " << int(msg.DATA[6]) << std::dec << std::endl;
+        
         position = velocity = torque = 0.0f;
         return;
     }
@@ -255,13 +256,16 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     uint16_t v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
     uint16_t t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
     
-    position = unmap_signed_16(p16, POS_MAX) * gear_ratio_;
-    velocity = unmap_signed_12(v12, VEL_MAX) * gear_ratio_;
-    torque   = unmap_signed_12(t12, T_MAX) * torque_constant_;
+    position = unmap_signed_16(p16 * gear_ratio_, POS_MAX);
+    velocity = unmap_signed_12(v12 * gear_ratio_, VEL_MAX);
+    torque   = unmap_signed_12(t12 * torque_constant_ * gear_ratio_, T_MAX);
 
     // Optional: interpret status in msg.DATA[6] if needed
     in_oc_mode = (msg.DATA[6] & 0x01) != 0;
     has_fault  = (msg.DATA[6] & 0x02) != 0;
+
+    if (has_fault)
+        std::cout << "Motor fault detected! RX ID: " << std::hex << int(msg.ID) << std::dec << std::endl;
     // std::cout << "Receiving states from RX ID: " << std::hex << int(msg.ID) << std::dec << "  pos=" << position << " rad, vel=" << velocity << " rad/s, tq=" << torque << " Nm, oc=" << in_oc_mode << ", fault=" << has_fault << "\n";
 }
 

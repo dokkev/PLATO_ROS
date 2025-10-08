@@ -63,51 +63,67 @@ static inline float unmap_signed_12(uint16_t u, float x_max)
 MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, const uint8_t &tx_id)
 : gear_ratio_(gear_ratio), torque_constant_(torque_constant), tx_id_(tx_id) {}
 
+// void MsgEncoder::set_limits(TPCANMsg& msg,
+//                             float pos_max_rad,
+//                             float vel_max_rps,
+//                             float tq_max_nm, bool set_pos, bool set_vel, bool set_tq)
+// {
+//     // Convert to protocol units (documented):
+//     //   Pos_Max: 0.1 rad / LSB
+//     //   Vel_Max: 0.01 rad/s / LSB
+//     //   T_Max:   0.01 Nm / LSB
+//     auto to_u16 = [](float value, float lsb){
+//         float v = value / lsb;
+//         if (v < 0) v = 0;
+//         if (v > 65535.0f) v = 65535.0f;
+//         return static_cast<uint16_t>(std::lround(v));
+//     };
+
+//     set_pos ? POS_MAX = pos_max_rad : POS_MAX = POS_MAX;
+//     set_vel ? VEL_MAX = vel_max_rps : VEL_MAX = VEL_MAX;
+//     set_tq  ? T_MAX   = tq_max_nm   : T_MAX   = T_MAX;
+
+//     uint16_t pos_u16 = 0.0f;
+//     uint16_t vel_u16 = 0.0f;
+//     uint16_t tq_u16  = 0.0f;
+
+//     set_pos ? pos_u16 = to_u16(pos_max_rad, 0.1f) : pos_u16 = to_u16(POS_MAX, 0.1f);
+//     set_vel ? vel_u16 = to_u16(vel_max_rps, 0.01f) : vel_u16 = to_u16(VEL_MAX, 0.01f);
+//     set_tq ? tq_u16  = to_u16(tq_max_nm,   0.01f) : tq_u16  = to_u16(T_MAX,   0.01f);
+
+//     // Build the 0xF0 frame (big-endian “hi, lo” per field).
+//     // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
+//     std::memset(&msg, 0, sizeof(msg));
+//     msg.ID      = tx_id_;
+//     msg.LEN     = 7;
+//     msg.DATA[0] = CMD_CFG_LIMITS;     // 0xF0
+
+//     msg.DATA[1] = static_cast<uint8_t>(pos_u16 >> 8);
+//     msg.DATA[2] = static_cast<uint8_t>(pos_u16 & 0xFF);
+
+//     msg.DATA[3] = static_cast<uint8_t>(vel_u16 >> 8);
+//     msg.DATA[4] = static_cast<uint8_t>(vel_u16 & 0xFF);
+
+//     msg.DATA[5] = static_cast<uint8_t>(tq_u16 >> 8);
+//     msg.DATA[6] = static_cast<uint8_t>(tq_u16 & 0xFF);
+// }
+
 void MsgEncoder::set_limits(TPCANMsg& msg,
                             float pos_max_rad,
                             float vel_max_rps,
                             float tq_max_nm, bool set_pos, bool set_vel, bool set_tq)
 {
-    // Convert to protocol units (documented):
-    //   Pos_Max: 0.1 rad / LSB
-    //   Vel_Max: 0.01 rad/s / LSB
-    //   T_Max:   0.01 Nm / LSB
-    auto to_u16 = [](float value, float lsb){
-        float v = value / lsb;
-        if (v < 0) v = 0;
-        if (v > 65535.0f) v = 65535.0f;
-        return static_cast<uint16_t>(std::lround(v));
-    };
-
-    set_pos ? POS_MAX = pos_max_rad : POS_MAX = POS_MAX;
-    set_vel ? VEL_MAX = vel_max_rps : VEL_MAX = VEL_MAX;
-    set_tq  ? T_MAX   = tq_max_nm   : T_MAX   = T_MAX;
-
-    uint16_t pos_u16 = 0.0f;
-    uint16_t vel_u16 = 0.0f;
-    uint16_t tq_u16  = 0.0f;
-
-    set_pos ? pos_u16 = to_u16(pos_max_rad, 0.1f) : pos_u16 = to_u16(POS_MAX, 0.1f);
-    set_vel ? vel_u16 = to_u16(vel_max_rps, 0.01f) : vel_u16 = to_u16(VEL_MAX, 0.01f);
-    set_tq ? tq_u16  = to_u16(tq_max_nm,   0.01f) : tq_u16  = to_u16(T_MAX,   0.01f);
-
-    // Build the 0xF0 frame (big-endian “hi, lo” per field).
-    // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
-    std::memset(&msg, 0, sizeof(msg));
     msg.ID      = tx_id_;
     msg.LEN     = 7;
-    msg.DATA[0] = CMD_CFG_LIMITS;     // 0xF0
-
-    msg.DATA[1] = static_cast<uint8_t>(pos_u16 >> 8);
-    msg.DATA[2] = static_cast<uint8_t>(pos_u16 & 0xFF);
-
-    msg.DATA[3] = static_cast<uint8_t>(vel_u16 >> 8);
-    msg.DATA[4] = static_cast<uint8_t>(vel_u16 & 0xFF);
-
-    msg.DATA[5] = static_cast<uint8_t>(tq_u16 >> 8);
-    msg.DATA[6] = static_cast<uint8_t>(tq_u16 & 0xFF);
+    msg.DATA[0] = CMD_CFG_LIMITS;
+    msg.DATA[1] = 0x03;
+    msg.DATA[2] = 0xbb;
+    msg.DATA[3] = 0x0f;
+    msg.DATA[4] = 0xa0;
+    msg.DATA[5] = 0x07;
+    msg.DATA[6] = 0x08;
+    
 }
-
 
 void MsgEncoder::set_zero_position(TPCANMsg &msg)
 {
@@ -171,6 +187,12 @@ static inline void pack_oc_frame(TPCANMsg& msg,
     // torque
     msg.DATA[6] |= uint8_t((t12 >> 8) & 0x0F);     // hi4 in [3:0]
     msg.DATA[7]  = uint8_t(t12 & 0xFF);            // lo8
+
+    std::cout << "OC Frame Data: " << std::hex << int(msg.ID) << " ";
+    for (int i = 0; i < 8; ++i) {
+        std::cout << std::hex << int(msg.DATA[i]) << " ";
+    }
+    std::cout << std::dec << std::endl;
 }
 
 void MsgEncoder::start_motor(TPCANMsg &msg)

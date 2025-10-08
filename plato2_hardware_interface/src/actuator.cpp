@@ -45,10 +45,10 @@ void Actuator::enable_motor(){
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     pcan_interface_.receive_message();
 
-    encoder_.set_zero_position(onoff_msg_);
-    pcan_interface_.send_message(onoff_msg_);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    pcan_interface_.receive_message();
+    // encoder_.set_zero_position(onoff_msg_);
+    // pcan_interface_.send_message(onoff_msg_);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // pcan_interface_.receive_message();
     encoder_.start_motor(onoff_msg_);
     pcan_interface_.send_message(onoff_msg_);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

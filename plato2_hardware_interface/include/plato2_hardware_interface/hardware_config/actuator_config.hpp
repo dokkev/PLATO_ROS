@@ -11,9 +11,9 @@ using namespace Plato;
 
 namespace MotorTxID{
     constexpr uint8_t MOTOR1 = 0xa;
-    constexpr uint8_t MOTOR2 = 0xb;
-    constexpr uint8_t MOTOR3 = 0xc;
-    constexpr uint8_t MOTOR4 = 0xd;
+    constexpr uint8_t MOTOR2 = 0xc;
+    constexpr uint8_t MOTOR3 = 0xb;
+    constexpr uint8_t MOTOR4 = 0x1;
     constexpr uint8_t MOTOR5 = 0xe;
     constexpr uint8_t MOTOR6 = 0xf;
     constexpr uint8_t MOTOR7 = 0x10;

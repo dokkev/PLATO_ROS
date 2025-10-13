@@ -140,12 +140,12 @@ PLATO2Hardware::read(const rclcpp::Time &time,
 
   joint_effort_commands_[0] = 0.0;
   joint_effort_commands_[1] = 0.0;
-  joint_effort_commands_[2] = 0.00;
-  joint_effort_commands_[3] = 0.00;
-  joint_effort_commands_[4] = 0.05;
-  joint_effort_commands_[5] = 0.00;
-  joint_effort_commands_[6] = 0.00;
-  joint_effort_commands_[7] = 0.00;
+  // joint_effort_commands_[2] = 0.00;
+  // joint_effort_commands_[3] = 0.00;
+  // joint_effort_commands_[4] = 0.3 *  0.52 * 8; // tau  / torque constant = Nm / (Nm/A) = A
+  // joint_effort_commands_[5] = 0.00;
+  // joint_effort_commands_[6] = 0.00;
+  // joint_effort_commands_[7] = 0.00;
 
   hand_->set_impedance_command(joint_effort_commands_, 300, 
                              joint_position_states_, joint_velocity_states_);

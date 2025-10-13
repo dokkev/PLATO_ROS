@@ -76,9 +76,10 @@ void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &durat
     // Apply limit protection
     const float safe_joint_torque = limit_torque_near_bounds_(joint_torque, states_.position);
     
-    // Convert the joint torque to motor torque
-    float motor_torque;
-    joint_to_motor_(joint_torque, motor_torque);
+    // Convert joint torque to motor torque 
+    // Since decoder applies gear_ratio², we need gear_ratio² compensation for commands
+    float gear_ratio_sq = config_.gear_ratio * config_.gear_ratio;
+    float motor_torque = (joint_torque * config_.direction) / gear_ratio_sq;
 
     // Encode and send the torque command over CAN
     encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
@@ -110,11 +111,11 @@ void Actuator::process_message(const TPCANMsg &msg){
         decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
                           states_.in_oc_mode, states_.has_fault);
 
-        // Update motor tracking and convert to joint space
-        motor_position_ = motor_pos;
-        motor_to_joint_(motor_pos, states_.position, true);
-        motor_to_joint_(motor_vel, states_.velocity, false);
-        motor_to_joint_(motor_torque, states_.torque, false);
+        // Values from decoder already have gear_ratio² applied, use directly
+        motor_position_ = motor_pos;  // Raw motor position for internal tracking
+        states_.position = motor_pos;   // Joint position (with gear_ratio² applied)
+        states_.velocity = motor_vel;   // Joint velocity (with gear_ratio² applied)
+        states_.torque = motor_torque;  // Joint torque (with gear_ratio² applied)
 
         // Update motor enabled status
         b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;

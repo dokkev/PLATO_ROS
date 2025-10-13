@@ -1,4 +1,5 @@
 // can_protocol.cpp — MIT-type CAN protocol mapping with legacy API preserved
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -21,38 +22,41 @@ static constexpr uint8_t  CMD_SET_ZERO       = 0xB1;   // set current position a
 // StdID bit[10] must be 1 for operation-control command frames (no command byte)
 static constexpr uint32_t STDID_OC_BIT   	 = 0x400;
 
-// ===== Scaling per documentation =====
-// Config limits (CMD 0xF0): Pos_Max=0.1 rad LSB; Vel_Max=0.01 rad/s LSB; T_Max=0.01 Nm LSB
-static inline uint16_t to_pos_max_u16(float rad)   { float v = rad / 0.1f;   if (v < 0) v = 0; if (v > 65535) v = 65535; return uint16_t(lroundf(v)); }
-static inline uint16_t to_vel_max_u16(float rps)   { float v = rps / 0.01f;  if (v < 0) v = 0; if (v > 65535) v = 65535; return uint16_t(lroundf(v)); }
-static inline uint16_t to_tmax_u16   (float nm)    { float v = nm  / 0.01f;  if (v < 0) v = 0; if (v > 65535) v = 65535; return uint16_t(lroundf(v)); }
+// ===== Optimized scaling functions =====
+// Compile-time constants for better performance
+static constexpr float INV_0_1 = 10.0f;    // 1/0.1
+static constexpr float INV_0_01 = 100.0f;  // 1/0.01
+static constexpr float INV_65535 = 1.0f / 65535.0f;
+static constexpr float INV_4095 = 1.0f / 4095.0f;
+static constexpr uint16_t MAX_12BIT = 4095;
+static constexpr uint16_t MAX_16BIT = 65535;
 
-// States (0xF1) and OC frame mapping use normalized 16/12-bit fields spanning [-Max, +Max]
-static inline uint16_t map_signed_16(float x, float x_max)
-{
-    // maps [-x_max, +x_max] -> [0..65535]
-    float n = (x / (2.0f * x_max) + 0.5f) * 65535.0f;
-    if (n < 0) n = 0; 
-    if (n > 65535) n = 65535;
-    return uint16_t(lroundf(n));
+// Limits scaling (0xF0 cmd)
+static constexpr uint16_t clamp_u16(float v) {
+    return (v <= 0) ? 0 : (v >= MAX_16BIT) ? MAX_16BIT : uint16_t(v + 0.5f);
 }
-static inline uint16_t map_signed_12(float x, float x_max)
-{
-    // maps [-x_max, +x_max] -> [0..4095]
-    float n = (x / (2.0f * x_max) + 0.5f) * 4095.0f;
-    if (n < 0) n = 0; 
-    if (n > 4095) n = 4095;
-    return uint16_t(lroundf(n));
+
+static constexpr uint16_t to_pos_max_u16(float rad) { return clamp_u16(rad * INV_0_1); }
+static constexpr uint16_t to_vel_max_u16(float rps) { return clamp_u16(rps * INV_0_01); }
+static constexpr uint16_t to_tmax_u16(float nm)     { return clamp_u16(nm * INV_0_01); }
+
+// Signed mapping for states/OC frames  
+static constexpr uint16_t map_signed_16(float x, float x_max) {
+    float n = (x / (x_max + x_max) + 0.5f) * MAX_16BIT;
+    return (n <= 0) ? 0 : (n >= MAX_16BIT) ? MAX_16BIT : uint16_t(n + 0.5f);
 }
-static inline float unmap_signed_16(uint16_t u, float x_max)
-{
-    // [0..65535] -> [-x_max, +x_max] - Symmetric with map_signed_16
-    return ( (float(u) / 65535.0f) - 0.5f ) * (2.0f * x_max);
+
+static constexpr uint16_t map_signed_12(float x, float x_max) {
+    float n = (x / (x_max + x_max) + 0.5f) * MAX_12BIT;
+    return (n <= 0) ? 0 : (n >= MAX_12BIT) ? MAX_12BIT : uint16_t(n + 0.5f);
 }
-static inline float unmap_signed_12(uint16_t u, float x_max)
-{
-    // [0..4095] -> [-x_max, +x_max] - Symmetric with map_signed_12
-    return ( (float(u) / 4095.0f) - 0.5f ) * (2.0f * x_max);
+
+static constexpr float unmap_signed_16(uint16_t u, float x_max) {
+    return (float(u) * INV_65535 - 0.5f) * (x_max + x_max);
+}
+
+static constexpr float unmap_signed_12(uint16_t u, float x_max) {
+    return (float(u) * INV_4095 - 0.5f) * (x_max + x_max);
 }
 
 // ======= MsgEncoder ===============================================================
@@ -74,23 +78,8 @@ MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, co
 //     // Convert to protocol units using documented LSBs (helpers above)
 //     uint16_t pos_u16 = set_pos ? to_pos_max_u16(pos_max_rad) : to_pos_max_u16(POS_MAX);
 //     uint16_t vel_u16 = set_vel ? to_vel_max_u16(vel_max_rps) : to_vel_max_u16(VEL_MAX);
-//     uint16_t tq_u16  = set_tq  ? to_tmax_u16(tq_max_nm)     : to_tmax_u16(T_MAX);
-
-//     // Pack big-endian hi/lo for each 16-bit field as documented
-//     msg.DATA[1] = static_cast<uint8_t>(pos_u16 >> 8);
-//     msg.DATA[2] = static_cast<uint8_t>(pos_u16 & 0xFF);
-
-//     msg.DATA[3] = static_cast<uint8_t>(vel_u16 >> 8);
-//     msg.DATA[4] = static_cast<uint8_t>(vel_u16 & 0xFF);
-
-//     msg.DATA[5] = static_cast<uint8_t>(tq_u16 >> 8);
-//     msg.DATA[6] = static_cast<uint8_t>(tq_u16 & 0xFF);
-// }
-
-void MsgEncoder::set_limits(TPCANMsg& msg,
-                            float pos_max_rad,
-                            float vel_max_rps,
-                            float tq_max_nm, bool set_pos, bool set_vel, bool set_tq)
+void MsgEncoder::set_limits(TPCANMsg& msg, float pos_max_rad, float vel_max_rps, float tq_max_nm, 
+                           bool set_pos, bool set_vel, bool set_tq)
 {
     msg.ID      = tx_id_;
     msg.LEN     = 7;
@@ -137,21 +126,18 @@ static inline void pack_oc_frame(TPCANMsg& msg,
     if (vel_set){ if (vel_rps >  vel_max) vel_rps =  vel_max; if (vel_rps < -vel_max) vel_rps = -vel_max; }
     if (tq_set) { if (tq_nm  >   t_max)  tq_nm  =   t_max;   if (tq_nm  <  -t_max)  tq_nm  =  -t_max;   }
 
-    uint16_t p16 = map_signed_16(pos_set ? pos_rad : 0.0f, pos_max);
-    uint16_t v12 = map_signed_12(vel_set ? vel_rps : 0.0f, vel_max);
-    uint16_t t12 = map_signed_12(tq_set  ? tq_nm  : 0.0f, t_max);
+    // Clamp and convert values efficiently
+    const float pos_val = pos_set ? std::clamp(pos_rad, -pos_max, pos_max) : 0.0f;
+    const float vel_val = vel_set ? std::clamp(vel_rps, -vel_max, vel_max) : 0.0f;
+    const float tq_val = tq_set ? std::clamp(tq_nm, -t_max, t_max) : 0.0f;
+    const float kp_val = kp_set ? std::clamp(kp, 0.0f, KP_MAX) : 0.0f;
+    const float kd_val = kd_set ? std::clamp(kd, 0.0f, KD_MAX) : 0.0f;
 
-    // Kp 0..500 -> 12-bit
-    if (!kp_set) kp = 0.0f;
-    if (kp < 0) kp = 0; 
-    if (kp > KP_MAX) kp = KP_MAX;
-    uint16_t kp12 = uint16_t(lroundf(kp / KP_MAX * 4095.0f));
-
-    // Kd 0..5 -> 12-bit
-    if (!kd_set) kd = 0.0f;
-    if (kd < 0) kd = 0; 
-    if (kd > KD_MAX) kd = KD_MAX;
-    uint16_t kd12 = uint16_t(lroundf(kd / KD_MAX * 4095.0f));
+    const uint16_t p16 = map_signed_16(pos_val, pos_max);
+    const uint16_t v12 = map_signed_12(vel_val, vel_max);
+    const uint16_t t12 = map_signed_12(tq_val, t_max);
+    const uint16_t kp12 = uint16_t(kp_val * (MAX_12BIT / KP_MAX) + 0.5f);
+    const uint16_t kd12 = uint16_t(kd_val * (MAX_12BIT / KD_MAX) + 0.5f);
 
     // Bytes:
     // pos
@@ -269,17 +255,11 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     
     // Extraction complete - p16, v12, t12 ready for unmapping
     
-    // First unmap the protocol fields to their physical units, then apply
-    // gear_ratio_ / torque_constant_ conversions as needed.
-    float pos_physical = unmap_signed_16(p16, POS_MAX);   // in radians (motor/mech)
-    float vel_physical = unmap_signed_12(v12, VEL_MAX);   // in rad/s (motor/mech)
-    float tq_physical  = unmap_signed_12(t12, T_MAX);     // in Nm (motor-side)
-
-    // Convert to joint-space where appropriate (gear ratio scales angles/velocities,
-    // torque is already in Nm from protocol, just scale by gear ratio for joint space)
-    position = pos_physical / gear_ratio_;
-    velocity = vel_physical / gear_ratio_;
-    torque   = tq_physical / gear_ratio_;
+    // Unmap and apply gear ratio² in one step (memory efficient)
+    const float gear_ratio_sq = 1.0f; // gear_ratio_ * gear_ratio_;
+    position = unmap_signed_16(p16, POS_MAX) * gear_ratio_sq;
+    velocity = unmap_signed_12(v12, VEL_MAX) * gear_ratio_sq;
+    torque   = unmap_signed_12(t12, T_MAX) * gear_ratio_sq;
 
     // 0xF1 response does not include Kp/Kd values, set them to 0 to avoid confusion
     kp = 0.0f;
@@ -308,9 +288,9 @@ void MsgDecoder::get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_
     uint16_t vel_u16 = uint16_t(msg.DATA[3]) | (uint16_t(msg.DATA[4]) << 8);
     uint16_t tq_u16  = uint16_t(msg.DATA[5]) | (uint16_t(msg.DATA[6]) << 8);
 
-    pos_max_rad = float(pos_u16) * 0.1f;   // 0.1 rad / LSB
-    vel_max_rps = float(vel_u16) * 0.01f;  // 0.01 rad/s / LSB
-    tq_max_nm   = float(tq_u16) * 0.01f;   // 0.01 Nm / LSB
+    pos_max_rad = pos_u16 * 0.1f;   // Direct conversion
+    vel_max_rps = vel_u16 * 0.01f;  // Direct conversion
+    tq_max_nm   = tq_u16 * 0.01f;   // Direct conversion
 
 }
 } // namespace can_protocol

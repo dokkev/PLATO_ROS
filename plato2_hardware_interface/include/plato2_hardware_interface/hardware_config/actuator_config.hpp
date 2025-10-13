@@ -59,12 +59,12 @@ namespace MotorOffset{
 }
 
 namespace MotorDirection{
-    constexpr char MOTOR1 = 1; //THUMB ROLL
+    constexpr char MOTOR1 = -1; //THUMB ROLL
     constexpr char MOTOR2 = 1; //THUMB YAW
     constexpr char MOTOR3 = -1; //THUMB MCP
-    constexpr char MOTOR4 = -1; //THUMB PIP
-    constexpr char MOTOR5 = -1; //INDEX MCP
-    constexpr char MOTOR6 = -1; //INDEX PIP
+    constexpr char MOTOR4 = 1; //THUMB PIP
+    constexpr char MOTOR5 = 1; //INDEX MCP
+    constexpr char MOTOR6 = 1; //INDEX PIP
     constexpr char MOTOR7 = 1; //MIDDLE MCP
     constexpr char MOTOR8 = 1; //MIDDLE PIP
 }

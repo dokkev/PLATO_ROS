@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<robot name="plato2_finger" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Set World Frame -->
+    <link name="world"/>
+
+    <!-- Include Robot Description Xacro -->
+    <xacro:include filename="$(find plato2_description)/urdf/xacro/finger_description.xacro"/>
+    <!-- Include ros2 control Xacro -->
+    <xacro:include filename="$(find plato2_description)/urdf/ros2_control/finger.ros2_control.xacro"/>
+
+
+    <!-- Create URDF -->
+    <xacro:finger_description connector_link="world" xyz="0 0 0" rpy="0 0 0"/>
+    <!-- Create ros2 control -->
+    <xacro:plato_ros2_control name="finger_ros2_control"/>
+
+
+</robot>

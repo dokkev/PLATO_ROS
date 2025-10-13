@@ -154,34 +154,26 @@ private:
         return msg;
     }
 
-    /// @brief Convert joint command Value to Motor Command Value considering motor direction and offset
-    /// @param joint_value joint command value from the robot
-    /// @param motor_value reference to store the motor command value to send to the motor
+    /// @brief Convert joint value to motor value considering direction and offset 
+    /// @param joint_value joint command/state value from the robot
+    /// @param motor_value reference to store the motor command/state value
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
-        // Convert joint-space -> motor-space before encoding.
-        // joint -> motor: motor = (joint [+ offset]) * direction / gear_ratio
-        float v = joint_value;
-        if (apply_offset) {
-            v = v + config_.position_offset;
-        }
-        motor_value = (v * config_.direction) / config_.gear_ratio;
+        // Convert joint-space -> motor-space for direction and offset only
+        // Gear ratio conversion is handled by MIT CAN protocol layer
+        motor_value = apply_offset ? (joint_value + config_.position_offset) * config_.direction
+                                   : joint_value * config_.direction;
     }
 
-    /// @brief convert motor state value to joint state value considering motor direction and offset
-    /// @param motor_value Motor State Value from the motor
+    /// @brief Convert motor value to joint value considering direction and offset 
+    /// @param motor_value Motor value from the motor (already gear ratio converted by MIT CAN protocol)
     /// @param joint_value reference to store the joint state value
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
-        // Convert motor-space -> joint-space after decoding.
-        // joint = motor * gear_ratio, apply offset and direction as configured
-        float v = motor_value * config_.gear_ratio;
-        if (apply_offset) {
-            joint_value = (v - config_.position_offset) * config_.direction;
-        } else {
-            joint_value = v * config_.direction;
-        }
-        
+        // Convert motor-space -> joint-space for direction and offset only
+        // Gear ratio conversion is handled by MIT CAN protocol layer
+        joint_value = apply_offset ? motor_value * config_.direction - config_.position_offset
+                                   : motor_value * config_.direction;
     }
 
     /// @brief Safety margin (in radians) to begin limiting torque near joint limits

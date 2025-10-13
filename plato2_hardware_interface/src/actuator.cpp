@@ -41,6 +41,8 @@ void Actuator::enable_motor(){
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     pcan_interface_.receive_message();
 
+    
+
 
 
 }
@@ -73,16 +75,11 @@ void Actuator::stop_control(){
 
 void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &duration ) {
 
-    // Apply limit protection
-    const float safe_joint_torque = limit_torque_near_bounds_(joint_torque, states_.position);
-    
-    // Convert joint torque to motor torque 
-    // Since decoder applies gear_ratio², we need gear_ratio² compensation for commands
-    float gear_ratio_sq = config_.gear_ratio * config_.gear_ratio;
-    float motor_torque = (joint_torque * config_.direction) / gear_ratio_sq;
+
+
 
     // Encode and send the torque command over CAN
-    encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
+    encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, joint_torque);
     pcan_interface_.send_message(cmd_msg_);
 
     // Cache command values
@@ -90,12 +87,6 @@ void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &durat
     
 }
 
-
-////////////////////////////////////////////////////////////////////////////
-
-void Actuator::calibrate_encoder(){}
-
-void Actuator::calibrate_phase_order(){}
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -107,15 +98,17 @@ void Actuator::process_message(const TPCANMsg &msg){
         float motor_pos, motor_vel, motor_torque;
         float kp, kd;  // Not used by 0xF1 but required by decoder interface
 
-        // Decode MIT CAN state response directly into states_ where possible
+        // Decode MIT CAN state response - decoder returns joint-space values
         decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
                           states_.in_oc_mode, states_.has_fault);
 
-        // Values from decoder already have gear_ratio² applied, use directly
-        motor_position_ = motor_pos;  // Raw motor position for internal tracking
-        states_.position = motor_pos;   // Joint position (with gear_ratio² applied)
-        states_.velocity = motor_vel;   // Joint velocity (with gear_ratio² applied)
-        states_.torque = motor_torque;  // Joint torque (with gear_ratio² applied)
+        // Store raw motor position (joint-space from decoder / gear_ratio for motor-space)
+        motor_position_ = motor_pos / config_.gear_ratio;  // Convert to motor-space for internal tracking
+        
+        // Apply direction to joint-space values from decoder
+        states_.position = motor_pos * config_.direction;   // Joint position with direction applied
+        states_.velocity = motor_vel * config_.direction;   // Joint velocity with direction applied  
+        states_.torque = motor_torque * config_.direction;  // Joint torque with direction applied
 
         // Update motor enabled status
         b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;

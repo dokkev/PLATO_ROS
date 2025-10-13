@@ -216,13 +216,17 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 											  const float kd, 
 											  const float torque_nm)
 {
-    // std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
+    const float motor_position = position_rad;
+    const float motor_velocity = velocity_rps;
+    const float motor_torque = torque_nm / 8.0f;
+    
+    // std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  joint_pos=" << position_rad << " -> motor_pos=" << motor_position << " rad, joint_vel=" << velocity_rps << " -> motor_vel=" << motor_velocity << " rad/s, joint_tq=" << torque_nm << " -> motor_tq=" << motor_torque << " Nm\n";
 	pack_oc_frame(msg,
-				  /*pos*/position_rad, true,
-				  /*vel*/velocity_rps, true,
+				  /*pos*/motor_position, true,
+				  /*vel*/motor_velocity, true,
 				  /*kp*/kp, true,           // Pass actual kp parameter
 				  /*kd*/kd, true,           // Pass actual kd parameter
-				  /*tq*/torque_nm, true,
+				  /*tq*/motor_torque, true,
 				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
 }
 
@@ -232,42 +236,64 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 MsgDecoder::MsgDecoder(const float &gear_ratio, const float &torque_constant)
 : gear_ratio_(gear_ratio), torque_constant_(torque_constant) {}
 
-// Parse 0xF1 response:
-// [0]=0xF1
-// [1..2]: mech pos 16b (hi,lo) -> (-Pos_Max..+Pos_Max)
-// [3..4]: mech vel 12b ([3]=hi8, [4][7:4]=lo4)
-// [4..5]: torque 12b ([4][3:0]=hi4, [5]=lo8)
-// [6]: status bits (bit0: in OC mode, bit1: fault)
+// Parse MIT CAN responses:
+// 8-byte: Operation-Control (OC) response frame (same format as OC command, no cmd byte)
+// 7-byte: 0xF1 state query response
 void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocity, float &kp, float &kd, float &torque, bool &in_oc_mode, bool &has_fault) const
 {
-    if (msg.LEN < 7 || msg.DATA[0] != CMD_READ_STATES)
-    {
-        std::cout << "MsgDecoder::get_states: unexpected frame" << "RX ID: " << std::hex << int(msg.ID) << std::dec << "  LEN: " << int(msg.LEN) << "  DATA: " << std::hex << int(msg.DATA[0]) << " " << int(msg.DATA[1]) << " " << int(msg.DATA[2]) << " " << int(msg.DATA[3]) << " " << int(msg.DATA[4]) << " " << int(msg.DATA[5]) << " " << int(msg.DATA[6]) << std::dec << std::endl;
+    uint16_t p16, v12, t12, kp12 = 0, kd12 = 0;
+    
+    if (msg.LEN == 8) {
+        // 8-byte Operation-Control response frame (no command byte)
+        // Same format as OC command frame sent to motor
+        p16 = (uint16_t(msg.DATA[0]) << 8) | uint16_t(msg.DATA[1]);
+        v12 = (uint16_t(msg.DATA[2]) << 4) | ((msg.DATA[3] & 0xF0) >> 4);
+        kp12 = ((msg.DATA[3] & 0x0F) << 8) | msg.DATA[4];
+        kd12 = (uint16_t(msg.DATA[5]) << 4) | ((msg.DATA[6] & 0xF0) >> 4);
+        t12 = ((msg.DATA[6] & 0x0F) << 8) | msg.DATA[7];
         
+        // OC mode is active since we received an OC response
+        in_oc_mode = true;
+        has_fault = false;  // No fault status in OC response
+        
+    } else if (msg.LEN >= 7 && msg.DATA[0] == CMD_READ_STATES) {
+        // 7-byte 0xF1 state query response
+        p16 = uint16_t(msg.DATA[1]) << 8 | uint16_t(msg.DATA[2]);
+        v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
+        t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
+        
+        // Status bits from 0xF1 response
+        in_oc_mode = (msg.DATA[6] & 0x01) != 0;
+        has_fault  = (msg.DATA[6] & 0x02) != 0;
+        
+    } else {
+        // Unexpected frame format
+        std::cout << "MsgDecoder::get_states: unexpected frame RX ID: " << std::hex << int(msg.ID) << std::dec 
+                  << " LEN: " << int(msg.LEN) << " DATA[0]: " << std::hex << int(msg.DATA[0]) << std::dec << std::endl;
         position = velocity = kp = kd = torque = 0.0f;
         in_oc_mode = has_fault = false;
         return;
     }
     
-    uint16_t p16 = uint16_t(msg.DATA[1]) << 8 | uint16_t(msg.DATA[2]);
-    uint16_t v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
-    uint16_t t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
+    // Unmap motor values and convert to joint-space
+    // Motor -> Joint transformations (multiply by gear ratio for position/velocity, gear_ratio² for torque)
+    const float motor_position = unmap_signed_16(p16, POS_MAX);
+    const float motor_velocity = unmap_signed_12(v12, VEL_MAX);
+    const float motor_torque = unmap_signed_12(t12, T_MAX);
     
-    // Extraction complete - p16, v12, t12 ready for unmapping
-    
-    // Unmap and apply gear ratio² in one step (memory efficient)
-    const float gear_ratio_sq = 1.0f; // gear_ratio_ * gear_ratio_;
-    position = unmap_signed_16(p16, POS_MAX) * gear_ratio_sq;
-    velocity = unmap_signed_12(v12, VEL_MAX) * gear_ratio_sq;
-    torque   = unmap_signed_12(t12, T_MAX) * gear_ratio_sq;
+    // Apply gear ratio conversions to get joint-space values
+    position = motor_position;
+    velocity = motor_velocity;
+    torque   = motor_torque;
 
-    // 0xF1 response does not include Kp/Kd values, set them to 0 to avoid confusion
-    kp = 0.0f;
-    kd = 0.0f;
-
-    // Optional: interpret status in msg.DATA[6] if needed
-    in_oc_mode = (msg.DATA[6] & 0x01) != 0;
-    has_fault  = (msg.DATA[6] & 0x02) != 0;
+    // Decode Kp/Kd if available (only from 8-byte OC responses)
+    if (msg.LEN == 8) {
+        kp = float(kp12) * (KP_MAX / MAX_12BIT);
+        kd = float(kd12) * (KD_MAX / MAX_12BIT);
+    } else {
+        kp = 0.0f;
+        kd = 0.0f;
+    }
 
     if (has_fault)
         std::cout << "Motor fault detected! RX ID: " << std::hex << int(msg.ID) << std::dec << std::endl;

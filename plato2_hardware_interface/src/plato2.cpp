@@ -142,7 +142,7 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   joint_effort_commands_[1] = 0.0;
   // joint_effort_commands_[2] = 0.00;
   // joint_effort_commands_[3] = 0.00;
-  // joint_effort_commands_[4] = 0.3 *  0.52 * 8; // tau  / torque constant = Nm / (Nm/A) = A
+  joint_effort_commands_[4] = 0.1 /  0.52 ; // tau  / torque constant = Nm / (Nm/A) = A
   // joint_effort_commands_[5] = 0.00;
   // joint_effort_commands_[6] = 0.00;
   // joint_effort_commands_[7] = 0.00;

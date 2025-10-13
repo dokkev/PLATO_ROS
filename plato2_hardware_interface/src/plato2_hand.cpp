@@ -177,11 +177,6 @@ void Hand::set_impedance_command(const std::vector<double> &joint_impedance_comm
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::set_zero_motor_position(){
-    for (size_t i = 0; i < num_actuators_; ++i){
-        actuators_[i].set_joint_position(0.0, 10);
-    }
-}
 
 
 ////////////////////////////////////////////////////////////////////////

@@ -1,138 +1,138 @@
 <?xml version="1.0" ?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">    
 <xacro:macro name="plato2_description" params="connector_link  xyz:='0 0 0'  rpy:='0 0 0' ">
-  
+
   <!-- Link hand_base -->
   <link name="hand_base">
     <inertial>
-      <origin xyz="0.0710032 0.00419305 0.0153006" rpy="0 0 0"/>
-      <mass value="0.799163"/>
-      <inertia ixx="0.000825527" ixy="0.000134393" ixz="-0.000212961" iyy="0.00124275" iyz="6.12778e-05" izz="0.00159582"/>
+      <origin xyz="1.14624e-05 -0.0735402 0.00270001" rpy="0 0 0"/>
+      <mass value="0.739028"/>
+      <inertia ixx="0.00120378" ixy="-5.74097e-07" ixz="9.38706e-08" iyy="0.000581026" iyz="0.000226035" izz="0.00122618"/>
     </inertial>
     <!-- Part hand_base_parts -->
     <visual>
-      <origin xyz="0.0710032 0.00419305 0.0153006" rpy="0 -0 0"/>
+      <origin xyz="1.14624e-05 -0.0735402 0.00270001" rpy="0 -0 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/hand_base.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/hand_base_visual.stl"/>
       </geometry>
       <material name="hand_base_parts_material">
-        <color rgba="0.598467 0.599053 0.600631 1"/>
+        <color rgba="0.582976 0.583383 0.583584 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0710032 0.00419305 0.0153006" rpy="0 -0 0"/>
+      <origin xyz="1.14624e-05 -0.0735402 0.00270001" rpy="0 -0 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/hand_base.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/hand_base_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link thumb_metacarpal -->
   <link name="thumb_metacarpal">
     <inertial>
-      <origin xyz="0.0331527 5.31963e-05 0.0202412" rpy="0 0 0"/>
-      <mass value="0.106079"/>
-      <inertia ixx="2.85968e-05" ixy="-2.76218e-08" ixz="-4.28002e-07" iyy="3.69471e-05" iyz="7.39826e-09" izz="2.50051e-05"/>
+      <origin xyz="5.08388e-05 0.0186588 -0.0228524" rpy="0 0 0"/>
+      <mass value="0.120521"/>
+      <inertia ixx="2.56992e-05" ixy="-5.49331e-08" ixz="4.85452e-08" iyy="3.3197e-05" iyz="2.03706e-06" izz="2.19064e-05"/>
     </inertial>
     <!-- Part thumb_metacarpal_parts -->
     <visual>
-      <origin xyz="0.0331527 5.31963e-05 0.0202412" rpy="1.80411e-16 -1.5708 0"/>
+      <origin xyz="5.08388e-05 0.0186588 -0.0228524" rpy="1.5708 -2.31294e-16 -6.83582e-14"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_metacarpal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_metacarpal_visual.stl"/>
       </geometry>
       <material name="thumb_metacarpal_parts_material">
-        <color rgba="0.582731 0.582731 0.582731 1"/>
+        <color rgba="0.55008 0.55008 0.55008 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0331527 5.31963e-05 0.0202412" rpy="1.80411e-16 -1.5708 0"/>
+      <origin xyz="5.08388e-05 0.0186588 -0.0228524" rpy="1.5708 -2.31294e-16 -6.83582e-14"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_metacarpal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_metacarpal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link thumb_actuators -->
   <link name="thumb_actuators">
     <inertial>
-      <origin xyz="-1.83214e-05 0.00935465 -0.0235065" rpy="0 0 0"/>
-      <mass value="0.22815"/>
-      <inertia ixx="4.53556e-05" ixy="2.34195e-05" ixz="3.62997e-08" iyy="0.000164951" iyz="1.07283e-06" izz="0.000150958"/>
+      <origin xyz="0.00119788 -0.0189545 -0.0225138" rpy="0 0 0"/>
+      <mass value="0.240831"/>
+      <inertia ixx="4.65934e-05" ixy="4.93309e-06" ixz="-5.99186e-07" iyy="0.00017164" iyz="-1.38804e-06" izz="0.000155026"/>
     </inertial>
     <!-- Part thumb_actuators_parts -->
     <visual>
-      <origin xyz="-1.83214e-05 0.00935465 -0.0235065" rpy="-2.11359e-14 5.96582e-15 3.14159"/>
+      <origin xyz="0.00119788 -0.0189545 -0.0225138" rpy="-3.06645e-16 -6.82726e-14 -1.5708"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_actuators.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_actuators_visual.stl"/>
       </geometry>
       <material name="thumb_actuators_parts_material">
-        <color rgba="0.546967 0.546967 0.546967 1"/>
+        <color rgba="0.545814 0.546439 0.546747 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="-1.83214e-05 0.00935465 -0.0235065" rpy="-2.11359e-14 5.96582e-15 3.14159"/>
+      <origin xyz="0.00119788 -0.0189545 -0.0225138" rpy="-3.06645e-16 -6.82726e-14 -1.5708"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_actuators.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_actuators_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link thumb_proximal -->
   <link name="thumb_proximal">
     <inertial>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="0 0 0"/>
-      <mass value="0.0339468"/>
-      <inertia ixx="1.73073e-06" ixy="-6.44674e-08" ixz="4.16261e-08" iyy="1.78285e-05" iyz="-2.33942e-10" izz="1.79881e-05"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="0 0 0"/>
+      <mass value="0.0306406"/>
+      <inertia ixx="1.81672e-06" ixy="4.24383e-08" ixz="6.4245e-07" iyy="1.85497e-05" iyz="-2.07897e-09" izz="1.81545e-05"/>
     </inertial>
     <!-- Part thumb_proximal_parts -->
     <visual>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="-1.5708 3.66046e-14 4.55885e-15"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="-1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_proximal_visual.stl"/>
       </geometry>
       <material name="thumb_proximal_parts_material">
-        <color rgba="0.692244 0.727805 0.747972 1"/>
+        <color rgba="0.63463 0.635887 0.633109 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="-1.5708 3.66046e-14 4.55885e-15"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="-1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_proximal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link thumb_distal -->
   <link name="thumb_distal">
     <inertial>
-      <origin xyz="-0.0260847 -0.00216038 -0.00249347" rpy="0 0 0"/>
-      <mass value="0.0246538"/>
-      <inertia ixx="1.51248e-06" ixy="1.06252e-06" ixz="-6.60259e-09" iyy="1.06e-05" iyz="2.39092e-09" izz="1.06808e-05"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="0 0 0"/>
+      <mass value="0.0219871"/>
+      <inertia ixx="1.20261e-06" ixy="-4.25688e-08" ixz="-2.6749e-09" iyy="9.76625e-06" iyz="1.45731e-10" izz="9.4432e-06"/>
     </inertial>
     <!-- Part thumb_distal_parts -->
     <visual>
-      <origin xyz="-0.0260847 -0.00216038 -0.00249347" rpy="1.5708 -3.69995e-14 -3.14159"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="-1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_distal_visual.stl"/>
       </geometry>
       <material name="thumb_distal_parts_material">
-        <color rgba="0.678206 0.731786 0.759611 1"/>
+        <color rgba="0.670015 0.670243 0.668779 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="-0.0260847 -0.00216038 -0.00249347" rpy="1.5708 -3.69995e-14 -3.14159"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="-1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/thumb_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/thumb_distal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Joint from thumb_proximal to thumb_distal -->
   <joint name="joint4" type="revolute">
-    <origin xyz="0.06 0 -0.005" rpy="-3.14159 3.94833e-16 -3.14159"/>
+    <origin xyz="0.06 1.38778e-17 -0.0105" rpy="3.14159 4.87464e-15 3.14159"/>
     <parent link="thumb_proximal"/>
     <child link="thumb_distal"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="-2.0944" upper="7.10543e-15"/>
+    <limit effort="10" velocity="10" lower="-2.0944" upper="1.0472"/>
   </joint>
   <!-- Joint from thumb_actuators to thumb_proximal -->
   <joint name="joint3" type="revolute">
-    <origin xyz="-0.0220021 0.002 -0.024" rpy="1.5708 1.05247e-14 3.14159"/>
+    <origin xyz="-0.022 -0.0305 -0.0235" rpy="1.5708 -3.06645e-16 3.14159"/>
     <parent link="thumb_actuators"/>
     <child link="thumb_proximal"/>
     <axis xyz="0 0 1"/>
@@ -140,79 +140,79 @@
   </joint>
   <!-- Joint from thumb_metacarpal to thumb_actuators -->
   <joint name="joint2" type="revolute">
-    <origin xyz="0.055 -5.55112e-16 0.03225" rpy="3.14159 1.5708 0"/>
+    <origin xyz="-1.42383e-10 0.0315 -0.025" rpy="1.5708 -1.5708 0"/>
     <parent link="thumb_metacarpal"/>
     <child link="thumb_actuators"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="-0.785398" upper="0.785398"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
   </joint>
   <!-- Joint from hand_base to thumb_metacarpal -->
   <joint name="joint1" type="revolute">
-    <origin xyz="0.0115 0.0385 -0.01585" rpy="-1.30451e-15 1.5708 0"/>
+    <origin xyz="4.36425e-16 -0.044 -0.0285" rpy="-1.5708 6.83582e-14 -2.31294e-16"/>
     <parent link="hand_base"/>
     <child link="thumb_metacarpal"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="-0.523599" upper="1.22173"/>
+    <limit effort="10" velocity="10" lower="-0.785398" upper="0.785398"/>
   </joint>
   <!-- Link index_proximal -->
   <link name="index_proximal">
     <inertial>
-      <origin xyz="0.0310493 7.38138e-05 -0.00253963" rpy="0 0 0"/>
-      <mass value="0.0339468"/>
-      <inertia ixx="1.73071e-06" ixy="-6.44715e-08" ixz="-3.24363e-08" iyy="1.78285e-05" iyz="2.16477e-10" izz="1.79881e-05"/>
+      <origin xyz="0.0275353 8.61566e-05 -0.00673211" rpy="0 0 0"/>
+      <mass value="0.0306406"/>
+      <inertia ixx="1.81666e-06" ixy="-4.24695e-08" ixz="6.42349e-07" iyy="1.85498e-05" iyz="1.97055e-09" izz="1.81546e-05"/>
     </inertial>
     <!-- Part index_proximal_parts -->
     <visual>
-      <origin xyz="0.0310493 7.38138e-05 -0.00253963" rpy="1.5708 1.56658e-15 -2.77556e-16"/>
+      <origin xyz="0.0275353 8.61566e-05 -0.00673211" rpy="-1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/index_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/index_proximal_visual.stl"/>
       </geometry>
       <material name="index_proximal_parts_material">
-        <color rgba="0.692244 0.727805 0.747972 1"/>
+        <color rgba="0.63463 0.635887 0.633109 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0310493 7.38138e-05 -0.00253963" rpy="1.5708 1.56658e-15 -2.77556e-16"/>
+      <origin xyz="0.0275353 8.61566e-05 -0.00673211" rpy="-1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/index_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/index_proximal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link index_distal -->
   <link name="index_distal">
     <inertial>
-      <origin xyz="-0.0260847 0.00203273 -0.00249403" rpy="0 0 0"/>
-      <mass value="0.0246538"/>
-      <inertia ixx="1.51968e-06" ixy="-1.09639e-06" ixz="-6.8818e-09" iyy="1.06e-05" iyz="-2.50208e-09" izz="1.0688e-05"/>
+      <origin xyz="-0.03316 0.000711768 -0.00299094" rpy="0 0 0"/>
+      <mass value="0.0219871"/>
+      <inertia ixx="1.20261e-06" ixy="4.25688e-08" ixz="2.6749e-09" iyy="9.76625e-06" iyz="1.45731e-10" izz="9.4432e-06"/>
     </inertial>
     <!-- Part index_distal_parts -->
     <visual>
-      <origin xyz="-0.0260847 0.00203273 -0.00249403" rpy="1.5708 -2.2929e-15 3.14159"/>
+      <origin xyz="-0.03316 0.000711768 -0.00299094" rpy="-1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/index_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/index_distal_visual.stl"/>
       </geometry>
       <material name="index_distal_parts_material">
-        <color rgba="0.678206 0.731786 0.759611 1"/>
+        <color rgba="0.670015 0.670243 0.668779 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="-0.0260847 0.00203273 -0.00249403" rpy="1.5708 -2.2929e-15 3.14159"/>
+      <origin xyz="-0.03316 0.000711768 -0.00299094" rpy="-1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/index_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/index_distal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Joint from index_proximal to index_distal -->
   <joint name="joint6" type="revolute">
-    <origin xyz="0.06 -1.38778e-17 -1.38778e-17" rpy="-1.8074e-16 -3.85948e-15 3.14159"/>
+    <origin xyz="0.06 5.20417e-18 -0.0105" rpy="-3.14159 6.12323e-17 -3.14159"/>
     <parent link="index_proximal"/>
     <child link="index_distal"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="0" upper="2.0944"/>
+    <limit effort="10" velocity="10" lower="-1.0472" upper="2.0944"/>
   </joint>
   <!-- Joint from hand_base to index_proximal -->
   <joint name="joint5" type="revolute">
-    <origin xyz="0.1135 0.039 0.026" rpy="-1.5708 2.77556e-16 1.56658e-15"/>
+    <origin xyz="0.0305 -0.113 0.0145" rpy="1.5708 1.58762e-14 -1.5708"/>
     <parent link="hand_base"/>
     <child link="index_proximal"/>
     <axis xyz="0 0 1"/>
@@ -221,62 +221,62 @@
   <!-- Link middle_proximal -->
   <link name="middle_proximal">
     <inertial>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="0 0 0"/>
-      <mass value="0.0339468"/>
-      <inertia ixx="1.73073e-06" ixy="-6.44674e-08" ixz="4.16261e-08" iyy="1.78285e-05" iyz="-2.33942e-10" izz="1.79881e-05"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="0 0 0"/>
+      <mass value="0.0306406"/>
+      <inertia ixx="1.81672e-06" ixy="4.24383e-08" ixz="6.4245e-07" iyy="1.85497e-05" iyz="-2.07897e-09" izz="1.81545e-05"/>
     </inertial>
     <!-- Part middle_proximal_parts -->
     <visual>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="1.5708 -1.50001e-15 -3.33067e-16"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/middle_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/middle_proximal_visual.stl"/>
       </geometry>
       <material name="middle_proximal_parts_material">
-        <color rgba="0.692244 0.727805 0.747972 1"/>
+        <color rgba="0.63463 0.635887 0.633109 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0310493 7.38178e-05 -0.0024697" rpy="1.5708 -1.50001e-15 -3.33067e-16"/>
+      <origin xyz="0.0275353 -8.61887e-05 -0.00673205" rpy="1.5708 -1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/middle_proximal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/middle_proximal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Link middle_distal -->
   <link name="middle_distal">
     <inertial>
-      <origin xyz="-0.0260847 0.00203273 -0.00250653" rpy="0 0 0"/>
-      <mass value="0.0246538"/>
-      <inertia ixx="1.51968e-06" ixy="-1.09639e-06" ixz="6.60259e-09" iyy="1.06e-05" iyz="2.40976e-09" izz="1.0688e-05"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="0 0 0"/>
+      <mass value="0.0219871"/>
+      <inertia ixx="1.20261e-06" ixy="-4.25688e-08" ixz="-2.6749e-09" iyy="9.76625e-06" iyz="1.45731e-10" izz="9.4432e-06"/>
     </inertial>
     <!-- Part middle_distal_parts -->
     <visual>
-      <origin xyz="-0.0260847 0.00203273 -0.00250653" rpy="1.5708 -1.22764e-15 3.14159"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/middle_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/middle_distal_visual.stl"/>
       </geometry>
       <material name="middle_distal_parts_material">
-        <color rgba="0.678206 0.731786 0.759611 1"/>
+        <color rgba="0.670015 0.670243 0.668779 1"/>
       </material>
     </visual>
     <collision>
-      <origin xyz="-0.0260847 0.00203273 -0.00250653" rpy="1.5708 -1.22764e-15 3.14159"/>
+      <origin xyz="-0.03316 -0.000711768 -0.00300906" rpy="1.5708 1.5708 0"/>
       <geometry>
-        <mesh filename="file://$(find plato2_description)/meshes/middle_distal.stl"/>
+        <mesh filename="file://$(find plato2_description)/meshes/middle_distal_collision.stl"/>
       </geometry>
     </collision>
   </link>
   <!-- Joint from middle_proximal to middle_distal -->
   <joint name="joint8" type="revolute">
-    <origin xyz="0.06 0 -0.00025" rpy="-3.33067e-16 2.72368e-16 3.14159"/>
+    <origin xyz="0.06 -4.51028e-17 -0.0105" rpy="3.14159 1.03954e-15 3.14159"/>
     <parent link="middle_proximal"/>
     <child link="middle_distal"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="0" upper="2.0944"/>
+    <limit effort="10" velocity="10" lower="-2.0944" upper="1.0472"/>
   </joint>
   <!-- Joint from hand_base to middle_proximal -->
   <joint name="joint7" type="revolute">
-    <origin xyz="0.1135 -0.034 0.026" rpy="-1.5708 3.33067e-16 -1.50001e-15"/>
+    <origin xyz="-0.0305 -0.113 0.0145" rpy="-1.5708 8.07687e-14 -1.5708"/>
     <parent link="hand_base"/>
     <child link="middle_proximal"/>
     <axis xyz="0 0 1"/>

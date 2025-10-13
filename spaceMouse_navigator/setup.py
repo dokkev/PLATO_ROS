@@ -17,7 +17,7 @@ setup(
     maintainer_email='haiyunzhang@utexas.edu',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={'test': ['pytest']},
     entry_points={
         'console_scripts': [
             'spaceMouse_motionTest = spaceMouse_navigator.spaceMouse_motionTest:main',

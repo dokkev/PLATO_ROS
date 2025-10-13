@@ -98,16 +98,6 @@ public:
     /// @param duration uint32_t execution time in ms 
     void set_joint_torque(const float &joint_torque, const uint32_t &duration);
 
-    /// @brief Send a velocity command to the motor after applying offsets and direction . It ignores the command if the command is the almost equal as the previous command
-    /// @param joint_velocity float velocity command in rad/s +CCW, -CW
-    /// @param duration uint32_t execution time in ms
-    void set_joint_velocity(const float &joint_velocity, const uint32_t &duration);
-
-    /// @brief Send a position command to the motor after applying offsets and direction. It ignores the command if the command is the almost equal as the previous command
-    /// @param joint_position float position command in rad +CCW, -CW
-    /// @param duration uint32_t execution time in ms 
-    void set_joint_position(const float &joint_position, const uint32_t &duration);
-
 
     /// @brief Given the received message, identify the type of message and process it to store the data in the buffer
     /// @param msg 
@@ -124,7 +114,6 @@ public:
     /// @brief Get the motor position without offset
     /// @return float motor position
     float get_motor_position() { return motor_position_; }
-
 
     void calibrate_encoder();
 
@@ -143,21 +132,19 @@ private:
 
     /// @brief Cached message to send to the motor
     TPCANMsg onoff_msg_;
-    TPCANMsg pos_msg_;
-    TPCANMsg vel_msg_;
-    TPCANMsg trq_msg_;
-    TPCANMsg gain_msg_;
-    TPCANMsg ind_msg_;
+    TPCANMsg cmd_msg_;
     TPCANMsg config_msg_;
 
     /// @brief Initialize a message with with 0 data and the configured CAN ID
     /// @return TPCANMsg initialized message
-    inline TPCANMsg init_message_(){
+    inline TPCANMsg init_message_(uint8_t len){
         TPCANMsg msg;
+        // Clear entire struct to avoid uninitialized bytes and ensure deterministic DATA
+        std::memset(&msg, 0, sizeof(msg));
+        if (len > 8) len = 8; // clamp DLC to CAN max
         msg.ID = config_.can_tx_id;
         msg.MSGTYPE = PCAN_MESSAGE_STANDARD;
-        msg.LEN = 8;
-        std::memset(msg.DATA, 0, 8);
+        msg.LEN = len;
 
         return msg;
     }

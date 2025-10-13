@@ -16,11 +16,11 @@ static constexpr uint8_t  CMD_CLEAR_FAULT    = 0xAF;   // clear fault
 static constexpr uint8_t  CMD_EXIT_OC_MODE   = 0xCF;   // exit operation control mode
 static constexpr uint8_t  CMD_SET_ZERO       = 0xB1;   // set current position as zero
 
-static float 			  KP_MAX			 = 0.0F;   // default max KP (rad)
+static float 			  KP_MAX			 = 5.0F;   // default max KP (rad)
 static float 			  KD_MAX			 = 0.1F;     // default max KD (rad/s) corresponds to 0 05
-static float 			  POS_MAX			 = 12.566f;   // rad (doc default) // 4pi rads
-static float 			  VEL_MAX			 = 42.0f;   // rad/s (doc default) // 42 rad/s
-static float 			  T_MAX  			 = 1.04f;   // Nm (doc default) // .52*3 Nm
+static float 			  POS_MAX			 = 95.50f;   // rad (doc default) // 4pi rads
+static float 			  VEL_MAX			 = 45.00f;   // rad/s (doc default) // 42 rad/s
+static float 			  T_MAX  			 = 18.00f;   // Nm (doc default) // .52*3 Nm
 
 // StdID bit[10] must be 1 for operation-control command frames (no command byte)
 static constexpr uint32_t STDID_OC_BIT   	 = 0x400;
@@ -68,36 +68,19 @@ MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, co
 //                             float vel_max_rps,
 //                             float tq_max_nm, bool set_pos, bool set_vel, bool set_tq)
 // {
-//     // Convert to protocol units (documented):
-//     //   Pos_Max: 0.1 rad / LSB
-//     //   Vel_Max: 0.01 rad/s / LSB
-//     //   T_Max:   0.01 Nm / LSB
-//     auto to_u16 = [](float value, float lsb){
-//         float v = value / lsb;
-//         if (v < 0) v = 0;
-//         if (v > 65535.0f) v = 65535.0f;
-//         return static_cast<uint16_t>(std::lround(v));
-//     };
-
-//     set_pos ? POS_MAX = pos_max_rad : POS_MAX = POS_MAX;
-//     set_vel ? VEL_MAX = vel_max_rps : VEL_MAX = VEL_MAX;
-//     set_tq  ? T_MAX   = tq_max_nm   : T_MAX   = T_MAX;
-
-//     uint16_t pos_u16 = 0.0f;
-//     uint16_t vel_u16 = 0.0f;
-//     uint16_t tq_u16  = 0.0f;
-
-//     set_pos ? pos_u16 = to_u16(pos_max_rad, 0.1f) : pos_u16 = to_u16(POS_MAX, 0.1f);
-//     set_vel ? vel_u16 = to_u16(vel_max_rps, 0.01f) : vel_u16 = to_u16(VEL_MAX, 0.01f);
-//     set_tq ? tq_u16  = to_u16(tq_max_nm,   0.01f) : tq_u16  = to_u16(T_MAX,   0.01f);
-
-//     // Build the 0xF0 frame (big-endian “hi, lo” per field).
-//     // DLC = 7 bytes: [0]=0xF0, [1..2]=Pos_Max, [3..4]=Vel_Max, [5..6]=T_Max
+//     // Build a protocol-correct 0xF0 (CFG_LIMITS) frame with DLC=7.
+//     // Zero the whole struct to ensure deterministic contents.
 //     std::memset(&msg, 0, sizeof(msg));
-//     msg.ID      = tx_id_;
-//     msg.LEN     = 7;
-//     msg.DATA[0] = CMD_CFG_LIMITS;     // 0xF0
+//     msg.ID = tx_id_;
+//     msg.LEN = 7;
+//     msg.DATA[0] = CMD_CFG_LIMITS; // 0xF0
 
+//     // Convert to protocol units using documented LSBs (helpers above)
+//     uint16_t pos_u16 = set_pos ? to_pos_max_u16(pos_max_rad) : to_pos_max_u16(POS_MAX);
+//     uint16_t vel_u16 = set_vel ? to_vel_max_u16(vel_max_rps) : to_vel_max_u16(VEL_MAX);
+//     uint16_t tq_u16  = set_tq  ? to_tmax_u16(tq_max_nm)     : to_tmax_u16(T_MAX);
+
+//     // Pack big-endian hi/lo for each 16-bit field as documented
 //     msg.DATA[1] = static_cast<uint8_t>(pos_u16 >> 8);
 //     msg.DATA[2] = static_cast<uint8_t>(pos_u16 & 0xFF);
 
@@ -246,8 +229,8 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 	pack_oc_frame(msg,
 				  /*pos*/position_rad, true,
 				  /*vel*/velocity_rps, true,
-				  .10, true, ///*kp*/kp, true,
-				  /*kd*/kd, true,
+				  /*kp*/0, true,
+				  /*kd*/0, true,
 				  /*tq*/torque_nm, true,
 				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
 }

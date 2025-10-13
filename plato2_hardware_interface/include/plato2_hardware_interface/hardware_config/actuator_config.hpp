@@ -10,42 +10,51 @@
 using namespace Plato;
 
 namespace MotorTxID{
-    constexpr uint8_t MOTOR1 = 0xa;
-    constexpr uint8_t MOTOR2 = 0xc;
-    constexpr uint8_t MOTOR3 = 0xb;
-    constexpr uint8_t MOTOR4 = 0x1;
-    constexpr uint8_t MOTOR5 = 0xe;
-    constexpr uint8_t MOTOR6 = 0xf;
-    constexpr uint8_t MOTOR7 = 0x10;
-    constexpr uint8_t MOTOR8 = 0x11;
+    constexpr uint8_t MOTOR1 = 0x0A; // 10
+    constexpr uint8_t MOTOR2 = 0x0B; // 11
+    constexpr uint8_t MOTOR3 = 0x0C; // 12
+    constexpr uint8_t MOTOR4 = 0x0D; // 13
+    constexpr uint8_t MOTOR5 = 0x0E; // 14
+    constexpr uint8_t MOTOR6 = 0x0F; // 15
+    constexpr uint8_t MOTOR7 = 0x10; // 16
+    constexpr uint8_t MOTOR8 = 0x11; // 17
 } // namespace MotorTxID
 
 namespace MotorRxID{
-    constexpr uint8_t MOTOR1 = 0xa;
-    constexpr uint8_t MOTOR2 = 0xb;
-    constexpr uint8_t MOTOR3 = 0xc;
-    constexpr uint8_t MOTOR4 = 0xd;
-    constexpr uint8_t MOTOR5 = 0xe;
-    constexpr uint8_t MOTOR6 = 0xf;
-    constexpr uint8_t MOTOR7 = 0x10;
-    constexpr uint8_t MOTOR8 = 0x11;
+    constexpr uint8_t MOTOR1 = 0x0A; // 10
+    constexpr uint8_t MOTOR2 = 0x0B; // 11
+    constexpr uint8_t MOTOR3 = 0x0C; // 12
+    constexpr uint8_t MOTOR4 = 0x0D; // 13
+    constexpr uint8_t MOTOR5 = 0x0E; // 14
+    constexpr uint8_t MOTOR6 = 0x0F; // 15
+    constexpr uint8_t MOTOR7 = 0x10; // 16
+    constexpr uint8_t MOTOR8 = 0x11; // 17
 } // namespace MotorRxID
+
+
+
+namespace CanMsgLimits{
+    constexpr float Pos_Max = 12.566f; // rad (4pi)
+    constexpr float Vel_Max = 52.36f;   // rad/s (500 rpm)
+    constexpr float T_Max   = 2.08f;   // Nm (4 Amp)
+} // namespace CanMsgLimits
 
 namespace GIM3505{
     constexpr float GEAR_RATIO = 8.0f;
-    constexpr float TORQUE_CONSTANT = 0.41f;
+    constexpr float TORQUE_CONSTANT = 0.52;
+    constexpr float PEAK_TORQUE = 1.27f; // Nm 
 } // namespace GIM3505
 
 namespace MotorOffset{
 
-    constexpr float MOTOR1 = -12.25f; // THUMB ROLL
-    constexpr float MOTOR2 = 12.3608f; // THUMB YAW
-    constexpr float MOTOR3 = -12.4586f; // THUMB MCP
-    constexpr float MOTOR4 = 12.52f; // THUMB PIP
-    constexpr float MOTOR5 = -12.5169f; // INDEX MCP
-    constexpr float MOTOR6 = 12.4617f; // INDEX PIP
-    constexpr float MOTOR7 = -12.3298f; // MIDDLE MCP
-    constexpr float MOTOR8 = 12.5108f; // MIDDLE PIP
+    constexpr float MOTOR1 = 0.0f; // THUMB CMC ROLL
+    constexpr float MOTOR2 = 0.0f; // THUMB MCP YAW
+    constexpr float MOTOR3 = 0.0f; // THUMB MCP PITCH
+    constexpr float MOTOR4 = 0.0f; // THUMB PIP PITCH
+    constexpr float MOTOR5 = 0.0f; // INDEX MCP PITCH
+    constexpr float MOTOR6 = 0.0f; // INDEX PIP PITCH
+    constexpr float MOTOR7 = 0.0f; // MIDDLE MCP PITCH
+    constexpr float MOTOR8 = 0.0f; // MIDDLE PIP PITCH
 
 }
 

@@ -16,11 +16,7 @@ static constexpr uint8_t  CMD_CLEAR_FAULT    = 0xAF;   // clear fault
 static constexpr uint8_t  CMD_EXIT_OC_MODE   = 0xCF;   // exit operation control mode
 static constexpr uint8_t  CMD_SET_ZERO       = 0xB1;   // set current position as zero
 
-static float 			  KP_MAX			 = 5.0F;   // default max KP (rad)
-static float 			  KD_MAX			 = 0.1F;     // default max KD (rad/s) corresponds to 0 05
-static float 			  POS_MAX			 = 95.50f;   // rad (doc default) // 4pi rads
-static float 			  VEL_MAX			 = 45.00f;   // rad/s (doc default) // 42 rad/s
-static float 			  T_MAX  			 = 18.00f;   // Nm (doc default) // .52*3 Nm
+// Protocol-default maxima are defined as inline constexpr in the header
 
 // StdID bit[10] must be 1 for operation-control command frames (no command byte)
 static constexpr uint32_t STDID_OC_BIT   	 = 0x400;
@@ -50,12 +46,12 @@ static inline uint16_t map_signed_12(float x, float x_max)
 }
 static inline float unmap_signed_16(uint16_t u, float x_max)
 {
-    // [0..65535] -> [-x_max, +x_max]
+    // [0..65535] -> [-x_max, +x_max] - Symmetric with map_signed_16
     return ( (float(u) / 65535.0f) - 0.5f ) * (2.0f * x_max);
 }
 static inline float unmap_signed_12(uint16_t u, float x_max)
 {
-    // [0..4095] -> [-x_max, +x_max]
+    // [0..4095] -> [-x_max, +x_max] - Symmetric with map_signed_12
     return ( (float(u) / 4095.0f) - 0.5f ) * (2.0f * x_max);
 }
 
@@ -99,19 +95,26 @@ void MsgEncoder::set_limits(TPCANMsg& msg,
     msg.ID      = tx_id_;
     msg.LEN     = 7;
     msg.DATA[0] = CMD_CFG_LIMITS;
-    msg.DATA[1] = 0x03;
-    msg.DATA[2] = 0xbb;
-    msg.DATA[3] = 0x0f;
-    msg.DATA[4] = 0xa0;
-    msg.DATA[5] = 0x07;
-    msg.DATA[6] = 0x08;
     
+    // Convert to protocol units and pack little-endian
+    uint16_t pos_u16 = to_pos_max_u16(pos_max_rad);  // 0.1 rad/LSB
+    uint16_t vel_u16 = to_vel_max_u16(vel_max_rps);  // 0.01 rad/s/LSB 
+    uint16_t tq_u16  = to_tmax_u16(tq_max_nm);       // 0.01 Nm/LSB
+    
+    // Pack little-endian (LSB first)
+    msg.DATA[1] = uint8_t(pos_u16 & 0xFF);
+    msg.DATA[2] = uint8_t(pos_u16 >> 8);
+    msg.DATA[3] = uint8_t(vel_u16 & 0xFF);
+    msg.DATA[4] = uint8_t(vel_u16 >> 8);
+    msg.DATA[5] = uint8_t(tq_u16  & 0xFF);
+    msg.DATA[6] = uint8_t(tq_u16  >> 8);
 }
 
 void MsgEncoder::set_zero_position(TPCANMsg &msg)
 {
     // Documentation: send 0xB1 to set current position as origin.
-    msg.ID      = (tx_id_ | STDID_OC_BIT);
+    // Normal command frames use base StdID (no STDID_OC_BIT)
+    msg.ID      = tx_id_;
     std::cout << "Setting zero position with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_SET_ZERO;
@@ -171,11 +174,11 @@ static inline void pack_oc_frame(TPCANMsg& msg,
     msg.DATA[6] |= uint8_t((t12 >> 8) & 0x0F);     // hi4 in [3:0]
     msg.DATA[7]  = uint8_t(t12 & 0xFF);            // lo8
 
-    std::cout << "OC Frame Data: " << std::hex << int(msg.ID) << " ";
-    for (int i = 0; i < 8; ++i) {
-        std::cout << std::hex << int(msg.DATA[i]) << " ";
-    }
-    std::cout << std::dec << std::endl;
+    // std::cout << "OC Frame Data: " << std::hex << int(msg.ID) << " ";
+    // for (int i = 0; i < 8; ++i) {
+    //     std::cout << std::hex << int(msg.DATA[i]) << " ";
+    // }
+    // std::cout << std::dec << std::endl;
 }
 
 void MsgEncoder::start_motor(TPCANMsg &msg)
@@ -203,8 +206,9 @@ void MsgEncoder::stop_motor(TPCANMsg &msg)
 void MsgEncoder::stop_control(TPCANMsg &msg)
 {
     // Exit operation-control mode: 0xCF
+    // Normal command frames use base StdID (no STDID_OC_BIT)
     std::cout << "Stopping control with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
-    msg.ID      = (tx_id_ | STDID_OC_BIT);
+    msg.ID      = tx_id_;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_EXIT_OC_MODE;
 }
@@ -212,7 +216,8 @@ void MsgEncoder::stop_control(TPCANMsg &msg)
 void MsgEncoder::clear_fault(TPCANMsg &msg)
 {
     // Clear fault: 0xAF
-    msg.ID      = (tx_id_ | STDID_OC_BIT);
+    // Normal command frames use base StdID (no STDID_OC_BIT)
+    msg.ID      = tx_id_;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_CLEAR_FAULT;
 }
@@ -225,12 +230,12 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 											  const float kd, 
 											  const float torque_nm)
 {
-    std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
+    // std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  pos=" << position_rad << " rad, vel=" << velocity_rps << " rad/s, kp=" << kp << ", kd=" << kd << ", tq=" << torque_nm << " Nm\n";
 	pack_oc_frame(msg,
 				  /*pos*/position_rad, true,
 				  /*vel*/velocity_rps, true,
-				  /*kp*/0, true,
-				  /*kd*/0, true,
+				  /*kp*/kp, true,           // Pass actual kp parameter
+				  /*kd*/kd, true,           // Pass actual kd parameter
 				  /*tq*/torque_nm, true,
 				  POS_MAX, VEL_MAX, T_MAX, tx_id_);
 }
@@ -253,7 +258,8 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     {
         std::cout << "MsgDecoder::get_states: unexpected frame" << "RX ID: " << std::hex << int(msg.ID) << std::dec << "  LEN: " << int(msg.LEN) << "  DATA: " << std::hex << int(msg.DATA[0]) << " " << int(msg.DATA[1]) << " " << int(msg.DATA[2]) << " " << int(msg.DATA[3]) << " " << int(msg.DATA[4]) << " " << int(msg.DATA[5]) << " " << int(msg.DATA[6]) << std::dec << std::endl;
         
-        position = velocity = torque = 0.0f;
+        position = velocity = kp = kd = torque = 0.0f;
+        in_oc_mode = has_fault = false;
         return;
     }
     
@@ -261,9 +267,23 @@ void MsgDecoder::get_states(const TPCANMsg &msg, float &position, float &velocit
     uint16_t v12 = (uint16_t(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
     uint16_t t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
     
-    position = unmap_signed_16(p16 * gear_ratio_, POS_MAX);
-    velocity = unmap_signed_12(v12 * gear_ratio_, VEL_MAX);
-    torque   = unmap_signed_12(t12 * torque_constant_ * gear_ratio_, T_MAX);
+    // Extraction complete - p16, v12, t12 ready for unmapping
+    
+    // First unmap the protocol fields to their physical units, then apply
+    // gear_ratio_ / torque_constant_ conversions as needed.
+    float pos_physical = unmap_signed_16(p16, POS_MAX);   // in radians (motor/mech)
+    float vel_physical = unmap_signed_12(v12, VEL_MAX);   // in rad/s (motor/mech)
+    float tq_physical  = unmap_signed_12(t12, T_MAX);     // in Nm (motor-side)
+
+    // Convert to joint-space where appropriate (gear ratio scales angles/velocities,
+    // torque is already in Nm from protocol, just scale by gear ratio for joint space)
+    position = pos_physical / gear_ratio_;
+    velocity = vel_physical / gear_ratio_;
+    torque   = tq_physical / gear_ratio_;
+
+    // 0xF1 response does not include Kp/Kd values, set them to 0 to avoid confusion
+    kp = 0.0f;
+    kd = 0.0f;
 
     // Optional: interpret status in msg.DATA[6] if needed
     in_oc_mode = (msg.DATA[6] & 0x01) != 0;
@@ -283,9 +303,10 @@ void MsgDecoder::get_limits(const TPCANMsg &msg, float &pos_max_rad, float &vel_
         return;
     }
 
-    uint16_t pos_u16 = (uint16_t(msg.DATA[1]) << 8) | uint16_t(msg.DATA[2]);
-    uint16_t vel_u16 = (uint16_t(msg.DATA[3]) << 8) | uint16_t(msg.DATA[4]);
-    uint16_t tq_u16  = (uint16_t(msg.DATA[5]) << 8) | uint16_t(msg.DATA[6]);
+    // Unpack little-endian (LSB first)
+    uint16_t pos_u16 = uint16_t(msg.DATA[1]) | (uint16_t(msg.DATA[2]) << 8);
+    uint16_t vel_u16 = uint16_t(msg.DATA[3]) | (uint16_t(msg.DATA[4]) << 8);
+    uint16_t tq_u16  = uint16_t(msg.DATA[5]) | (uint16_t(msg.DATA[6]) << 8);
 
     pos_max_rad = float(pos_u16) * 0.1f;   // 0.1 rad / LSB
     vel_max_rps = float(vel_u16) * 0.01f;  // 0.01 rad/s / LSB

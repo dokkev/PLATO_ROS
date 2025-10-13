@@ -1,5 +1,5 @@
 #include "plato2_hardware_interface/actuator.hpp"
-
+#include <iostream>
 
 namespace actuator{
 
@@ -32,12 +32,12 @@ Actuator::~Actuator(){
 
 void Actuator::enable_motor(){
 
-    // encoder_.set_limits(config_msg_,
-    //                     12.566f,// config_.joint_limit_max,
-    //                     52.36f,
-    //                     2.08f,
-    //                     true, true, true);
-    // pcan_interface_.send_message(config_msg_);
+    encoder_.set_limits(config_msg_,
+                        mit_can_protocol::POS_MAX,
+                        mit_can_protocol::VEL_MAX,
+                        mit_can_protocol::T_MAX,
+                        true, true, true);
+    pcan_interface_.send_message(config_msg_);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     pcan_interface_.receive_message();
 
@@ -99,29 +99,38 @@ void Actuator::calibrate_phase_order(){}
 ////////////////////////////////////////////////////////////////////////////
 
 void Actuator::process_message(const TPCANMsg &msg){
+    
+    // Handle state messages (8-byte MIT control responses or 7-byte 0xF1 responses)
+    if (msg.LEN == 8 || (msg.LEN >= 7 && msg.DATA[0] == 0xF1)) {
+        
+        float motor_pos, motor_vel, motor_torque;
+        float kp, kd;  // Not used by 0xF1 but required by decoder interface
 
-    // Decode the received message
-    float position_rad = 0.0f;
-    float velocity_rps = 0.0f;
-    float kp = 0.0f;
-    float kd = 0.0f;
-    float torque_nm = 0.0f;
-    bool in_oc_mode = false;
-    bool has_fault = false;
+        // Decode MIT CAN state response directly into states_ where possible
+        decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
+                          states_.in_oc_mode, states_.has_fault);
 
-    decoder_.get_states(msg, position_rad, velocity_rps, kp, kd, torque_nm, in_oc_mode, has_fault);
+        // Update motor tracking and convert to joint space
+        motor_position_ = motor_pos;
+        motor_to_joint_(motor_pos, states_.position, true);
+        motor_to_joint_(motor_vel, states_.velocity, false);
+        motor_to_joint_(motor_torque, states_.torque, false);
 
-    // Convert motor states to joint states
-    motor_to_joint_(position_rad, states_.position, true);
-    motor_to_joint_(position_rad, motor_position_, true);
-    motor_to_joint_(velocity_rps, states_.velocity);
-    motor_to_joint_(torque_nm, states_.torque);
+        // Update motor enabled status
+        b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;
 
-    states_.in_oc_mode = in_oc_mode;
-    states_.has_fault = has_fault;
-
-    // Update motor enabled status
-    b_motor_enabled_ = in_oc_mode && !has_fault;
+        // Log faults
+        if (states_.has_fault) {
+            std::cerr << "Fault on CAN ID " << std::hex << msg.ID << std::dec << std::endl;
+        }
+    }
+    else if (msg.LEN >= 7 && msg.DATA[0] == 0xF0) {
+        // Handle limits response
+        float pos_max, vel_max, tq_max;
+        decoder_.get_limits(msg, pos_max, vel_max, tq_max);
+        std::cout << "Limits ID " << std::hex << msg.ID << std::dec 
+                  << ": " << pos_max << "rad, " << vel_max << "rad/s, " << tq_max << "Nm" << std::endl;
+    }
 }
 
 

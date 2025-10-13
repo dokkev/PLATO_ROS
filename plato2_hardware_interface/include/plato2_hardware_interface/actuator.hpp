@@ -13,6 +13,8 @@ struct Commands{
     float position;
     float velocity;
     float torque;
+    float stiffness;
+    float damping;
 };
 
 /// @brief Actuator states variables : position, velocity, torque
@@ -20,6 +22,9 @@ struct States{
     float position;
     float velocity;
     float torque;
+    float stiffness;
+    float damping;
+    
     bool in_oc_mode;
     bool has_fault;
 };
@@ -154,13 +159,13 @@ private:
     /// @param motor_value reference to store the motor command value to send to the motor
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void joint_to_motor_(const float &joint_value, float &motor_value, bool apply_offset = false) {
+        // Convert joint-space -> motor-space before encoding.
+        // joint -> motor: motor = (joint [+ offset]) * direction / gear_ratio
+        float v = joint_value;
         if (apply_offset) {
-            motor_value = (joint_value * config_.direction) + config_.position_offset;
-            // std::cout << "Joint Cmd: " << joint_value << std::endl;
-
-        } else {
-            motor_value = joint_value * config_.direction;
+            v = v + config_.position_offset;
         }
+        motor_value = (v * config_.direction) / config_.gear_ratio;
     }
 
     /// @brief convert motor state value to joint state value considering motor direction and offset
@@ -168,12 +173,13 @@ private:
     /// @param joint_value reference to store the joint state value
     /// @param apply_offset boolean to apply the offset or not (only for position)
     inline void motor_to_joint_(const float &motor_value, float &joint_value, bool apply_offset = false) {
+        // Convert motor-space -> joint-space after decoding.
+        // joint = motor * gear_ratio, apply offset and direction as configured
+        float v = motor_value * config_.gear_ratio;
         if (apply_offset) {
-            joint_value = (motor_value - config_.position_offset) * config_.direction;
-
-
+            joint_value = (v - config_.position_offset) * config_.direction;
         } else {
-            joint_value = motor_value * config_.direction;
+            joint_value = v * config_.direction;
         }
         
     }

@@ -12,6 +12,12 @@
 
 namespace mit_can_protocol{
 
+static float 			  KP_MAX			 = 500.0F;   // default max KP per PDF (0..500)
+static float 			  KD_MAX			 = 5.0F;     // default max KD per PDF (0..5)
+static float 			  POS_MAX			 = 95.50f;   // rad (doc default) // 4pi rads
+static float 			  VEL_MAX			 = 45.00f;   // rad/s (doc default) // 42 rad/s
+static float 			  T_MAX  			 = 18.00f;   // Nm (doc default) // .52*3 Nm
+
 
 /// @brief Runtime motor motion control command message. ControlMessage takes TPCANMsg message and encode the control command following
 /// the MIT Steadywin CAN Protocol for PCANInterface to send to the motor driver later

@@ -77,9 +77,11 @@ void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &durat
 
 
 
+    float motor_torque;
+    joint_to_motor_(joint_torque, motor_torque);
 
     // Encode and send the torque command over CAN
-    encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, joint_torque);
+    encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
     pcan_interface_.send_message(cmd_msg_);
 
     // Cache command values
@@ -87,44 +89,77 @@ void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &durat
     
 }
 
+////////////////////////////////////////////////////////////////////////////
+
+void Actuator::set_joint_impedance(const float &joint_position, 
+                                   const float &joint_velocity, 
+                                   const float &joint_stiffness, 
+                                   const float &joint_damping, 
+                                   const float &joint_torque) {
+
+    float motor_position, motor_velocity, motor_torque;
+    joint_to_motor_(joint_position, motor_position);
+    joint_to_motor_(joint_velocity, motor_velocity);
+    joint_to_motor_(joint_torque, motor_torque);
+
+    // Encode and send the impedance command over CAN
+    encoder_.set_impedance(cmd_msg_, motor_position, motor_velocity, joint_stiffness, joint_damping, motor_torque);
+    pcan_interface_.send_message(cmd_msg_);
+
+    // Cache command values
+    commands_.position = joint_position;
+    commands_.velocity = joint_velocity;
+    commands_.stiffness = joint_stiffness;
+    commands_.damping = joint_damping;
+    commands_.torque = joint_torque;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 
-void Actuator::process_message(const TPCANMsg &msg){
+void Actuator::process_message(const TPCANMsg &msg) {
+    
+    // Early return for invalid messages
+    if (msg.LEN < 7) return;
     
     // Handle state messages (8-byte MIT control responses or 7-byte 0xF1 responses)
-    if (msg.LEN == 8 || (msg.LEN >= 7 && msg.DATA[0] == 0xF1)) {
-        
-        float motor_pos, motor_vel, motor_torque;
-        float kp, kd;  // Not used by 0xF1 but required by decoder interface
-
-        // Decode MIT CAN state response - decoder returns joint-space values
-        decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
-                          states_.in_oc_mode, states_.has_fault);
-
-        // Store raw motor position (joint-space from decoder / gear_ratio for motor-space)
-        motor_position_ = motor_pos / config_.gear_ratio;  // Convert to motor-space for internal tracking
-        
-        // Apply direction to joint-space values from decoder
-        states_.position = motor_pos * config_.direction;   // Joint position with direction applied
-        states_.velocity = motor_vel * config_.direction;   // Joint velocity with direction applied  
-        states_.torque = motor_torque * config_.direction;  // Joint torque with direction applied
-
-        // Update motor enabled status
-        b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;
-
-        // Log faults
-        if (states_.has_fault) {
-            std::cerr << "Fault on CAN ID " << std::hex << msg.ID << std::dec << std::endl;
-        }
+    if (msg.LEN == 8 || msg.DATA[0] == 0xF1) {
+        process_state_message(msg);
     }
-    else if (msg.LEN >= 7 && msg.DATA[0] == 0xF0) {
-        // Handle limits response
-        float pos_max, vel_max, tq_max;
-        decoder_.get_limits(msg, pos_max, vel_max, tq_max);
-        std::cout << "Limits ID " << std::hex << msg.ID << std::dec 
-                  << ": " << pos_max << "rad, " << vel_max << "rad/s, " << tq_max << "Nm" << std::endl;
+    else if (msg.DATA[0] == 0xF0) {
+        process_limits_message(msg);
     }
+}
+
+void Actuator::process_state_message(const TPCANMsg &msg) {
+    float motor_pos, motor_vel, motor_torque;
+    float kp, kd;  // Unused for 0xF1 but required by decoder interface
+
+    // Decode MIT CAN state response - decoder returns joint-space values
+    decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
+                       states_.in_oc_mode, states_.has_fault);
+
+    // Use motor_to_joint_ for consistent transformations (direction + offset if needed)
+    motor_to_joint_(motor_pos, states_.position);    // Apply direction transformation
+    motor_to_joint_(motor_vel, states_.velocity);    // Apply direction transformation  
+    motor_to_joint_(motor_torque, states_.torque);   // Apply direction transformation
+
+    // Store raw motor position for internal tracking
+    motor_position_ = motor_pos;
+
+    // Update motor enabled status and handle faults
+    b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;
+    
+    if (states_.has_fault) {
+        std::cerr << "Motor fault on CAN ID 0x" << std::hex << msg.ID << std::dec << std::endl;
+    }
+}
+
+void Actuator::process_limits_message(const TPCANMsg &msg) {
+    float pos_max, vel_max, tq_max;
+    decoder_.get_limits(msg, pos_max, vel_max, tq_max);
+    std::cout << "Motor limits CAN ID 0x" << std::hex << msg.ID << std::dec 
+              << ": pos=" << pos_max << "rad, vel=" << vel_max << "rad/s, torque=" << tq_max << "Nm" << std::endl;
 }
 
 

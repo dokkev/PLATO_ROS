@@ -218,7 +218,7 @@ void MsgEncoder::set_impedance(TPCANMsg &msg, const float position_rad,
 {
     const float motor_position = position_rad;
     const float motor_velocity = velocity_rps;
-    const float motor_torque = torque_nm / 8.0f;
+    const float motor_torque = torque_nm * 2.0 / gear_ratio_;
     
     // std::cout << "Sending impedance to TX ID: " << std::hex << int(tx_id_) << std::dec << "  joint_pos=" << position_rad << " -> motor_pos=" << motor_position << " rad, joint_vel=" << velocity_rps << " -> motor_vel=" << motor_velocity << " rad/s, joint_tq=" << torque_nm << " -> motor_tq=" << motor_torque << " Nm\n";
 	pack_oc_frame(msg,

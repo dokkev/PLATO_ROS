@@ -7,6 +7,9 @@
 #include <plato2_hardware_interface/utils/useful_functions.hpp>
 
 
+// white CANH 
+// yellow CANL
+
 using namespace Plato;
 
 namespace MotorTxID{

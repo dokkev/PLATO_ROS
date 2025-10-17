@@ -19,6 +19,15 @@ PLATO2Hardware::on_init(const hardware_interface::HardwareInfo &info) {
   joint_position_commands_.resize(info_.joints.size(),
                                 std::numeric_limits<double>::quiet_NaN());
 
+  joint_velocity_commands_.resize(info_.joints.size(),
+                                std::numeric_limits<double>::quiet_NaN());
+
+  joint_stiffness_commands_.resize(info_.joints.size(),
+                                 std::numeric_limits<double>::quiet_NaN());
+
+  joint_damping_commands_.resize(info_.joints.size(),
+                               std::numeric_limits<double>::quiet_NaN());
+
   joint_effort_commands_.resize(info_.joints.size(),
                               std::numeric_limits<double>::quiet_NaN());
 
@@ -133,29 +142,64 @@ PLATO2Hardware::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/
 hardware_interface::return_type
 PLATO2Hardware::read(const rclcpp::Time &time,
                     const rclcpp::Duration &period) {
+  // Check if hand object is initialized
+  if (!hand_) {
+    RCLCPP_ERROR(rclcpp::get_logger("PLATO2Hardware"), 
+                 "Hand object is not initialized");
+    return hardware_interface::return_type::ERROR;
+  }
+
+  // Check if vectors are properly sized
+  if (joint_position_states_.size() != info_.joints.size() ||
+      joint_velocity_states_.size() != info_.joints.size() ||
+      joint_effort_states_.size() != info_.joints.size()) {
+    RCLCPP_ERROR(rclcpp::get_logger("PLATO2Hardware"), 
+                 "Joint state vectors have incorrect size");
+    return hardware_interface::return_type::ERROR;
+  }
+
   // Update hand state
 
-  // Comment out set_impedance_command and uncomment set_idle_command/print_motor_positions
-  // and rebuild/resource to manually rezero in actuator_config.hpp
-
-  joint_effort_commands_[0] = 0.0;
-  joint_effort_commands_[1] = 0.0;
-  // joint_effort_commands_[2] = 0.00;
-  // joint_effort_commands_[3] = 0.00;
-  joint_effort_commands_[4] = 0.1 /  0.52 ; // tau  / torque constant = Nm / (Nm/A) = A
-  // joint_effort_commands_[5] = 0.00;
-  // joint_effort_commands_[6] = 0.00;
-  // joint_effort_commands_[7] = 0.00;
-
-  hand_->set_impedance_command(joint_effort_commands_, 300, 
-                             joint_position_states_, joint_velocity_states_);
 
 
-  // hand_->set_idle_command();
-  // hand_->print_motor_positions();
+  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
+      joint_position_commands_[i] = 0.0;
+  }
 
+  for (size_t i = 0; i < joint_velocity_commands_.size(); ++i) {
+      joint_velocity_commands_[i] = 0.0;
+  }
+
+  for (size_t i = 0; i < joint_stiffness_commands_.size(); ++i) {
+      joint_stiffness_commands_[i] = 0.0;
+  }
+
+  for (size_t i = 0; i < joint_damping_commands_.size(); ++i) {
+      joint_damping_commands_[i] = 0.0;
+  }
+
+  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
+      joint_effort_commands_[i] = 0.0;
+  }
+
+  joint_position_commands_[4] = -1.57;
+  joint_stiffness_commands_[4] = 0.5;
+  joint_damping_commands_[4] = 0.05;
+  joint_effort_commands_[4] = 0.0 / 0.52; // 0.3 A / 0.52 Nm/A = 0.5769 Nm
+
+
+
+
+  hand_->set_impedance_command(joint_position_commands_, 
+                               joint_velocity_commands_,
+                               joint_stiffness_commands_,
+                               joint_damping_commands_,
+                               joint_effort_commands_);
+
+
+  // Read joint states from the hardware
   hand_->update_joint_states(joint_position_states_, joint_velocity_states_, 
-                      joint_effort_states_);
+                            joint_effort_states_);
 
 
   // Read FT sensor data

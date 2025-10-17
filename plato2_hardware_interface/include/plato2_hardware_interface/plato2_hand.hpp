@@ -69,9 +69,17 @@ public:
     /// @brief TORQUE Command fuction
     void set_torque_command(const std::vector<double> &joint_torque_command, const uint32_t &duration);
 
-    /// @brief  Send TORQUE command using PD controller
-    /// @param joint_impedance position mann
-    void set_impedance_command(const std::vector<double> &joint_impedance_command, const uint32_t& servo_current, const std::vector<double> &joint_position_states, const std::vector<double> &joint_velocity_states);
+    /// @brief  Send IMPEDANCE command using PD controller + feedforward torque
+    /// @param joint_position_command
+    /// @param joint_velocity_command
+    /// @param joint_stiffness_command
+    /// @param joint_damping_command
+    /// @param joint_torque_command
+    void set_impedance_command(const std::vector<double> &joint_position_command,
+                               const std::vector<double> &joint_velocity_command,
+                               const std::vector<double> &joint_stiffness_command,
+                               const std::vector<double> &joint_damping_command,
+                               const std::vector<double> &joint_torque_command);
 
     void set_zero_motor_position();
 

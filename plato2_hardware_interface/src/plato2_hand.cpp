@@ -27,7 +27,7 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
     print_actuator_info_();
 
     // enable the motors
-    enable();
+    // enable();
 
     // Empty the CAN buffer
     pcan_interface_.receive_message();
@@ -155,24 +155,23 @@ void Hand::set_torque_command(const std::vector<double>& joint_torque_command, c
 
 ////////////////////////////////////////////////////////////////////////
 
-void Hand::set_impedance_command(const std::vector<double> &joint_impedance_command, 
-                                 const uint32_t& servo_current, 
-                                 const std::vector<double> &joint_position_states, 
-                                 const std::vector<double> &joint_velocity_states){ 
+void Hand::set_impedance_command(const std::vector<double> &joint_position_command, 
+                                 const std::vector<double> &joint_velocity_command,
+                                 const std::vector<double> &joint_stiffness_command,
+                                 const std::vector<double> &joint_damping_command,
+                                 const std::vector<double> &joint_torque_command) {
+
 
     for (size_t i = 0; i < num_actuators_; ++i) {
-        // PD Controller
-        float actuator_cmd = static_cast<float>(joint_impedance_command[i]);
-        // Optional clamp to safe values
-        actuator_cmd = std::clamp(actuator_cmd, -9.8f, 9.8f);
-
-        actuators_[i].set_joint_torque(actuator_cmd, 0);
-
-
-     
-    //  std::cout << "Actuator " << i << " Impedance Command: " << actuator_cmd << std::endl;
+        float pos_cmd = joint_position_command[i];
+        float vel_cmd = joint_velocity_command[i];
+        float kp = joint_stiffness_command[i];
+        float kd = joint_damping_command[i];
+        float torque_cmd = joint_torque_command[i];
+        actuators_[i].set_joint_impedance(pos_cmd, vel_cmd, kp, kd, torque_cmd);
     }
-   
+
+
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -190,7 +189,6 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
     joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position);
     joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
     joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
-
     }
 
     counter_++;

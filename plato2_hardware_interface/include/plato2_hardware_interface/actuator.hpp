@@ -103,10 +103,30 @@ public:
     /// @param duration uint32_t execution time in ms 
     void set_joint_torque(const float &joint_torque, const uint32_t &duration);
 
+    /// @brief  Send a position, velocity, stiffness, damping and torque command to the motor after applying offsets and direction.
+    /// @param joint_position  
+    /// @param joint_velocity 
+    /// @param joint_stiffness Kp gain 
+    /// @param joint_damping 
+    /// @param joint_torque feedforward torque 
+    void set_joint_impedance(const float &joint_position, 
+                             const float &joint_velocity, 
+                             const float &joint_stiffness, 
+                             const float &joint_damping, 
+                             const float &joint_torque);
+
 
     /// @brief Given the received message, identify the type of message and process it to store the data in the buffer
     /// @param msg 
     void process_message(const TPCANMsg &msg);
+
+    /// @brief Process state messages (8-byte MIT control responses or 7-byte 0xF1 responses)
+    /// @param msg CAN message containing state data
+    void process_state_message(const TPCANMsg &msg);
+
+    /// @brief Process limits configuration messages (0xF0 responses)
+    /// @param msg CAN message containing limits data
+    void process_limits_message(const TPCANMsg &msg);
 
     /// @brief Get the CAN TX ID of the motor
     /// @return uint CAN TX ID

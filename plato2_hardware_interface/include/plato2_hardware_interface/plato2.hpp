@@ -89,7 +89,10 @@
     /////////// Command interfaces ///////////
     std::vector<double> joint_position_commands_;
     std::vector<double> joint_velocity_commands_;
+    std::vector<double> joint_stiffness_commands_;
+    std::vector<double> joint_damping_commands_;
     std::vector<double> joint_effort_commands_;
+    
   
 
     /////////// State interfaces ///////////

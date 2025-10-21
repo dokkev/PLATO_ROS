@@ -6,10 +6,19 @@
 #include <cstdint>
 #include <plato2_hardware_interface/utils/useful_functions.hpp>
 
-
+// Motor
 // white CANH 
 // yellow CANL
+// black RS458 A
+// red RS485 B
 
+// gray d-usb color
+// red: can-0 low
+// blue: can-0 high
+// brown: can-1 high
+// green: can-1 low
+// orange/yellow: V+
+// purple/black: GND
 using namespace Plato;
 
 namespace MotorTxID{

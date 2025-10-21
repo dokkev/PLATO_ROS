@@ -32,12 +32,12 @@ Actuator::~Actuator(){
 
 void Actuator::enable_motor(){
 
-    encoder_.set_limits(config_msg_,
-                        mit_can_protocol::POS_MAX,
-                        mit_can_protocol::VEL_MAX,
-                        mit_can_protocol::T_MAX,
-                        true, true, true);
-    pcan_interface_.send_message(config_msg_);
+    // encoder_.set_limits(config_msg_,
+    //                     mit_can_protocol::POS_MAX,
+    //                     mit_can_protocol::VEL_MAX,
+    //                     mit_can_protocol::T_MAX,
+    //                     true, true, true);
+    // pcan_interface_.send_message(config_msg_);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     pcan_interface_.receive_message();
 

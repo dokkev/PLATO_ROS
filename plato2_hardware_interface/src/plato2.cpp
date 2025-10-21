@@ -182,10 +182,10 @@ PLATO2Hardware::read(const rclcpp::Time &time,
       joint_effort_commands_[i] = 0.0;
   }
 
-  joint_position_commands_[4] = -1.57;
-  joint_stiffness_commands_[4] = 0.5;
+  joint_position_commands_[4] = 0.0;
+  joint_stiffness_commands_[4] = 0.0;
   joint_damping_commands_[4] = 0.05;
-  joint_effort_commands_[4] = 0.0 / 0.52; // 0.3 A / 0.52 Nm/A = 0.5769 Nm
+  joint_effort_commands_[4] = 0.0; //0.2 / 0.52; // Nm/A = 0.5769 Nm
 
 
 

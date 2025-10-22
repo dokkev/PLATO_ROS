@@ -81,8 +81,6 @@ public:
                                const std::vector<double> &joint_damping_command,
                                const std::vector<double> &joint_torque_command);
 
-    void set_zero_motor_position();
-
     /// @brief Update the joint states of from the actuators
     void update_joint_states(std::vector<double> &joint_position_states, std::vector<double> &joint_velocity_states, std::vector<double> &joint_effort_states);
 

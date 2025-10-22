@@ -18,6 +18,7 @@ Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, const Config& 
     onoff_msg_ = init_message_(8);
     cmd_msg_ = init_message_(8);
     config_msg_ = init_message_(7);
+    calibrate_msg_ = init_message_(1);
 
     // Precalculate limit thresholds using config struct limits
     min_limit_threshold_ = config_.joint_limit_min + JOINT_LIMIT_SAFETY_MARGIN;
@@ -67,15 +68,16 @@ void Actuator::stop_control(){
 
 }
 
+//////////////////////////////////////////////////////////////////////////
 
-
-
+void Actuator::set_current_position_as_zero(){
+    encoder_.set_zero_position(onoff_msg_);
+    pcan_interface_.send_message(onoff_msg_);
+}
 
 ////////////////////////////////////////////////////////////////////////////
 
 void Actuator::set_joint_torque(const float &joint_torque, const uint32_t &duration ) {
-
-
 
     float motor_torque;
     joint_to_motor_(joint_torque, motor_torque);
@@ -131,6 +133,8 @@ void Actuator::process_message(const TPCANMsg &msg) {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////
+
 void Actuator::process_state_message(const TPCANMsg &msg) {
     float motor_pos, motor_vel, motor_torque;
     float kp, kd;  // Unused for 0xF1 but required by decoder interface
@@ -154,6 +158,8 @@ void Actuator::process_state_message(const TPCANMsg &msg) {
         std::cerr << "Motor fault on CAN ID 0x" << std::hex << msg.ID << std::dec << std::endl;
     }
 }
+
+////////////////////////////////////////////////////////////////////////////
 
 void Actuator::process_limits_message(const TPCANMsg &msg) {
     float pos_max, vel_max, tq_max;

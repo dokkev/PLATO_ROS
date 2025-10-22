@@ -97,6 +97,9 @@ public:
 
     /// @brief stop current ongoing control command immediately, and if there is no ongoing control command it is just ignored.
     void stop_control();
+
+
+    void set_current_position_as_zero();
     
     /// @brief Send a torque command to the motor after applying offsets and direction. It ignores the command if the command is the almost equal as the previous command 
     /// @param joint_torque  float torque command in Nm +CCW, -CW
@@ -159,6 +162,7 @@ private:
     TPCANMsg onoff_msg_;
     TPCANMsg cmd_msg_;
     TPCANMsg config_msg_;
+    TPCANMsg calibrate_msg_;
 
     /// @brief Initialize a message with with 0 data and the configured CAN ID
     /// @return TPCANMsg initialized message

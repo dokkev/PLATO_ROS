@@ -130,6 +130,9 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
     joint_effort_commands_[i] = 0.0;
   }
 
+  // set current position as zero
+  hand_->set_current_position_as_zero();
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -175,7 +178,7 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   }
 
   for (size_t i = 0; i < joint_damping_commands_.size(); ++i) {
-      joint_damping_commands_[i] = 0.0;
+      joint_damping_commands_[i] = 0.23;
   }
 
   for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
@@ -183,9 +186,13 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   }
 
   joint_position_commands_[4] = 0.0;
-  joint_stiffness_commands_[4] = 0.0;
-  joint_damping_commands_[4] = 0.05;
-  joint_effort_commands_[4] = 0.0; //0.2 / 0.52; // Nm/A = 0.5769 Nm
+  joint_stiffness_commands_[4] = 0.1;
+  joint_damping_commands_[4] = 0.00;
+
+  joint_position_commands_[5] = 0.0;
+  joint_stiffness_commands_[5] = 0.1;
+  joint_damping_commands_[5] = 0.00;
+  joint_effort_commands_[5] = 0.0; //0.2 / 0.52; // Nm/A = 0.5769 Nm
 
 
 
@@ -200,6 +207,8 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   // Read joint states from the hardware
   hand_->update_joint_states(joint_position_states_, joint_velocity_states_, 
                             joint_effort_states_);
+
+  // hand_->set_current_position_as_zero();
 
 
   // Read FT sensor data

@@ -177,6 +177,12 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
 ////////////////////////////////////////////////////////////////////////
 
 
+void Hand::set_current_position_as_zero(){
+    for (size_t i = 0; i < num_actuators_; ++i){
+        actuators_[i].set_current_position_as_zero();
+    }
+}
+
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -184,11 +190,28 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
     // recevie the message from the CAN bus every loop
     pcan_interface_.receive_message();
 
-    // update the joint states for each actuator
     for (size_t i = 0; i < num_actuators_; ++i){
-    joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position);
-    joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
-    joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
+        joint_position_states[i] = static_cast<double>(actuators_[i].get_states().position);
+        joint_velocity_states[i] = static_cast<double>(actuators_[i].get_states().velocity);
+        joint_effort_states[i] = static_cast<double>(actuators_[i].get_states().torque);
+    }
+
+    // Compensation for decoupled PIP joints (actuators are grounded):
+    // In the URDF fingers are modeled as 2RR (MCP followed by PIP). The
+    // actual hardware has MCP and PIP actuators both grounded, so the
+    // PIP joint angle in the kinematic chain equals (pip_actuator - mcp_actuator).
+    // PIP actuators correspond to joint indices 3,5,7 (0-based indexing in our layout).
+    const std::array<size_t,3> pip_indices = {3,5,7};
+    for (size_t idx : pip_indices) {
+        if (idx < joint_position_states.size() && (idx - 1) < joint_position_states.size()) {
+            // MCP actuator for the same finger is at index (idx - 1)
+            double pip_motor = joint_position_states[idx];
+            double mcp_motor = joint_position_states[idx - 1];
+            // Compute kinematic PIP angle
+            joint_position_states[idx] = pip_motor - mcp_motor;
+            // Velocities: subtract to get joint-space velocity
+            joint_velocity_states[idx] = joint_velocity_states[idx] - joint_velocity_states[idx - 1];
+        }
     }
 
     counter_++;

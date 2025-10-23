@@ -35,11 +35,9 @@ public:
         
         // Set initial values
         current_stiffness_preset_ = "normal";
-        current_effort_preset_ = "zero";
-        
+
         // Initialize stiffness and effort vectors with default values
         stiffness_ = stiffness_presets_["normal"];
-        effort_ff_ = effort_presets_["zero"];
 
         // Create subscription for position commands
         position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -69,22 +67,14 @@ private:
     void initializePresets() {
         // Stiffness presets
         stiffness_presets_["zero"] = std::vector<double>(8, 0.0);
-        stiffness_presets_["soft"] = std::vector<double>(8, 0.5);
-        stiffness_presets_["normal"] = std::vector<double>(8, 1.5);
-        stiffness_presets_["stiff"] = std::vector<double>(8, 3.5);
+        stiffness_presets_["low"] = std::vector<double>(8, 0.2);
+        stiffness_presets_["medium"] = std::vector<double>(8, 2.0);
+        stiffness_presets_["high"] = std::vector<double>(8, 3.5);
 
-        // Effort feedforward presets
-        effort_presets_["zero"] = std::vector<double>(8, 0.0);
-        effort_presets_["low"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-        effort_presets_["power_grasp"] = std::vector<double>{0.0, 0.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0};
-        effort_presets_["mcp"] = std::vector<double>{0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0};
-
-        // thumb: 3,4   index 5,6 
-        stiffness_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 5.0, 5.0, 1.0, 1.0, 0.0, 0.0};
-        effort_presets_["flick_ready"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
-        
-        stiffness_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.5, 0.5, 5.0, 5.0, 0.0, 0.0};
-        effort_presets_["flick"] = std::vector<double>{0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0};
+        damping_presets_["zero"] = std::vector<double>(8, 0.0);
+        damping_presets_["low"] = std::vector<double>(8, 0.1);
+        damping_presets_["medium"] = std::vector<double>(8, 0.5);
+        damping_presets_["high"] = std::vector<double>(8, 2.0);
     }
 
     void updateStiffnessFromPreset(const std::string& preset) {
@@ -105,17 +95,22 @@ private:
         }
     }
 
+    void updateDampingFromPreset(const std::string& preset) {
+        std::lock_guard<std::mutex> lock(param_mutex_);
+        if (damping_presets_.find(preset) != damping_presets_.end()) {
+            // Update damping based on preset
+            RCLCPP_INFO(this->get_logger(), "Switched damping to preset: %s", preset.c_str());
+        }
+    }
+
     void printHelp() {
         RCLCPP_INFO(this->get_logger(), "Keyboard Controls:");
         RCLCPP_INFO(this->get_logger(), "0: Zero stiffness");
-        RCLCPP_INFO(this->get_logger(), "1: Soft stiffness");
-        RCLCPP_INFO(this->get_logger(), "2: Normal stiffness");
-        RCLCPP_INFO(this->get_logger(), "3: Stiff stiffness");
-        RCLCPP_INFO(this->get_logger(), "4: Flick Ready");
-        RCLCPP_INFO(this->get_logger(), "5: Flick");
-        RCLCPP_INFO(this->get_logger(), "6: Power grasp");
-        RCLCPP_INFO(this->get_logger(), "7: MCP Low effort feedforward");
-        RCLCPP_INFO(this->get_logger(), "h: Show this help");
+        RCLCPP_INFO(this->get_logger(), "1: Low stiffness");
+        RCLCPP_INFO(this->get_logger(), "2: Medium stiffness");
+        RCLCPP_INFO(this->get_logger(), "3: High stiffness");
+        RCLCPP_INFO(this->get_logger(), "4: High damping only");
+        RCLCPP_INFO(this->get_logger(), "h: Help");
         RCLCPP_INFO(this->get_logger(), "q: Quit");
     }
 
@@ -126,34 +121,24 @@ private:
             switch (c) {
                 case '0':
                     updateStiffnessFromPreset("zero");
-                    updateEffortFromPreset("zero");
+                    updateDampingFromPreset("zero");
+
                     break;
                 case '1':
-                    updateStiffnessFromPreset("soft");
-                    updateEffortFromPreset("zero");
+                    updateStiffnessFromPreset("low");
+                    updateDampingFromPreset("low");
                     break;
                 case '2':
-                    updateStiffnessFromPreset("normal");
-                    updateEffortFromPreset("zero");
+                    updateStiffnessFromPreset("medium");
+                    updateDampingFromPreset("medium");  
                     break;
                 case '3':
-                    updateStiffnessFromPreset("stiff");
-                    updateEffortFromPreset("zero");
+                    updateStiffnessFromPreset("high");
+                    updateDampingFromPreset("medium");
                     break;
                 case '4':
-                    updateEffortFromPreset("flick_ready");
-                    updateStiffnessFromPreset("flick_ready");
-                    break;
-                case '5':
-                    updateEffortFromPreset("flick");
-                    updateStiffnessFromPreset("flick");
-                    break;
-                case '6':
-                    updateEffortFromPreset("power_grasp");
-                    updateStiffnessFromPreset("normal");
-                    break;
-                case '7':
-                    updateEffortFromPreset("mcp");
+                    updateStiffnessFromPreset("zero");
+                    updateDampingFromPreset("high");
                     break;
                 case 'h':
                     printHelp();
@@ -212,6 +197,7 @@ private:
     std::string current_stiffness_preset_;
     std::string current_effort_preset_;
     
+    std::map<std::string, std::vector<double>> damping_presets_;
     std::map<std::string, std::vector<double>> stiffness_presets_;
     std::map<std::string, std::vector<double>> effort_presets_;
     

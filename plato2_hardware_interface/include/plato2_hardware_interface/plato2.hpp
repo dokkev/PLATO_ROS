@@ -105,6 +105,8 @@
     std::vector<std::string> effort_command_interface_names_;
     std::vector<std::string> velocity_command_interface_names_;
     std::vector<std::string> position_command_interface_names_;
+  std::vector<std::string> stiffness_command_interface_names_;
+  std::vector<std::string> damping_command_interface_names_;
 
     pcan_interface::PCANInterface pcan_interface_;
 

@@ -34,7 +34,7 @@ def generate_launch_description():
 
     # --- URDF via xacro ---
     pkg_share = get_package_share_directory("plato2_description")
-    xacro_file = os.path.join(pkg_share, "urdf", "plato2.urdf.xacro")
+    xacro_file = os.path.join(pkg_share, "urdf", "aristo.urdf.xacro")
     rviz_config = PathJoinSubstitution(
         [FindPackageShare("plato2_description"), "rviz", "plato2.rviz"]
     )

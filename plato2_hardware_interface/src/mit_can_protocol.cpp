@@ -104,7 +104,7 @@ void MsgEncoder::set_zero_position(TPCANMsg &msg)
     // Documentation: send 0xB1 to set current position as origin.
     // Normal command frames use base StdID (no STDID_OC_BIT)
     msg.ID      = tx_id_;
-    // std::cout << "Setting zero position with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    std::cout << "Setting current position as zero position [Actuator ID : 0x]: " << std::hex << int(tx_id_) << std::dec << std::endl;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_SET_ZERO;
 }

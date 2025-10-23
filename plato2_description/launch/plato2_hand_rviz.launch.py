@@ -21,7 +21,7 @@ def generate_launch_description():
     pkg_share= get_package_share_directory(pkg_name)
 
     # URDF file path
-    urdf_path = 'urdf/plato2.urdf.xacro'
+    urdf_path = 'urdf/aristo.urdf.xacro'
 
     # RVIZ config file path
     rviz_config_file = pkg_share + '/rviz/plato_description.rviz'

@@ -23,7 +23,11 @@ plato2:
         - joint8
 
       command_interfaces:
+        - position
+        - velocity
         - effort
+        - stiffness
+        - damping
 
       state_interfaces:
         - position

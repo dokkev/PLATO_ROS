@@ -161,17 +161,31 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
                                  const std::vector<double> &joint_damping_command,
                                  const std::vector<double> &joint_torque_command) {
 
+    // Create local copies of command vectors to apply compensation
+    auto pos_cmd_compensated = joint_position_command;
+    auto vel_cmd_compensated = joint_velocity_command;
+
+    // Compensate for the PIP joints (indices 3, 5, 7)
+    // The actuator command needs to be the sum of the PIP and MCP joint commands
+    // pip_motor_cmd = pip_joint_cmd + mcp_joint_cmd
+    pos_cmd_compensated[3] += joint_position_command[2];
+
+    // Middle finger
+    pos_cmd_compensated[5] += joint_position_command[4];
+
+    // Ring/Pinky finger
+    pos_cmd_compensated[7] += joint_position_command[6];
+
+    
 
     for (size_t i = 0; i < num_actuators_; ++i) {
-        float pos_cmd = joint_position_command[i];
-        float vel_cmd = joint_velocity_command[i];
+        float pos_cmd = pos_cmd_compensated[i];
+        float vel_cmd = vel_cmd_compensated[i];
         float kp = joint_stiffness_command[i];
         float kd = joint_damping_command[i];
         float torque_cmd = joint_torque_command[i];
         actuators_[i].set_joint_impedance(pos_cmd, vel_cmd, kp, kd, torque_cmd);
     }
-
-
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -197,22 +211,22 @@ void Hand::update_joint_states(std::vector<double>&joint_position_states, std::v
     }
 
     // Compensation for decoupled PIP joints (actuators are grounded):
-    // In the URDF fingers are modeled as 2RR (MCP followed by PIP). The
-    // actual hardware has MCP and PIP actuators both grounded, so the
-    // PIP joint angle in the kinematic chain equals (pip_actuator - mcp_actuator).
-    // PIP actuators correspond to joint indices 3,5,7 (0-based indexing in our layout).
-    const std::array<size_t,3> pip_indices = {3,5,7};
-    for (size_t idx : pip_indices) {
-        if (idx < joint_position_states.size() && (idx - 1) < joint_position_states.size()) {
-            // MCP actuator for the same finger is at index (idx - 1)
-            double pip_motor = joint_position_states[idx];
-            double mcp_motor = joint_position_states[idx - 1];
-            // Compute kinematic PIP angle
-            joint_position_states[idx] = pip_motor - mcp_motor;
-            // Velocities: subtract to get joint-space velocity
-            joint_velocity_states[idx] = joint_velocity_states[idx] - joint_velocity_states[idx - 1];
-        }
-    }
+    // In the URDF, fingers are modeled as 2RR (MCP followed by PIP).
+    // The physical linkage means pip_joint_angle = pip_motor_angle - mcp_motor_angle.
+    // We apply this correction to the reported states for joints 3, 5, and 7.
+
+    // Index finger (PIP joint 3, MCP joint 2)
+    joint_position_states[3] -= joint_position_states[2];
+
+
+    // Middle finger (PIP joint 5, MCP joint 4)
+    joint_position_states[5] -= joint_position_states[4];
+
+
+    // Ring/Pinky finger (PIP joint 7, MCP joint 6)
+    joint_position_states[7] -= joint_position_states[6];
+
+    
 
     counter_++;
 }
@@ -280,8 +294,11 @@ void Hand::print_actuator_info_() {
 
     // Actuator TX and RX IDs
     for (size_t i = 0; i < num_actuators_; ++i) {
-        std::cout << "[INFO] Actuator " << i + 1 << " TX ID: 0x" << std::hex << (int)actuators_[i].get_tx_id()
-                  << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id() << std::endl;
+        std::cout << "[INFO] Actuator " << i + 1 
+                  << " TX ID: 0x" << std::hex << (int)actuators_[i].get_tx_id()
+                  << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id()
+                  << " MIT Control ID 0x" << std::hex << (int)actuators_[i].get_mit_control_id()
+                  << std::endl;
     }
     
     std::cout << "===================FT Sensors Info ==================" << std::endl;

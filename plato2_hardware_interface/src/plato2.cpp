@@ -103,16 +103,43 @@ PLATO2Hardware::export_state_interfaces() {
 std::vector<hardware_interface::CommandInterface>
 PLATO2Hardware::export_command_interfaces() {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-  command_interfaces.reserve(info_.joints.size());
+  // We'll expose 5 command interfaces per joint: position, velocity, effort,
+  // stiffness (kp) and damping (kd). Reserve accordingly.
+  command_interfaces.reserve(info_.joints.size() * 5);
+  position_command_interface_names_.reserve(info_.joints.size());
+  velocity_command_interface_names_.reserve(info_.joints.size());
   effort_command_interface_names_.reserve(info_.joints.size());
+  stiffness_command_interface_names_.reserve(info_.joints.size());
+  damping_command_interface_names_.reserve(info_.joints.size());
 
-  // Position Command Interface
   for (size_t i = 0; i < info_.joints.size(); ++i) {
-    command_interfaces.emplace_back(hardware_interface::CommandInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-        &joint_effort_commands_[i]));
-    effort_command_interface_names_.push_back(
-        command_interfaces.back().get_name());
+  // Position
+  command_interfaces.emplace_back(hardware_interface::CommandInterface(
+    info_.joints[i].name, hardware_interface::HW_IF_POSITION,
+    &joint_position_commands_[i]));
+  position_command_interface_names_.push_back(command_interfaces.back().get_name());
+
+  // Velocity
+  command_interfaces.emplace_back(hardware_interface::CommandInterface(
+    info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
+    &joint_velocity_commands_[i]));
+  velocity_command_interface_names_.push_back(command_interfaces.back().get_name());
+
+  // Effort
+  command_interfaces.emplace_back(hardware_interface::CommandInterface(
+    info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
+    &joint_effort_commands_[i]));
+  effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+
+  // Stiffness (Kp)
+  command_interfaces.emplace_back(hardware_interface::CommandInterface(
+    info_.joints[i].name, "stiffness", &joint_stiffness_commands_[i]));
+  stiffness_command_interface_names_.push_back(command_interfaces.back().get_name());
+
+  // Damping (Kd)
+  command_interfaces.emplace_back(hardware_interface::CommandInterface(
+    info_.joints[i].name, "damping", &joint_damping_commands_[i]));
+  damping_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
 
   return command_interfaces;
@@ -130,8 +157,22 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
     joint_effort_commands_[i] = 0.0;
   }
 
+  // initialize other command vectors
+  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
+    joint_position_commands_[i] = 0.0;
+  }
+  for (size_t i = 0; i < joint_velocity_commands_.size(); ++i) {
+    joint_velocity_commands_[i] = 0.0;
+  }
+  for (size_t i = 0; i < joint_stiffness_commands_.size(); ++i) {
+    joint_stiffness_commands_[i] = 0.0; // default Kp
+  }
+  for (size_t i = 0; i < joint_damping_commands_.size(); ++i) {
+    joint_damping_commands_[i] = 0.0; // default Kd
+  }
+
   // set current position as zero
-  hand_->set_current_position_as_zero();
+  // hand_->set_current_position_as_zero();
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -161,40 +202,23 @@ PLATO2Hardware::read(const rclcpp::Time &time,
     return hardware_interface::return_type::ERROR;
   }
 
-  // Update hand state
-
-
-
+  // All zero command
   for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
-      joint_position_commands_[i] = 0.0;
+    joint_position_commands_[i] = 0.0;
+    joint_velocity_commands_[i] = 0.0;
+    joint_stiffness_commands_[i] = 0.0;
+    joint_damping_commands_[i] = 0.0;
+    joint_effort_commands_[i] = 0.0;
+
   }
-
-  for (size_t i = 0; i < joint_velocity_commands_.size(); ++i) {
-      joint_velocity_commands_[i] = 0.0;
-  }
-
-  for (size_t i = 0; i < joint_stiffness_commands_.size(); ++i) {
-      joint_stiffness_commands_[i] = 0.0;
-  }
-
-  for (size_t i = 0; i < joint_damping_commands_.size(); ++i) {
-      joint_damping_commands_[i] = 0.23;
-  }
-
-  for (size_t i = 0; i < joint_effort_commands_.size(); ++i) {
-      joint_effort_commands_[i] = 0.0;
-  }
-
-  joint_position_commands_[4] = 0.0;
-  joint_stiffness_commands_[4] = 0.1;
-  joint_damping_commands_[4] = 0.00;
-
-  joint_position_commands_[5] = 0.0;
-  joint_stiffness_commands_[5] = 0.1;
-  joint_damping_commands_[5] = 0.00;
-  joint_effort_commands_[5] = 0.0; //0.2 / 0.52; // Nm/A = 0.5769 Nm
+  //
 
 
+  // recommended impedance values for thumb joints
+  joint_stiffness_commands_[0] = 3.0;
+  joint_damping_commands_[0] = 0.20;
+  joint_stiffness_commands_[1] = 4.0;
+  joint_damping_commands_[1] = 0.20;
 
 
   hand_->set_impedance_command(joint_position_commands_, 

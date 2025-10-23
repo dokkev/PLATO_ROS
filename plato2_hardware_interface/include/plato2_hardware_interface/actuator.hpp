@@ -139,6 +139,8 @@ public:
     /// @return uint CAN RX ID
     uint get_rx_id() const { return config_.can_rx_id; }
 
+    unit get_mit_control_id() const { return config_.can_rx_id - 0x80; }
+
     /// @brief Get the motor position without offset
     /// @return float motor position
     float get_motor_position() { return motor_position_; }

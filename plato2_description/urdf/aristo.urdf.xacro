@@ -1,19 +1,16 @@
 <?xml version="1.0"?>
 <robot name="aristo_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <!-- Set World Frame -->
-    <!-- <link name="world"/> -->
 
-    <!-- Include Robot Description Xacro -->
+  <link name="base_link"/>
+
+  <!-- Includes -->
     <xacro:include filename="$(find plato2_description)/urdf/xacro/aristo_description.xacro"/>
-    <!-- Include ros2 control Xacro -->
     <xacro:include filename="$(find plato2_description)/urdf/ros2_control/aristo.ros2_control.xacro"/>
 
 
-    <!-- Create URDF -->
-    <xacro:aristo_description connector_link="world" xyz="0 0 0" rpy="0 0 0"/>
-    <!-- Create ros2 control -->
-    <xacro:aristo_ros2_control name="aristo_ros2_control"/>
-
+  <!-- Instantiate geometry/tree and ros2_control -->
+  <xacro:aristo_description connector_link="base_link" xyz="0 0 0" rpy="0 0 0"/>
+  <xacro:aristo_ros2_control name="aristo_ros2_control"/>
 
 </robot>

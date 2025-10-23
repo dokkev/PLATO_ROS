@@ -34,10 +34,14 @@ public:
         initializePresets();
         
         // Set initial values
-        current_stiffness_preset_ = "normal";
+        current_stiffness_preset_ = "medium";
+        current_damping_preset_ = "low";
 
         // Initialize stiffness and effort vectors with default values
-        stiffness_ = stiffness_presets_["normal"];
+        stiffness_ = stiffness_presets_["medium"];
+        damping_ = damping_presets_["low"];
+        effort_ff_ = std::vector<double>(8, 0.0);
+        last_position_ = std::vector<double>(8, 0.0);
 
         // Create subscription for position commands
         position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -75,6 +79,8 @@ private:
         damping_presets_["low"] = std::vector<double>(8, 0.1);
         damping_presets_["medium"] = std::vector<double>(8, 0.5);
         damping_presets_["high"] = std::vector<double>(8, 2.0);
+
+        effort_presets_["zero"] = std::vector<double>(8, 0.0);
     }
 
     void updateStiffnessFromPreset(const std::string& preset) {
@@ -98,7 +104,8 @@ private:
     void updateDampingFromPreset(const std::string& preset) {
         std::lock_guard<std::mutex> lock(param_mutex_);
         if (damping_presets_.find(preset) != damping_presets_.end()) {
-            // Update damping based on preset
+            damping_ = damping_presets_[preset];
+            current_damping_preset_ = preset;
             RCLCPP_INFO(this->get_logger(), "Switched damping to preset: %s", preset.c_str());
         }
     }
@@ -167,12 +174,7 @@ private:
         {
             std::lock_guard<std::mutex> lock(param_mutex_);
             impedance_msg->stiffness = stiffness_;
-            
-            // Calculate damping based on stiffness
-            impedance_msg->damping.resize(stiffness_.size());
-            for (size_t i = 0; i < stiffness_.size(); i++) {
-                impedance_msg->damping[i] = stiffness_[i] / 2.0;
-            }
+            impedance_msg->damping = damping_;
             
             impedance_msg->position = last_position_;
             impedance_msg->velocity = std::vector<double>(8, 0.0);
@@ -191,11 +193,13 @@ private:
     std::mutex param_mutex_;  // Mutex to protect shared data
     
     std::vector<double> stiffness_;
+    std::vector<double> damping_;
     std::vector<double> effort_ff_;
     std::vector<double> last_position_;
     
     std::string current_stiffness_preset_;
     std::string current_effort_preset_;
+    std::string current_damping_preset_;
     
     std::map<std::string, std::vector<double>> damping_presets_;
     std::map<std::string, std::vector<double>> stiffness_presets_;

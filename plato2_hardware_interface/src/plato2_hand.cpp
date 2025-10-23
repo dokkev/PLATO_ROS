@@ -168,15 +168,14 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
     // Compensate for the PIP joints (indices 3, 5, 7)
     // The actuator command needs to be the sum of the PIP and MCP joint commands
     // pip_motor_cmd = pip_joint_cmd + mcp_joint_cmd
-    pos_cmd_compensated[3] += joint_position_command[2];
+    pos_cmd_compensated[3] = joint_position_command[3] - joint_position_command[2];
 
     // Middle finger
-    pos_cmd_compensated[5] += joint_position_command[4];
+    pos_cmd_compensated[5] = joint_position_command[5] - joint_position_command[4];
 
     // Ring/Pinky finger
-    pos_cmd_compensated[7] += joint_position_command[6];
+    pos_cmd_compensated[7] = joint_position_command[7] - joint_position_command[6];
 
-    
 
     for (size_t i = 0; i < num_actuators_; ++i) {
         float pos_cmd = pos_cmd_compensated[i];
@@ -297,7 +296,6 @@ void Hand::print_actuator_info_() {
         std::cout << "[INFO] Actuator " << i + 1 
                   << " TX ID: 0x" << std::hex << (int)actuators_[i].get_tx_id()
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id()
-                  << " MIT Control ID 0x" << std::hex << (int)actuators_[i].get_mit_control_id()
                   << std::endl;
     }
     

@@ -202,17 +202,6 @@ PLATO2Hardware::read(const rclcpp::Time &time,
     return hardware_interface::return_type::ERROR;
   }
 
-  // All zero command
-  for (size_t i = 0; i < joint_position_commands_.size(); ++i) {
-    joint_position_commands_[i] = 0.0;
-    joint_velocity_commands_[i] = 0.0;
-    joint_stiffness_commands_[i] = 0.0;
-    joint_damping_commands_[i] = 0.0;
-    joint_effort_commands_[i] = 0.0;
-
-  }
-  //
-
 
   // recommended impedance values for thumb joints
   joint_stiffness_commands_[0] = 3.0;
@@ -220,6 +209,16 @@ PLATO2Hardware::read(const rclcpp::Time &time,
   joint_stiffness_commands_[1] = 4.0;
   joint_damping_commands_[1] = 0.20;
 
+
+  // DEBUG: Print received commands
+  RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Commands received:");
+  for (size_t i = 0; i < info_.joints.size(); ++i) {
+    RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"),
+                "  Joint %zu: Pos=%.2f, Vel=%.2f, Eff=%.2f, Kp=%.2f, Kd=%.2f",
+                i, joint_position_commands_[i], joint_velocity_commands_[i],
+                joint_effort_commands_[i], joint_stiffness_commands_[i],
+                joint_damping_commands_[i]);
+  }
 
   hand_->set_impedance_command(joint_position_commands_, 
                                joint_velocity_commands_,

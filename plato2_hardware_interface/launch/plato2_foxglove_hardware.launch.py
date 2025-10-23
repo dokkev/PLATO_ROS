@@ -42,7 +42,7 @@ def generate_launch_description():
     # Get URDF via xacro
     pkg_name = 'plato2_description'
     pkg_share= get_package_share_directory(pkg_name)
-    urdf_path = 'urdf/plato2.urdf.xacro'
+    urdf_path = 'urdf/aristo.urdf.xacro'
     xacro_file = os.path.join(pkg_share, urdf_path)
 
     robot_description_content = xacro.process_file(xacro_file).toxml()

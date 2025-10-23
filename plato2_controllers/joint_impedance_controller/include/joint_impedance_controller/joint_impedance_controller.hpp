@@ -15,7 +15,7 @@
 #include "plato2_interfaces/msg/impedance_controller_state.hpp"
 
 // Include generated parameter header
-#include "joint_impedance_controller_parameters.hpp"
+#include <joint_impedance_controller/joint_impedance_controller_parameters.hpp>
 
 namespace joint_impedance_controller
 {
@@ -44,25 +44,28 @@ public:
   controller_interface::InterfaceConfiguration command_interface_configuration() const override;
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
 
-  void publish_state(const rclcpp::Time & time, const std::shared_ptr<CmdType>& command);
+  void publish_state(const rclcpp::Time & time, const CmdType& command);
 
 protected:
   std::vector<std::string> joint_names_;
-  std::vector<std::string> command_interface_types_;
 
   // State interfaces
   std::vector<double> positions_;
   std::vector<double> velocities_;
   std::vector<double> efforts_;
 
-  // Command interfaces
-  std::vector<double> effort_ff_;
-  std::vector<double> effort_fb_;
-  std::vector<double> effort_cmd_;
+  // Command interfaces - to be passed to hardware
+  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
+    ordered_position_command_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
+    ordered_velocity_command_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
+    ordered_effort_command_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
+    ordered_stiffness_command_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
+    ordered_damping_command_interfaces_;
 
-  std::vector<double> position_error_;
-  std::vector<double> velocity_error_;
-  
   // Real-time buffer for commands
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
   rclcpp::Subscription<CmdType>::SharedPtr joints_command_subscriber_;

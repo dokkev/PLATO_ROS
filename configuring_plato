@@ -30,3 +30,12 @@ and rebuild
 To run contact estimator:
 
 ros2 run plato2_state_estimator contact_estimator 
+
+
+ros2 topic pub --rate 10 /plato2/joint_impedance_controller/commands plato2_interfaces/msg/ImpedanceCommands "{
+  position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  stiffness: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
+  damping: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+}"

@@ -95,7 +95,6 @@ def generate_launch_description():
         arguments=[
             "joint_impedance_controller",
             "--controller-manager", "/plato2/controller_manager",
-            "--inactive",  # <-- safer: won’t move on startup
         ],
         namespace=plato_ns,
         output="screen",

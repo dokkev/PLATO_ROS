@@ -53,50 +53,12 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
 
   // Store parameters
   joint_names_ = params_.joints;
-
-  // Setup command interface types with effort interface
-  command_interface_types_.clear();
-  for (const auto & joint : joint_names_)
-  {
-    command_interface_types_.push_back(joint + "/" + hardware_interface::HW_IF_EFFORT);
-  }
+  const size_t num_joints = joint_names_.size();
 
   // Initialize state vectors
-  const size_t num_joints = joint_names_.size();
   positions_.resize(num_joints, 0.0);
   velocities_.resize(num_joints, 0.0);
   efforts_.resize(num_joints, 0.0);
-
-
-  effort_ff_.resize(num_joints, 0.0);
-  effort_fb_.resize(num_joints, 0.0);
-  effort_cmd_.resize(num_joints, 0.0);
-
-  position_error_.resize(num_joints, 0.0);
-  velocity_error_.resize(num_joints, 0.0);
-
-
-  // Log parameters
-  RCLCPP_INFO(get_node()->get_logger(), "Configured joints: ");
-  for (size_t i = 0; i < joint_names_.size(); ++i)
-  {
-    if (i < 2)
-    {
-      RCLCPP_INFO(
-        get_node()->get_logger(), 
-        "Joint '%s': DIRECT POSITION CONTROL", 
-        joint_names_[i].c_str());
-    }
-    // else
-    // {
-    //   RCLCPP_INFO(
-    //     // get_node()->get_logger(), 
-    //     "Joint '%s': stiffness=%.2f, damping=%.2f", 
-    //     joint_names_[i].c_str(),
-    //     params_.impedance.joints_map[joint_names_[i]].stiffness,
-    //     params_.impedance.joints_map[joint_names_[i]].damping);
-    // }
-  }
 
   // Create command subscriber
   joints_command_subscriber_ = get_node()->create_subscription<CmdType>(
@@ -105,7 +67,6 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
 
   RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   
-
   // Create State Publisher
   publisher_ = get_node()->create_publisher<plato2_interfaces::msg::ImpedanceControllerState>(
     "~/controller_state", rclcpp::SystemDefaultsQoS());
@@ -135,38 +96,65 @@ controller_interface::CallbackReturn JointImpedanceController::on_configure(
 
   state_publisher_->unlock();
   return controller_interface::CallbackReturn::SUCCESS;
-
 }
 
 controller_interface::CallbackReturn JointImpedanceController::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // Check command interfaces
-  if (command_interfaces_.size() != joint_names_.size())
-  {
-    RCLCPP_ERROR(
-      get_node()->get_logger(),
-      "Expected %zu command interfaces, got %zu",
-      joint_names_.size(), command_interfaces_.size());
-    return controller_interface::CallbackReturn::ERROR;
-  }
+  // Clear and reserve interfaces
+  ordered_position_command_interfaces_.clear();
+  ordered_velocity_command_interfaces_.clear();
+  ordered_effort_command_interfaces_.clear();
+  ordered_stiffness_command_interfaces_.clear();
+  ordered_damping_command_interfaces_.clear();
 
-  // Get ordered interfaces
-  std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_interfaces;
-  if (
-    !controller_interface::get_ordered_interfaces(
-      command_interfaces_, command_interface_types_, std::string(""), ordered_interfaces) ||
-    command_interface_types_.size() != ordered_interfaces.size())
+  const auto num_joints = joint_names_.size();
+  ordered_position_command_interfaces_.reserve(num_joints);
+  ordered_velocity_command_interfaces_.reserve(num_joints);
+  ordered_effort_command_interfaces_.reserve(num_joints);
+  ordered_stiffness_command_interfaces_.reserve(num_joints);
+  ordered_damping_command_interfaces_.reserve(num_joints);
+
+  for (const auto & joint_name : joint_names_)
   {
-    RCLCPP_ERROR(
-      get_node()->get_logger(),
-      "Command interface configuration mismatch");
-    return controller_interface::CallbackReturn::ERROR;
+    for (auto & command_interface : command_interfaces_)
+    {
+      if (command_interface.get_name() == joint_name + "/" + hardware_interface::HW_IF_POSITION)
+      {
+        ordered_position_command_interfaces_.emplace_back(command_interface);
+      }
+      if (command_interface.get_name() == joint_name + "/" + hardware_interface::HW_IF_VELOCITY)
+      {
+        ordered_velocity_command_interfaces_.emplace_back(command_interface);
+      }
+      if (command_interface.get_name() == joint_name + "/" + hardware_interface::HW_IF_EFFORT)
+      {
+        ordered_effort_command_interfaces_.emplace_back(command_interface);
+      }
+      if (command_interface.get_name() == joint_name + "/stiffness")
+      {
+        ordered_stiffness_command_interfaces_.emplace_back(command_interface);
+      }
+      if (command_interface.get_name() == joint_name + "/damping")
+      {
+        ordered_damping_command_interfaces_.emplace_back(command_interface);
+      }
+    }
   }
 
   // Reset command buffer
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+
+  // Check if all interfaces were found
+  if (ordered_position_command_interfaces_.size() != num_joints ||
+      ordered_velocity_command_interfaces_.size() != num_joints ||
+      ordered_effort_command_interfaces_.size() != num_joints ||
+      ordered_stiffness_command_interfaces_.size() != num_joints ||
+      ordered_damping_command_interfaces_.size() != num_joints)
+  {
+    RCLCPP_FATAL(get_node()->get_logger(), "Some command interfaces were not found!");
+    return controller_interface::CallbackReturn::ERROR;
+  }
 
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
@@ -177,9 +165,13 @@ controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
 {
   // Reset command buffer and zero commands
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
-  for (auto & command_interface : command_interfaces_)
+  for (size_t i = 0; i < joint_names_.size(); ++i)
   {
-    command_interface.set_value(0.0);
+    ordered_position_command_interfaces_[i].get().set_value(0.0);
+    ordered_velocity_command_interfaces_[i].get().set_value(0.0);
+    ordered_effort_command_interfaces_[i].get().set_value(0.0);
+    ordered_stiffness_command_interfaces_[i].get().set_value(0.0);
+    ordered_damping_command_interfaces_[i].get().set_value(0.0);
   }
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -189,54 +181,36 @@ controller_interface::return_type JointImpedanceController::update(
 {
   auto impedance_commands = rt_command_ptr_.readFromRT();
 
-  // Read current states
-  for (size_t i = 0; i < joint_names_.size(); ++i)
-  {
-    positions_[i] = state_interfaces_[i * 3].get_value();
-    velocities_[i] = state_interfaces_[i * 3 + 1].get_value();
-    efforts_[i] = state_interfaces_[i * 3 + 2].get_value();
-  }
-
   // No command received yet
   if (!impedance_commands || !(*impedance_commands))
   {
     return controller_interface::return_type::OK;
   }
 
+  const auto& commands = **impedance_commands;
+
   // Validate message size
-  if ((*impedance_commands)->position.size() != joint_names_.size())
+  if (commands.position.size() != joint_names_.size())
   {
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Command size (%zu) does not match number of joints (%zu)",
-      (*impedance_commands)->position.size(), joint_names_.size());
+      commands.position.size(), joint_names_.size());
     return controller_interface::return_type::ERROR;
   }
 
-  // Apply control for each joint
+  // Pass commands to hardware
   for (size_t i = 0; i < joint_names_.size(); ++i)
   {
-    if (i < 2)  // First two joints (0 and 1): direct position control
-    {
-      command_interfaces_[i].set_value((*impedance_commands)->position[i]);
-    }
-    else  // Other joints: impedance control
-    {
-      position_error_[i] = (*impedance_commands)->position[i] - positions_[i];
-      velocity_error_[i] = (*impedance_commands)->velocity[i] - velocities_[i];
-      
-      effort_ff_[i] = (*impedance_commands)->effort_ff[i];
-      effort_fb_[i] = (*impedance_commands)->stiffness[i] * position_error_[i] + 
-                      (*impedance_commands)->damping[i] * velocity_error_[i];
-      effort_cmd_[i] = effort_ff_[i] + effort_fb_[i];
-
-      command_interfaces_[i].set_value(effort_cmd_[i]);
-    }
+    ordered_position_command_interfaces_[i].get().set_value(commands.position[i]);
+    ordered_velocity_command_interfaces_[i].get().set_value(commands.velocity[i]);
+    ordered_effort_command_interfaces_[i].get().set_value(commands.effort_ff[i]);
+    ordered_stiffness_command_interfaces_[i].get().set_value(commands.stiffness[i]);
+    ordered_damping_command_interfaces_[i].get().set_value(commands.damping[i]);
   }
 
   // Publish state
-  publish_state(time, *impedance_commands);
-  
+  publish_state(time, commands);
 
   return controller_interface::return_type::OK;
 }
@@ -246,7 +220,17 @@ JointImpedanceController::command_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration command_interfaces_config;
   command_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
-  command_interfaces_config.names = command_interface_types_;
+  
+  command_interfaces_config.names.clear();
+  for (const auto & joint : joint_names_)
+  {
+    command_interfaces_config.names.push_back(joint + "/" + hardware_interface::HW_IF_POSITION);
+    command_interfaces_config.names.push_back(joint + "/" + hardware_interface::HW_IF_VELOCITY);
+    command_interfaces_config.names.push_back(joint + "/" + hardware_interface::HW_IF_EFFORT);
+    command_interfaces_config.names.push_back(joint + "/stiffness");
+    command_interfaces_config.names.push_back(joint + "/damping");
+  }
+
   return command_interfaces_config;
 }
 
@@ -270,12 +254,9 @@ JointImpedanceController::state_interface_configuration() const
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void JointImpedanceController::publish_state(const rclcpp::Time & time, const std::shared_ptr<CmdType>& command)
+void JointImpedanceController::publish_state(const rclcpp::Time & time, const CmdType& command)
 {
-
-
   if (state_publisher_->trylock()){
-
     auto& msg = state_publisher_->msg_;
     msg.header.stamp = time;
 
@@ -284,16 +265,9 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const st
     msg.velocity_actual = velocities_;
     msg.effort_actual = efforts_;
     
-    msg.position_desired = command->position;
-    msg.velocity_desired = command->velocity;
+    msg.position_desired = command.position;
+    msg.velocity_desired = command.velocity;
     
-    // Pre-computed errors and efforts
-    msg.position_error = position_error_;
-    msg.velocity_error = velocity_error_;
-    msg.effort_ff = effort_ff_;
-    msg.effort_fb = effort_fb_;
-    msg.effort_desired = effort_cmd_;
-
     // Calculate end-effector forces
     // Finger 1: joints [2,3]
     const Jacobian Jinv1 = get_Jinv(positions_[2], positions_[3]);
@@ -302,7 +276,6 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const st
     msg.force_y[0] = 0.0;
     msg.force_norm[0] = std::sqrt(msg.force_x[0]*msg.force_x[0] + msg.force_z[0]*msg.force_z[0]);
   
-
     // Finger 2: joints [4,5]
     const Jacobian Jinv2 = get_Jinv(positions_[4], positions_[5]);
     msg.force_x[1] = Jinv2.j11 * efforts_[4] + Jinv2.j12 * efforts_[5];
@@ -310,7 +283,6 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const st
     msg.force_y[1] = 0.0;
     msg.force_norm[1] = std::sqrt(msg.force_x[1]*msg.force_x[1] + msg.force_z[1]*msg.force_z[1]);
   
-
     // Finger 3: joints [6,7]
     const Jacobian Jinv3 = get_Jinv(positions_[6], positions_[7]);
     msg.force_x[2] = Jinv3.j11 * efforts_[6] + Jinv3.j12 * efforts_[7];
@@ -318,11 +290,7 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const st
     msg.force_y[2] = 0.0;
     msg.force_norm[2] = std::sqrt(msg.force_x[2]*msg.force_x[2] + msg.force_z[2]*msg.force_z[2]);
   
-
-
     state_publisher_->unlockAndPublish();
-  
-    
   }
 }
 

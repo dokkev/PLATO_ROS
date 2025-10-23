@@ -57,18 +57,6 @@ public:
     /// @brief Off Command fuction
     void set_off_command_();
 
-    /// @brief IDLE Command fuction
-    void set_idle_command();
-
-    /// @brief POSITION Command fuction
-    void set_position_command(const std::vector<double> &joint_position_command, const uint32_t &duration);
-
-    /// @brief VELOCITY Command fuction
-    void set_velocity_command(const std::vector<double> &joint_velocity_command, const uint32_t &duration);
-
-    /// @brief TORQUE Command fuction
-    void set_torque_command(const std::vector<double> &joint_torque_command, const uint32_t &duration);
-
     /// @brief  Send IMPEDANCE command using PD controller + feedforward torque
     /// @param joint_position_command
     /// @param joint_velocity_command
@@ -153,19 +141,18 @@ private:
     /// @brief read RX CAN messages from the Bus using the PCAN Interface and sort the messages to the corresponding actuators
     void sort_can_rx_id_(const TPCANMsg &msg);
 
-    
     ///////////////////////////////////////////////// CONFIGURATIONS //////////////////////////////////////////////
 
     /// @brief Predefined Actuator Configurations
     std::vector<actuator::Config> actuator_configs_ = {
-        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1,  MotorDirection::MOTOR1, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::THUMB_ROLL_MAX, MotorJointLimit::THUMB_ROLL_MIN},
-        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2,  MotorDirection::MOTOR2, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::THUMB_YAW_MAX, MotorJointLimit::THUMB_YAW_MIN},
-        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3,  MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4,  MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
-        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5,  MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6,  MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN},
-        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::MCP_MAX, MotorJointLimit::MCP_MIN},
-        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8,  MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorJointLimit::PIP_MAX, MotorJointLimit::PIP_MIN}
+        actuator::Config{MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1,  MotorDirection::MOTOR1, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::THUMB_ROLL_MAX, MotorPositionLimit::THUMB_ROLL_MIN},
+        actuator::Config{MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2,  MotorDirection::MOTOR2, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::THUMB_YAW_MAX, MotorPositionLimit::THUMB_YAW_MIN},
+        actuator::Config{MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3,  MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4,  MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN},
+        actuator::Config{MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5,  MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6,  MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN},
+        actuator::Config{MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7,  MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
+        actuator::Config{MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8,  MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN}
     };
 
     std::vector<sensor::Config> ft_sensor_configs_ = {

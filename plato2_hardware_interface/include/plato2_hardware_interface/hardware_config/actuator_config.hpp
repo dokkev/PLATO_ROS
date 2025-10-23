@@ -81,14 +81,14 @@ namespace MotorDirection{
     constexpr char MOTOR8 = 1; //MIDDLE PIP
 }
 
-namespace MotorJointLimit{
+namespace MotorPositionLimit{
     constexpr float THUMB_ROLL_MAX = deg2rad(45.0f);
     constexpr float THUMB_ROLL_MIN = deg2rad(-45.0f);
     constexpr float THUMB_YAW_MAX = deg2rad(45.0f);
     constexpr float THUMB_YAW_MIN = deg2rad(-45.0f);
-    constexpr float MCP_MAX = deg2rad(60.0f);
+    constexpr float MCP_MAX = deg2rad(70.0f);
     constexpr float MCP_MIN = deg2rad(-60.0f);
-    constexpr float PIP_MAX = deg2rad(120.0f);
+    constexpr float PIP_MAX = deg2rad(180.0f);
     constexpr float PIP_MIN = deg2rad(-60.0f);
 }
 

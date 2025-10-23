@@ -8,14 +8,6 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
                num_actuators_(8),
                num_ft_sensors_(3){
 
-
-    // initialize the all reduction ratios to 1
-    for (size_t i = 0; i < num_actuators_; ++i){
-        pos_ratios_.push_back(1.0);
-        vel_ratios_.push_back(1.0);
-        trq_ratios_.push_back(1.0);
-    }
-
     // set actuator temperature vector size
     actuators_temperature_.resize(num_actuators_);
 
@@ -38,11 +30,10 @@ Hand::Hand(pcan_interface::PCANInterface &pcan_interface)
 
 Hand::~Hand(){
     // Stop the motion control
-
-    set_idle_command();
     std::cout << "Stopping the motion control..." << std::endl;
-    
-    disable();
+    for (size_t i=0; i < num_actuators_; ++i){
+        actuators_[i].disable_motor();
+    }
     std::cout << "Disabling the motors..." << std::endl;
     
 }
@@ -88,8 +79,6 @@ void Hand::init_can_hardware() {
                 sensor_it->second->process_message(msg);
                 return;
             }
-
-            // std::cerr << "Unknown CAN message ID: 0x" << std::hex << msg.ID << std::dec << std::endl;
         }
     );
 
@@ -110,9 +99,7 @@ void Hand::enable(){
 
 void Hand::disable(){
     // GIM3505
-    for (size_t i=0; i < num_actuators_; ++i){
-        actuators_[i].disable_motor();
-    }
+
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -125,33 +112,6 @@ void Hand::stop(){
     }
 }
 
-////////////////////////////////////////////////////////////////////////
-
-void Hand::set_idle_command() {
-
-    // viscous damping coefficient (N·m·s/rad)
-    const double b = 0.0;
-
-    // apply damping to actuators 0 through 7
-    for (size_t i = 0; i < actuators_.size(); ++i) {
-        double vel = actuators_[i].get_states().velocity;
-        double tau_damp = -b * vel;
-        actuators_[i].set_joint_torque(tau_damp, 0);
-        }
-}
-    
-    
-
-
-////////////////////////////////////////////////////////////////////////
-
-void Hand::set_torque_command(const std::vector<double>& joint_torque_command, const uint32_t& duration) {
-
-    for (size_t i = 0; i < num_actuators_; ++i) {
-        float actuator_cmd = joint_torque_command[i];
-        actuators_[i].set_joint_torque(actuator_cmd, duration);
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -161,34 +121,34 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
                                  const std::vector<double> &joint_damping_command,
                                  const std::vector<double> &joint_torque_command) {
 
-    // Create local copies of command vectors to apply compensation
-    auto pos_cmd_compensated = joint_position_command;
-    auto vel_cmd_compensated = joint_velocity_command;
-
-    // Compensate for the PIP joints (indices 3, 5, 7) using the CURRENT MEASURED STATE of the MCP joints.
     // The controller provides a RELATIVE angle for the PIP joint (relative to the MCP link).
     // The hardware needs an ABSOLUTE angle for the PIP motor (relative to the palm).
     // The conversion is: pip_motor_absolute = pip_joint_relative + mcp_joint_absolute_STATE.
-    
-    // Index finger (PIP joint 3, MCP joint 2)
-    pos_cmd_compensated[3] = joint_position_command[3] + actuators_[2].get_states().position;
-    vel_cmd_compensated[3] = joint_velocity_command[3] + actuators_[2].get_states().velocity;
-
-    // Middle finger (PIP joint 5, MCP joint 4)
-    pos_cmd_compensated[5] = joint_position_command[5] + actuators_[4].get_states().position;
-    vel_cmd_compensated[5] = joint_velocity_command[5] + actuators_[4].get_states().velocity;
-
-    // Ring/Pinky finger (PIP joint 7, MCP joint 6)
-    pos_cmd_compensated[7] = joint_position_command[7] + actuators_[6].get_states().position;
-    vel_cmd_compensated[7] = joint_velocity_command[7] + actuators_[6].get_states().velocity;
+    // This compensation is applied directly within the loop for the affected joints.
 
     for (size_t i = 0; i < num_actuators_; ++i) {
-        float pos_cmd = pos_cmd_compensated[i];
-        float vel_cmd = vel_cmd_compensated[i];
-        float kp = joint_stiffness_command[i];
-        float kd = joint_damping_command[i];
-        float torque_cmd = joint_torque_command[i];
-        actuators_[i].set_joint_impedance(pos_cmd, vel_cmd, kp, kd, torque_cmd);
+        float pos_cmd = joint_position_command[i];
+
+        // Apply compensation for PIP joints by adding the measured state of the parent MCP joint.
+        if (i == 3) { // Index finger PIP (parent MCP is joint 2)
+            const auto& mcp_state = actuators_[2].get_states();
+            pos_cmd += mcp_state.position;
+        } else if (i == 5) { // Middle finger PIP (parent MCP is joint 4)
+            const auto& mcp_state = actuators_[4].get_states();
+            pos_cmd += mcp_state.position;
+        } else if (i == 7) { // Ring/Pinky finger PIP (parent MCP is joint 6)
+            const auto& mcp_state = actuators_[6].get_states();
+            pos_cmd += mcp_state.position;
+        }
+
+        // Send the final command (compensated or direct) to the actuator.
+        actuators_[i].set_joint_impedance(
+            pos_cmd, 
+            joint_velocity_command[i], 
+            joint_stiffness_command[i], 
+            joint_damping_command[i], 
+            joint_torque_command[i]
+        );
     }
 }
 

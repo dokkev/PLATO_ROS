@@ -48,9 +48,11 @@ public:
             "/plato2/plato2_position_controller/commands", 10,
             std::bind(&PositionToImpedanceConverter::position_callback, this, std::placeholders::_1));
 
-        // Create publisher for impedance commands
+        // Create publisher for impedance commands with a volatile QoS profile
+        rclcpp::QoS qos_profile(rclcpp::KeepLast(10));
+        qos_profile.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
         impedance_pub_ = this->create_publisher<plato2_interfaces::msg::ImpedanceCommands>(
-            "/plato2/joint_impedance_controller/commands", 10);
+            "/plato2/joint_impedance_controller/commands", qos_profile);
 
         // Start keyboard input thread
         keyboard_thread_ = std::thread(&PositionToImpedanceConverter::keyboardInput, this);
@@ -178,7 +180,7 @@ private:
             
             impedance_msg->position = last_position_;
             impedance_msg->velocity = std::vector<double>(8, 0.0);
-            impedance_msg->effort_ff = effort_ff_;
+            impedance_msg->effort_ff = std::vector<double>(8, 0.0);
         }
         
         // Publish the message

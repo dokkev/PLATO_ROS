@@ -64,8 +64,6 @@ void Actuator::disable_motor(){
 void Actuator::stop_control(){
     encoder_.stop_control(onoff_msg_);
     pcan_interface_.send_message(onoff_msg_);
-
-
 }
 
 //////////////////////////////////////////////////////////////////////////

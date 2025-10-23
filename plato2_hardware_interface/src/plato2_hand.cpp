@@ -165,17 +165,22 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
     auto pos_cmd_compensated = joint_position_command;
     auto vel_cmd_compensated = joint_velocity_command;
 
-    // Compensate for the PIP joints (indices 3, 5, 7)
-    // The actuator command needs to be the sum of the PIP and MCP joint commands
-    // pip_motor_cmd = pip_joint_cmd + mcp_joint_cmd
-    pos_cmd_compensated[3] = joint_position_command[3] - joint_position_command[2];
+    // Compensate for the PIP joints (indices 3, 5, 7) using the CURRENT MEASURED STATE of the MCP joints.
+    // The controller provides a RELATIVE angle for the PIP joint (relative to the MCP link).
+    // The hardware needs an ABSOLUTE angle for the PIP motor (relative to the palm).
+    // The conversion is: pip_motor_absolute = pip_joint_relative + mcp_joint_absolute_STATE.
+    
+    // Index finger (PIP joint 3, MCP joint 2)
+    pos_cmd_compensated[3] = joint_position_command[3] + actuators_[2].get_states().position;
+    vel_cmd_compensated[3] = joint_velocity_command[3] + actuators_[2].get_states().velocity;
 
-    // Middle finger
-    pos_cmd_compensated[5] = joint_position_command[5] - joint_position_command[4];
+    // Middle finger (PIP joint 5, MCP joint 4)
+    pos_cmd_compensated[5] = joint_position_command[5] + actuators_[4].get_states().position;
+    vel_cmd_compensated[5] = joint_velocity_command[5] + actuators_[4].get_states().velocity;
 
-    // Ring/Pinky finger
-    pos_cmd_compensated[7] = joint_position_command[7] - joint_position_command[6];
-
+    // Ring/Pinky finger (PIP joint 7, MCP joint 6)
+    pos_cmd_compensated[7] = joint_position_command[7] + actuators_[6].get_states().position;
+    vel_cmd_compensated[7] = joint_velocity_command[7] + actuators_[6].get_states().velocity;
 
     for (size_t i = 0; i < num_actuators_; ++i) {
         float pos_cmd = pos_cmd_compensated[i];
@@ -296,6 +301,7 @@ void Hand::print_actuator_info_() {
         std::cout << "[INFO] Actuator " << i + 1 
                   << " TX ID: 0x" << std::hex << (int)actuators_[i].get_tx_id()
                   << " RX ID: 0x" << std::hex << (int)actuators_[i].get_rx_id()
+
                   << std::endl;
     }
     

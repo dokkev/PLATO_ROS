@@ -10,17 +10,16 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
-#include "realtime_tools/realtime_server_goal_handle.hpp"
 #include "plato2_interfaces/msg/impedance_commands.hpp"
 #include "plato2_interfaces/msg/impedance_controller_state.hpp"
 
-// Include generated parameter header
 #include <joint_impedance_controller/joint_impedance_controller_parameters.hpp>
 
 namespace joint_impedance_controller
 {
 
 using CmdType = plato2_interfaces::msg::ImpedanceCommands;
+using StateMsg = plato2_interfaces::msg::ImpedanceControllerState;
 
 class JointImpedanceController : public controller_interface::ControllerInterface
 {
@@ -28,13 +27,10 @@ public:
   JointImpedanceController();
 
   controller_interface::CallbackReturn on_init() override;
-  
   controller_interface::CallbackReturn on_configure(
     const rclcpp_lifecycle::State & previous_state) override;
-    
   controller_interface::CallbackReturn on_activate(
     const rclcpp_lifecycle::State & previous_state) override;
-    
   controller_interface::CallbackReturn on_deactivate(
     const rclcpp_lifecycle::State & previous_state) override;
 
@@ -44,17 +40,22 @@ public:
   controller_interface::InterfaceConfiguration command_interface_configuration() const override;
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
 
+private:
+  /// @brief Publish controller state (called from update loop)
   void publish_state(const rclcpp::Time & time, const CmdType& command);
 
-protected:
+  /// @brief Read state interfaces into member variables
+  void read_state_interfaces();
+
+  // Joint names
   std::vector<std::string> joint_names_;
 
-  // State interfaces
+  // State interface data (read from hardware)
   std::vector<double> positions_;
   std::vector<double> velocities_;
   std::vector<double> efforts_;
 
-  // Command interfaces - to be passed to hardware
+  // Command interfaces (write to hardware)
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
     ordered_position_command_interfaces_;
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
@@ -66,37 +67,14 @@ protected:
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
     ordered_damping_command_interfaces_;
 
-  // Real-time buffer for commands
+  // Real-time command buffer
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
   rclcpp::Subscription<CmdType>::SharedPtr joints_command_subscriber_;
 
-  // State Publisher
-  using ControllerStateMsg = plato2_interfaces::msg::ImpedanceControllerState;
-  using StatePublisher = realtime_tools::RealtimePublisher<ControllerStateMsg>;
-  using StatePublisherPtr = std::unique_ptr<StatePublisher>;
-  rclcpp::Publisher<ControllerStateMsg>::SharedPtr publisher_;
-  StatePublisherPtr state_publisher_;
-
-  //QoS
-  // Link Parameters for finger jacobian
-
-  const double L1 = 0.06;
-  const double L2 = 0.06;
-
-  struct Jacobian{
-    double j11, j12;
-    double j21, j22;
-  };
-
-  Jacobian get_J(double theta1, double theta2) const;
-  Jacobian get_Jinv(double theta1, double theta2) const;
-
-
-
-  // jacobian matrix
-
-
-  
+  // State publisher
+  using StatePublisher = realtime_tools::RealtimePublisher<StateMsg>;
+  rclcpp::Publisher<StateMsg>::SharedPtr publisher_;
+  std::unique_ptr<StatePublisher> state_publisher_;
 
   // Parameters
   std::shared_ptr<ParamListener> param_listener_;

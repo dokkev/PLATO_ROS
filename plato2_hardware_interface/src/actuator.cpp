@@ -6,6 +6,7 @@ namespace actuator {
 Actuator::Actuator(pcan_interface::PCANInterface &pcan_interface, const Config& config) 
     : pcan_interface_(pcan_interface), 
       config_(config),
+      control_state_(SoftLimitState::kOperational),
       encoder_(config.gear_ratio, config.torque_constant, config.can_tx_id),
       decoder_(config.gear_ratio, config.torque_constant),
       motor_position_(0.0f),
@@ -47,40 +48,117 @@ void Actuator::set_current_position_as_zero() {
     pcan_interface_.send_message(onoff_msg_);
 }
 
+
 ////////////////////////////////////////////////////////////////////////
 
-void Actuator::set_joint_torque(float joint_torque, uint32_t duration) {
-    float motor_torque;
-    joint_to_motor_(joint_torque, motor_torque);
-
-    encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
-    pcan_interface_.send_message(cmd_msg_);
-
-    commands_.torque = joint_torque;
+void Actuator::determine_current_state_() {
+    // Update state machine with hysteresis
+    if (states_.position <= config_.position_limit_min || 
+        states_.position >= config_.position_limit_max) {
+        // Hard limit exceeded
+        control_state_ = SoftLimitState::kOverLimit;
+        
+    } else if (states_.position < config_.position_limit_min + safety_margin_ && 
+               states_.velocity < 0.0f) {
+        // Approaching lower limit (moving downward)
+        control_state_ = SoftLimitState::kLowerLimit;
+        
+    } else if (states_.position > config_.position_limit_max - safety_margin_ && 
+               states_.velocity > 0.0f) {
+        // Approaching upper limit (moving upward)
+        control_state_ = SoftLimitState::kUpperLimit;
+        
+    } else if (control_state_ == SoftLimitState::kLowerLimit) {
+        // Exit lower limit state with hysteresis
+        if (states_.position > config_.position_limit_min + safety_margin_ + hysteresis_margin_) {
+            control_state_ = SoftLimitState::kOperational;
+        }
+        
+    } else if (control_state_ == SoftLimitState::kUpperLimit) {
+        // Exit upper limit state with hysteresis
+        if (states_.position < config_.position_limit_max - safety_margin_ - hysteresis_margin_) {
+            control_state_ = SoftLimitState::kOperational;
+        }
+        
+    } else {
+        control_state_ = SoftLimitState::kOperational;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////
 
-void Actuator::set_joint_impedance(float joint_position, 
-                                   float joint_velocity, 
-                                   float joint_stiffness, 
-                                   float joint_damping, 
-                                   float joint_torque) {
-    float motor_position, motor_velocity, motor_torque;
-    joint_to_motor_(joint_position, motor_position);
-    joint_to_motor_(joint_velocity, motor_velocity);
-    joint_to_motor_(joint_torque, motor_torque);
+void Actuator::set_joint_impedance(float joint_position_cmd, 
+                                   float joint_velocity_cmd, 
+                                   float joint_stiffness_cmd, 
+                                   float joint_damping_cmd, 
+                                   float joint_torque_cmd) {
 
-    encoder_.set_impedance(cmd_msg_, motor_position, motor_velocity, 
-                          joint_stiffness, joint_damping, motor_torque);
+    // Clamp commands to limits first
+    clamp_commands_(joint_position_cmd, joint_velocity_cmd, joint_stiffness_cmd, joint_damping_cmd, joint_torque_cmd);
+    
+    // Soft limit gradient torque parameters
+    const float MAX_LIMIT_TORQUE = 2.0f; // Maximum resistive torque at hard limit [Nm]
+    
+    // Determine current state based on position and velocity
+    determine_current_state_();
+    
+    // Calculate gradient torque based on state
+    float limit_torque = 0.0f;
+    
+    switch (control_state_) {
+        case SoftLimitState::kOperational:
+            // No additional torque needed
+            limit_torque = 0.0f;
+            break;
+            
+        case SoftLimitState::kLowerLimit: {
+            // Gradient increases as we approach lower limit
+            float violation = (config_.position_limit_min + safety_margin_) - states_.position;
+            float gradient = std::clamp(violation / safety_margin_, 0.0f, 1.0f);
+            limit_torque = gradient * MAX_LIMIT_TORQUE;  // Push back up (positive torque)
+            break;
+        }
+        
+        case SoftLimitState::kUpperLimit: {
+            // Gradient increases as we approach upper limit
+            float violation = states_.position - (config_.position_limit_max - safety_margin_);
+            float gradient = std::clamp(violation / safety_margin_, 0.0f, 1.0f);
+            limit_torque = -gradient * MAX_LIMIT_TORQUE;  // Push back down (negative torque)
+            break;
+        }
+        
+        case SoftLimitState::kOverLimit:
+            // Emergency: zero all commands for safety
+            joint_position_cmd = states_.position;
+            joint_velocity_cmd = 0.0f;
+            joint_stiffness_cmd = 0.0f;
+            joint_damping_cmd = 0.0f;
+            joint_torque_cmd = 0.0f;
+            limit_torque = 0.0f;
+            break;
+    }
+    
+    // Add gradient torque to commanded torque (except in kOverLimit)
+    if (control_state_ != SoftLimitState::kOverLimit) {
+        joint_torque_cmd += limit_torque;
+    }
+
+    // Convert to motor frame
+    float motor_position_cmd = joint_to_motor_(joint_position_cmd);
+    float motor_velocity_cmd = joint_to_motor_(joint_velocity_cmd);
+    float motor_torque_cmd = joint_to_motor_(joint_torque_cmd);
+
+    // Send command to motor
+    encoder_.set_impedance(cmd_msg_, motor_position_cmd, motor_velocity_cmd, 
+                          joint_stiffness_cmd, joint_damping_cmd, motor_torque_cmd);
     pcan_interface_.send_message(cmd_msg_);
 
     // Cache commands
-    commands_.position = joint_position;
-    commands_.velocity = joint_velocity;
-    commands_.stiffness = joint_stiffness;
-    commands_.damping = joint_damping;
-    commands_.torque = joint_torque;
+    commands_.position = joint_position_cmd;
+    commands_.velocity = joint_velocity_cmd;
+    commands_.stiffness = joint_stiffness_cmd;
+    commands_.damping = joint_damping_cmd;
+    commands_.torque = joint_torque_cmd;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -104,9 +182,9 @@ void Actuator::process_state_message(const TPCANMsg &msg) {
     decoder_.get_states(msg, motor_pos, motor_vel, kp, kd, motor_torque, 
                        states_.in_oc_mode, states_.has_fault);
 
-    motor_to_joint_(motor_pos, states_.position);
-    motor_to_joint_(motor_vel, states_.velocity);
-    motor_to_joint_(motor_torque, states_.torque);
+    states_.position = motor_to_joint_(motor_pos);
+    states_.velocity = motor_to_joint_(motor_vel);
+    states_.torque = motor_to_joint_(motor_torque);
 
     motor_position_ = motor_pos;
     b_motor_enabled_ = states_.in_oc_mode && !states_.has_fault;
@@ -124,6 +202,57 @@ void Actuator::process_limits_message(const TPCANMsg &msg) {
     std::cout << "Motor limits CAN ID 0x" << std::hex << msg.ID << std::dec 
               << ": pos=" << pos_max << " rad, vel=" << vel_max 
               << " rad/s, torque=" << tq_max << " Nm" << std::endl;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+bool Actuator::check_joint_limits_(float joint_position) const {
+    if (joint_position < config_.position_limit_min) {
+        std::cerr << "Hard limit exceeded! Joint position " << joint_position 
+                  << " < min limit " << config_.position_limit_min << " [CAN ID: 0x" 
+                  << std::hex << config_.can_tx_id << std::dec << "]" << std::endl;
+        return false;
+    }
+    
+    if (joint_position > config_.position_limit_max) {
+        std::cerr << "Hard limit exceeded! Joint position " << joint_position 
+                  << " > max limit " << config_.position_limit_max << " [CAN ID: 0x" 
+                  << std::hex << config_.can_tx_id << std::dec << "]" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+void Actuator::clamp_commands_(float& joint_position, float& joint_velocity, 
+                               float& joint_stiffness, float& joint_damping, 
+                               float& joint_torque) const {
+    // Clamp position to joint limits
+    joint_position = std::clamp(joint_position, 
+                                config_.position_limit_min, 
+                                config_.position_limit_max);
+    
+    // Clamp velocity to limit (symmetric)
+    joint_velocity = std::clamp(joint_velocity, 
+                                -config_.velocity_limit, 
+                                config_.velocity_limit);
+    
+    // Clamp torque to effort limit (symmetric)
+    joint_torque = std::clamp(joint_torque, 
+                              -config_.effort_limit, 
+                              config_.effort_limit);
+    
+    // Clamp stiffness (always positive, 0 to max)
+    joint_stiffness = std::clamp(joint_stiffness, 
+                                 0.0f, 
+                                 config_.stiffness_limit);
+    
+    // Clamp damping (always positive, 0 to max)
+    joint_damping = std::clamp(joint_damping, 
+                               0.0f, 
+                               config_.damping_limit);
 }
 
 ////////////////////////////////////////////////////////////////////////

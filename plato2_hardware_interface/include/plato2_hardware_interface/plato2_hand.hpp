@@ -76,22 +76,22 @@ private:
     // Hardware configurations
     /// @brief Actuator configurations (Motor 1-8)
     std::vector<actuator::Config> actuator_configs_ = {
-        {MotorTxID::MOTOR1, MotorRxID::MOTOR1, MotorOffset::MOTOR1, MotorDirection::MOTOR1, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::THUMB_ROLL_MAX, MotorPositionLimit::THUMB_ROLL_MIN},
-        {MotorTxID::MOTOR2, MotorRxID::MOTOR2, MotorOffset::MOTOR2, MotorDirection::MOTOR2, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::THUMB_YAW_MAX, MotorPositionLimit::THUMB_YAW_MIN},
-        {MotorTxID::MOTOR3, MotorRxID::MOTOR3, MotorOffset::MOTOR3, MotorDirection::MOTOR3, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
-        {MotorTxID::MOTOR4, MotorRxID::MOTOR4, MotorOffset::MOTOR4, MotorDirection::MOTOR4, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN},
-        {MotorTxID::MOTOR5, MotorRxID::MOTOR5, MotorOffset::MOTOR5, MotorDirection::MOTOR5, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
-        {MotorTxID::MOTOR6, MotorRxID::MOTOR6, MotorOffset::MOTOR6, MotorDirection::MOTOR6, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN},
-        {MotorTxID::MOTOR7, MotorRxID::MOTOR7, MotorOffset::MOTOR7, MotorDirection::MOTOR7, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::MCP_MAX, MotorPositionLimit::MCP_MIN},
-        {MotorTxID::MOTOR8, MotorRxID::MOTOR8, MotorOffset::MOTOR8, MotorDirection::MOTOR8, GIM3505::TORQUE_CONSTANT, GIM3505::GEAR_RATIO, MotorPositionLimit::PIP_MAX, MotorPositionLimit::PIP_MIN}
+        actuator::ActuatorConfigFactory::create_thumb_roll_config(),  // Motor 1: Thumb CMC Roll
+        actuator::ActuatorConfigFactory::create_thumb_yaw_config(),   // Motor 2: Thumb MCP Yaw
+        actuator::ActuatorConfigFactory::create_mcp_config(3),        // Motor 3: Thumb MCP Pitch
+        actuator::ActuatorConfigFactory::create_pip_config(4),        // Motor 4: Thumb PIP Pitch
+        actuator::ActuatorConfigFactory::create_mcp_config(5),        // Motor 5: Index MCP Pitch
+        actuator::ActuatorConfigFactory::create_pip_config(6),        // Motor 6: Index PIP Pitch
+        actuator::ActuatorConfigFactory::create_mcp_config(7),        // Motor 7: Middle MCP Pitch
+        actuator::ActuatorConfigFactory::create_pip_config(8)         // Motor 8: Middle PIP Pitch
     };
 
     /// @brief Force-torque sensor configurations
     std::vector<sensor::Config> ft_sensor_configs_ = {
         // Uncomment when FT sensors are used:
-        // {FTSensorID::THUMB_FORCE, FTSensorID::THUMB_TORQUE},
-        // {FTSensorID::INDEX_FORCE, FTSensorID::INDEX_TORQUE},
-        // {FTSensorID::MIDDLE_FORCE, FTSensorID::MIDDLE_TORQUE}
+        {FTSensorID::THUMB_FORCE, FTSensorID::THUMB_TORQUE},
+        {FTSensorID::INDEX_FORCE, FTSensorID::INDEX_TORQUE},
+        {FTSensorID::MIDDLE_FORCE, FTSensorID::MIDDLE_TORQUE}
     };
 };
 

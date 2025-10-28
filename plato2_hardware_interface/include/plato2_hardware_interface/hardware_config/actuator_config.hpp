@@ -21,6 +21,7 @@
 // purple/black: GND
 using namespace Plato;
 
+// CAN IDs for motors
 namespace MotorTxID{
     constexpr uint8_t MOTOR1 = 0x0A; // 10
     constexpr uint8_t MOTOR2 = 0x0B; // 11
@@ -57,8 +58,9 @@ namespace GIM3505{
     constexpr float PEAK_TORQUE = 1.27f; // Nm 
 } // namespace GIM3505
 
-namespace MotorOffset{
 
+// not used for Aristo
+namespace MotorOffset{
     constexpr float MOTOR1 = 0.0f; // THUMB CMC ROLL
     constexpr float MOTOR2 = 0.0f; // THUMB MCP YAW
     constexpr float MOTOR3 = 0.0f; // THUMB MCP PITCH
@@ -81,15 +83,43 @@ namespace MotorDirection{
     constexpr char MOTOR8 = 1; //MIDDLE PIP
 }
 
-namespace MotorPositionLimit{
+namespace JointPositionLimit{
     constexpr float THUMB_ROLL_MAX = deg2rad(45.0f);
-    constexpr float THUMB_ROLL_MIN = deg2rad(-45.0f);
+    constexpr float THUMB_ROLL_MIN = deg2rad(-15.0f);
     constexpr float THUMB_YAW_MAX = deg2rad(45.0f);
     constexpr float THUMB_YAW_MIN = deg2rad(-45.0f);
     constexpr float MCP_MAX = deg2rad(70.0f);
     constexpr float MCP_MIN = deg2rad(-60.0f);
     constexpr float PIP_MAX = deg2rad(180.0f);
     constexpr float PIP_MIN = deg2rad(-60.0f);
+}
+
+namespace JointVelocityLimit{
+    constexpr float THUMB_ROLL = 40.21f; // rad/s
+    constexpr float THUMB_YAW = 40.21f;  // rad/s
+    constexpr float MCP = 40.21f;        // rad/s
+    constexpr float PIP = 40.21f;        // rad/s
+}
+
+namespace JointEffortLimit{
+    constexpr float THUMB_ROLL = GIM3505::PEAK_TORQUE; // Nm
+    constexpr float THUMB_YAW = GIM3505::PEAK_TORQUE;  // Nm
+    constexpr float MCP = GIM3505::PEAK_TORQUE;        // Nm
+    constexpr float PIP = GIM3505::PEAK_TORQUE;        // Nm
+}
+
+namespace JointStiffnessLimit{
+    constexpr float THUMB_ROLL = 5.0f; // Nm/rad
+    constexpr float THUMB_YAW = 5.0f;  // Nm/rad
+    constexpr float MCP = 5.0f;        // Nm/rad
+    constexpr float PIP = 5.0f;        // Nm/rad
+}
+
+namespace JointDampingLimit{
+    constexpr float THUMB_ROLL = 2.5f; // Nms/rad
+    constexpr float THUMB_YAW = 2.5f;  // Nms/rad
+    constexpr float MCP = 2.0f;        // Nms/rad
+    constexpr float PIP = 2.0f;        // Nms/rad
 }
 
 #endif // PLATO_HARDWARE_INTERFACE__ACTUATOR_CONFIG_HPP_

@@ -110,6 +110,21 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+  
+  # Add GTest
+  find_package(ament_cmake_gtest REQUIRED)
+  
+  # MIT CAN Protocol unit test
+  ament_add_gtest(test_mit_can_protocol test/test_mit_can_protocol.cpp)
+  target_include_directories(test_mit_can_protocol PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${PCAN_INCLUDE_DIR}
+  )
+  target_link_libraries(test_mit_can_protocol 
+    plato2_hardware_interface
+    ${PCAN_LIB}
+  )
 endif()
 
 ## EXPORTS

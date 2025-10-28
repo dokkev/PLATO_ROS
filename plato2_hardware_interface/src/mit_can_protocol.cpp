@@ -193,7 +193,7 @@ void MsgEncoder::stop_control(TPCANMsg &msg)
 {
     // Exit operation-control mode: 0xCF
     // Normal command frames use base StdID (no STDID_OC_BIT)
-    std::cout << "Stopping control with TX ID: " << std::hex << int(tx_id_) << std::dec << std::endl;
+    std::cout << "Stopping control with TX ID: 0x" << std::hex << int(tx_id_) << std::dec << std::endl;
     msg.ID      = tx_id_;
     msg.LEN     = 1;
     msg.DATA[0] = CMD_EXIT_OC_MODE;

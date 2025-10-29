@@ -185,8 +185,8 @@ PLATO2Hardware::write(const rclcpp::Time &time,
   // Set recommended impedance values for thumb joints
   joint_stiffness_commands_[0] = 3.0;
   joint_damping_commands_[0] = 0.20;
-  joint_stiffness_commands_[1] = 0.0;
-  joint_damping_commands_[1] = 0.10;
+  joint_stiffness_commands_[1] = 4.0;
+  joint_damping_commands_[1] = 0.20;
 
   // Send impedance commands to the hardware
   hand_->set_impedance_command(joint_position_commands_, 

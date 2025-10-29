@@ -1,5 +1,6 @@
 #include "plato2_hardware_interface/actuator.hpp"
 #include <iostream>
+#include <cmath>
 
 namespace actuator {
 
@@ -112,18 +113,23 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
             break;
             
         case SoftLimitState::kLowerLimit: {
-            // Gradient increases as we approach lower limit
+            // Quadratic gradient increases as we approach lower limit
             float violation = (config_.position_limit_min + safety_margin_) - states_.position;
             float gradient = std::clamp(violation / safety_margin_, 0.0f, 1.0f);
-            limit_torque = gradient * MAX_LIMIT_TORQUE;  // Push back up (positive torque)
+            // Apply quadratic scaling: gradient^2
+            // This makes the torque increase smoothly and more aggressively near the limit
+            float quad_gradient = gradient * gradient;
+            limit_torque = quad_gradient * MAX_LIMIT_TORQUE;  // Push back up (positive torque)
             break;
         }
         
         case SoftLimitState::kUpperLimit: {
-            // Gradient increases as we approach upper limit
+            // Quadratic gradient increases as we approach upper limit
             float violation = states_.position - (config_.position_limit_max - safety_margin_);
             float gradient = std::clamp(violation / safety_margin_, 0.0f, 1.0f);
-            limit_torque = -gradient * MAX_LIMIT_TORQUE;  // Push back down (negative torque)
+            // Apply quadratic scaling: gradient^2
+            float quad_gradient = gradient * gradient;
+            limit_torque = -quad_gradient * MAX_LIMIT_TORQUE;  // Push back down (negative torque)
             break;
         }
         

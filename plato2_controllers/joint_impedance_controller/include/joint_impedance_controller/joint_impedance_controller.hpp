@@ -57,15 +57,15 @@ private:
 
   // Command interfaces (write to hardware)
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_position_command_interfaces_;
+    position_command_interfaces_;
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_velocity_command_interfaces_;
+    velocity_command_interfaces_;
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_effort_command_interfaces_;
+    effort_command_interfaces_;
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_stiffness_command_interfaces_;
+    stiffness_command_interfaces_;
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
-    ordered_damping_command_interfaces_;
+    damping_command_interfaces_;
 
   // Real-time command buffer
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;

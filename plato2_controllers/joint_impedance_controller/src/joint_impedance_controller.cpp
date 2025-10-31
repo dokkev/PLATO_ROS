@@ -105,17 +105,17 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
   const auto num_joints = joint_names_.size();
 
   // Clear and reserve interface vectors (prevents reallocation)
-  ordered_position_command_interfaces_.clear();
-  ordered_velocity_command_interfaces_.clear();
-  ordered_effort_command_interfaces_.clear();
-  ordered_stiffness_command_interfaces_.clear();
-  ordered_damping_command_interfaces_.clear();
+  position_command_interfaces_.clear();
+  velocity_command_interfaces_.clear();
+  effort_command_interfaces_.clear();
+  stiffness_command_interfaces_.clear();
+  damping_command_interfaces_.clear();
 
-  ordered_position_command_interfaces_.reserve(num_joints);
-  ordered_velocity_command_interfaces_.reserve(num_joints);
-  ordered_effort_command_interfaces_.reserve(num_joints);
-  ordered_stiffness_command_interfaces_.reserve(num_joints);
-  ordered_damping_command_interfaces_.reserve(num_joints);
+  position_command_interfaces_.reserve(num_joints);
+  velocity_command_interfaces_.reserve(num_joints);
+  effort_command_interfaces_.reserve(num_joints);
+  stiffness_command_interfaces_.reserve(num_joints);
+  damping_command_interfaces_.reserve(num_joints);
 
   // Gather command interfaces in order
   for (const auto & joint_name : joint_names_)
@@ -131,25 +131,25 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
       const auto& iface_name = command_interface.get_name();
       
       if (iface_name == pos_name) {
-        ordered_position_command_interfaces_.emplace_back(command_interface);
+        position_command_interfaces_.emplace_back(command_interface);
       } else if (iface_name == vel_name) {
-        ordered_velocity_command_interfaces_.emplace_back(command_interface);
+        velocity_command_interfaces_.emplace_back(command_interface);
       } else if (iface_name == eff_name) {
-        ordered_effort_command_interfaces_.emplace_back(command_interface);
+        effort_command_interfaces_.emplace_back(command_interface);
       } else if (iface_name == stiff_name) {
-        ordered_stiffness_command_interfaces_.emplace_back(command_interface);
+        stiffness_command_interfaces_.emplace_back(command_interface);
       } else if (iface_name == damp_name) {
-        ordered_damping_command_interfaces_.emplace_back(command_interface);
+        damping_command_interfaces_.emplace_back(command_interface);
       }
     }
   }
 
   // Validate all interfaces were found
-  if (ordered_position_command_interfaces_.size() != num_joints ||
-      ordered_velocity_command_interfaces_.size() != num_joints ||
-      ordered_effort_command_interfaces_.size() != num_joints ||
-      ordered_stiffness_command_interfaces_.size() != num_joints ||
-      ordered_damping_command_interfaces_.size() != num_joints)
+  if (position_command_interfaces_.size() != num_joints ||
+      velocity_command_interfaces_.size() != num_joints ||
+      effort_command_interfaces_.size() != num_joints ||
+      stiffness_command_interfaces_.size() != num_joints ||
+      damping_command_interfaces_.size() != num_joints)
   {
     RCLCPP_FATAL(get_node()->get_logger(), "Not all command interfaces found!");
     return controller_interface::CallbackReturn::ERROR;
@@ -173,11 +173,11 @@ controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
   const size_t num_joints = joint_names_.size();
   for (size_t i = 0; i < num_joints; ++i)
   {
-    ordered_position_command_interfaces_[i].get().set_value(0.0);
-    ordered_velocity_command_interfaces_[i].get().set_value(0.0);
-    ordered_effort_command_interfaces_[i].get().set_value(0.0);
-    ordered_stiffness_command_interfaces_[i].get().set_value(0.0);
-    ordered_damping_command_interfaces_[i].get().set_value(0.0);
+    position_command_interfaces_[i].get().set_value(0.0);
+    velocity_command_interfaces_[i].get().set_value(0.0);
+    effort_command_interfaces_[i].get().set_value(0.0);
+    stiffness_command_interfaces_[i].get().set_value(0.0);
+    damping_command_interfaces_[i].get().set_value(0.0);
   }
   
   return controller_interface::CallbackReturn::SUCCESS;
@@ -228,11 +228,26 @@ controller_interface::return_type JointImpedanceController::update(
   // Write commands to hardware
   for (size_t i = 0; i < num_joints; ++i)
   {
-    ordered_position_command_interfaces_[i].get().set_value(commands.position[i]);
-    ordered_velocity_command_interfaces_[i].get().set_value(commands.velocity[i]);
-    ordered_effort_command_interfaces_[i].get().set_value(commands.effort_ff[i]);
-    ordered_stiffness_command_interfaces_[i].get().set_value(commands.stiffness[i]);
-    ordered_damping_command_interfaces_[i].get().set_value(commands.damping[i]);
+    // Compute position error
+    const double position_error = commands.position[i] - positions_[i];
+    const double velocity_error = commands.velocity[i] - velocities_[i];
+    
+    // Compute feedback torque using proportional-derivative control
+    // tau_fb = Kp * position_error + Kd * velocity_error
+    const double tau_fb = commands.stiffness[i] * position_error + 
+                          commands.damping[i] * velocity_error;
+    
+    // Total desired torque = feedforward + feedback
+    const double tau_desired = commands.effort_ff[i] + tau_fb;
+    
+    // Write commands to hardware interfaces
+    position_command_interfaces_[i].get().set_value(commands.position[i]);
+    velocity_command_interfaces_[i].get().set_value(commands.velocity[i]);
+    effort_command_interfaces_[i].get().set_value(tau_desired);
+    
+    // Pass stiffness and damping through (for transparency/monitoring)
+    stiffness_command_interfaces_[i].get().set_value(commands.stiffness[i]);
+    damping_command_interfaces_[i].get().set_value(commands.damping[i]);
   }
 
   // Publish state
@@ -289,12 +304,33 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const Cm
   auto& msg = state_publisher_->msg_;
   msg.header.stamp = time;
 
-  // Assign states (no allocation, vectors already sized)
+  const size_t num_joints = joint_names_.size();
+  
+  // Assign actual states
   msg.position_actual = positions_;
   msg.velocity_actual = velocities_;
   msg.effort_actual = efforts_;
+  
+  // Assign desired states
   msg.position_desired = command.position;
   msg.velocity_desired = command.velocity;
+  msg.stiffness = command.stiffness;
+  msg.damping = command.damping;
+  msg.effort_ff = command.effort_ff;
+  
+  // Compute errors and feedback torque
+  for (size_t i = 0; i < num_joints; ++i)
+  {
+    msg.position_error[i] = command.position[i] - positions_[i];
+    msg.velocity_error[i] = command.velocity[i] - velocities_[i];
+    
+    // Compute feedback torque (same as in update)
+    msg.effort_fb[i] = command.stiffness[i] * msg.position_error[i] + 
+                       command.damping[i] * msg.velocity_error[i];
+    
+    // Total desired effort
+    msg.effort_desired[i] = command.effort_ff[i] + msg.effort_fb[i];
+  }
 
   state_publisher_->unlockAndPublish();
 }

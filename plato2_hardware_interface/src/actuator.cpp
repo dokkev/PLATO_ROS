@@ -119,7 +119,7 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
             // Apply quadratic scaling: gradient^2
             // This makes the torque increase smoothly and more aggressively near the limit
             float quad_gradient = gradient * gradient;
-            limit_torque = quad_gradient * MAX_LIMIT_TORQUE;  // Push back up (positive torque)
+            // limit_torque = quad_gradient * MAX_LIMIT_TORQUE;  // Push back up (positive torque)
             break;
         }
         
@@ -129,7 +129,7 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
             float gradient = std::clamp(violation / safety_margin_, 0.0f, 1.0f);
             // Apply quadratic scaling: gradient^2
             float quad_gradient = gradient * gradient;
-            limit_torque = -quad_gradient * MAX_LIMIT_TORQUE;  // Push back down (negative torque)
+            // limit_torque = -quad_gradient * MAX_LIMIT_TORQUE;  // Push back down (negative torque)
             break;
         }
         
@@ -146,7 +146,7 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
     
     // Add gradient torque to commanded torque (except in kOverLimit)
     if (control_state_ != SoftLimitState::kOverLimit) {
-        joint_torque_cmd += limit_torque;
+        joint_torque_cmd += 0.0f; // limit_torque;
     }
 
     // Convert to motor frame
@@ -154,16 +154,20 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
     float motor_velocity_cmd = joint_to_motor_(joint_velocity_cmd);
     float motor_torque_cmd = joint_to_motor_(joint_torque_cmd);
 
+
+
+    // NOTE: we disable internal (embedded) kp gain but keep it external (plato2 joint impedance controller)
+    //       However, kd gain is retained internally for better damping behavior
     // Send command to motor
     encoder_.set_impedance(cmd_msg_, motor_position_cmd, motor_velocity_cmd, 
-                          joint_stiffness_cmd, joint_damping_cmd, motor_torque_cmd);
+                          0.0f, joint_damping_cmd, motor_torque_cmd);
     pcan_interface_.send_message(cmd_msg_);
 
     // Cache commands
     commands_.position = joint_position_cmd;
     commands_.velocity = joint_velocity_cmd;
-    commands_.stiffness = joint_stiffness_cmd;
-    commands_.damping = joint_damping_cmd;
+    commands_.stiffness = 0.0f;
+    commands_.damping = 0.0f;
     commands_.torque = joint_torque_cmd;
 }
 

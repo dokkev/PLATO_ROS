@@ -112,13 +112,13 @@ void Hand::set_impedance_command(const std::vector<double> &joint_position_comma
         float pos_cmd = joint_position_command[i];
 
         // Compensate PIP joints by adding the current MCP state
-        if (i == 3) { // Index finger PIP (parent is MCP joint 2)
-            pos_cmd += actuators_[2].get_states().position;
-        } else if (i == 5) { // Middle finger PIP (parent is MCP joint 4)
-            pos_cmd += actuators_[4].get_states().position;
-        } else if (i == 7) { // Ring/Pinky finger PIP (parent is MCP joint 6)
-            pos_cmd += actuators_[6].get_states().position;
-        }
+        // if (i == 3) { // Index finger PIP (parent is MCP joint 2)
+        //     pos_cmd += actuators_[2].get_states().position;
+        // } else if (i == 5) { // Middle finger PIP (parent is MCP joint 4)
+        //     pos_cmd += actuators_[4].get_states().position;
+        // } else if (i == 7) { // Ring/Pinky finger PIP (parent is MCP joint 6)
+        //     pos_cmd += actuators_[6].get_states().position;
+        // }
 
         actuators_[i].set_joint_impedance(
             pos_cmd, 

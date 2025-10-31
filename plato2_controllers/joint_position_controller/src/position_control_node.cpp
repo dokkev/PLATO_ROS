@@ -9,6 +9,19 @@
 #include <termios.h>
 #include <unistd.h>
 
+
+// joint 1:  pos :0.0 vel: 0.0 eff: 0.0 stiff: 3.0 damp: 0.2
+// joint 2:  pos :0.0 vel: 0.0 eff: 0.0 stiff: 3.0 damp: 0.2
+// joint 3 :  pos :-0.398 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+// joint 4:  pos :0.0 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+// joint 5 :  pos :0.992 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+// joint 6 :  pos :0.0 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+// joint 7 :  pos :0.0 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+// joint 8 :  pos :0.0 vel: 0.0 eff: 0.0 stiff: 1.0 damp: 0.1
+
+
+
+
 // Function to configure terminal for immediate keyboard input
 void configureTerminal() {
     struct termios term;

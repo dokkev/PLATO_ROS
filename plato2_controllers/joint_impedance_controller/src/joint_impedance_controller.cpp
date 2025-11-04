@@ -234,16 +234,16 @@ controller_interface::return_type JointImpedanceController::update(
     
     // Compute feedback torque using proportional-derivative control
     // tau_fb = Kp * position_error + Kd * velocity_error
-    const double tau_fb = commands.stiffness[i] * position_error + 
-                          commands.damping[i] * velocity_error;
+    // const double tau_fb = commands.stiffness[i] * position_error + 
+    //                       commands.damping[i] * velocity_error;
     
     // Total desired torque = feedforward + feedback
-    const double tau_desired = commands.effort_ff[i] + tau_fb;
+    // const double tau_desired = commands.effort_ff[i] + tau_fb;
     
     // Write commands to hardware interfaces
     position_command_interfaces_[i].get().set_value(commands.position[i]);
     velocity_command_interfaces_[i].get().set_value(commands.velocity[i]);
-    effort_command_interfaces_[i].get().set_value(tau_desired);
+    effort_command_interfaces_[i].get().set_value(commands.effort_ff[i]);
     
     // Pass stiffness and damping through (for transparency/monitoring)
     stiffness_command_interfaces_[i].get().set_value(commands.stiffness[i]);

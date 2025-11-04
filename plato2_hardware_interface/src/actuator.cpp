@@ -160,14 +160,14 @@ void Actuator::set_joint_impedance(float joint_position_cmd,
     //       However, kd gain is retained internally for better damping behavior
     // Send command to motor
     encoder_.set_impedance(cmd_msg_, motor_position_cmd, motor_velocity_cmd, 
-                          0.0f, joint_damping_cmd, motor_torque_cmd);
+                          joint_stiffness_cmd, joint_damping_cmd, motor_torque_cmd);
     pcan_interface_.send_message(cmd_msg_);
 
     // Cache commands
     commands_.position = joint_position_cmd;
     commands_.velocity = joint_velocity_cmd;
-    commands_.stiffness = 0.0f;
-    commands_.damping = 0.0f;
+    commands_.stiffness = joint_stiffness_cmd;
+    commands_.damping = joint_damping_cmd;
     commands_.torque = joint_torque_cmd;
 }
 

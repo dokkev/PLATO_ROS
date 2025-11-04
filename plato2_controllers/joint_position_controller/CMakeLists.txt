@@ -27,6 +27,23 @@ ament_target_dependencies(position_control_node
 install(TARGETS position_control_node
   DESTINATION lib/${PROJECT_NAME})
 
+add_executable(parallel_grasp_node src/parallel_grasp_node.cpp src/parallel_grasp_controller.cpp)
+target_include_directories(parallel_grasp_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(parallel_grasp_node PUBLIC c_std_99 cxx_std_17)
+ament_target_dependencies(parallel_grasp_node
+  rclcpp
+  std_msgs
+)
+# add plato2_interfaces dependency for impedance command message
+ament_target_dependencies(parallel_grasp_node
+  plato2_interfaces
+)
+
+install(TARGETS parallel_grasp_node
+  DESTINATION lib/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

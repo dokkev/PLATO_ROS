@@ -32,6 +32,18 @@
       </collision>
     </link>
 
+    <!-- thumb_distal_tactile: tactile sensor frame 4.73 cm distal of thumb_distal -->
+    <link name="thumb_distal_tactile" />
+
+    <joint name="thumb_distal_to_tactile" type="fixed">
+      <!-- translate 0.0473 m (4.73 cm) along the distal link local +x -->
+  <!-- orient tactile frame so Z+ points downward while keeping +X forward: rotate pi around X -->
+  <!-- keep thumb translation, mirror orientation of index (invert yaw) -->
+  <origin xyz="-0.0523 0.01 -0.0025" rpy="0 1.57 1.57"/>
+      <parent link="thumb_distal"/>
+      <child link="thumb_distal_tactile"/>
+    </joint>
+
     <!-- thumb_metacarpal -->
     <link name="thumb_metacarpal">
       <inertial>
@@ -128,21 +140,18 @@
       </collision>
     </link>
 
-    <!-- Thumb joints -->
-    <joint name="joint4" type="revolute">
-      <origin xyz="0.06 0 0.0105" rpy="0 0 3.14159"/>
-      <parent link="thumb_proximal"/>
-      <child link="thumb_distal"/>
-      <axis xyz="0 0 1"/>
-      <limit effort="10" velocity="10" lower="-2.0944" upper="1.0472"/>
-    </joint>
 
-    <joint name="joint3" type="revolute">
-      <origin xyz="-0.022 -0.0305 -0.0235" rpy="-1.5708 0 3.14159"/>
-      <parent link="thumb_actuators"/>
-      <child link="thumb_proximal"/>
+    
+
+    <!-- Thumb joints -->
+
+
+    <joint name="joint1" type="revolute">
+      <origin xyz="4.56293e-16 -0.044 -0.0285" rpy="1.5708 0 0"/>
+      <parent link="hand_base"/>
+      <child link="thumb_metacarpal"/>
       <axis xyz="0 0 1"/>
-      <limit effort="10" velocity="10" lower="-1.0472" upper="1.0472"/>
+      <limit effort="10" velocity="10" lower="-0.785398" upper="0.785398"/>
     </joint>
 
     <joint name="joint2" type="revolute">
@@ -153,13 +162,23 @@
       <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
     </joint>
 
-    <joint name="joint1" type="revolute">
-      <origin xyz="4.56293e-16 -0.044 -0.0285" rpy="1.5708 0 0"/>
-      <parent link="hand_base"/>
-      <child link="thumb_metacarpal"/>
+    <joint name="joint3" type="revolute">
+      <origin xyz="-0.022 -0.0305 -0.0235" rpy="-1.5708 0 3.14159"/>
+      <parent link="thumb_actuators"/>
+      <child link="thumb_proximal"/>
       <axis xyz="0 0 1"/>
-      <limit effort="10" velocity="10" lower="-0.785398" upper="0.785398"/>
+      <limit effort="10" velocity="10" lower="-1.0472" upper="1.0472"/>
     </joint>
+
+    <joint name="joint4" type="revolute">
+      <origin xyz="0.06 0 0.0105" rpy="0 0 3.14159"/>
+      <parent link="thumb_proximal"/>
+      <child link="thumb_distal"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="10" velocity="10" lower="-2.0944" upper="1.0472"/>
+    </joint>
+
+
 
     <!-- index_proximal -->
     <link name="index_proximal">
@@ -210,6 +229,14 @@
     </link>
 
     <!-- Index joints -->
+    <joint name="joint5" type="revolute">
+      <origin xyz="0.0305 -0.113 0.0145" rpy="-1.5708 0 -1.5708"/>
+      <parent link="hand_base"/>
+      <child link="index_proximal"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="10" velocity="10" lower="-1.0472" upper="1.0472"/>
+    </joint>
+
     <joint name="joint6" type="revolute">
       <origin xyz="0.06 0 0.0105" rpy="0 0 3.14159"/>
       <parent link="index_proximal"/>
@@ -218,13 +245,34 @@
       <limit effort="10" velocity="10" lower="-1.0472" upper="2.0944"/>
     </joint>
 
-    <joint name="joint5" type="revolute">
-      <origin xyz="0.0305 -0.113 0.0145" rpy="-1.5708 0 -1.5708"/>
+    <!-- index_distal_tactile: tactile sensor frame 4.73 cm distal of index_distal -->
+    <link name="index_distal_tactile" />
+
+    <joint name="index_distal_to_tactile" type="fixed">
+      <!-- translate 0.0473 m (4.73 cm) along the distal link local +x -->
+  <!-- orient tactile frame so Z+ points downward while keeping +X forward: rotate pi around X -->
+  <origin xyz="-0.0523 -0.01 -0.0025" rpy="0 -1.57 1.57"/>
+      <parent link="index_distal"/>
+      <child link="index_distal_tactile"/>
+    </joint>
+
+      <!-- Middle joints -->
+    <joint name="joint7" type="revolute">
+      <origin xyz="-0.0305 -0.113 0.0145" rpy="-1.5708 0 -1.5708"/>
       <parent link="hand_base"/>
-      <child link="index_proximal"/>
+      <child link="middle_proximal"/>
       <axis xyz="0 0 1"/>
       <limit effort="10" velocity="10" lower="-1.0472" upper="1.0472"/>
     </joint>
+
+    <joint name="joint8" type="revolute">
+      <origin xyz="0.06 0 -0.0105" rpy="0 0 -3.14159"/>
+      <parent link="middle_proximal"/>
+      <child link="middle_distal"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="10" velocity="10" lower="-1.0472" upper="2.0944"/>
+    </joint>
+
 
     <!-- middle_proximal -->
     <link name="middle_proximal">
@@ -274,22 +322,18 @@
       </collision>
     </link>
 
-    <!-- Middle joints -->
-    <joint name="joint8" type="revolute">
-      <origin xyz="0.06 0 -0.0105" rpy="0 0 -3.14159"/>
-      <parent link="middle_proximal"/>
-      <child link="middle_distal"/>
-      <axis xyz="0 0 1"/>
-      <limit effort="10" velocity="10" lower="-2.0944" upper="1.0472"/>
+
+    <!-- middle_distal_tactile: tactile sensor frame 4.73 cm distal of middle_distal -->
+    <link name="middle_distal_tactile" />
+
+    <joint name="middle_distal_to_tactile" type="fixed">
+      <!-- translate 0.0473 m (4.73 cm) along the distal link local +x -->
+  <!-- orient tactile frame so Z+ points downward while keeping +X forward: rotate pi around X -->
+  <origin xyz="-0.0523 -0.01 -0.0025" rpy="0 -1.57 1.57"/>
+      <parent link="middle_distal"/>
+      <child link="middle_distal_tactile"/>
     </joint>
 
-    <joint name="joint7" type="revolute">
-      <origin xyz="-0.0305 -0.113 0.0145" rpy="-1.5708 0 -1.5708"/>
-      <parent link="hand_base"/>
-      <child link="middle_proximal"/>
-      <axis xyz="0 0 1"/>
-      <limit effort="10" velocity="10" lower="-1.0472" upper="1.0472"/>
-    </joint>
 
     <!-- Attach hand_base to the provided connector link -->
     <joint name="hand_mount" type="fixed">

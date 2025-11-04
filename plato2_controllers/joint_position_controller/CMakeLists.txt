@@ -31,7 +31,7 @@ add_executable(parallel_grasp_node src/parallel_grasp_node.cpp src/parallel_gras
 target_include_directories(parallel_grasp_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(parallel_grasp_node PUBLIC c_std_99 cxx_std_17)
+target_compile_features(parallel_grasp_node PUBLIC c_std_99 cxx_std_20)
 ament_target_dependencies(parallel_grasp_node
   rclcpp
   std_msgs

@@ -1,43 +1,52 @@
 #include "joint_position_controller/parallel_grasp_controller.hpp"
 
-ParallelGraspController::ParallelGraspController()
-{
+ParallelGraspController::ParallelGraspController() {
+  // Feasibility check: x-alignment requires |w| ≤ 2L
+  if (std::abs(w) > 2.0 * L) {
+    throw std::runtime_error("parallel grasp: |w| > 2L; x-alignment impossible.");
+  }
+}
+
+double ParallelGraspController::compute_q5_delta(double q3) {
+  // Enforce x-alignment: x5 = x3  =>  cos(q5) = cos(q3) - w/L
+  // We choose the opposite-motion branch so dq5/dq3 < 0 (fingers move in opposite directions)
+
+  const double Araw = std::cos(q3) - w / L;
+
+  // Check feasibility (may occur if q3 is at extreme angles)
+  // Fall back to clamped value but exact x-alignment may not be achievable
+  const double A = std::clamp(Araw, -1.0, 1.0);
+
+  // Opposite-motion branch: use negative sgn(sin(q3))
+  const double y = -sgn(std::sin(q3)) * std::sqrt(std::max(0.0, 1.0 - A * A));
+  const double q5 = std::atan2(y, A);
+
+  // Return wrapped angle difference: Δq = q5 - q3
+  return wrap_pi(q5 - q3);
 }
 
 const std::vector<double>& ParallelGraspController::get_commands(double u_cmd) {
-  // Feasible gap range is precomputed in the constructor
+  // Map u ∈ [0,1] → q3 ∈ [qmin, qmax]
   const double u = std::clamp(u_cmd, 0.0, 1.0);
-  const double d = d_min_ + u * (d_max_ - d_min_);
+  const double q3 = qmin + u * (qmax - qmin);
 
-  // Closed-form solve for (q3,q5)
-  const double dy = d - h;
-  const double Lvec = std::hypot(w, dy);
-  const double s = std::clamp(Lvec / (2.0 * L), 0.0, 1.0);
+  // Compute q5 using geometric constraint
+  const double dq = compute_q5_delta(q3);
+  double q5 = q3 + dq;
 
-  const double m = std::atan2(w, dy);
-  const double delta = std::asin(s);
+  // Mirror for opposite finger (joints 4 and 6) - parallelogram assumption
+  const double q4 = -q3;
+  const double q6 = -q5;
 
+  // Update internal state
+  last_u_ = u;
 
-  double q3 = m - delta;
-  double q4 = -q3;
-  double q5 = m + delta;
-  double q6 = -q5;
+  // Build 8-element joint command vector (indices 2-5 contain grasp joints)
+  joint_commands_.assign(8, 0.0);
+  joint_commands_[2] = q3;
+  joint_commands_[3] = q4;
+  joint_commands_[4] = q5;
+  joint_commands_[5] = q6;
 
-  // Clamp to joint limits (hardcoded in header)
-  q5 = std::clamp(q5, qmin, qmax);
-  q3 = std::clamp(q3, qmin, qmax);
-
-  // update internal state
-  u_ = u;
-  d_ = d;
-
-  // Build and store the 8-element joint command vector (indices 0..7 -> joints 1..8).
-  // Write directly into the internal buffer to avoid a temporary allocation.
-  joint_position_commands_.assign(8, 0.0);
-  joint_position_commands_[2] = q3;
-  joint_position_commands_[3] = q4;
-  joint_position_commands_[4] = q5;
-  joint_position_commands_[5] = q6;
-
-  return joint_position_commands_;
+  return joint_commands_;
 }

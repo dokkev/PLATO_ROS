@@ -1,6 +1,5 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, RegisterEventHandler
-from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 
@@ -12,7 +11,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.conditions import IfCondition,UnlessCondition
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution
 import xacro
@@ -21,11 +19,12 @@ import xacro
 def generate_launch_description():
     # Declare arguments
     declared_arguments = []
+    # Preserve GUI arg for compatibility, but unused
     declared_arguments.append(
         DeclareLaunchArgument(
             "gui",
-            default_value="true",
-            description="Start RViz2 automatically with this launch file.",
+            default_value="false",
+            description="(Unused) GUI toggle preserved for compatibility.",
         )
     )
     declared_arguments.append(
@@ -111,12 +110,7 @@ def generate_launch_description():
         namespace=plato_ns,  
     )
 
-    optimo_plato_transform_broadcaster = Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_broadcaster',
-            arguments=['0', '0', '0.157', '0.707388', '0.0005629', '0.706825', '0.0005633', 'link7_passive', 'plato2/hand_base'],
-        )  
+    # Removed static transform broadcaster (not needed for foxglove setup)
 
     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
@@ -125,20 +119,7 @@ def generate_launch_description():
         )
     )
     
-    position_control_node = Node(
-        package='joint_position_controller',  
-        executable='position_control_node',
-        name='position_control_node',
-        namespace=plato_ns,  # Use the same namespace as other nodes
-        output='screen'
-    )
-    
-    delay_position_control_node_after_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=robot_controller_spawner,
-            on_exit=[position_control_node],
-        )
-    )
+    # Removed delayed position control node (not used)
     
     ft_sensor_broadcaster_spawner = Node(
         package="controller_manager",
@@ -158,8 +139,7 @@ def generate_launch_description():
         foxglove_graph,
         foxglove_commands,
         foxglove_trajectory,
-        # delay_position_control_node_after_controller_spawner
-        optimo_plato_transform_broadcaster,
+        # position control and static transform broadcaster removed
     ]
 
     return LaunchDescription(declared_arguments + nodes)

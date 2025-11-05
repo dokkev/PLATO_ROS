@@ -5,7 +5,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
-from plato2_interfaces.msg import SavedNames
+from plato2_interfaces.msg import SavedNames, ImpedanceCommands, ImpedanceParams
 import yaml
 import os
 
@@ -38,12 +38,22 @@ class JointStateRecorder(Node):
             10
         )
         
-        # Publisher for the fetched joint state
+        # Publisher for impedance commands to our controller
         self.commands_publisher = self.create_publisher(
-            Float64MultiArray,
-            '/plato2/plato2_position_controller/commands',
+            ImpedanceCommands,
+            '/plato2/joint_impedance_controller/commands',
             10
         )
+        
+        # Subscriber for compact impedance params (MCP/PIP) on a single topic
+        self.params_subscriber = self.create_subscription(
+            ImpedanceParams,
+            'impedance_params',  # resolves to <ns>/impedance_params
+            self.params_callback,
+            10
+        )
+        self.get_logger().info(
+            f"Listening for ImpedanceParams on: {self.get_namespace()}/impedance_params")
         
         # Publisher for SavedNames
         self.saved_names_publisher = self.create_publisher(
@@ -61,6 +71,16 @@ class JointStateRecorder(Node):
         self.joint_state_subscriber = None
         self.joint_state_name = None
         self.joint_state_data = None
+
+        # Cached command state
+        self.NUM_JOINTS = 8
+        self.cached_position = [0.0] * self.NUM_JOINTS
+        # Defaults for compact params (MCP, PIP)
+        self.cached_params = {
+            'stiffness': [0.0, 0.0],
+            'damping': [0.0, 0.0],
+            'effort_ff': [0.0, 0.0],
+        }
         self.get_logger().info("Joint State Recorder Node initialized.")
 
     def string_callback(self, msg):
@@ -140,10 +160,80 @@ class JointStateRecorder(Node):
             self.get_logger().error(f"No entry found for '{requested_name}' in YAML file.")
 
     def publish_joint_state(self, joint_state):
-        msg = Float64MultiArray()
-        msg.data = joint_state
-        self.commands_publisher.publish(msg)
-        self.get_logger().info(f"Published joint state: {joint_state}")
+        """
+        Update cached position from provided array and publish a full ImpedanceCommands
+        using cached parameters for stiffness/damping/effort_ff.
+        """
+        positions = list(joint_state)[:self.NUM_JOINTS]
+        if len(positions) < self.NUM_JOINTS:
+            positions.extend([0.0] * (self.NUM_JOINTS - len(positions)))
+        self.cached_position = positions
+        self.publish_current_command()
+
+    def params_callback(self, msg: ImpedanceParams):
+        """Update cached compact params and publish the full command."""
+        # Accept any iterable/sequence-like; pad/trim to 2
+        def get_pair(arr):
+            try:
+                a = list(arr) if arr is not None else []
+            except Exception:
+                a = []
+            if len(a) < 2:
+                a.extend([0.0] * (2 - len(a)))
+            a = a[:2]
+            return [float(a[0]), float(a[1])]
+
+        self.cached_params['stiffness'] = get_pair(msg.stiffness)
+        self.cached_params['damping'] = get_pair(msg.damping)
+        self.cached_params['effort_ff'] = get_pair(msg.effort_ff)
+
+        self.get_logger().info(
+            f"Received params MCP/PIP -> K={self.cached_params['stiffness']}, B={self.cached_params['damping']}, FF={self.cached_params['effort_ff']}")
+        self.publish_current_command()
+
+    def publish_current_command(self):
+        """
+        Build a full ImpedanceCommands from cached_position and cached_params.
+        Mapping:
+          MCP joints: indices [2,4,6]
+          PIP joints: indices [3,5,7]
+          Joints 0,1: fixed stiffness=3.0, damping=0.2; effort_ff defaults 0.0
+        Velocity is zeroed.
+        """
+        K_mcp, K_pip = self.cached_params['stiffness']
+        B_mcp, B_pip = self.cached_params['damping']
+        FF_mcp, FF_pip = self.cached_params['effort_ff']
+
+        K = [0.0] * self.NUM_JOINTS
+        B = [0.0] * self.NUM_JOINTS
+        FF = [0.0] * self.NUM_JOINTS
+
+        # Fixed thumb/base gains (indices 0,1)
+        K[0] = 3.0; K[1] = 3.0
+        B[0] = 0.2; B[1] = 0.2
+        # Effort feedforward for 0,1 remains 0.0 by default
+
+        # MCP joints (2,4,6)
+        for idx in [2, 4, 6]:
+            K[idx] = K_mcp
+            B[idx] = B_mcp
+            FF[idx] = FF_mcp
+        # PIP joints (3,5,7)
+        for idx in [3, 5, 7]:
+            K[idx] = K_pip
+            B[idx] = B_pip
+            FF[idx] = FF_pip
+
+        cmd = ImpedanceCommands()
+        cmd.position = list(self.cached_position)
+        cmd.velocity = [0.0] * self.NUM_JOINTS
+        cmd.stiffness = K
+        cmd.damping = B
+        cmd.effort_ff = FF
+
+        self.commands_publisher.publish(cmd)
+        self.get_logger().info(
+            f"Published ImpedanceCommands from cache: pos={cmd.position}, K0-1=3,B0-1=0.2, K_mcp={K_mcp}, K_pip={K_pip}")
 
     def publish_saved_names(self):
         """

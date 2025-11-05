@@ -25,6 +25,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   msg/SavedNames.msg
   msg/ImpedanceCommands.msg
   msg/ImpedanceControllerState.msg
+  msg/ImpedanceParams.msg
   DEPENDENCIES trajectory_msgs
  )
 ament_export_dependencies(

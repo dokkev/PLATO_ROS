@@ -44,3 +44,6 @@ ros2 topic pub /plato2/joint_impedance_controller/commands plato2_interfaces/msg
   stiffness: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   damping: [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 }"
+
+
+ros2 service call /naritouch_grasp_demo/start_grasp std_srvs/srv/Empty

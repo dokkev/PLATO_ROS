@@ -317,20 +317,21 @@ void JointImpedanceController::publish_state(const rclcpp::Time & time, const Cm
   msg.stiffness = command.stiffness;
   msg.damping = command.damping;
   msg.effort_ff = command.effort_ff;
+  msg.effort_desired = command.effort_ff;  // Initialize with feedforward
   
   // Compute errors and feedback torque
-  for (size_t i = 0; i < num_joints; ++i)
-  {
-    msg.position_error[i] = command.position[i] - positions_[i];
-    msg.velocity_error[i] = command.velocity[i] - velocities_[i];
+  // for (size_t i = 0; i < num_joints; ++i)
+  // {
+  //   msg.position_error[i] = command.position[i] - positions_[i];
+  //   msg.velocity_error[i] = command.velocity[i] - velocities_[i];
     
-    // Compute feedback torque (same as in update)
-    msg.effort_fb[i] = command.stiffness[i] * msg.position_error[i] + 
-                       command.damping[i] * msg.velocity_error[i];
+  //   // Compute feedback torque (same as in update)
+  //   msg.effort_fb[i] = command.stiffness[i] * msg.position_error[i] + 
+  //                      command.damping[i] * msg.velocity_error[i];
     
-    // Total desired effort
-    msg.effort_desired[i] = command.effort_ff[i] + msg.effort_fb[i];
-  }
+  //   // Total desired effort
+  //   msg.effort_desired[i] = command.effort_ff[i] + msg.effort_fb[i];
+  // }
 
   state_publisher_->unlockAndPublish();
 }

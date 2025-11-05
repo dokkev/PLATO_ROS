@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64, Float64MultiArray
+from plato2_interfaces.msg import ImpedanceCommands
 from threading import Lock
 
 
@@ -15,23 +16,23 @@ class JointStateSplitter(Node):
         self.declare_parameter('joint_count', 8)
         self.joint_count = self.get_parameter('joint_count').get_parameter_value().integer_value
 
-        # Subscribe to the joint states and position commands
+        # Subscribe to the joint states and impedance commands
         self.joint_state_sub = self.create_subscription(
             JointState,
             '/plato2/joint_states',
             self.joint_state_callback,
             10
         )
-        self.position_command_sub = self.create_subscription(
-            Float64MultiArray,
-            'plato2_position_controller/commands',
-            self.position_command_callback,
+        self.impedance_command_sub = self.create_subscription(
+            ImpedanceCommands,
+            '/plato2/joint_impedance_controller/commands',
+            self.impedance_command_callback,
             10
         )
 
-        # Publishers for each joint state
+        # Publishers for each joint state (renamed under foxglove_graph, 0-based indexing)
         self.joint_publishers = [
-            self.create_publisher(JointState, f'/plato2/joint_states/joint{i+1}', 10)
+            self.create_publisher(JointState, f'/plato2/foxglove_graph/joint{i}_states', 10)
             for i in range(self.joint_count)
         ]
 
@@ -42,14 +43,16 @@ class JointStateSplitter(Node):
             10
         )
 
-        # Publishers for position commands
-        self.command_publishers = [
-            self.create_publisher(Float64, f'/plato2/plato2_position_controller/joint{i+1}', 10)
-            for i in range(self.joint_count)
-        ]
+        # Array publishers for position and velocity under foxglove_graph
+        self.position_array_pub = self.create_publisher(
+            Float64MultiArray, '/plato2/foxglove_graph/position', 10)
+        self.velocity_array_pub = self.create_publisher(
+            Float64MultiArray, '/plato2/foxglove_graph/velocity', 10)
 
-        # Initialize the latest command for each joint
-        self.latest_commands = [0.0] * self.joint_count
+        # Initialize the latest command caches for each joint
+        self.latest_position = [0.0] * self.joint_count
+        self.latest_velocity = [0.0] * self.joint_count
+    # Drop stiffness/damping/effort_ff for graphing simplification
 
         # Lock to protect shared resources
         self.lock = Lock()
@@ -57,7 +60,7 @@ class JointStateSplitter(Node):
         # Flag to indicate a new command has been received
         self.new_command_received = False
 
-        # Create a timer to repeatedly publish commands
+    # Create a timer to repeatedly publish commands (for consistent streaming)
         self.command_publish_timer = self.create_timer(0.5, self.timer_publish_commands)
 
     def joint_state_callback(self, msg):
@@ -88,19 +91,22 @@ class JointStateSplitter(Node):
 
             self.joint_publishers[i].publish(joint_msg)
 
-    def position_command_callback(self, msg):
+    def impedance_command_callback(self, msg: ImpedanceCommands):
         with self.lock:
-            # Update the latest commands for each joint
-            if len(msg.data) == self.joint_count:
-                self.latest_commands = list(msg.data)
-                self.new_command_received = True
-                # self.get_logger().info("Received new position commands.")
-                # Publish immediately
-                self.publish_commands()
-            else:
-                self.get_logger().warn(
-                    f"Received position command with {len(msg.data)} elements, expected {self.joint_count}."
-                )
+            # Robustly size-check and assign each field
+            def take(arr, n):
+                a = list(arr) if arr is not None else []
+                if len(a) < n:
+                    a.extend([0.0] * (n - len(a)))
+                return a[:n]
+
+            self.latest_position = take(msg.position, self.joint_count)
+            self.latest_velocity = take(msg.velocity, self.joint_count)
+            # Ignore stiffness/damping/effort_ff for graphing
+
+            self.new_command_received = True
+            # Publish immediately
+            self.publish_commands()
 
     def timer_publish_commands(self):
         with self.lock:
@@ -112,12 +118,11 @@ class JointStateSplitter(Node):
                 self.new_command_received = False
 
     def publish_commands(self):
-        # Publish the latest commands
-        for i in range(self.joint_count):
-            command_msg = Float64()
-            command_msg.data = self.latest_commands[i]
-            self.command_publishers[i].publish(command_msg)
-            # self.get_logger().debug(f"Publishing command for joint{i+1}: {self.latest_commands[i]}")
+        # Publish the latest position and velocity arrays
+        pos_msg = Float64MultiArray(); pos_msg.data = list(self.latest_position)
+        vel_msg = Float64MultiArray(); vel_msg.data = list(self.latest_velocity)
+        self.position_array_pub.publish(pos_msg)
+        self.velocity_array_pub.publish(vel_msg)
 
 
 def main(args=None):

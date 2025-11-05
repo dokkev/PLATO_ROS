@@ -3,8 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from plato2_interfaces.msg import Trajectory, SavedNames
-from std_msgs.msg import Float64MultiArray
+from plato2_interfaces.msg import Trajectory, SavedNames, ImpedanceCommands, ImpedanceParams
 from collections import OrderedDict
 import yaml
 import os
@@ -45,10 +44,10 @@ class TrajectoryManager(Node):
             10
         )
 
-        # Publisher for the joint commands
+        # Publisher for impedance commands to the controller
         self.commands_publisher = self.create_publisher(
-            Float64MultiArray,
-            '/plato2/plato2_position_controller/commands',
+            ImpedanceCommands,
+            '/plato2/joint_impedance_controller/commands',
             10
         )
 
@@ -133,9 +132,21 @@ class TrajectoryManager(Node):
 
         self.get_logger().info(f"Received Trajectory message to save: '{trajectory_name}'")
 
-        # Validate message lengths
+        # Validate message lengths (params can be length 0/1/N)
         if not (len(position_names) == len(motion_times) == len(hold_times)):
             self.get_logger().error("Lengths of position_name, motion_time, and hold_time arrays must be equal.")
+            return
+
+        # Normalize params list
+        params_list = list(msg.params) if hasattr(msg, 'params') and msg.params is not None else []
+        if len(params_list) == 1:
+            params_list = params_list * len(position_names)
+        elif len(params_list) == 0:
+            # default zeros
+            zero = ImpedanceParams(stiffness=[0.0, 0.0], damping=[0.0, 0.0], effort_ff=[0.0, 0.0])
+            params_list = [zero] * len(position_names)
+        elif len(params_list) != len(position_names):
+            self.get_logger().error("Length of params must be 0, 1, or match position_name length.")
             return
 
         # Build the trajectory data as a list
@@ -154,6 +165,13 @@ class TrajectoryManager(Node):
             step['position_name'] = position_name
             step['Motion_Time'] = motion_time
             step['Hold_Time'] = hold_time
+            # Add ImpedanceParams for this step
+            ip = params_list[i]
+            step['ImpedanceParams'] = {
+                'stiffness': list(ip.stiffness) if ip.stiffness is not None else [0.0, 0.0],
+                'damping': list(ip.damping) if ip.damping is not None else [0.0, 0.0],
+                'effort_ff': list(ip.effort_ff) if ip.effort_ff is not None else [0.0, 0.0],
+            }
             trajectory_steps.append(step)
 
             self.get_logger().debug(f"Added step: {trajectory_steps[-1]}")
@@ -202,15 +220,20 @@ class TrajectoryManager(Node):
                 return
 
             target_positions = self.joint_states[position_name]
+            # Extract ImpedanceParams for this step (MCP/PIP compact)
+            ip = step.get('ImpedanceParams', {'stiffness':[0.0,0.0], 'damping':[0.0,0.0], 'effort_ff':[0.0,0.0]})
+            K_pair = ip.get('stiffness', [0.0, 0.0])
+            B_pair = ip.get('damping', [0.0, 0.0])
+            FF_pair = ip.get('effort_ff', [0.0, 0.0])
 
             self.get_logger().info(f"Moving to '{position_name}' over {motion_time}s and holding for {hold_time}s.")
 
             # Interpolate from current_positions to target_positions over motion_time using minimum jerk
-            self.interpolate_and_publish(current_positions, target_positions, motion_time)
+            self.interpolate_and_publish(current_positions, target_positions, motion_time, K_pair, B_pair, FF_pair)
 
             # Hold at target_positions for hold_time
             if hold_time > 0.0:
-                self.publish_position(target_positions)
+                self.publish_command(target_positions, K_pair, B_pair, FF_pair)
                 self.get_logger().info(f"Holding position '{position_name}' for {hold_time}s.")
                 time.sleep(hold_time)
 
@@ -247,10 +270,10 @@ class TrajectoryManager(Node):
 
         return list_x
 
-    def interpolate_and_publish(self, start_positions, end_positions, duration):
+    def interpolate_and_publish(self, start_positions, end_positions, duration, K_pair, B_pair, FF_pair):
         if duration <= 0.0:
             # Immediate move to the target position
-            self.publish_position(end_positions)
+            self.publish_command(end_positions, K_pair, B_pair, FF_pair)
             return
 
         dt = 0.01  # Time step (seconds)
@@ -259,14 +282,43 @@ class TrajectoryManager(Node):
         self.get_logger().debug(f"Interpolating using minimum jerk over {len(interpolated_positions)} steps with {dt}s between steps.")
 
         for pos in interpolated_positions:
-            self.publish_position(pos)
+            self.publish_command(pos, K_pair, B_pair, FF_pair)
             time.sleep(dt)
 
-    def publish_position(self, positions):
-        msg = Float64MultiArray()
-        msg.data = positions
-        self.commands_publisher.publish(msg)
-        self.get_logger().debug(f"Published positions: {positions}")
+    def publish_command(self, positions, K_pair, B_pair, FF_pair):
+        # Build full ImpedanceCommands
+        NUM_JOINTS = len(positions)
+        K_mcp, K_pip = (list(K_pair) + [0.0, 0.0])[:2]
+        B_mcp, B_pip = (list(B_pair) + [0.0, 0.0])[:2]
+        FF_mcp, FF_pip = (list(FF_pair) + [0.0, 0.0])[:2]
+
+        K = [0.0] * NUM_JOINTS
+        B = [0.0] * NUM_JOINTS
+        FF = [0.0] * NUM_JOINTS
+
+        # Fixed joints 0,1 gains/feedforward
+        if NUM_JOINTS >= 2:
+            K[0] = 3.0; K[1] = 3.0
+            B[0] = 0.2; B[1] = 0.2
+            FF[0] = 0.0; FF[1] = 0.0
+
+        # Map MCP -> [2,4,6], PIP -> [3,5,7]
+        for idx in [2, 4, 6]:
+            if idx < NUM_JOINTS:
+                K[idx] = K_mcp; B[idx] = B_mcp; FF[idx] = FF_mcp
+        for idx in [3, 5, 7]:
+            if idx < NUM_JOINTS:
+                K[idx] = K_pip; B[idx] = B_pip; FF[idx] = FF_pip
+
+        cmd = ImpedanceCommands()
+        cmd.position = list(positions)
+        cmd.velocity = [0.0] * NUM_JOINTS
+        cmd.stiffness = K
+        cmd.damping = B
+        cmd.effort_ff = FF
+
+        self.commands_publisher.publish(cmd)
+        # self.get_logger().debug(f"Published ImpedanceCommands: pos={positions}")
 
     def publish_saved_trajectories(self):
         """

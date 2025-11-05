@@ -7,46 +7,42 @@ ParallelGraspController::ParallelGraspController() {
   }
 }
 
-double ParallelGraspController::compute_q5_delta(double q3) {
-  // Enforce x-alignment: x5 = x3  =>  cos(q5) = cos(q3) - w/L
-  // We choose the opposite-motion branch so dq5/dq3 < 0 (fingers move in opposite directions)
+double ParallelGraspController::compute_q5_smooth(double q3) {
+  if (q3 < 0.0) {
+    // For closing (q3 < 0): enforce exact x-alignment (zero horizontal displacement)
+    // Geometric constraint: cos(q5) = cos(q3) - w/L
+    const double cos_q5 = std::cos(q3) - w / L;
 
-  const double Araw = std::cos(q3) - w / L;
+    // Clamp to valid range [-1, 1]
+    const double cos_q5_clamped = std::clamp(cos_q5, -1.0, 1.0);
 
-  // Check feasibility (may occur if q3 is at extreme angles)
-  // Fall back to clamped value but exact x-alignment may not be achievable
-  const double A = std::clamp(Araw, -1.0, 1.0);
-
-  // Opposite-motion branch: use negative sgn(sin(q3))
-  const double y = -sgn(std::sin(q3)) * std::sqrt(std::max(0.0, 1.0 - A * A));
-  const double q5 = std::atan2(y, A);
-
-  // Return wrapped angle difference: Δq = q5 - q3
-  return wrap_pi(q5 - q3);
+    // For q3 < 0, we want q5 > 0 (opposite direction)
+    // Since acos returns [0, π], this gives us the positive solution
+    return std::acos(cos_q5_clamped);
+  } else {
+    // For opening (q3 >= 0): use smooth linear scaling
+    const double scale_factor = -(1.0 + std::abs(w) / L);
+    return q3 * scale_factor;
+  }
 }
 
-const std::vector<double>& ParallelGraspController::get_commands(double u_cmd) {
+const std::vector<double>& ParallelGraspController::get_commands(
+    double u_cmd,
+    const std::vector<double>& current_positions) {
+
   // Map u ∈ [0,1] → q3 ∈ [qmin, qmax]
-  const double u = std::clamp(u_cmd, 0.0, 1.0);
-  const double q3 = qmin + u * (qmax - qmin);
+  u_ = std::clamp(u_cmd, 0.0, 1.0);
+  const double q3 = qmin + u_ * (qmax - qmin);
 
-  // Compute q5 using geometric constraint
-  const double dq = compute_q5_delta(q3);
-  double q5 = q3 + dq;
-
-  // Mirror for opposite finger (joints 4 and 6) - parallelogram assumption
-  const double q4 = -q3;
-  const double q6 = -q5;
-
-  // Update internal state
-  last_u_ = u;
-
-  // Build 8-element joint command vector (indices 2-5 contain grasp joints)
-  joint_commands_.assign(8, 0.0);
+  // Build 8-element joint command vector
+  joint_commands_[0] = 0.0;
+  joint_commands_[1] = 0.0;
   joint_commands_[2] = q3;
-  joint_commands_[3] = q4;
-  joint_commands_[4] = q5;
-  joint_commands_[5] = q6;
+  joint_commands_[3] = -current_positions[2];  // q4 mirrors current q3
+  joint_commands_[4] = compute_q5_smooth(q3);
+  joint_commands_[5] = -current_positions[4];  // q6 mirrors current q5
+  joint_commands_[6] = 0.785;
+  joint_commands_[7] = 1.5708;
 
   return joint_commands_;
 }

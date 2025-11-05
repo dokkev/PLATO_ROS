@@ -35,9 +35,7 @@ target_compile_features(parallel_grasp_node PUBLIC c_std_99 cxx_std_20)
 ament_target_dependencies(parallel_grasp_node
   rclcpp
   std_msgs
-)
-# add plato2_interfaces dependency for impedance command message
-ament_target_dependencies(parallel_grasp_node
+  sensor_msgs
   plato2_interfaces
 )
 

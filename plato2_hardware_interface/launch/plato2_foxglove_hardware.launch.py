@@ -136,7 +136,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         # ft_sensor_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        foxglove_graph,
+        # foxglove_graph,
         foxglove_commands,
         foxglove_trajectory,
         # position control and static transform broadcaster removed

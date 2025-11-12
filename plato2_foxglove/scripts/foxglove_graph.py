@@ -43,16 +43,16 @@ class JointStateSplitter(Node):
             10
         )
 
-        # Array publishers for position and velocity under foxglove_graph
-        self.position_array_pub = self.create_publisher(
-            Float64MultiArray, '/plato2/foxglove_graph/position', 10)
-        self.velocity_array_pub = self.create_publisher(
-            Float64MultiArray, '/plato2/foxglove_graph/velocity', 10)
+        # Per-joint publishers using JointState format for commands
+        self.joint_command_pubs = [
+            self.create_publisher(JointState, f'/plato2/foxglove_graph/joint{i}_commands', 10)
+            for i in range(self.joint_count)
+        ]
 
         # Initialize the latest command caches for each joint
         self.latest_position = [0.0] * self.joint_count
         self.latest_velocity = [0.0] * self.joint_count
-    # Drop stiffness/damping/effort_ff for graphing simplification
+        self.joint_names = [f'joint{i}' for i in range(self.joint_count)]
 
         # Lock to protect shared resources
         self.lock = Lock()
@@ -118,11 +118,14 @@ class JointStateSplitter(Node):
                 self.new_command_received = False
 
     def publish_commands(self):
-        # Publish the latest position and velocity arrays
-        pos_msg = Float64MultiArray(); pos_msg.data = list(self.latest_position)
-        vel_msg = Float64MultiArray(); vel_msg.data = list(self.latest_velocity)
-        self.position_array_pub.publish(pos_msg)
-        self.velocity_array_pub.publish(vel_msg)
+        # Publish per-joint commands using JointState format
+        for i in range(self.joint_count):
+            cmd_msg = JointState()
+            cmd_msg.name = [self.joint_names[i]]
+            cmd_msg.position = [self.latest_position[i]]
+            cmd_msg.velocity = [self.latest_velocity[i]]
+            cmd_msg.effort = []  # Empty for commands
+            self.joint_command_pubs[i].publish(cmd_msg)
 
 
 def main(args=None):

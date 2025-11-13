@@ -153,7 +153,7 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
   }
 
   // set current position as zero
-  // hand_->set_current_position_as_zero();
+
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -202,6 +202,8 @@ PLATO2Hardware::write(const rclcpp::Time &time,
                                joint_stiffness_commands_,
                                joint_damping_commands_,
                                joint_effort_commands_);
+
+  // hand_->set_current_position_as_zero();
 
   return hardware_interface::return_type::OK;
 }

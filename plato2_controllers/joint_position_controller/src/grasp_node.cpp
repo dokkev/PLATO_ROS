@@ -313,8 +313,8 @@ private:
       /* 1: Close */
       case State::kCloseGripper: {
         // Gradually close gripper until contact is detected
-        // Close at ~0.1/sec (will take ~3 seconds to fully close from 0.3)
-        const double CLOSE_RATE = 0.1 / ROS_HZ;  // per control loop iteration
+        // Close at ~0.3/sec (will take ~1 second to fully close from 0.3)
+        const double CLOSE_RATE = 0.3 / ROS_HZ;  // per control loop iteration
         u_cmd_ = std::max(0.0, u_cmd_ - CLOSE_RATE);
 
         if ((contact_state_0 >= ContactStatus::kFewContact) &&

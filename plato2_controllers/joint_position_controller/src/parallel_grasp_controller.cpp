@@ -9,15 +9,9 @@ ParallelGraspController::ParallelGraspController() {
 
 double ParallelGraspController::compute_q5_smooth(double q3) {
   if (q3 < 0.0) {
-    // For closing (q3 < 0): enforce exact x-alignment (zero horizontal displacement)
-    // Geometric constraint: cos(q5) = cos(q3) - w/L
+    // Closing: enforce exact x-alignment (geometric constraint)
     const double cos_q5 = std::cos(q3) - w / L;
-
-    // Clamp to valid range [-1, 1]
     const double cos_q5_clamped = std::clamp(cos_q5, -1.0, 1.0);
-
-    // For q3 < 0, we want q5 > 0 (opposite direction)
-    // Since acos returns [0, π], this gives us the positive solution
     const double q5_geometric = std::acos(cos_q5_clamped);
 
     // Store for opening transition
@@ -26,9 +20,10 @@ double ParallelGraspController::compute_q5_smooth(double q3) {
 
     return q5_geometric;
   } else {
-    // For opening (q3 >= 0): mirror the increment from last closing position
-    const double delta_q3 = q3 - prev_q3_;
-    return prev_q5_ - delta_q3;  // Mirror increment
+    // Opening: linearly interpolate from last closing q5 to 0 (fully open)
+    // Map q3 ∈ [0, qmax] → q5 ∈ [prev_q5_, 0]
+    const double t = q3 / qmax;  // normalized [0, 1]
+    return prev_q5_ * (1.0 - t);  // linear blend to zero
   }
 }
 

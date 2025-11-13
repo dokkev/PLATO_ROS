@@ -1,0 +1,81 @@
+/**:
+  ros__parameters:
+    # ========================================================================
+    # State Machine Timing
+    # ========================================================================
+    contact_stable_time: 0.5       # seconds - time to confirm stable contact
+    contact_lost_timeout: 0.5      # seconds - timeout before returning to idle on contact loss
+    control_rate: 100.0            # Hz - main control loop frequency
+
+    # ========================================================================
+    # Force Limits and Safety
+    # ========================================================================
+    min_force_limit: 0.0           # N - minimum grasp force
+    max_force_limit: 30.0          # N - maximum grasp force
+
+    # ========================================================================
+    # Force-to-Command Mapping
+    # ========================================================================
+    # These parameters control how force from grasp_force_ctrl is converted to position commands
+    force_to_position_gain: 0.01   # Position change per unit force (dimensionless/N)
+                                    # Higher values = more aggressive closing for given force
+                                    # Tune based on your gripper geometry and sensor calibration
+
+    force_to_effort_gain: 1.0      # Effort feedforward per unit force
+                                    # Used for impedance control feedforward term
+
+    # ========================================================================
+    # Impedance Parameters for Different States
+    # ========================================================================
+    # kIdle state: Standard open-loop position control
+    default_stiffness: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    default_damping: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+
+    # kAdaptive state: Higher stiffness on grasp joints for force control
+    # Joints 3-6 (indices 2-5) are the parallel grasp joints
+    adaptive_stiffness: [1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0]
+    adaptive_damping: [0.1, 0.1, 0.2, 0.2, 0.2, 0.2, 0.1, 0.1]
+
+    # kForce state: Highest stiffness for precise force tracking
+    force_tracking_stiffness: [1.0, 1.0, 3.0, 3.0, 3.0, 3.0, 1.0, 1.0]
+    force_tracking_damping: [0.1, 0.1, 0.3, 0.3, 0.3, 0.3, 0.1, 0.1]
+
+# ============================================================================
+# SIMPLIFIED ARCHITECTURE NOTES
+# ============================================================================
+#
+# This node coordinates between grasp_force_ctrl (which calculates forces)
+# and the parallel grasp controller (which controls positions).
+#
+# Division of Labor:
+# - grasp_force_ctrl: Calculates desired force based on tactile feedback (PID, slip detection)
+# - This node: State machine, force-to-position mapping, impedance control
+#
+# The force control parameters (PID gains, slip threshold, etc.) are configured
+# in the grasp_force_ctrl config file, NOT here.
+#
+# ============================================================================
+# Parameter Tuning Guide
+# ============================================================================
+#
+# 1. Contact Detection:
+#    - contact_stable_time: Increase if false positives, decrease for faster response
+#    - Tune based on how quickly your tactile sensors stabilize
+#
+# 2. Force-to-Position Mapping:
+#    - force_to_position_gain: Start small (0.01) and increase gradually
+#    - Too high: Gripper closes too aggressively, may damage objects
+#    - Too low: Insufficient force application, objects may slip
+#    - This is the MOST IMPORTANT parameter to tune for your gripper
+#
+# 3. Impedance Tuning:
+#    - Higher stiffness: Better force control, but less compliant
+#    - Higher damping: More stable, but slower response
+#    - Grasp joints (indices 2-5) should have higher values than wrist joints
+#
+# 4. Force Control (in grasp_force_ctrl config):
+#    - PID gains for slip-based control
+#    - Slip detection thresholds
+#    - Moving average window for tactile filtering
+#
+# ============================================================================

@@ -47,3 +47,10 @@ ros2 topic pub /plato2/joint_impedance_controller/commands plato2_interfaces/msg
 
 
 ros2 service call /naritouch_grasp_demo/start_grasp std_srvs/srv/Empty
+
+
+
+ros2 topic pub --rate 10 /parallel_grasp_node/u_cmd std_msgs/msg/Float64 "{data: 0.8}"
+
+
+ros2 service call /parallel_grasp_node/start_grasp std_srvs/srv/Empty

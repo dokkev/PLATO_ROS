@@ -52,17 +52,20 @@ PLATO2Hardware::export_state_interfaces() {
   // Reserve space for joint and FT sensor interfaces
   state_interfaces.reserve(info_.joints.size() * 3 + (hand_->get_num_ft_sensors() * 6));
 
-  // Joint state interfaces
-  for (size_t i = 0; i < info_.joints.size(); ++i) {
+  // Joint state interfaces - explicitly export in order joint1, joint2, ..., joint8
+  // This ensures the joint_state_broadcaster publishes in the correct order
+  const size_t num_joints = info_.joints.size();
+  for (size_t i = 1; i <= num_joints; ++i) {
+    std::string joint_name = "joint" + std::to_string(i);
     state_interfaces.emplace_back(hardware_interface::StateInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_POSITION,
-        &joint_position_states_[i]));
+        joint_name, hardware_interface::HW_IF_POSITION,
+        &joint_position_states_[i - 1]));
     state_interfaces.emplace_back(hardware_interface::StateInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
-        &joint_velocity_states_[i]));
+        joint_name, hardware_interface::HW_IF_VELOCITY,
+        &joint_velocity_states_[i - 1]));
     state_interfaces.emplace_back(hardware_interface::StateInterface(
-        info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-        &joint_effort_states_[i]));
+        joint_name, hardware_interface::HW_IF_EFFORT,
+        &joint_effort_states_[i - 1]));
   }
 
 
@@ -94,34 +97,39 @@ PLATO2Hardware::export_command_interfaces() {
   stiffness_command_interface_names_.reserve(info_.joints.size());
   damping_command_interface_names_.reserve(info_.joints.size());
 
-  for (size_t i = 0; i < info_.joints.size(); ++i) {
-  // Position
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, hardware_interface::HW_IF_POSITION,
-    &joint_position_commands_[i]));
-  position_command_interface_names_.push_back(command_interfaces.back().get_name());
+  // Command interfaces - explicitly export in order joint1, joint2, ..., joint8
+  // This ensures controllers receive commands in the correct order
+  const size_t num_joints = info_.joints.size();
+  for (size_t i = 1; i <= num_joints; ++i) {
+    std::string joint_name = "joint" + std::to_string(i);
+    
+    // Position
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      joint_name, hardware_interface::HW_IF_POSITION,
+      &joint_position_commands_[i - 1]));
+    position_command_interface_names_.push_back(command_interfaces.back().get_name());
 
-  // Velocity
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
-    &joint_velocity_commands_[i]));
-  velocity_command_interface_names_.push_back(command_interfaces.back().get_name());
+    // Velocity
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      joint_name, hardware_interface::HW_IF_VELOCITY,
+      &joint_velocity_commands_[i - 1]));
+    velocity_command_interface_names_.push_back(command_interfaces.back().get_name());
 
-  // Effort
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-    &joint_effort_commands_[i]));
-  effort_command_interface_names_.push_back(command_interfaces.back().get_name());
+    // Effort
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      joint_name, hardware_interface::HW_IF_EFFORT,
+      &joint_effort_commands_[i - 1]));
+    effort_command_interface_names_.push_back(command_interfaces.back().get_name());
 
-  // Stiffness (Kp)
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, "stiffness", &joint_stiffness_commands_[i]));
-  stiffness_command_interface_names_.push_back(command_interfaces.back().get_name());
+    // Stiffness (Kp)
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      joint_name, "stiffness", &joint_stiffness_commands_[i - 1]));
+    stiffness_command_interface_names_.push_back(command_interfaces.back().get_name());
 
-  // Damping (Kd)
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[i].name, "damping", &joint_damping_commands_[i]));
-  damping_command_interface_names_.push_back(command_interfaces.back().get_name());
+    // Damping (Kd)
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(
+      joint_name, "damping", &joint_damping_commands_[i - 1]));
+    damping_command_interface_names_.push_back(command_interfaces.back().get_name());
   }
 
   return command_interfaces;

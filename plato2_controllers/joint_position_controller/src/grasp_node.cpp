@@ -69,6 +69,10 @@ private:
   static constexpr double kContactDetTime = 0.01;
   static constexpr double kNoContactDetTime = 0.5;
   static constexpr double kContactEnoughTime = 0.5;
+  // U regulator gains (force tracking): simple PI on force error (desired - measured)
+  static constexpr double kU_KP = 0.02;   // proportional gain for u feedback
+  static constexpr double kU_KI = 0.005;  // integral gain for u feedback
+  static constexpr double kU_I_LIMIT = 0.5; // anti-windup limit for integral term
   static constexpr int TERMINATE = -1;
 
   // State machine
@@ -292,6 +296,10 @@ private:
         prev_force_ = 0;
         applied_force = 0;
 
+        // Ensure gripper is in a mostly-open standby position (u in [0,1],
+        // where 1.0 is fully open). Use 0.9 so we don't fully open.
+        u_cmd_ = 0.9;
+
         if (start_close_) {
           start_close_ = false;
           time_sec = 0;
@@ -305,8 +313,8 @@ private:
       /* 1: Close */
       case State::kCloseGripper: {
         // Gradually close gripper until contact is detected
-        // Close at ~0.01/sec (will take ~30 seconds to fully close from 0.3)
-        const double CLOSE_RATE = 0.01 / ROS_HZ;  // per control loop iteration
+        // Close at ~0.1/sec (will take ~3 seconds to fully close from 0.3)
+        const double CLOSE_RATE = 0.1 / ROS_HZ;  // per control loop iteration
         u_cmd_ = std::max(0.0, u_cmd_ - CLOSE_RATE);
 
         if ((contact_state_0 >= ContactStatus::kFewContact) &&
@@ -531,7 +539,9 @@ private:
   void OpenCloseGripper() {
     // Start closing gripper slowly (u=0.0 is fully closed, u=1.0 is fully open)
     // Start from slightly open position and slowly close until contact detected
-    u_cmd_ = 0.3;  // Start closing from 30% open
+    // Do NOT reset u_cmd_ here so closing will start from the current u_cmd_
+    // (which is set to 0.9 in standby). This prevents a jump to a different
+    // start position when transitioning to CloseGripper.
 
     auto trajectory_name = std_msgs::msg::String();
     trajectory_name.data = "close_block";
@@ -551,6 +561,17 @@ private:
     }
   }
 
+  // Measure current grasp force from tactile sensors. Use the Z component
+  // (normal force) and return whichever sensor reports the larger value.
+  // If no data yet, values default to 0.
+  double MeasuredForce() {
+    double f0z = tactile_0_.force.z;
+    double f1z = tactile_1_.force.z;
+    f0z = std::max(0.0, f0z);
+    f1z = std::max(0.0, f1z);
+    return std::max(f0z, f1z);
+  }
+
   void ClearContactPosition() {
     pos_contact_.clear();
   }
@@ -564,21 +585,29 @@ private:
   }
 
   void SendPosCommand(double diff) {
-    // Map position difference to normalized grasp command [0,1]
+    // Map position difference to normalized grasp command [0,1] (feedforward)
     // diff > 0 means closing the gripper (applying force)
     // u=0.0 is fully closed, u=1.0 is fully open
     const double MAX_DIFF = 0.05;  // Maximum expected diff value
 
-    // Convert diff to normalized command
-    // When diff is 0 (no force), gripper at contact position (0.3)
-    // When diff increases (more force), gripper closes more (towards 0.0)
     double normalized_cmd = 0.3 - (diff / MAX_DIFF) * 0.3;
-
-    // Clamp to [0, 1]
     normalized_cmd = std::clamp(normalized_cmd, 0.0, 1.0);
+    double u_ff = normalized_cmd;
 
-    // Update u_cmd for controller
-    u_cmd_ = normalized_cmd;
+    // Force tracking error (desired - measured). Positive error means we
+    // need more force -> close gripper -> decrease u, so feedback is
+    // inverted (negative sign).
+    double measured = MeasuredForce();
+    double desired = force_;
+    double err = desired - measured;
+
+    const double dt = 1.0 / ROS_HZ;
+    u_integral_ += err * dt;
+    u_integral_ = std::clamp(u_integral_, -kU_I_LIMIT, kU_I_LIMIT);
+
+    double u_fb = -(kU_KP * err + kU_KI * u_integral_);
+
+    u_cmd_ = std::clamp(u_ff + u_fb, 0.0, 1.0);
   }
 
   void Terminate() {
@@ -651,7 +680,8 @@ private:
   State state_ = State::kIdle;
   double time_sec = 0;
   double init_force_;
-  double u_cmd_ = 0.5;  // Normalized grasp command [0, 1]
+  double u_cmd_ = 0.9;  // Normalized grasp command [0, 1]
+  double u_integral_ = 0.0;  // Integral state for u PI regulator
 
   ContactStatus contact_state_0 = ContactStatus::kNoContact;
   ContactStatus contact_state_1 = ContactStatus::kNoContact;

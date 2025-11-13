@@ -18,11 +18,17 @@ double ParallelGraspController::compute_q5_smooth(double q3) {
 
     // For q3 < 0, we want q5 > 0 (opposite direction)
     // Since acos returns [0, π], this gives us the positive solution
-    return std::acos(cos_q5_clamped);
+    const double q5_geometric = std::acos(cos_q5_clamped);
+
+    // Store for opening transition
+    prev_q3_ = q3;
+    prev_q5_ = q5_geometric;
+
+    return q5_geometric;
   } else {
-    // For opening (q3 >= 0): use smooth linear scaling
-    const double scale_factor = -(1.0 + std::abs(w) / L);
-    return q3 * scale_factor;
+    // For opening (q3 >= 0): mirror the increment from last closing position
+    const double delta_q3 = q3 - prev_q3_;
+    return prev_q5_ - delta_q3;  // Mirror increment
   }
 }
 
@@ -32,17 +38,31 @@ const std::vector<double>& ParallelGraspController::get_commands(
 
   // Map u ∈ [0,1] → q3 ∈ [qmin, qmax]
   u_ = std::clamp(u_cmd, 0.0, 1.0);
-  const double q3 = qmin + u_ * (qmax - qmin);
+  const double q3_target = qmin + u_ * (qmax - qmin);
+  const double q5_target = compute_q5_smooth(q3_target);
 
-  // Build 8-element joint command vector
-  joint_commands_[0] = 0.0;
-  joint_commands_[1] = 0.0;
-  joint_commands_[2] = q3;
+  // Initialize on first call
+  if (!initialized_) {
+    joint_commands_[0] = 0.0;
+    joint_commands_[1] = 0.0;
+    joint_commands_[2] = q3_target;
+    joint_commands_[4] = q5_target;
+    joint_commands_[6] = 0.785;
+    joint_commands_[7] = 1.5708;
+    initialized_ = true;
+  }
+
+  // Interpolate all joints except [3] and [5]
+  joint_commands_[0] += alpha_ * (0.0 - joint_commands_[0]);
+  joint_commands_[1] += alpha_ * (0.0 - joint_commands_[1]);
+  joint_commands_[2] += alpha_ * (q3_target - joint_commands_[2]);
+  joint_commands_[4] += alpha_ * (q5_target - joint_commands_[4]);
+  joint_commands_[6] += alpha_ * (0.785 - joint_commands_[6]);
+  joint_commands_[7] += alpha_ * (1.5708 - joint_commands_[7]);
+
+  // Mirror joints (fast response, no interpolation)
   joint_commands_[3] = -current_positions[2];  // q4 mirrors current q3
-  joint_commands_[4] = compute_q5_smooth(q3);
   joint_commands_[5] = -current_positions[4];  // q6 mirrors current q5
-  joint_commands_[6] = 0.785;
-  joint_commands_[7] = 1.5708;
 
   return joint_commands_;
 }

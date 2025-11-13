@@ -41,15 +41,27 @@ public:
    */
   const std::vector<double>& get_commands(double u_cmd, const std::vector<double>& current_positions);
 
+  /**
+   * @brief Set interpolation factor for trajectory smoothing
+   * @param alpha Interpolation factor [0,1], where 0=no motion, 1=instant motion, default=0.1
+   */
+  void set_interpolation_alpha(double alpha) { alpha_ = std::clamp(alpha, 0.0, 1.0); }
+
 private:
   /**
    * @brief Compute q5 from q3 for smooth opposite motion
    * @param q3 Joint angle (rad)
    * @return q5 angle (rad)
    */
-  static double compute_q5_smooth(double q3);
+  double compute_q5_smooth(double q3);
 
   // Internal state
   double u_ = 0.5;
   std::vector<double> joint_commands_ = std::vector<double>(8, 0.0);
+  double alpha_ = 0.1;  // Interpolation factor (10% per step)
+  bool initialized_ = false;
+
+  // State for smooth opening transition
+  mutable double prev_q3_ = 0.0;
+  mutable double prev_q5_ = 0.0;
 };

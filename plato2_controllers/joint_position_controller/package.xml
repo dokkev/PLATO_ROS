@@ -16,6 +16,10 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>plato2_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>sdr_grasp_msgs</depend>
+  <depend>grasp_srvs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

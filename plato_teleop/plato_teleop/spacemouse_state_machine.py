@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Joy, JointState
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 import numpy as np
-import time
+from plato_teleop.spacemouse_hardware import SpaceMouseHardware
 
 class SpaceMouseStateMachine(Node):
     def __init__(self):
-        super().__init__('space_mouse_state_machine')
+        super().__init__('spacemouse_state_machine')
         
         # Initialize state (0: open, 1: close, 2: poke)
         self.state = 0
@@ -111,14 +111,17 @@ class SpaceMouseStateMachine(Node):
         self.interpolation_duration = 0.8  # Duration in seconds
         self.interpolation_steps = 500      # Number of steps for interpolation
         self.step_time = self.interpolation_duration / self.interpolation_steps
-        
-        # Create a subscription to SpaceMouse Joy messages
-        self.joy_subscription = self.create_subscription(
-            Joy,
-            'spaceMouseMotion',
-            self.joy_callback,
-            10
-        )
+
+        # Initialize SpaceMouse hardware
+        self.spacemouse = SpaceMouseHardware()
+        if not self.spacemouse.open():
+            self.get_logger().error('Failed to open SpaceMouse device')
+            raise RuntimeError('SpaceMouse initialization failed')
+
+        self.get_logger().info('SpaceMouse initialized successfully')
+
+        # Create a timer to poll SpaceMouse buttons
+        self.spacemouse_timer = self.create_timer(0.01, self.spacemouse_callback)
         
         # Create a subscription to joint states
         self.joint_states_sub = self.create_subscription(
@@ -179,22 +182,27 @@ class SpaceMouseStateMachine(Node):
             # Optionally publish initial position
             # self.publish_joint_position(self.current_position)
 
-    def joy_callback(self, msg):
+    def spacemouse_callback(self):
         # Skip processing if we're already interpolating or haven't received joint states
         if self.interpolating or not self.received_joint_states:
             return
-            
+
+        # Read SpaceMouse state
+        state = self.spacemouse.read()
+        if state is None:
+            return
+
         # Extract button states
-        left_button = msg.buttons[0]
-        right_button = msg.buttons[1]
-        
+        left_button = 1 if state.buttons[0] else 0
+        right_button = 1 if state.buttons[1] else 0
+
         # Check for button clicks (transition from not pressed to pressed)
         left_click = (left_button == 1 and self.prev_left_button == 0)
         right_click = (right_button == 1 and self.prev_right_button == 0)
-        
+
         # Update state based on button clicks
         state_changed = False
-        
+
         if left_click:
             if self.state == 0:
                 self.target_state = 1  # open -> close
@@ -222,11 +230,11 @@ class SpaceMouseStateMachine(Node):
                 self.target_state = 2  # open or close -> poke
                 state_changed = True
                 self.get_logger().info('Right button clicked: Switching to state 2 (poke)')
-        
+
         # Start interpolation if state changed
         if state_changed:
             self.start_interpolation(self.state, self.target_state)
-        
+
         # Update previous button states
         self.prev_left_button = left_button
         self.prev_right_button = right_button
@@ -284,12 +292,18 @@ class SpaceMouseStateMachine(Node):
         # Create message
         msg = Float64MultiArray()
         msg.data = position.tolist()
-        
+
         # Publish message
         self.joint_publisher.publish(msg)
-        
+
         # For debugging (commented out to avoid log spam)
         # self.get_logger().debug(f'Published position: {position}')
+
+    def destroy_node(self):
+        """Clean up resources when node is destroyed."""
+        self.spacemouse.close()
+        self.get_logger().info('SpaceMouse closed successfully')
+        super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)

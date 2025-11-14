@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>joint_position_controller</name>
+  <name>parallel_grasp_controller</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Parallel grasp controller for robotic gripper with force control</description>
   <maintainer email="akim2002@utexas.edu">optimo</maintainer>
   <license>Apache-2.0</license>
 
@@ -16,6 +16,10 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>plato2_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>sdr_grasp_msgs</depend>
+  <depend>grasp_srvs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

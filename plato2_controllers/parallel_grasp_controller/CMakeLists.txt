@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(joint_position_controller)
+project(parallel_grasp_controller)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -9,24 +9,31 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(plato2_interfaces REQUIRED)
+find_package(sdr_grasp_msgs REQUIRED)
+find_package(grasp_srvs REQUIRED)
 
-add_executable(position_control_node src/position_control_node.cpp)
-target_include_directories(position_control_node PUBLIC
+add_executable(grasp_node src/grasp_node.cpp src/parallel_grasp_controller.cpp src/pid.cpp)
+target_include_directories(grasp_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(position_control_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
-ament_target_dependencies(position_control_node
+target_compile_features(grasp_node PUBLIC c_std_99 cxx_std_20)
+ament_target_dependencies(grasp_node
   rclcpp
   std_msgs
-  plato2_interfaces
+  std_srvs
   sensor_msgs
+  plato2_interfaces
+  sdr_grasp_msgs
+  grasp_srvs
 )
 
-install(TARGETS position_control_node
+install(TARGETS grasp_node
   DESTINATION lib/${PROJECT_NAME})
+
 
 # Install launch files and config
 install(DIRECTORY launch

@@ -23,8 +23,8 @@
 #include "grasp_srvs/srv/stop_release_ctrl.hpp"
 #include "grasp_srvs/srv/tactile_zero_reset.hpp"
 #include "std_srvs/srv/empty.hpp"
-#include "joint_position_controller/parallel_grasp_controller.hpp"
-#include "joint_position_controller/pid.hpp"
+#include "parallel_grasp_controller/parallel_grasp_controller.hpp"
+#include "parallel_grasp_controller/pid.hpp"
 
 #define ROS_HZ (100)  // Hz
 

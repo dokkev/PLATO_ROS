@@ -15,7 +15,7 @@
 #include "grasp_srvs/srv/start_adaptive_grasp_ctrl.hpp"
 #include "grasp_srvs/srv/start_constant_grasp_ctrl.hpp"
 #include "grasp_srvs/srv/stop_grasp_ctrl.hpp"
-#include "joint_position_controller/parallel_grasp_controller.hpp"
+#include "parallel_grasp_controller/parallel_grasp_controller.hpp"
 
 /**
  * @file grasp_node.hpp

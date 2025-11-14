@@ -44,9 +44,9 @@ def generate_launch_description():
 
     # --- Controllers YAML (position/impedance config) ---
     position_ctrl_yaml = PathJoinSubstitution([
-        FindPackageShare("plato2_hardware_interface"),
+        FindPackageShare("plato2_bringup"),
         "config",
-        "plato2_position_controller.yaml",
+        "plato2_joint_impedance_controller.yaml",
     ])
 
     # --- Nodes ---

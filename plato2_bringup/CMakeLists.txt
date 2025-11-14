@@ -14,6 +14,11 @@ install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install config files
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # Install any other package resources (e.g., rviz configs) if present
 install(DIRECTORY rviz
   DESTINATION share/${PROJECT_NAME}

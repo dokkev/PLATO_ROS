@@ -49,9 +49,9 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-            FindPackageShare("plato2_hardware_interface"),
+            FindPackageShare("plato2_bringup"),
             "config",
-            "plato2_position_controller.yaml",
+            "plato2_joint_impedance_controller.yaml",
         ]
     )
 

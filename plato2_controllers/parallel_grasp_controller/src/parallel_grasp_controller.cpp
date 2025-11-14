@@ -1,4 +1,4 @@
-#include "joint_position_controller/parallel_grasp_controller.hpp"
+#include "parallel_grasp_controller/parallel_grasp_controller.hpp"
 
 ParallelGraspController::ParallelGraspController() {
   // Feasibility check: x-alignment requires |w| ≤ 2L

@@ -1,4 +1,4 @@
-#include "joint_position_controller/pid.hpp"
+#include "parallel_grasp_controller/pid.hpp"
 
 // Constrain value within bounds
 template<typename T>

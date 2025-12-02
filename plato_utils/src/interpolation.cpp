@@ -7,7 +7,6 @@
 
 namespace util {
 double Smooth(double ini, double fin, double rat) {
-  double ret(0.);
   if (rat < 0) {
     return ini;
   } else if (rat > 1) {
@@ -622,8 +621,9 @@ MinJerkCurveVec::MinJerkCurveVec(const Eigen::VectorXd &start_pos,
                                  const Eigen::VectorXd &end_vel,
                                  const Eigen::VectorXd &end_acc,
                                  const double duration)
-    : p1_(start_pos), v1_(start_vel), a1_(start_acc), p2_(end_pos),
-      v2_(end_vel), a2_(end_acc), Ts_(duration) {
+    : Ts_(duration),
+      p1_(start_pos), v1_(start_vel), a1_(start_acc),
+      p2_(end_pos), v2_(end_vel), a2_(end_acc) {
 
   // Create N minjerk curves_ with the specified boundary conditions
   for (int i = 0; i < start_pos.size(); i++) {

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <array>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -91,6 +92,9 @@ private:
    * @return delta_q5 (rad)
    */
   double compute_delta_q5(double q3) const;
+
+  double update_f(double f_cmd, double current_force, double u_cmd);
+  void update_phi(double phi_cmd, const std::vector<double>& current_positions);
 
   // Internal state
   enum class State { kInit, kMotion, kForce };

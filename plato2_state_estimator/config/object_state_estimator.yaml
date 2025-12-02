@@ -12,7 +12,7 @@ object_state_estimator:
     n: 2               # Order of contact surface (2 for quadric/hemisphere)
 
     # Slip detection thresholds
-    translational_slip_threshold: 0.5  # [mm] - tune based on sensor sensitivity
+    translational_slip_threshold: 0.1  # [mm] - tune based on sensor sensitivity
     rotational_slip_threshold: 0.05    # [rad] - tune based on sensor sensitivity
 
     # Control parameters
@@ -28,6 +28,6 @@ object_state_estimator:
 
     # PID gains for rotational control
     # From paper recommendations: [30.0, 0.0, 90.0]
-    pid_theta_p: 30.0
+    pid_theta_p: 10.0
     pid_theta_i: 0.0
-    pid_theta_d: 90.0
+    pid_theta_d: 30.0

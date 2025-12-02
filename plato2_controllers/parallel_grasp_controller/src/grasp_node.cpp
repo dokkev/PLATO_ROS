@@ -7,6 +7,8 @@
  * direct position commands.
  */
 
+#include <array>
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -254,7 +256,8 @@ private:
         first_pub = false;
       }
       // Get position commands from controller
-      controller_.update(u_cmd_, sorted_positions_);
+      const std::array<double, 3> controller_commands{{u_cmd_, 0.0, 0.0}};
+      controller_.update(controller_commands, sorted_positions_);
       auto pos_cmd = controller_.get_commands();
 
       // Create impedance command message

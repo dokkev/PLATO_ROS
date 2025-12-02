@@ -28,15 +28,27 @@ ObjectStateEstimatorOutput ObjectStateEstimator::update(
 {
     ObjectStateEstimatorOutput output;
 
+    // Track contact availability up front so we can publish a safe command even when unstable
+    bool sensor0_contact = tactile0.contact_state >= TactileData::FEW_CONTACTS;
+    bool sensor1_contact = tactile1.contact_state >= TactileData::FEW_CONTACTS;
+    const double normal_force_avg = (tactile0.force_z + tactile1.force_z) / 2.0;
+
     // Validate dt
     if (dt <= 0.0 || dt > 1.0) {
         dt = 0.01;  // Default to 10ms if invalid
     }
 
-    // Check if we have valid contact data
-    if (!hasBothContacts(tactile0, tactile1)) {
-        output.slip_state = SlipState::NO_CONTACT;
-        output.has_valid_data = false;
+    // Check if we have valid contact data. Consider loss of normal force as loss of contact.
+    const bool has_normal_force = normal_force_avg >= config_.min_contact_force;
+    if (!sensor0_contact || !sensor1_contact || !has_normal_force) {
+        output.slip_state = (!sensor0_contact && !sensor1_contact)
+            ? SlipState::NO_CONTACT
+            : SlipState::PARTIAL_CONTACT;
+        output.minimal_force = 0.0;
+        output.force_x = 0.0;
+        output.force_y = 0.0;
+        output.moment_z = 0.0;
+        output.has_valid_data = true;
 
         // Reset PID controllers when contact is lost
         pid_translational_x_->reset();
@@ -322,8 +334,8 @@ bool ObjectStateEstimator::hasBothContacts(
     const TactileData& tactile0,
     const TactileData& tactile1) const
 {
-    return (tactile0.contact_state >= TactileData::FEW_CONTACTS) &&
-           (tactile1.contact_state >= TactileData::FEW_CONTACTS);
+    return (tactile0.contact_state >= TactileData::ENOUGH_CONTACTS) &&
+           (tactile1.contact_state >= TactileData::ENOUGH_CONTACTS);
 }
 
 }  // namespace plato2_state_estimator

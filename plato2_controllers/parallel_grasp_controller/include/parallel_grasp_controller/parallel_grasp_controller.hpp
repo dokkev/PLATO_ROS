@@ -29,6 +29,19 @@ public:
   static constexpr double qmax =   0.0;     // Joint upper limit (rad); u=0 ⇒ fingertips meet
   static constexpr double q_default = -0.35; // Default starting q3 (rad), clamped to limits
 
+  // Control parameters
+  static constexpr double q5_min = 1e-3;                  // Minimum q5 angle (rad)
+  static constexpr double midpoint = 0.5;                 // U midpoint between closing/opening
+  static constexpr double neutral = 0.0;                  // Neutral angle (rad)
+  static constexpr double joint6 = 0.785;                 // π/4 rad
+  static constexpr double joint7 = 1.5708;                // π/2 rad
+  static constexpr double mirror_alpha = 0.9;             // Smoothing factor for mirrored joints
+  static constexpr double max_flexion_angle = 0.785;      // π/4 rad (~45°) maximum flexion
+
+  // Force control parameters
+  static constexpr double force_threshold = 0.1;          // Minimum force to activate force control (N)
+  static constexpr double admittance_gain = 0.01;         // Admittance control gain
+
   /**
    * @brief Constructor with feasibility check
    * @throws std::runtime_error if |w| > 2L (x-alignment impossible)
@@ -36,11 +49,31 @@ public:
   ParallelGraspController();
 
   /**
-   * @brief Update internal command vector based on input u and current joints
-   * @param u_cmd Normalized command [0,1]
-   * @param current_positions Current joint positions (mirroring uses this)
+   * @brief Update internal command vector based on input commands and current joints
+   * @param commands 3-element array: [u, phi, f] where:
+   *        - u: Normalized grasp distance [0,1] (0=closed, 1=open) or velocity in force mode
+   *        - phi: Normalized contact angle [0,1] (0=parallel, 1=max flexion)
+   *        - f: Desired force [N] (0=motion control, >0=force control)
+   * @param current_positions Current joint positions (used for absolute angle control)
+   * @param current_force Current measured force (N)
    */
-  void update(double u_cmd, const std::vector<double>& current_positions);
+  void update(const std::array<double, 3>& commands,
+              const std::vector<double>& current_positions,
+              double current_force = 0.0);
+
+  /**
+   * @brief Update grasp distance command (u parameter)
+   * @param u Normalized grasp distance [0,1] (0=closed, 1=open)
+   * @param current_positions Current joint positions
+   */
+  void update_u(double u, const std::vector<double>& current_positions);
+
+  /**
+   * @brief Update contact angle command (phi parameter)
+   * @param phi Normalized contact angle [0,1] (0=parallel, 1=max flexion)
+   * @param current_positions Current joint positions
+   */
+  void update_phi(double phi, const std::vector<double>& current_positions);
 
   /**
    * @brief Get latest joint command vector (after update)
@@ -67,8 +100,8 @@ private:
   double compute_delta_q5(double q3) const;
 
   // Internal state
-  enum class State { Init, Active };
-  State state_ = State::Init;
+  enum class State { kInit, kMotion, kForce };
+  State state_ = State::kInit;
   std::vector<double> joint_commands_ = std::vector<double>(8, 0.0);
   double alpha_ = 0.1;  // Interpolation factor (10% per step)
   double init_progress_ = 0.0;
@@ -76,4 +109,7 @@ private:
   std::vector<double> init_start_ = std::vector<double>(8, 0.0);
   std::vector<double> init_target_ = std::vector<double>(8, 0.0);
   std::vector<double> padded_positions_ = std::vector<double>(8, 0.0);
+
+  // Force control state
+  double u_internal_ = 0.5;  // Internal u value for force control
 };

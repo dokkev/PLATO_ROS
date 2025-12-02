@@ -11,21 +11,32 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(plato2_interfaces REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(plato_utils REQUIRED)
+find_package(eigen3_cmake_module REQUIRED)
+find_package(Eigen3 REQUIRED)
 
-add_executable(position_control_node src/position_control_node.cpp)
-target_include_directories(position_control_node PUBLIC
+add_executable(joint_position_controller_node
+  src/control_node.cpp
+  src/joint_position_controller.cpp
+  src/impedance_gain_handler.cpp
+)
+target_include_directories(joint_position_controller_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(position_control_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(joint_position_controller_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-ament_target_dependencies(position_control_node
+ament_target_dependencies(joint_position_controller_node
   rclcpp
   std_msgs
   plato2_interfaces
   sensor_msgs
+  std_srvs
+  plato_utils
 )
+target_link_libraries(joint_position_controller_node Eigen3::Eigen)
 
-install(TARGETS position_control_node
+install(TARGETS joint_position_controller_node
   DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files and config

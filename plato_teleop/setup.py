@@ -55,6 +55,7 @@ setup(
         'console_scripts': [
             'spacemouse_twist = plato_teleop.spacemouse_twist:main',
             'spacemouse_state_machine = plato_teleop.spacemouse_state_machine:main',
+            'impedance_gain_keyboard = plato_teleop.impedance_gain_keyboard:main',
         ],
     },
 )

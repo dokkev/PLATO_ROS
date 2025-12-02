@@ -36,12 +36,7 @@ public:
   static constexpr double neutral = 0.0;                  // Neutral angle (rad)
   static constexpr double joint6 = 0.785;                 // π/4 rad
   static constexpr double joint7 = 1.5708;                // π/2 rad
-  static constexpr double mirror_alpha = 0.9;             // Smoothing factor for mirrored joints
   static constexpr double max_flexion_angle = 0.785;      // π/4 rad (~45°) maximum flexion
-
-  // Force control parameters
-  static constexpr double force_threshold = 0.1;          // Minimum force to activate force control (N)
-  static constexpr double admittance_gain = 0.01;         // Admittance control gain
 
   /**
    * @brief Constructor with feasibility check
@@ -51,12 +46,12 @@ public:
 
   /**
    * @brief Update internal command vector based on input commands and current joints
-   * @param commands 3-element array: [u, phi, f] where:
-   *        - u: Normalized grasp distance [0,1] (0=closed, 1=open) or velocity in force mode
-   *        - phi: Normalized contact angle [0,1] (0=parallel, 1=max flexion)
-   *        - f: Desired force [N] (0=motion control, >0=force control)
+   * @param commands 3-element array: [u_d, u_phi, f] where:
+   *        - u_d: Normalized grasp distance [0,1] (0=closed, 1=open)
+   *        - u_phi: Normalized contact angle [0,1] (0=parallel, 1=max flexion)
+   *        - f: Unused (reserved for future force control integration)
    * @param current_positions Current joint positions (used for absolute angle control)
-   * @param current_force Current measured force (N)
+   * @param current_force Unused (reserved for future force control integration)
    */
   void update(const std::array<double, 3>& commands,
               const std::vector<double>& current_positions,
@@ -78,7 +73,7 @@ public:
    * @brief Set interpolation factor for trajectory smoothing
    * @param alpha Interpolation factor [0,1], where 0=no motion, 1=instant motion, default=0.1
    */
-  void set_interpolation_alpha(double alpha) { alpha_ = std::clamp(alpha, 0.0, 1.0); }
+  void set_interpolation_alpha(double /*alpha*/) {}
 
 private:
   /**
@@ -93,20 +88,9 @@ private:
    */
   double compute_delta_q5(double q3) const;
 
-  double update_f(double f_cmd, double current_force, double u_cmd);
   void update_phi(double phi_cmd, const std::vector<double>& current_positions);
 
   // Internal state
-  enum class State { kInit, kMotion, kForce };
-  State state_ = State::kInit;
   std::vector<double> joint_commands_ = std::vector<double>(8, 0.0);
-  double alpha_ = 0.1;  // Interpolation factor (10% per step)
-  double init_progress_ = 0.0;
-  double init_rate_ = 0.05;
-  std::vector<double> init_start_ = std::vector<double>(8, 0.0);
-  std::vector<double> init_target_ = std::vector<double>(8, 0.0);
   std::vector<double> padded_positions_ = std::vector<double>(8, 0.0);
-
-  // Force control state
-  double u_internal_ = 0.5;  // Internal u value for force control
 };

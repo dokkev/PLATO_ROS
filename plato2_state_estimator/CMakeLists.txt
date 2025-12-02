@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sdr_grasp_msgs REQUIRED)
 find_package(plato_utils REQUIRED)
 
 # Include directories
@@ -43,6 +44,7 @@ ament_target_dependencies(object_state_estimator_node
   rclcpp
   geometry_msgs
   std_msgs
+  sdr_grasp_msgs
   plato_utils)
 
 # Install library

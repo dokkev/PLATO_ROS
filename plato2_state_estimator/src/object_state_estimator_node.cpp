@@ -2,23 +2,6 @@
 #include <std_msgs/msg/float32.hpp>
 #include <geometry_msgs/msg/wrench.hpp>
 
-// Placeholder for nari_touch message types
-// TODO: Update when actual sdr_grasp_msgs package is available
-namespace sdr_grasp_msgs {
-namespace msg {
-struct Tactile {
-    int32_t contact_state;
-    geometry_msgs::msg::Pose2D shear_displacement;
-    geometry_msgs::msg::Vector3 force;
-    double timestamp;
-
-    static constexpr int32_t NO_CONTACT = 0;
-    static constexpr int32_t FEW_CONTACTS = 1;
-    static constexpr int32_t ENOUGH_CONTACTS = 2;
-};
-}
-}
-
 namespace plato2_state_estimator {
 
 ObjectStateEstimatorNode::ObjectStateEstimatorNode()
@@ -192,7 +175,8 @@ TactileData ObjectStateEstimatorNode::convertTactileMsg(
     data.force_y = 0.0;
     data.force_z = msg->force.z;
 
-    data.timestamp = msg->timestamp;
+    // Convert ROS2 timestamp to seconds
+    data.timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
 
     return data;
 }

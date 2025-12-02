@@ -6,18 +6,12 @@
 #include <geometry_msgs/msg/wrench.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <sdr_grasp_msgs/msg/tactile.hpp>
 
 #include "plato2_state_estimator/object_state_estimator.hpp"
 
 #include <memory>
 #include <string>
-
-// Forward declare tactile message types (from nari_touch)
-namespace sdr_grasp_msgs {
-namespace msg {
-struct Tactile;
-}
-}
 
 namespace plato2_state_estimator {
 

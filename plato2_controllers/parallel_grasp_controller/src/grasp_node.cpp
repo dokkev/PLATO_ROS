@@ -254,7 +254,8 @@ private:
         first_pub = false;
       }
       // Get position commands from controller
-      auto pos_cmd = controller_.get_commands(u_cmd_, sorted_positions_);
+      controller_.update(u_cmd_, sorted_positions_);
+      auto pos_cmd = controller_.get_commands();
 
       // Create impedance command message
       plato2_interfaces::msg::ImpedanceCommands impedance_cmd;

@@ -20,6 +20,13 @@
   <depend>std_srvs</depend>
   <depend>sdr_grasp_msgs</depend>
   <depend>grasp_srvs</depend>
+  <depend>plato_utils</depend>
+  <build_depend>eigen3_cmake_module</build_depend>
+  <build_export_depend>eigen3_cmake_module</build_export_depend>
+  <exec_depend>eigen3_cmake_module</exec_depend>
+  <build_depend>Eigen3</build_depend>
+  <build_export_depend>Eigen3</build_export_depend>
+  <exec_depend>Eigen3</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

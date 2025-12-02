@@ -1,0 +1,33 @@
+# Configuration for Object State Estimator
+# Based on equations from "Theoretical Derivation and Realization of Adaptive Grasping"
+# T. Narita et al., ICRA 2020
+
+object_state_estimator:
+  ros__parameters:
+    # Material properties (example values - adjust based on your gripper/sensor)
+    E_star: 1.0e6      # Effective Young's modulus [Pa]
+    G_star: 0.4e6      # Transverse elastic modulus [Pa]
+    C_n: 1.0           # Contact surface constant
+    lambda_n: 1.0      # Scaling factor for 3D contact
+    n: 2               # Order of contact surface (2 for quadric/hemisphere)
+
+    # Slip detection thresholds
+    translational_slip_threshold: 0.5  # [mm] - tune based on sensor sensitivity
+    rotational_slip_threshold: 0.05    # [rad] - tune based on sensor sensitivity
+
+    # Control parameters
+    update_rate: 100.0        # [Hz] Update frequency
+    min_contact_force: 0.5    # [N] Minimum force to maintain contact
+    max_force_limit: 30.0     # [N] Maximum allowed force (SAFETY LIMIT)
+
+    # PID gains for translational control (x and y directions)
+    # From paper recommendations: [1.8, 0.0, 4.5]
+    pid_tx_p: 1.8
+    pid_tx_i: 0.0
+    pid_tx_d: 4.5
+
+    # PID gains for rotational control
+    # From paper recommendations: [30.0, 0.0, 90.0]
+    pid_theta_p: 30.0
+    pid_theta_i: 0.0
+    pid_theta_d: 90.0

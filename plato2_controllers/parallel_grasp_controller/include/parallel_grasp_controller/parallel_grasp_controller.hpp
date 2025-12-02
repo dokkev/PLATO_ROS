@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
+#include <plato_utils/interpolation.hpp>
 
 #ifdef _MSC_VER
 #define _USE_MATH_DEFINES
@@ -24,8 +25,9 @@ public:
   // Geometric parameters
   static constexpr double L    = 0.06;     // Tip radius (m)
   static constexpr double w    = 0.022;   // Lateral offset (m)
-  static constexpr double qmin = -0.524;  // Joint lower limit (rad) ≈ -60°
-  static constexpr double qmax =  0.524;  // Joint upper limit (rad) ≈ +60°
+  static constexpr double qmin =  -45.0 * M_PI / 180.0; // Joint lower limit (rad)
+  static constexpr double qmax =   0.0;     // Joint upper limit (rad); u=0 ⇒ fingertips meet
+  static constexpr double q_default = -0.35; // Default starting q3 (rad), clamped to limits
 
   /**
    * @brief Constructor with feasibility check
@@ -34,12 +36,16 @@ public:
   ParallelGraspController();
 
   /**
-   * @brief Map normalized command to joint positions
-   * @param u_cmd Normalized command [0,1] → q3 ∈ [qmin, qmax]
-   * @param current_positions Current joint positions (8 elements), used to determine q4, q6
-   * @return 8-element joint position vector (indices 2-5 contain q3,q4,q5,q6)
+   * @brief Update internal command vector based on input u and current joints
+   * @param u_cmd Normalized command [0,1]
+   * @param current_positions Current joint positions (mirroring uses this)
    */
-  const std::vector<double>& get_commands(double u_cmd, const std::vector<double>& current_positions);
+  void update(double u_cmd, const std::vector<double>& current_positions);
+
+  /**
+   * @brief Get latest joint command vector (after update)
+   */
+  const std::vector<double>& get_commands() const { return joint_commands_; }
 
   /**
    * @brief Set interpolation factor for trajectory smoothing
@@ -49,19 +55,25 @@ public:
 
 private:
   /**
-   * @brief Compute q5 from q3 for smooth opposite motion
-   * @param q3 Joint angle (rad)
-   * @return q5 angle (rad)
+   * @brief Compute q5 geometric angle for a given q3 (clamped valid range)
    */
-  double compute_q5_smooth(double q3);
+  double compute_q5_geom(double q3) const;
+
+  /**
+   * @brief Compute delta so that q5 = q3 + delta (geometric coupling)
+   * @param q3 Joint angle (rad)
+   * @return delta_q5 (rad)
+   */
+  double compute_delta_q5(double q3) const;
 
   // Internal state
-  double u_ = 0.5;
+  enum class State { Init, Active };
+  State state_ = State::Init;
   std::vector<double> joint_commands_ = std::vector<double>(8, 0.0);
   double alpha_ = 0.1;  // Interpolation factor (10% per step)
-  bool initialized_ = false;
-
-  // State for smooth opening transition
-  mutable double prev_q3_ = 0.0;
-  mutable double prev_q5_ = 0.0;
+  double init_progress_ = 0.0;
+  double init_rate_ = 0.05;
+  std::vector<double> init_start_ = std::vector<double>(8, 0.0);
+  std::vector<double> init_target_ = std::vector<double>(8, 0.0);
+  std::vector<double> padded_positions_ = std::vector<double>(8, 0.0);
 };

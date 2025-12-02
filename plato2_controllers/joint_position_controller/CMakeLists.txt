@@ -29,13 +29,18 @@ install(TARGETS position_control_node
   DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files and config
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
+# Install launch files and config if present
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
 
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}/
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(DIRECTORY config
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

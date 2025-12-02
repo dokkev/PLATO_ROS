@@ -80,8 +80,8 @@ private:
     plato2_interfaces::msg::ImpedanceCommands cmd_msg;
     cmd_msg.position = target;
     cmd_msg.velocity.assign(target.size(), 0.0);
-    cmd_msg.stiffness.assign(target.size(), 0.0);
-    cmd_msg.damping.assign(target.size(), 0.0);
+    cmd_msg.stiffness.assign(target.size(), 1.0);
+    cmd_msg.damping.assign(target.size(), 0.1);
     cmd_msg.effort_ff.assign(target.size(), 0.0);
 
     impedance_pub_->publish(cmd_msg);

@@ -1,8 +1,37 @@
+import warnings
 from setuptools import find_packages, setup
+from setuptools.command.develop import develop as _develop
 import os
 from glob import glob
 
 package_name = 'plato_teleop'
+
+
+# Silence setuptools develop deprecation noise emitted by colcon's invocation.
+try:
+    from setuptools import SetuptoolsDeprecationWarning
+except ImportError:  # pragma: no cover - fallback for older setuptools
+    class SetuptoolsDeprecationWarning(Warning):
+        pass
+warnings.filterwarnings("ignore", category=SetuptoolsDeprecationWarning)
+
+
+class DevelopCommand(_develop):
+    """Add a no-op --editable flag so colcon's invocation succeeds."""
+
+    user_options = _develop.user_options + [
+        ('editable', None, 'Editable install (ignored)'),
+        ('build-directory=', None, 'Build directory (ignored)'),
+        ('script-dir=', None, 'Script install directory (ignored)'),
+    ]
+    boolean_options = _develop.boolean_options + ['editable']
+
+    def initialize_options(self):
+        super().initialize_options()
+        self.editable = True
+        self.build_directory = None
+        self.script_dir = None
+
 
 setup(
     name=package_name,
@@ -21,6 +50,7 @@ setup(
     description='PLATO teleoperation package with spacemouse and other control interfaces',
     license='Apache-2.0',
     extras_require={'test': ['pytest']},
+    cmdclass={'develop': DevelopCommand},
     entry_points={
         'console_scripts': [
             'spacemouse_twist = plato_teleop.spacemouse_twist:main',

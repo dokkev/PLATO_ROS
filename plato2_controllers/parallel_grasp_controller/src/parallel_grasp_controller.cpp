@@ -71,35 +71,11 @@ void ParallelGraspController::update(const std::array<double, 3>& commands,
     return;
   }
 
-  // Transition between kMotion and kForce
-  const bool force_requested = (f_cmd > force_threshold);
-  const bool force_detected  = (current_force > force_threshold);
-
-  if (state_ == State::kMotion && force_requested && force_detected) {
-    // Transition to force control
-    state_ = State::kForce;
-    u_internal_ = u_cmd;  // Initialize internal u from current command
-  } else if (state_ == State::kForce && !force_requested) {
-    // Transition back to motion control
-    state_ = State::kMotion;
-  }
-
   // ========================================================================
   // Control Logic
   // ========================================================================
 
-  double u_effective;
-
-  if (state_ == State::kForce) {
-    // Force control mode: admittance-based regulation
-    const double force_error = f_cmd - current_force;
-    u_internal_ += admittance_gain * force_error;  // Adjust u based on force error
-    u_internal_ = std::clamp(u_internal_, 0.0, 1.0);
-    u_effective = u_internal_;
-  } else {
-    // Motion control mode: direct position control
-    u_effective = u_cmd;
-  }
+  const double u_effective = update_f(f_cmd, current_force, u_cmd);  // Handle force control & state transitions
 
   update_u(u_effective, current_positions);  // Control proximal joints (q3, q5)
   update_phi(phi, current_positions);        // Control distal joints (q4, q6)
@@ -137,6 +113,37 @@ void ParallelGraspController::update_u(double u_cmd, const std::vector<double>& 
   // Apply smoothed commands to proximal joints
   joint_commands_[2] = util::Smooth(joint_commands_[2], q3_target, alpha_);  // q3 (joint3)
   joint_commands_[4] = util::Smooth(joint_commands_[4], q5_target, alpha_);  // q5 (joint5)
+}
+
+// ============================================================================
+// Force Control (f parameter)
+// ============================================================================
+
+double ParallelGraspController::update_f(double f_cmd, double current_force, double u_cmd) {
+  const bool force_requested = (f_cmd > force_threshold);
+  const bool force_detected  = (current_force > force_threshold);
+
+  // State transitions
+  if (state_ == State::kMotion && force_requested && force_detected) {
+    // Transition to force control
+    state_ = State::kForce;
+    u_internal_ = u_cmd;  // Initialize internal u from current command
+  } else if (state_ == State::kForce && !force_requested) {
+    // Transition back to motion control
+    state_ = State::kMotion;
+  }
+
+  // Compute effective u based on current state
+  if (state_ == State::kForce) {
+    // Force control mode: admittance-based regulation
+    const double force_error = f_cmd - current_force;
+    u_internal_ += admittance_gain * force_error;  // Adjust u based on force error
+    u_internal_ = std::clamp(u_internal_, 0.0, 1.0);
+    return u_internal_;
+  } else {
+    // Motion control mode: direct position control
+    return u_cmd;
+  }
 }
 
 // ============================================================================

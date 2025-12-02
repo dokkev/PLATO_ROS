@@ -69,13 +69,6 @@ public:
   void update_u(double u, const std::vector<double>& current_positions);
 
   /**
-   * @brief Update contact angle command (phi parameter)
-   * @param phi Normalized contact angle [0,1] (0=parallel, 1=max flexion)
-   * @param current_positions Current joint positions
-   */
-  void update_phi(double phi, const std::vector<double>& current_positions);
-
-  /**
    * @brief Get latest joint command vector (after update)
    */
   const std::vector<double>& get_commands() const { return joint_commands_; }

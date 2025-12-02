@@ -254,9 +254,7 @@ private:
         first_pub = false;
       }
       // Get position commands from controller
-      const double current_force = MeasuredForce();  // Read from tactile sensors
-      std::array<double, 3> commands = {u_cmd_, 0.0, 0.0};  // [u, phi, f]
-      controller_.update(commands, sorted_positions_, current_force);
+      controller_.update(u_cmd_, sorted_positions_);
       auto pos_cmd = controller_.get_commands();
 
       // Create impedance command message

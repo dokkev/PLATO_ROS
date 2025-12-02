@@ -6,6 +6,7 @@
 #include <geometry_msgs/msg/wrench.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <sdr_grasp_msgs/msg/tactile.hpp>
 
 #include "plato2_state_estimator/object_state_estimator.hpp"
@@ -43,6 +44,7 @@ private:
     // ROS publishers
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr minimal_force_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Wrench>::SharedPtr estimated_wrench_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr measured_force_pub_;
 
     // Timer for periodic updates
     rclcpp::TimerBase::SharedPtr update_timer_;

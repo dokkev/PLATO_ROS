@@ -21,10 +21,10 @@ class SpaceMouseTwistPublisher(Node):
         super().__init__('spacemouse_twist_publisher')
 
         # Declare parameters
-        self.declare_parameter('translation_scale', 0.3)
-        self.declare_parameter('rotation_scale', 0.3)
-        self.declare_parameter('translation_threshold', 0.3)
-        self.declare_parameter('rotation_threshold', 0.3)
+        self.declare_parameter('translation_scale', 0.01)
+        self.declare_parameter('rotation_scale', 0.05)
+        self.declare_parameter('translation_threshold', 0.001)
+        self.declare_parameter('rotation_threshold', 0.001)
         self.declare_parameter('publish_rate', 900.0)  # Hz
         self.declare_parameter('twist_topic', '/optimo/servo/twist_cmd')
         self.declare_parameter('frame_id', 'world')

@@ -34,7 +34,7 @@ public:
       std::bind(&ParallelGraspNode::joint_state_callback, this, _1));
 
     position_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
-      "/plato2/plato2_position_controller/commands", 10);
+      "/plato2/joint_position_controller/commands", 10);
 
     RCLCPP_INFO(this->get_logger(), "parallel_grasp_node ready");
     RCLCPP_INFO(this->get_logger(), "Expecting commands: [u, phi] (force ignored here):");

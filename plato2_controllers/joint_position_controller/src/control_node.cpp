@@ -19,7 +19,7 @@ public:
       gain_handler_(*this)
   {
     position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-        "/plato2/plato2_position_controller/commands", 10,
+        "/plato2/joint_position_controller/commands", 10,
         std::bind(&JointPositionControllerNode::position_callback, this, std::placeholders::_1));
 
     desired_force_sub_ = this->create_subscription<std_msgs::msg::Float64>(
@@ -27,7 +27,7 @@ public:
         10, std::bind(&JointPositionControllerNode::desired_force_cb, this, std::placeholders::_1));
 
     measured_force_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        this->declare_parameter<std::string>("measured_force_topic", "/tactile/force_measured"),
+        this->declare_parameter<std::string>("measured_force_topic", "/object_state/measured_force"),
         10, std::bind(&JointPositionControllerNode::measured_force_cb, this, std::placeholders::_1));
 
     rclcpp::QoS qos_profile(rclcpp::KeepLast(10));

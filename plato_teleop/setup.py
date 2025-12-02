@@ -50,12 +50,14 @@ setup(
     description='PLATO teleoperation package with spacemouse and other control interfaces',
     license='Apache-2.0',
     extras_require={'test': ['pytest']},
-    cmdclass={'develop': DevelopCommand},
     entry_points={
         'console_scripts': [
             'spacemouse_twist = plato_teleop.spacemouse_twist:main',
             'spacemouse_state_machine = plato_teleop.spacemouse_state_machine:main',
             'impedance_gain_keyboard = plato_teleop.impedance_gain_keyboard:main',
+            'retargeting_converter = plato_teleop.retargeting_converter:main',
+            'ftip_to_parallel_grasp = plato_teleop.ftip_to_parallel_grasp:main',
         ],
     },
+    cmdclass={'develop': DevelopCommand},
 )

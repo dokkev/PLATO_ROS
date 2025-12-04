@@ -1,4 +1,5 @@
 #include "parallel_grasp_controller/parallel_grasp_controller.hpp"
+#include <iostream>
 
 // ============================================================================
 // Constructor & Geometric Computations
@@ -31,18 +32,17 @@ double ParallelGraspController::compute_delta_q5(double q3) const {
 
 void ParallelGraspController::update(const std::array<double, 3>& commands,
                                       const std::vector<double>& current_positions,
-                                      double current_force) {
-  (void)current_force;  // Reserved for future force control integration
-
+                                      double measured_force) {
   // ========================================================================
   // Parse Input Commands
   // ========================================================================
   // commands[0] = u_d: grasp distance [0,1] where 0=closed, 1=open
   // commands[1] = u_phi: contact angle [0,1] where 0=parallel, 1=max flexion
-  // commands[2] = f: unused (reserved for future force control)
+  // commands[2] = f_d: desired force for force control
 
   const double u_d   = commands[0];   // Grasp distance or velocity
   const double u_phi = commands[1];   // Contact angle
+  const double desired_force = commands[2];  // Desired force
 
   // ========================================================================
   // Copy & Pad Current Joint Positions
@@ -61,10 +61,71 @@ void ParallelGraspController::update(const std::array<double, 3>& commands,
   const double u_effective = std::clamp(u_d, 0.0, 1.0);
 
   // ========================================================================
-  // Update Joint Commands (Common to both kMotion and kForce states)
+  // Force Control State Machine
   // ========================================================================
-  update_u(u_effective, current_positions);  // Control proximal joints (q3, q5) for grasp width
-  update_phi(u_phi, current_positions);      // Control distal joints (q4, q6) for contact angle
+  // Activate force control when both desired_force > 0 and measured_force > 0
+  // Deactivate when u > 0.6
+  const bool force_requested = desired_force > 0.0;
+  const bool force_detected = measured_force > 0.0;
+  const bool u_below_threshold = u_effective <= 0.6;
+
+  // Debug: print state machine conditions
+  static int print_counter = 0;
+  if (++print_counter % 100 == 0) {  // Print every 100 cycles to avoid spam
+    std::cout << "[STATE MACHINE] force_requested=" << force_requested
+              << " force_detected=" << force_detected
+              << " u_below_threshold=" << u_below_threshold
+              << " (u_eff=" << u_effective << ")"
+              << " desired_force=" << desired_force
+              << " measured_force=" << measured_force
+              << " active=" << force_control_active_ << std::endl;
+  }
+
+  if (force_requested && force_detected && u_below_threshold) {
+    force_control_active_ = true;
+  } else if (!u_below_threshold) {
+    force_control_active_ = false;
+  }
+
+  // ========================================================================
+  // Update Joint Commands
+  // ========================================================================
+  double u_d_final = u_effective;
+  double u_phi_final = u_phi;
+
+  if (force_control_active_) {
+    // Admittance-based force control: directly modulate u_d and u_phi based on force error
+    const double force_error = desired_force - measured_force;
+    const double admittance_offset = admittance_gain_ * force_error;
+
+    // Apply admittance offset to u_d (decrease u_d to close grasp when force_error > 0)
+    u_d_final = std::clamp(u_effective - admittance_offset, 0.0, 0.6);
+
+    // Update joints using adjusted u_d and original u_phi
+    update_u(u_d_final, current_positions);  // Control proximal joints (q3, q5) for grasp width
+    update_phi(u_phi_final, current_positions);       // Control distal joints (q4, q6) for contact angle
+
+    // Debug print force control details
+    static int force_counter = 0;
+    if (++force_counter % 100 == 0) {
+      std::cout << "[FORCE CTRL] force_error=" << force_error
+                << " admittance_offset=" << admittance_offset
+                << " admittance_gain=" << admittance_gain_ << std::endl;
+    }
+
+  } else {
+    // Motion control mode
+    update_u(u_d_final, current_positions);  // Control proximal joints (q3, q5) for grasp width
+    update_phi(u_phi_final, current_positions);      // Control distal joints (q4, q6) for contact angle
+  }
+
+  // Debug print adjusted values
+  static int adjust_counter = 0;
+  if (++adjust_counter % 100 == 0) {
+    std::cout << "[ADJUSTED] u_d: " << u_d << " -> " << u_d_final
+              << " | u_phi: " << u_phi << " -> " << u_phi_final
+              << " | active=" << force_control_active_ << std::endl;
+  }
 
   // Static joints: maintain fixed positions
   joint_commands_[0] = neutral;  // q1 (index 0)

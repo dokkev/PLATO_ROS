@@ -19,6 +19,14 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install scripts
+install(PROGRAMS
+  scripts/tf_merger.py
+  scripts/index_fingertip_pose_publisher.py
+  scripts/joint_impedance_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # Install any other package resources (e.g., rviz configs) if present
 install(DIRECTORY rviz
   DESTINATION share/${PROJECT_NAME}

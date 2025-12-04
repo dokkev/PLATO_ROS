@@ -64,6 +64,6 @@ def generate_launch_description():
         controller_params_arg,
         estimator_params_arg,
         controller_node,
-        # object_state_estimator_node,
+        object_state_estimator_node,
         # impedance_keyboard_node,
     ])

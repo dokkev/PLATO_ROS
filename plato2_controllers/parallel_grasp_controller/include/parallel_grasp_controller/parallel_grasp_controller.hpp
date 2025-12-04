@@ -49,13 +49,13 @@ public:
    * @param commands 3-element array: [u_d, u_phi, f] where:
    *        - u_d: Normalized grasp distance [0,1] (0=closed, 1=open)
    *        - u_phi: Normalized contact angle [0,1] (0=parallel, 1=max flexion)
-   *        - f: Unused (reserved for future force control integration)
+   *        - f: Desired force for force control (activates when > 0)
    * @param current_positions Current joint positions (used for absolute angle control)
-   * @param current_force Unused (reserved for future force control integration)
+   * @param measured_force Current measured contact force
    */
   void update(const std::array<double, 3>& commands,
               const std::vector<double>& current_positions,
-              double current_force = 0.0);
+              double measured_force = 0.0);
 
   /**
    * @brief Update grasp distance command (u parameter)
@@ -75,6 +75,12 @@ public:
    */
   void set_interpolation_alpha(double /*alpha*/) {}
 
+  /**
+   * @brief Set admittance control gain for force control
+   * @param gain Admittance gain (rad/N), default=0.01
+   */
+  void set_admittance_gain(double gain) { admittance_gain_ = gain; }
+
 private:
   /**
    * @brief Compute q5 geometric angle for a given q3 (clamped valid range)
@@ -93,4 +99,8 @@ private:
   // Internal state
   std::vector<double> joint_commands_ = std::vector<double>(8, 0.0);
   std::vector<double> padded_positions_ = std::vector<double>(8, 0.0);
+
+  // Force control state
+  double admittance_gain_ = 0.05;  // Admittance gain (input/N)
+  bool force_control_active_ = false;
 };

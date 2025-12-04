@@ -57,7 +57,7 @@ class FtipToParallelGrasp(Node):
 
         data = self._latest.data
         distance = _clamp01(data[0]) if len(data) > 0 else 0.0
-        angle = _clamp01(data[3]) if len(data) > 3 else 0.0
+        angle = _clamp01(data[3]*2) if len(data) > 3 else 0.0
 
         out = Float64MultiArray()
         out.data = [distance, angle]

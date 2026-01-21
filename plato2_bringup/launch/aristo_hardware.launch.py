@@ -61,7 +61,7 @@ def generate_launch_description():
     robot_state_pub = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[robot_description, {"use_sim_time": use_sim_time}],
+        parameters=[robot_description, {"use_sim_time": use_sim_time}, {"publish_rate": 200.0}],
         output="both",
         namespace=plato_ns,
         # If your joint_states are NOT namespaced, uncomment the next line:

@@ -6,6 +6,13 @@ ros2 topic pub /plato2/joint_impedance_controller/commands plato2_interfaces/msg
   damping: [0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 }"
 
+ros2 topic pub /plato2/joint_impedance_controller/commands plato2_interfaces/msg/ImpedanceCommands "{
+  position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  stiffness: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  damping: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+}"
 
 ros2 topic pub /plato2/parallel_grasp_controller/command std_msgs/msg/Float64 "{data: 1.0}"
 

@@ -13,6 +13,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   sensor_msgs
   can_msgs
+  geometry_msgs
+  plato2_interfaces
   Eigen3
 )
 
@@ -47,6 +49,7 @@ add_library(
   src/utils/ring_buf.cpp
   src/pcan_interface.cpp
   src/ft_sensor.cpp
+  src/ft_sensor_can.cpp
   src/can_protocol.cpp
   src/mit_can_protocol.cpp
   src/actuator.cpp
@@ -88,6 +91,7 @@ install(
 
 install(DIRECTORY 
   launch 
+  config
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -103,6 +107,54 @@ add_executable(can_verify src/tools/can_verify.cpp)
 target_include_directories(can_verify PRIVATE ${PCAN_INCLUDE_DIR})
 target_link_libraries(can_verify plato2_hardware_interface ${PCAN_LIB})
 install(TARGETS can_verify RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+add_executable(ft_sensor_can_test src/tools/ft_sensor_can_test.cpp)
+target_link_libraries(ft_sensor_can_test plato2_hardware_interface)
+install(TARGETS ft_sensor_can_test RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+# FT Collision Test Node
+add_executable(ft_collision_test_node src/tools/ft_collision_test_node.cpp)
+target_include_directories(ft_collision_test_node PRIVATE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(ft_collision_test_node
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  plato2_interfaces
+)
+install(TARGETS ft_collision_test_node RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+# FT Sensor Bringup (CAN read -> ROS topics + console)
+add_executable(ft_sensor_bringup src/tools/ft_sensor_bringup.cpp)
+target_include_directories(ft_sensor_bringup PRIVATE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(ft_sensor_bringup
+  rclcpp
+  geometry_msgs
+)
+target_link_libraries(ft_sensor_bringup plato2_hardware_interface ${PCAN_LIB})
+install(TARGETS ft_sensor_bringup RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+add_executable(joint_state_moving_average_node src/tools/joint_state_moving_average_node.cpp)
+ament_target_dependencies(joint_state_moving_average_node rclcpp sensor_msgs)
+install(TARGETS joint_state_moving_average_node DESTINATION lib/${PROJECT_NAME})
+
+# Effort Collision Test Node
+add_executable(effort_collision_test_node src/tools/effort_collision_test_node.cpp)
+target_include_directories(effort_collision_test_node PRIVATE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(effort_collision_test_node
+  rclcpp
+  sensor_msgs
+  plato2_interfaces
+)
+install(TARGETS effort_collision_test_node RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

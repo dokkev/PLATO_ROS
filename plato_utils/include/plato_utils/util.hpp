@@ -5,6 +5,9 @@
 #include <iostream>
 #include <list>
 #include <stdio.h>
+#include <vector>
+#include <cstddef>
+#include <array>
 
 #include <Eigen/Dense>
 #include <Eigen/QR>
@@ -174,4 +177,26 @@ Eigen::MatrixXd HStack(const Eigen::MatrixXd &a, const Eigen::MatrixXd &b);
 Eigen::MatrixXd VStack(const Eigen::MatrixXd &a, const Eigen::MatrixXd &b);
 Eigen::MatrixXd BlockDiagonalMatrix(const Eigen::MatrixXd &a,
                                     const Eigen::MatrixXd &b);
+
+// =========================================================================
+// Joint state utilities
+// =========================================================================
+
+/**
+ * @brief Reorder a joint state vector according to an index mapping.
+ *
+ * @param input Incoming joint values.
+ * @param index_map index_map[i] = source index in @p input for output i.
+ * @return Reordered joint vector; elements missing in input are zero.
+ */
+std::vector<double> ReorderJointState(const std::vector<double>& input,
+                                      const std::vector<size_t>& index_map);
+
+/**
+ * @brief Reorder to standard joint order [1..8] from the expected hardware order.
+ *
+ * Incoming order: [joint2, joint3, joint6, joint8, joint1, joint4, joint7, joint5]
+ * Output order:   [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8]
+ */
+std::vector<double> ReorderToStandardJointOrder(const std::vector<double>& input);
 } // namespace util

@@ -59,7 +59,7 @@ ros2 service call /naritouch_grasp_demo/start_grasp std_srvs/srv/Empty
 
 ros2 topic pub --rate 10 /parallel_grasp_node/u_cmd std_msgs/msg/Float64 "{data: 0.8}"
 
-ros2 topic pub --rate 100 /plato2/parallel_grasp_controller/commands std_msgs/msg/Float64MultiArray "data: [0.0, 0.0, 0.0]"
+ros2 topic pub --rate 100 /plato2/parallel_grasp_controller/commands std_msgs/msg/Float64MultiArray "data: [0.5, 0.0]"
 
 
 ros2 service call /parallel_grasp_node/start_grasp std_srvs/srv/Empty

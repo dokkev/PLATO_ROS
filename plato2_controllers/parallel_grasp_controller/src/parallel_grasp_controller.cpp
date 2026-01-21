@@ -1,4 +1,5 @@
 #include "parallel_grasp_controller/parallel_grasp_controller.hpp"
+#include <iostream>
 
 // ============================================================================
 // Constructor & Geometric Computations
@@ -6,6 +7,7 @@
 
 ParallelGraspController::ParallelGraspController() {
   // Verify geometric feasibility: lateral offset must allow parallel alignment
+  // If |w| > 2L, the fingertips cannot physically achieve parallel orientation
   if (std::abs(w) > 2.0 * L) {
     throw std::runtime_error("parallel grasp: |w| > 2L; x-alignment impossible.");
   }
@@ -13,9 +15,10 @@ ParallelGraspController::ParallelGraspController() {
 
 double ParallelGraspController::compute_q5_geom(double q3) const {
   // Geometric constraint to maintain parallel fingertips
-  // Based on: cos(q5) = cos(q3) - w/L
-  const double cos_q5 = std::clamp(std::cos(q3) - w / L, -1.0, 1.0);
-  return std::max(q5_min, std::acos(cos_q5));
+  // Derived from kinematic analysis: cos(q5) = cos(q3) - w/L
+  // where w is lateral offset between fingers and L is tip radius
+  const double cos_q5 = std::clamp(std::cos(q3) - w / L, -1.0, 1.0);  // Clamp to valid cosine range
+  return std::max(q5_min, std::acos(cos_q5));  // Enforce minimum angle constraint
 }
 
 double ParallelGraspController::compute_delta_q5(double q3) const {
@@ -29,62 +32,106 @@ double ParallelGraspController::compute_delta_q5(double q3) const {
 
 void ParallelGraspController::update(const std::array<double, 3>& commands,
                                       const std::vector<double>& current_positions,
-                                      double current_force) {
-  // Copy current joint positions with zero-padding for safety
-  const size_t num_joints = padded_positions_.size();
+                                      double measured_force) {
+  // ========================================================================
+  // Parse Input Commands
+  // ========================================================================
+  // commands[0] = u_d: grasp distance [0,1] where 0=closed, 1=open
+  // commands[1] = u_phi: contact angle [0,1] where 0=parallel, 1=max flexion
+  // commands[2] = f_d: desired force for force control
+
+  const double u_d   = commands[0];   // Grasp distance or velocity
+  const double u_phi = commands[1];   // Contact angle
+  const double desired_force = commands[2];  // Desired force
+
+  // ========================================================================
+  // Copy & Pad Current Joint Positions
+  // ========================================================================
+  // Safely handle variable-length input by zero-padding to expected size (8 joints)
+  const size_t num_joints = padded_positions_.size();  // Expected: 8 joints
   const size_t available = std::min(num_joints, current_positions.size());
 
   for (size_t i = 0; i < available; ++i) {
-    padded_positions_[i] = current_positions[i];
+    padded_positions_[i] = current_positions[i];  // Copy available positions
   }
   for (size_t i = available; i < num_joints; ++i) {
-    padded_positions_[i] = 0.0;
+    padded_positions_[i] = 0.0;  // Zero-pad missing joints
   }
 
-  const double u_cmd   = commands[0];  // Grasp distance or velocity
-  const double phi     = commands[1];  // Contact angle
-  const double f_cmd   = commands[2];  // Desired force
+  const double u_effective = std::clamp(u_d, 0.0, 1.0);
 
   // ========================================================================
-  // State Machine Transitions
+  // Force Control State Machine
   // ========================================================================
+  // Activate force control when both desired_force > 0 and measured_force > 0
+  // Deactivate when u > 0.6
+  const bool force_requested = desired_force > 0.0;
+  const bool force_detected = measured_force > 0.0;
+  const bool u_below_threshold = u_effective <= 0.6;
 
-  if (state_ == State::kInit) {
-    // Initialization phase: smooth transition to neutral pose
-    if (init_progress_ == 0.0) {
-      init_start_ = padded_positions_;
-      const double q5_neutral = compute_q5_geom(neutral);
-      init_target_ = {neutral, neutral, neutral, -neutral,
-                      q5_neutral, -q5_neutral, joint6, joint7};
-    }
+  // Debug: print state machine conditions
+  static int print_counter = 0;
+  if (++print_counter % 100 == 0) {  // Print every 100 cycles to avoid spam
+    std::cout << "[STATE MACHINE] force_requested=" << force_requested
+              << " force_detected=" << force_detected
+              << " u_below_threshold=" << u_below_threshold
+              << " (u_eff=" << u_effective << ")"
+              << " desired_force=" << desired_force
+              << " measured_force=" << measured_force
+              << " active=" << force_control_active_ << std::endl;
+  }
 
-    init_progress_ = std::min(1.0, init_progress_ + init_rate_);
-
-    for (size_t i = 0; i < num_joints; ++i) {
-      joint_commands_[i] = util::Smooth(init_start_[i], init_target_[i], init_progress_);
-    }
-
-    if (init_progress_ >= 1.0) {
-      state_ = State::kMotion;
-      u_internal_ = 0.5;  // Initialize to mid-position
-    }
-    return;
+  if (force_requested && force_detected && u_below_threshold) {
+    force_control_active_ = true;
+  } else if (!u_below_threshold) {
+    force_control_active_ = false;
   }
 
   // ========================================================================
-  // Control Logic
+  // Update Joint Commands
   // ========================================================================
+  double u_d_final = u_effective;
+  double u_phi_final = u_phi;
 
-  const double u_effective = update_f(f_cmd, current_force, u_cmd);  // Handle force control & state transitions
+  if (force_control_active_) {
+    // Admittance-based force control: directly modulate u_d and u_phi based on force error
+    const double force_error = desired_force - measured_force;
+    const double admittance_offset = admittance_gain_ * force_error;
 
-  update_u(u_effective, current_positions);  // Control proximal joints (q3, q5)
-  update_phi(phi, current_positions);        // Control distal joints (q4, q6)
+    // Apply admittance offset to u_d (decrease u_d to close grasp when force_error > 0)
+    u_d_final = std::clamp(u_effective - admittance_offset, 0.0, 0.6);
 
-  // Static joints: keep at fixed target positions
-  joint_commands_[0] = util::Smooth(joint_commands_[0], neutral, alpha_);  // q1
-  joint_commands_[1] = util::Smooth(joint_commands_[1], neutral, alpha_);  // q2
-  joint_commands_[6] = util::Smooth(joint_commands_[6], joint6, alpha_);   // q7
-  joint_commands_[7] = util::Smooth(joint_commands_[7], joint7, alpha_);   // q8
+    // Update joints using adjusted u_d and original u_phi
+    update_u(u_d_final, current_positions);  // Control proximal joints (q3, q5) for grasp width
+    update_phi(u_phi_final, current_positions);       // Control distal joints (q4, q6) for contact angle
+
+    // Debug print force control details
+    static int force_counter = 0;
+    if (++force_counter % 100 == 0) {
+      std::cout << "[FORCE CTRL] force_error=" << force_error
+                << " admittance_offset=" << admittance_offset
+                << " admittance_gain=" << admittance_gain_ << std::endl;
+    }
+
+  } else {
+    // Motion control mode
+    update_u(u_d_final, current_positions);  // Control proximal joints (q3, q5) for grasp width
+    update_phi(u_phi_final, current_positions);      // Control distal joints (q4, q6) for contact angle
+  }
+
+  // Debug print adjusted values
+  static int adjust_counter = 0;
+  if (++adjust_counter % 100 == 0) {
+    std::cout << "[ADJUSTED] u_d: " << u_d << " -> " << u_d_final
+              << " | u_phi: " << u_phi << " -> " << u_phi_final
+              << " | active=" << force_control_active_ << std::endl;
+  }
+
+  // Static joints: maintain fixed positions
+  joint_commands_[0] = neutral;  // q1 (index 0)
+  joint_commands_[1] = neutral;  // q2 (index 1)
+  joint_commands_[6] = joint6;   // q7 (index 6)
+  joint_commands_[7] = joint7;   // q8 (index 7)
 }
 
 // ============================================================================
@@ -93,57 +140,25 @@ void ParallelGraspController::update(const std::array<double, 3>& commands,
 
 void ParallelGraspController::update_u(double u_cmd, const std::vector<double>& /* current_positions */) {
   const double u = std::clamp(u_cmd, 0.0, 1.0);
-  const double q5_neutral = compute_q5_geom(neutral);
-
   double q3_target, q5_target;
 
   if (u > midpoint) {
-    // Opening mode (u > 0.5): keep q3 neutral, reduce q5 to open fingertips
+    const double ratio = (u - midpoint) * 2.0;  // Map [0.5, 1.0] -> [0, 1]
+    const double q5_neutral = compute_q5_geom(neutral);
+
     q3_target = neutral;
-    const double open_ratio = (u - midpoint) * 2.0;  // Map [0.5,1.0] -> [0,1]
-    q5_target = std::max(q5_min, q5_neutral - open_ratio * (q5_neutral - q5_min));
+    q5_target = std::max(q5_min, q5_neutral - ratio * (q5_neutral - q5_min));
+
   } else {
-    // Closing mode (u <= 0.5): move q3 from qmax to qmin, q5 follows geometry
-    const double close_ratio = (midpoint - u) * 2.0;  // Map [0,0.5] -> [1,0]
-    q3_target = std::clamp(qmax - close_ratio * (qmax - qmin),
+    const double ratio = (midpoint - u) * 2.0;  // Map [0.5, 0] -> [0, 1]
+
+    q3_target = std::clamp(qmax - ratio * (qmax - qmin),
                            std::min(qmin, qmax), std::max(qmin, qmax));
     q5_target = std::max(q5_min, q3_target + compute_delta_q5(q3_target));
   }
 
-  // Apply smoothed commands to proximal joints
-  joint_commands_[2] = util::Smooth(joint_commands_[2], q3_target, alpha_);  // q3 (joint3)
-  joint_commands_[4] = util::Smooth(joint_commands_[4], q5_target, alpha_);  // q5 (joint5)
-}
-
-// ============================================================================
-// Force Control (f parameter)
-// ============================================================================
-
-double ParallelGraspController::update_f(double f_cmd, double current_force, double u_cmd) {
-  const bool force_requested = (f_cmd > force_threshold);
-  const bool force_detected  = (current_force > force_threshold);
-
-  // State transitions
-  if (state_ == State::kMotion && force_requested && force_detected) {
-    // Transition to force control
-    state_ = State::kForce;
-    u_internal_ = u_cmd;  // Initialize internal u from current command
-  } else if (state_ == State::kForce && !force_requested) {
-    // Transition back to motion control
-    state_ = State::kMotion;
-  }
-
-  // Compute effective u based on current state
-  if (state_ == State::kForce) {
-    // Force control mode: admittance-based regulation
-    const double force_error = f_cmd - current_force;
-    u_internal_ += admittance_gain * force_error;  // Adjust u based on force error
-    u_internal_ = std::clamp(u_internal_, 0.0, 1.0);
-    return u_internal_;
-  } else {
-    // Motion control mode: direct position control
-    return u_cmd;
-  }
+  joint_commands_[2] = q3_target;  // q3 (index 2)
+  joint_commands_[4] = q5_target;  // q5 (index 4)
 }
 
 // ============================================================================
@@ -151,18 +166,21 @@ double ParallelGraspController::update_f(double f_cmd, double current_force, dou
 // ============================================================================
 
 void ParallelGraspController::update_phi(double phi_cmd, const std::vector<double>& current_positions) {
-  // Read current proximal joint angles for absolute angle control
+  // Read current proximal joint angles (q3, q5) for absolute angle control
   const double q3_current = current_positions.size() > 2 ? current_positions[2] : 0.0;
   const double q5_current = current_positions.size() > 4 ? current_positions[4] : 0.0;
   const double phi = std::clamp(phi_cmd, 0.0, 1.0);
 
-  // Compute distal joint targets for pinching action
-  // phi = 0: parallel grasp (mirrored angles)
-  // phi = 1: maximum flexion (opposite directions for pinching)
-  const double q4_target = -q3_current - phi * max_flexion_angle;  // Flexes negative
-  const double q6_target = -q5_current + phi * max_flexion_angle;  // Flexes positive
+  // ========================================================================
+  // Compute Distal Joint Targets
+  // ========================================================================
+  // Base mirroring: q4 = -q3, q6 = -q5 (maintains parallel orientation)
+  // Additional flexion: add/subtract phi * max_flexion_angle for pinching
+  //
+  // q4 flexes negative (toward palm), q6 flexes positive (toward palm)
+  const double q4_target = -q3_current - phi * max_flexion_angle;  // Mirror q3 + flex inward
+  const double q6_target = -q5_current + phi * max_flexion_angle;  // Mirror q5 + flex inward
 
-  // Apply smoothed commands to distal joints
-  joint_commands_[3] = util::Smooth(joint_commands_[3], q4_target, mirror_alpha);  // q4 (joint4)
-  joint_commands_[5] = util::Smooth(joint_commands_[5], q6_target, mirror_alpha);  // q6 (joint6)
+  joint_commands_[3] = q4_target;  // q4 (index 3)
+  joint_commands_[5] = q6_target;  // q6 (index 5)
 }

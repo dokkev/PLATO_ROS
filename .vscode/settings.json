@@ -115,5 +115,6 @@
         "/opt/ros/iron/lib/python3.10/site-packages"
     ],
     "C_Cpp.errorSquiggles": "disabled",
-    "taipyStudio.gUI.elementsFilePaths": []
+    "taipyStudio.gUI.elementsFilePaths": [],
+    "cmake.sourceDirectory": "/home/optimo/CODE/plato_ws/src/PLATO_ROS/plato2_bringup"
 }

@@ -77,6 +77,40 @@ def generate_launch_description():
         condition=IfCondition(gui),
     )
 
+    # TF Merger: republish optimo TF to global TF tree
+    tf_merger = Node(
+        package="plato2_bringup",
+        executable="tf_merger.py",
+        name="tf_merger",
+        output="screen",
+    )
+
+    # Index fingertip pose publisher
+    index_fingertip_pose_pub = Node(
+        package="plato2_bringup",
+        executable="index_fingertip_pose_publisher.py",
+        name="index_fingertip_pose_publisher",
+        output="screen",
+    )
+
+    # Static transform from optimo ee to plato2 base_link
+    static_tf_optimo_to_plato = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_tf_optimo_to_plato",
+        arguments=[
+            "--x", "0",
+            "--y", "0",
+            "--z", "0",
+            "--roll", "0.0",
+            "--pitch", "-1.5708",
+            "--yaw", "3.14159",
+            "--frame-id", "ee",
+            "--child-frame-id", "base_link",
+        ],
+        output="screen",
+    )
+
     # Spawners
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -118,9 +152,12 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_state_pub,
+        static_tf_optimo_to_plato,
         joint_state_broadcaster_spawner,
         start_impedance_after_jsb,
         start_rviz_after_jsb,
+        tf_merger,
+        index_fingertip_pose_pub,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

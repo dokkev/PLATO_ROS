@@ -63,7 +63,7 @@ ros2 launch plato_teleop spacemouse_twist.launch.py
 - `/plato2/joint_states` (sensor_msgs/JointState) - Current joint positions
 
 **Published Topics:**
-- `/plato2/plato2_position_controller/commands` (std_msgs/Float64MultiArray) - Joint position commands
+- `/plato2/joint_position_controller/commands` (std_msgs/Float64MultiArray) - Joint position commands
 
 **Features:**
 - Direct SpaceMouse hardware access

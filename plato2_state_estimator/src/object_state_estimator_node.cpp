@@ -1,6 +1,8 @@
 #include "plato2_state_estimator/object_state_estimator_node.hpp"
 #include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <geometry_msgs/msg/wrench.hpp>
+#include <cstdint>
 
 namespace plato2_state_estimator {
 
@@ -29,6 +31,9 @@ ObjectStateEstimatorNode::ObjectStateEstimatorNode()
 
     estimated_wrench_pub_ = this->create_publisher<geometry_msgs::msg::Wrench>(
         "/object_state/estimated_wrench", 10);
+
+    measured_force_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+        "/object_state/measured_force", 10);
 
     // Create update timer
     auto update_period = std::chrono::duration<double>(1.0 / update_rate_);
@@ -121,6 +126,27 @@ void ObjectStateEstimatorNode::updateTimerCallback() {
     TactileData tactile0 = convertTactileMsg(tactile0_msg_);
     TactileData tactile1 = convertTactileMsg(tactile1_msg_);
 
+    // Track measured force using the best available tactile source
+    double measured_force = 0.0;
+    int8_t measured_source = -1;  // -1 = none, 0 = tactile0, 1 = tactile1
+    bool sensor0_contact = tactile0.contact_state >= TactileData::FEW_CONTACTS;
+    bool sensor1_contact = tactile1.contact_state >= TactileData::FEW_CONTACTS;
+    if (sensor0_contact && sensor1_contact) {
+        if (tactile0.force_z >= tactile1.force_z) {
+            measured_force = tactile0.force_z;
+            measured_source = 0;
+        } else {
+            measured_force = tactile1.force_z;
+            measured_source = 1;
+        }
+    } else if (sensor0_contact) {
+        measured_force = tactile0.force_z;
+        measured_source = 0;
+    } else if (sensor1_contact) {
+        measured_force = tactile1.force_z;
+        measured_source = 1;
+    }
+
     // Update estimator
     ObjectStateEstimatorOutput output = estimator_->update(tactile0, tactile1, dt);
 
@@ -138,6 +164,11 @@ void ObjectStateEstimatorNode::updateTimerCallback() {
         wrench_msg.force.z = output.minimal_force;  // Normal force
         wrench_msg.torque.z = output.moment_z;
         estimated_wrench_pub_->publish(wrench_msg);
+
+        // Publish measured force (normal) used for feedback
+        auto measured_msg = std_msgs::msg::Float64();
+        measured_msg.data = measured_force;
+        measured_force_pub_->publish(measured_msg);
 
         // Log slip state changes (optional, for debugging)
         static SlipState last_state = SlipState::NO_CONTACT;

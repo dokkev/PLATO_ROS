@@ -8,6 +8,25 @@
   -->
   <xacro:macro name="aristo_description" params="connector_link xyz:='0 0 0' rpy:='0 0 0'">
 
+
+    <!-- Create hand_mount link as intermediate frame -->
+    <link name="hand_mount">
+    </link>
+
+    <!-- Attach hand_mount to the provided connector link -->
+    <joint name="connector_to_hand_mount" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <parent link="${connector_link}"/>
+      <child link="hand_mount"/>
+    </joint>
+
+    <!-- Rotate hand_base 90 degrees around Z to point in +X direction -->
+    <joint name="hand_mount_to_base" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 1.5708"/>
+      <parent link="hand_mount"/>
+      <child link="hand_base"/>
+    </joint>
+
     <!-- Base link of the hand -->
     <link name="hand_base">
       <inertial>
@@ -42,6 +61,15 @@
   <origin xyz="-0.0523 0.01 -0.0025" rpy="0 1.57 1.57"/>
       <parent link="thumb_distal"/>
       <child link="thumb_distal_tactile"/>
+    </joint>
+
+    <!-- thumb_fingertip: fingertip frame at the end of thumb -->
+    <link name="thumb_fingertip" />
+
+    <joint name="thumb_distal_to_fingertip" type="fixed">
+      <origin xyz="-0.066 0 0" rpy="0 0 0"/>
+      <parent link="thumb_distal"/>
+      <child link="thumb_fingertip"/>
     </joint>
 
     <!-- thumb_metacarpal -->
@@ -256,6 +284,15 @@
       <child link="index_distal_tactile"/>
     </joint>
 
+    <!-- index_fingertip: fingertip frame at the end of index finger -->
+    <link name="index_fingertip" />
+
+    <joint name="index_distal_to_fingertip" type="fixed">
+      <origin xyz="-0.066 0 0" rpy="0 0 0"/>
+      <parent link="index_distal"/>
+      <child link="index_fingertip"/>
+    </joint>
+
       <!-- Middle joints -->
     <joint name="joint7" type="revolute">
       <origin xyz="-0.0305 -0.113 0.0145" rpy="-1.5708 0 -1.5708"/>
@@ -334,13 +371,17 @@
       <child link="middle_distal_tactile"/>
     </joint>
 
+    <!-- middle_fingertip: fingertip frame at the end of middle finger -->
+    <link name="middle_fingertip" />
 
-    <!-- Attach hand_base to the provided connector link -->
-    <joint name="hand_mount" type="fixed">
-      <origin xyz="${xyz}" rpy="${rpy}"/>
-      <parent link="${connector_link}"/>
-      <child link="hand_base"/>
+    <joint name="middle_distal_to_fingertip" type="fixed">
+      <origin xyz="-0.066 0 0" rpy="0 0 0"/>
+      <parent link="middle_distal"/>
+      <child link="middle_fingertip"/>
     </joint>
+
+
+
 
   </xacro:macro>
 </robot>

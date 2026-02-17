@@ -97,6 +97,12 @@ void Hand::set_current_position_as_zero() {
 
 ////////////////////////////////////////////////////////////////////////
 
+void Hand::set_default_can_limits() {
+    for (auto &actuator : actuators_) {
+        actuator.set_default_can_limits();
+    }
+}
+
 void Hand::set_impedance_command(const std::vector<double> &joint_position_command, 
                                  const std::vector<double> &joint_velocity_command,
                                  const std::vector<double> &joint_stiffness_command,

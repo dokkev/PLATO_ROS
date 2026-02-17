@@ -78,7 +78,8 @@ MsgEncoder::MsgEncoder(const float &gear_ratio, const float &torque_constant, co
 //     // Convert to protocol units using documented LSBs (helpers above)
 //     uint16_t pos_u16 = set_pos ? to_pos_max_u16(pos_max_rad) : to_pos_max_u16(POS_MAX);
 //     uint16_t vel_u16 = set_vel ? to_vel_max_u16(vel_max_rps) : to_vel_max_u16(VEL_MAX);
-void MsgEncoder::set_limits(TPCANMsg& msg, float pos_max_rad, float vel_max_rps, float tq_max_nm, 
+
+void MsgEncoder::set_can_limits(TPCANMsg& msg, float pos_max_rad, float vel_max_rps, float tq_max_nm, 
                            bool set_pos, bool set_vel, bool set_tq)
 {
     msg.ID      = tx_id_;
@@ -98,6 +99,29 @@ void MsgEncoder::set_limits(TPCANMsg& msg, float pos_max_rad, float vel_max_rps,
     msg.DATA[5] = uint8_t(tq_u16  & 0xFF);
     msg.DATA[6] = uint8_t(tq_u16  >> 8);
 }
+
+void MsgEncoder::set_default_can_limits(TPCANMsg& msg)
+{
+    msg.ID      = tx_id_;
+    msg.LEN     = 7;
+    msg.DATA[0] = CMD_CFG_LIMITS;   // should be 0xF0 for MIT limit config
+
+    // ===== Default raw protocol values =====
+    constexpr uint16_t POS_MAX_U16 = 955;   // 95.5 rad
+    constexpr uint16_t VEL_MAX_U16 = 4500;  // 45.00 rad/s
+    constexpr uint16_t T_MAX_U16   = 1800;  // 18.00 Nm
+
+    // Little-endian packing
+    msg.DATA[1] = static_cast<uint8_t>(POS_MAX_U16 & 0xFF);
+    msg.DATA[2] = static_cast<uint8_t>(POS_MAX_U16 >> 8);
+
+    msg.DATA[3] = static_cast<uint8_t>(VEL_MAX_U16 & 0xFF);
+    msg.DATA[4] = static_cast<uint8_t>(VEL_MAX_U16 >> 8);
+
+    msg.DATA[5] = static_cast<uint8_t>(T_MAX_U16 & 0xFF);
+    msg.DATA[6] = static_cast<uint8_t>(T_MAX_U16 >> 8);
+}
+
 
 void MsgEncoder::set_zero_position(TPCANMsg &msg)
 {

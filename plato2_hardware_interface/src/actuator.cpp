@@ -50,6 +50,14 @@ void Actuator::set_current_position_as_zero() {
 }
 
 
+void Actuator::set_default_can_limits() {
+    encoder_.set_default_can_limits(config_msg_);
+    pcan_interface_.send_message(config_msg_);
+    // wait
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pcan_interface_.receive_message();
+}
+
 ////////////////////////////////////////////////////////////////////////
 
 void Actuator::determine_current_state_() {

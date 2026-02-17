@@ -134,6 +134,11 @@ public:
 
     /// @brief Set current position as zero reference
     void set_current_position_as_zero();
+
+    void set_can_limits(float pos_max_rad, float vel_max_rps, float tq_max_nm, 
+                        bool set_pos = true, bool set_vel = true, bool set_tq = true);
+
+    void set_default_can_limits();
     
 
     /// @brief Send impedance control command

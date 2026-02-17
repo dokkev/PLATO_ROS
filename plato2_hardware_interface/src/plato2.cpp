@@ -152,8 +152,12 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
     joint_damping_commands_[i] = 0.0;
   }
 
+  // set default CAN limits for all actuators
+  // hand_->set_default_can_limits();
+
   // set current position as zero
   hand_->set_current_position_as_zero();
+  
 
 
   RCLCPP_INFO(rclcpp::get_logger("PLATO2Hardware"), "Successfully activated!");

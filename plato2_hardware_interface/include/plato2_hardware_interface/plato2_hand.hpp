@@ -51,6 +51,9 @@ public:
     /// @brief Get number of force-torque sensors
     size_t get_num_ft_sensors() const { return num_ft_sensors_; }
 
+
+    void set_default_can_limits();
+
 private:
     /// @brief Initialize CAN hardware (actuators and sensors)
     void init_can_hardware();

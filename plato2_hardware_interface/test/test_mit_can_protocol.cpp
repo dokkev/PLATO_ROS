@@ -84,7 +84,7 @@ TEST_F(MITCANProtocolTest, LimitsConfiguration) {
     float vel_max = 20.0f;  // 20 rad/s
     float tq_max = 15.0f;   // 15 Nm
     
-    encoder->set_limits(msg, pos_max, vel_max, tq_max, true, true, true);
+    encoder->set_can_limits(msg, pos_max, vel_max, tq_max, true, true, true);
     
     EXPECT_EQ(msg.ID, tx_id) << "Limits command should use base ID (no OC bit)";
     EXPECT_EQ(msg.LEN, 7) << "Limits command should be 7 bytes";

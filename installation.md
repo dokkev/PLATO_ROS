@@ -25,7 +25,9 @@ make clean
 
 Install dependency
 ```
-sudo apt-get install libelf-dev sudo apt-get install libpopt-dev
+sudo apt-get install libelf-dev 
+
+sudo apt-get install libpopt-dev
 ```
 
 make and install 

@@ -1,0 +1,80 @@
+actuators:
+  - name: thumb_roll
+    tx_id: 0x11
+    rx_id: 0x21
+    direction: 1
+    torque_constant: 1.17
+    gear_ratio: 350.0
+    limits:
+      min: -3.14159
+      max: 3.14159
+
+  - name: thumb_yaw
+    tx_id: 0x12
+    rx_id: 0x22
+    direction: 1
+    torque_constant: 1.17
+    gear_ratio: 350.0
+    limits:
+      min: -3.14159
+      max: 3.14159
+
+  - name: thumb_mcp
+    tx_id: 0x14
+    rx_id: 0x24
+    direction: -1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -1.0471976
+      max: 1.0471976
+
+  - name: thumb_pip
+    tx_id: 0x13
+    rx_id: 0x23
+    direction: -1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -0.7853982
+      max: 2.268928
+
+  - name: index_mcp
+    tx_id: 0x16
+    rx_id: 0x26
+    direction: -1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -1.0471976
+      max: 1.0471976
+
+  - name: index_pip
+    tx_id: 0x15
+    rx_id: 0x25
+    direction: -1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -0.7853982
+      max: 2.268928
+
+  - name: middle_mcp
+    tx_id: 0x18
+    rx_id: 0x28
+    direction: 1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -1.0471976
+      max: 1.0471976
+
+  - name: middle_pip
+    tx_id: 0x17
+    rx_id: 0x27
+    direction: 1
+    torque_constant: 0.41
+    gear_ratio: 8.0
+    limits:
+      min: -0.7853982
+      max: 2.268928

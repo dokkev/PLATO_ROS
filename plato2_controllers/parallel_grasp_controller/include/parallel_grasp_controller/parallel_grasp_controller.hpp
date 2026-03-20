@@ -7,14 +7,6 @@
 #include <stdexcept>
 #include <plato_utils/interpolation.hpp>
 
-#ifdef _MSC_VER
-#define _USE_MATH_DEFINES
-#endif
-
-#if __cplusplus >= 202002L
-#include <numbers>  // C++20
-#endif
-
 /**
  * @brief Simplified parallel grasp controller
  *
@@ -23,10 +15,13 @@
  */
 class ParallelGraspController {
 public:
+  static constexpr double kPi = 3.14159265358979323846;
+  static constexpr double kDegreesToRadians = kPi / 180.0;
+
   // Geometric parameters
   static constexpr double L    = 0.06;     // Tip radius (m)
   static constexpr double w    = 0.022;   // Lateral offset (m)
-  static constexpr double qmin =  -45.0 * M_PI / 180.0; // Joint lower limit (rad)
+  static constexpr double qmin =  -45.0 * kDegreesToRadians; // Joint lower limit (rad)
   static constexpr double qmax =   0.0;     // Joint upper limit (rad); u=0 ⇒ fingertips meet
   static constexpr double q_default = -0.35; // Default starting q3 (rad), clamped to limits
 

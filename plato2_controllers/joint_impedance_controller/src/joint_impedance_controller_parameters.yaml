@@ -4,6 +4,11 @@ joint_impedance_controller:
     default_value: [],
     description: "Name of the joints to control",
   }
+  compute_impedance_torque: {
+    type: bool,
+    default_value: false,
+    description: "If true, additionally compute tau = effort_ff + Kp*pos_err + Kd*vel_err in the controller and send it through the effort command interface while still forwarding the desired impedance values. If false, only pass impedance commands through to the hardware.",
+  }
   interface_name: {
     type: string,
     default_value: "",

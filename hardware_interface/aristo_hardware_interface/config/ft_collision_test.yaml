@@ -1,0 +1,14 @@
+ft_collision_test_node:
+  ros__parameters:
+    # Joint 4 movement parameters
+    joint4_velocity: 0.1      # rad/s - velocity of joint 4 movement
+    joint4_min: -1.5          # rad - minimum joint 4 position
+    joint4_max: 1.5           # rad - maximum joint 4 position
+    
+    # Collision detection thresholds
+    force_threshold: 2.0      # N - force magnitude threshold for collision
+    torque_threshold: 0.1     # Nm - torque magnitude threshold for collision
+    
+    # Control parameters
+    control_rate: 100.0       # Hz - control loop update rate
+    auto_start: false         # Auto-start movement on launch (true/false)

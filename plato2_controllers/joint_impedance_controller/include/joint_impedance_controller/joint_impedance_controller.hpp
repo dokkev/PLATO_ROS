@@ -54,6 +54,10 @@ private:
   std::vector<double> positions_;
   std::vector<double> velocities_;
   std::vector<double> efforts_;
+  std::vector<double> position_errors_;
+  std::vector<double> velocity_errors_;
+  std::vector<double> feedback_efforts_;
+  std::vector<double> desired_efforts_;
 
   // Command interfaces (write to hardware)
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>

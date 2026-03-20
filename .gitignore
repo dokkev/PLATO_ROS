@@ -9,3 +9,4 @@ plato_hardware_interface/log/latest_list
 ros2_socketcan
 .qodo
 .pyc
+.github

@@ -1,0 +1,80 @@
+#ifndef PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_
+#define PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_
+
+#include <cstdint>
+#include <memory>
+#include "can_hardware_common/actuator.hpp"
+#include "plato_hardware_interface/can_protocol.hpp"
+
+namespace plato_actuator
+{
+
+struct Config
+{
+  can_hardware_common::ActuatorCoreConfig core;
+  actuator::Limits limits;
+};
+
+class Actuator
+{
+public:
+  explicit Actuator(const Config & config);
+  Actuator(const Actuator &) = delete;
+  Actuator & operator=(const Actuator &) = delete;
+  Actuator(Actuator &&) noexcept;
+  Actuator & operator=(Actuator &&) noexcept;
+  ~Actuator();
+
+  actuator::TxCommand enable_motor();
+  actuator::TxCommand disable_motor();
+  actuator::TxCommand stop_control();
+
+  actuator::TxCommand set_joint_torque(float joint_torque);
+  actuator::TxCommand set_joint_position(
+    float joint_position,
+    uint32_t duration_ms = can_protocol::kDefaultQddPositionDurationMs);
+  actuator::TxCommand set_servo_position(float joint_position, uint32_t current_milliamps = 0);
+  bool set_current_position_as_zero();
+
+  void process_message(const TPCANMsg & msg);
+
+  const Config & get_config() const { return config_; }
+  const can_hardware_common::ActuatorFeedback & get_feedback() const { return feedback_; }
+  const can_hardware_common::ActuatorStatus & get_status() const { return status_; }
+
+  uint32_t get_tx_id() const { return config_.core.can_tx_id; }
+  uint32_t get_rx_id() const { return config_.core.can_rx_id; }
+  float get_motor_position() const { return motor_position_; }
+  float get_position_offset() const { return config_.core.position_offset; }
+  bool is_enabled() const { return motor_enabled_; }
+  bool has_feedback() const { return has_feedback_; }
+
+  void set_status_temperature(uint8_t temperature) { status_.temperature = temperature; }
+  void set_motor_enabled(bool enabled) { motor_enabled_ = enabled; }
+  void set_motor_position_raw(float motor_position) { motor_position_ = motor_position; }
+  void apply_motor_feedback(
+    float motor_position,
+    float motor_velocity,
+    float motor_torque,
+    bool position_has_offset,
+    bool velocity_is_rpm);
+
+private:
+  float clamp_torque_near_bounds_(float joint_torque) const;
+  float map_joint_to_motor_frame_(float joint_value, bool apply_offset = false) const;
+  float map_motor_to_joint_frame_(float motor_value, bool apply_offset = false) const;
+
+  Config config_;
+  std::unique_ptr<can_protocol::SteadywinProtocol> protocol_;
+  can_hardware_common::ActuatorFeedback feedback_;
+  can_hardware_common::ActuatorStatus status_;
+  float motor_position_ = 0.0f;
+  bool motor_enabled_ = false;
+  bool has_feedback_ = false;
+
+  static constexpr float kJointLimitSafetyMargin = 0.05f;
+};
+
+}  // namespace plato_actuator
+
+#endif  // PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_

@@ -1,0 +1,9 @@
+<library path="aristo_hardware_interface">
+  <class name="aristo_hardware_interface/AristoHardware"
+         type="aristo_hardware_interface::AristoHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ros2_control hardware interface for Aristo.
+    </description>
+  </class>
+</library>

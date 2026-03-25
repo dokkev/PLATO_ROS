@@ -1,6 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <plato2_interfaces/msg/impedance_commands.hpp>
+#include <plato_interfaces/msg/impedance_commands.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <atomic>
 #include <cmath>
@@ -54,7 +54,7 @@ public:
         );
         
         // Publisher for impedance commands
-        impedance_pub_ = this->create_publisher<plato2_interfaces::msg::ImpedanceCommands>(
+        impedance_pub_ = this->create_publisher<plato_interfaces::msg::ImpedanceCommands>(
             "/plato2/joint_impedance_controller/commands",
             10
         );
@@ -104,7 +104,7 @@ public:
         }
         
         // Stop the robot
-        auto msg = plato2_interfaces::msg::ImpedanceCommands();
+        auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.resize(8, 0.0);
         msg.velocity.resize(8, 0.0);
         msg.stiffness.resize(8, 2.0);
@@ -205,7 +205,7 @@ private:
         
         if (returning_to_start_) {
             // Command immediate return to start
-            auto msg = plato2_interfaces::msg::ImpedanceCommands();
+            auto msg = plato_interfaces::msg::ImpedanceCommands();
             msg.position.resize(8, 0.0);
             msg.velocity.resize(8, 0.0);
             msg.stiffness.resize(8, 2.0);
@@ -245,7 +245,7 @@ private:
         }
         
         // Publish impedance command
-        auto msg = plato2_interfaces::msg::ImpedanceCommands();
+        auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.resize(8, 0.0);
         msg.velocity.resize(8, 0.0);
         msg.stiffness.resize(8, 2.0);  // Moderate stiffness
@@ -280,7 +280,7 @@ private:
     }
 
     void publish_stop_command() {
-        auto msg = plato2_interfaces::msg::ImpedanceCommands();
+        auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.assign(8, 0.0);
         msg.velocity.assign(8, 0.0);
         msg.stiffness.assign(8, 2.0);
@@ -368,7 +368,7 @@ private:
     
     // Subscribers and Publishers
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
-    rclcpp::Publisher<plato2_interfaces::msg::ImpedanceCommands>::SharedPtr impedance_pub_;
+    rclcpp::Publisher<plato_interfaces::msg::ImpedanceCommands>::SharedPtr impedance_pub_;
     rclcpp::TimerBase::SharedPtr control_timer_;
     
     // State variables

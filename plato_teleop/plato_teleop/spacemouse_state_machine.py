@@ -134,7 +134,7 @@ class SpaceMouseStateMachine(Node):
         # Create a publisher for joint positions
         self.joint_publisher = self.create_publisher(
             Float64MultiArray,
-            '/plato2/joint_position_controller/commands',
+            '/plato2/joint_impedance_trajectory_controller/commands',
             10
         )
         

@@ -37,7 +37,7 @@ def generate_launch_description():
 
     # RViz configuration
     rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("plato2_description"), "rviz", "plato2.rviz"]
+        [FindPackageShare("plato_description"), "rviz", "plato2.rviz"]
     )
 
     rviz_node = Node(

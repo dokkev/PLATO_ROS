@@ -37,19 +37,19 @@ def generate_launch_description():
     )
 
     foxglove_graph = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_graph.py',
         namespace=plato_ns,
     )
 
     foxglove_commands = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_commands.py',
         namespace=plato_ns,
     )
 
     foxglove_trajectory = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_trajectory.py',
         namespace=plato_ns,
     )

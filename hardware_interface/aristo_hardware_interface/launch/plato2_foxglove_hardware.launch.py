@@ -39,7 +39,7 @@ def generate_launch_description():
     plato_ns = LaunchConfiguration("plato_ns")
 
     # Get URDF via xacro
-    pkg_name = 'plato2_description'
+    pkg_name = 'plato_description'
     pkg_share= get_package_share_directory(pkg_name)
     urdf_path = 'urdf/aristo.urdf.xacro'
     xacro_file = os.path.join(pkg_share, urdf_path)
@@ -49,7 +49,7 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-            FindPackageShare("plato2_bringup"),
+            FindPackageShare("aristo_bringup"),
             "config",
             "plato2_joint_impedance_controller.yaml",
         ]
@@ -79,19 +79,19 @@ def generate_launch_description():
     )
     
     foxglove_graph = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_graph.py',
         namespace=plato_ns,
     )
     
     foxglove_commands = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_commands.py',
         namespace=plato_ns,
     )
 
     foxglove_trajectory = Node(
-        package='plato2_foxglove',
+        package='plato_foxglove',
         executable='foxglove_trajectory.py',
         namespace=plato_ns,
     )

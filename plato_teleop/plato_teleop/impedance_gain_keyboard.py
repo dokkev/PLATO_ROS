@@ -13,10 +13,10 @@ class ImpedanceGainKeyboard(Node):
         super().__init__('impedance_gain_keyboard')
         self._lock = threading.Lock()
         self._clients = {
-            '0': self._make_client('zero', '/joint_position_controller_node/impedance_gains/soft'),
-            '1': self._make_client('soft', '/joint_position_controller_node/impedance_gains/soft'),
-            '2': self._make_client('medium', '/joint_position_controller_node/impedance_gains/medium'),
-            '3': self._make_client('hard', '/joint_position_controller_node/impedance_gains/hard'),
+            '0': self._make_client('zero', '/impedance_trajectory_controller_node/impedance_gains/zero'),
+            '1': self._make_client('soft', '/impedance_trajectory_controller_node/impedance_gains/soft'),
+            '2': self._make_client('medium', '/impedance_trajectory_controller_node/impedance_gains/medium'),
+            '3': self._make_client('hard', '/impedance_trajectory_controller_node/impedance_gains/hard'),
         }
         self.get_logger().info("Impedance gain keyboard: 0=zero, 1=soft, 2=medium, 3=hard, q=quit")
         self._stop = threading.Event()

@@ -37,7 +37,7 @@ def generate_launch_description():
     )
 
     # Paths
-    bringup_pkg = FindPackageShare('plato2_bringup')
+    bringup_pkg = FindPackageShare('aristo_bringup')
     hw_launch = PathJoinSubstitution([bringup_pkg, 'launch', 'aristo_hardware.launch.py'])
 
     hw_include = IncludeLaunchDescription(

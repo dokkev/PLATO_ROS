@@ -26,7 +26,7 @@ class RetargetingConverter(Node):
             "source_topic", "/plato2/joint_impedance_controller/commands_float8array_HY"
         ).value
         self.target_topic: str = self.declare_parameter(
-            "target_topic", "/plato2/joint_position_controller/commands"
+            "target_topic", "/plato2/joint_impedance_trajectory_controller/commands"
         ).value
 
         self._filtered_cmd: List[float] = []

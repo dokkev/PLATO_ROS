@@ -17,6 +17,9 @@ struct PlatoHandConfig
   FiveBarLinkage::FiveBarLinkageConfig linkage_config;
   std::string actuator_offset_yaml_path;
   std::chrono::microseconds direct_tx_inter_frame_gap{std::chrono::microseconds(100)};
+  bool disable_on_destruction{true};
+  bool enable_transport_simulator{false};
+  bool transport_simulator_bypass_hardware{true};
 };
 
 }  // namespace plato_hand

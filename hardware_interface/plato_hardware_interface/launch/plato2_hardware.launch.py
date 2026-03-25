@@ -16,7 +16,7 @@ def generate_launch_description():
         [
             FindExecutable(name="xacro"),
             " ",
-            PathJoinSubstitution([FindPackageShare("plato2_description"), "urdf", "plato.urdf.xacro"]),
+            PathJoinSubstitution([FindPackageShare("plato_description"), "urdf", "plato.urdf.xacro"]),
             " ",
             "zeroing:=",
             zeroing,
@@ -26,13 +26,13 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-            FindPackageShare("plato2_bringup"),
+            FindPackageShare("plato_bringup"),
             "config",
             "plato2_joint_impedance_controller.yaml",
         ]
     )
     rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("plato2_description"), "rviz", "plato2.rviz"]
+        [FindPackageShare("plato_description"), "rviz", "plato2.rviz"]
     )
 
     control_node = Node(

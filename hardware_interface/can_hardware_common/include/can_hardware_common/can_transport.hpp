@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -23,6 +24,7 @@ class CanTransport
 {
 public:
   using RxObserver = std::function<void(const TPCANMsg & frame)>;
+  using TxSimulator = std::function<std::vector<TPCANMsg>(const TPCANMsg & tx_frame)>;
 
   struct RxResult
   {
@@ -60,6 +62,12 @@ public:
   void clear_rx_observers();
   const std::vector<RxObserver> & rx_observers() const { return rx_observers_; }
 
+  /// Optional TX simulator: inject synthetic RX frames generated from each TX frame.
+  /// If bypass_hardware is true, CAN_Write/CAN_Read are skipped and only simulated frames are used.
+  void set_tx_simulator(TxSimulator simulator, bool bypass_hardware = true);
+  void clear_tx_simulator();
+  bool has_tx_simulator() const;
+
   // ── TX ──
 
   /// Non-blocking paced send. Returns PCAN_ERROR_QXMTFULL if gap not ready.
@@ -82,6 +90,11 @@ private:
   mutable std::mutex tx_mutex_;
   std::chrono::microseconds min_inter_frame_gap_{std::chrono::microseconds(0)};
   std::chrono::steady_clock::time_point last_tx_time_{};
+
+  mutable std::mutex simulator_mutex_;
+  TxSimulator tx_simulator_{};
+  bool simulator_bypass_hardware_ = false;
+  std::deque<TPCANMsg> injected_rx_frames_;
 };
 
 }  // namespace can_hardware_common

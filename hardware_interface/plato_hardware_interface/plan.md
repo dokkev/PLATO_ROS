@@ -86,13 +86,13 @@ This package should mirror the same pattern:
 - `AristoHardwareInterface`
 - Aristo-specific transmission
 
-### `plato_bringup` (currently `plato2_bringup`)
+### `plato_bringup`
 
-This package should own ROS-facing bringup config:
+This package should own Plato ROS-facing bringup config:
 
 - ros2_control controller parameter YAML
 - controller manager / broadcaster YAML
-- per-robot joint impedance controller YAML
+- Plato joint impedance controller YAML
 - launch-time ROS wiring
 
 This package should not own:
@@ -100,6 +100,15 @@ This package should not own:
 - actuator hardware YAML
 - linkage geometry YAML
 - Plato hardware parsing and validation logic
+
+### `aristo_bringup`
+
+This package should own Aristo ROS-facing bringup config:
+
+- ros2_control controller parameter YAML
+- controller manager / broadcaster YAML
+- Aristo joint impedance controller YAML
+- launch-time ROS wiring
 
 ### `joint_impedance_controller`
 
@@ -135,8 +144,8 @@ For Plato specifically, the package-owned hardware config files should be:
 - `config/plato_actuator_offsets.yaml`
 - `config/plato_linkage.yaml`
 
-This is separate from ROS-facing controller config, which should live in `plato_bringup/config`
-(currently `plato2_bringup/config`), for example:
+This is separate from ROS-facing controller config, which should live in `plato_bringup/config`,
+for example:
 
 - `plato_bringup/config/plato2_joint_impedance_controller.yaml`
 
@@ -298,14 +307,14 @@ That means:
 
 - `joint_impedance_controller` owns the generic parameter schema only
 - `plato_bringup` owns Plato controller YAML
-- `plato_bringup` also owns Aristo controller YAML while that bringup package remains shared
+- `aristo_bringup` owns Aristo controller YAML
 
 Expected bringup-side files:
 
 - `plato_bringup/config/plato_joint_impedance_controller.yaml`
-- `plato_bringup/config/aristo_joint_impedance_controller.yaml`
+- `aristo_bringup/config/plato2_joint_impedance_controller.yaml`
 
-Currently this is under `plato2_bringup/config`, and the Aristo file name may still reflect older naming.
+The Aristo controller file name may still reflect older naming.
 
 That naming cleanup is secondary to the architectural rule: controller package generic, bringup package robot-specific.
 
@@ -777,13 +786,17 @@ In `joint_impedance_controller`:
 - `include/plato_hardware_interface/plato_hardware_interface.hpp`
 - `src/plato_hardware_interface.cpp`
 
-### `plato_bringup` (currently `plato2_bringup`)
+### `plato_bringup`
 
 - `config/plato2_joint_impedance_controller.yaml`
 - `config/plato_joint_impedance_controller.yaml`
-- `config/aristo_joint_impedance_controller.yaml`
 - other ROS controller / broadcaster YAML
 - launch files that bind the hardware interface into ROS
+
+### `aristo_bringup`
+
+- `config/plato2_joint_impedance_controller.yaml`
+- Aristo bringup launch files and scripts
 
 ### `joint_impedance_controller`
 

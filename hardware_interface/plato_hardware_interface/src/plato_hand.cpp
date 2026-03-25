@@ -1,6 +1,9 @@
 #include "plato_hardware_interface/plato_hand.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -18,6 +21,8 @@ namespace
 {
 constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
+constexpr float kTwoPi = 6.28318530717958647692f;
+constexpr float kSecondsPerMinute = 60.0f;
 
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -59,6 +64,13 @@ Hand::Hand(PlatoHandConfig config)
     actuators_.emplace_back(cfg);
   }
 
+  transport_simulator_enabled_ = config.enable_transport_simulator;
+  disable_on_destruction_ = config.disable_on_destruction;
+  simulator_states_.assign(kNumActuators, SimActuatorState{});
+  if (transport_simulator_enabled_) {
+    configure_transport_simulator_(config.transport_simulator_bypass_hardware);
+  }
+
   transport_.add_rx_observer([this](const TPCANMsg & frame) {
     (void)frame;
     mark_rx_frame_();
@@ -96,10 +108,37 @@ Hand::Hand(PlatoHandConfig config)
     logger(),
     "Direct TX inter-frame gap: %ld us",
     static_cast<long>(config.direct_tx_inter_frame_gap.count()));
+  if (transport_simulator_enabled_) {
+    RCLCPP_WARN(
+      logger(),
+      "Plato hand transport simulator enabled (bypass_hardware=%s)",
+      config.transport_simulator_bypass_hardware ? "true" : "false");
+  }
+}
+
+Hand::~Hand()
+{
+  if (!disable_on_destruction_ || !enable_requested_ || disable_requested_) {
+    return;
+  }
+
+  try {
+    if (!disable()) {
+      RCLCPP_WARN(
+        logger(),
+        "Destructor auto-disable: one or more actuators did not acknowledge STOP_MOTOR.");
+    }
+  } catch (const std::exception & e) {
+    RCLCPP_WARN(logger(), "Destructor auto-disable raised exception: %s", e.what());
+  } catch (...) {
+    RCLCPP_WARN(logger(), "Destructor auto-disable raised unknown exception.");
+  }
 }
 
 bool Hand::enable(bool automatic_zeroing)
 {
+  enable_requested_ = true;
+  disable_requested_ = false;
   bool success = true;
 
   for (size_t i = 0; i < kNumActuators; ++i) {
@@ -121,6 +160,7 @@ bool Hand::enable(bool automatic_zeroing)
 
 bool Hand::disable()
 {
+  disable_requested_ = true;
   bool success = true;
 
   for (size_t i = 0; i < kNumActuators; ++i) {
@@ -289,6 +329,154 @@ bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microsecond
 // ════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ════════════════════════════════════════════════════════════════════════════
+
+void Hand::configure_transport_simulator_(bool bypass_hardware)
+{
+  transport_.set_tx_simulator(
+    [this](const TPCANMsg & tx_frame) {
+      return simulate_tx_frame_(tx_frame);
+    },
+    bypass_hardware);
+}
+
+std::vector<TPCANMsg> Hand::simulate_tx_frame_(const TPCANMsg & tx_frame)
+{
+  if (tx_frame.MSGTYPE != PCAN_MESSAGE_STANDARD || tx_frame.LEN < 1) {
+    return {};
+  }
+
+  std::lock_guard<std::mutex> lock(simulator_state_mutex_);
+
+  size_t actuator_index = kNumActuators;
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    if (actuators_[i].get_tx_id() == tx_frame.ID) {
+      actuator_index = i;
+      break;
+    }
+  }
+  if (actuator_index >= kNumActuators) {
+    return {};
+  }
+
+  auto & sim = simulator_states_[actuator_index];
+  const uint32_t rx_id = actuators_[actuator_index].get_rx_id();
+  const uint8_t opcode = tx_frame.DATA[0];
+
+  switch (opcode) {
+    case CommandByte::START_MOTOR:
+      sim.motor_enabled = true;
+      sim.motor_velocity_rpm = 0.0f;
+      sim.motor_torque = 0.0f;
+      return {make_ack_frame_(rx_id, opcode)};
+    case CommandByte::STOP_MOTOR:
+    case CommandByte::STOP_CONTROL:
+      sim.motor_enabled = false;
+      sim.motor_velocity_rpm = 0.0f;
+      sim.motor_torque = 0.0f;
+      return {make_ack_frame_(rx_id, opcode)};
+    case CommandByte::TORQUE_CONTROL: {
+        if (!sim.motor_enabled) {
+          return {make_ack_frame_(rx_id, opcode, ResultByte::FAILURE)};
+        }
+
+        const float commanded_torque = decode_float_le_(tx_frame, 1);
+        sim.motor_torque = std::clamp(commanded_torque, -9.8f, 9.8f);
+        sim.motor_velocity_rpm =
+          std::clamp(0.90f * sim.motor_velocity_rpm + sim.motor_torque * 8.0f, -65.0f, 65.0f);
+        sim.motor_position += (sim.motor_velocity_rpm * kTwoPi / kSecondsPerMinute) * 0.002f;
+        return {
+          make_state_frame_(
+            rx_id,
+            opcode,
+            sim.temperature,
+            sim.motor_position,
+            sim.motor_velocity_rpm,
+            sim.motor_torque)};
+      }
+    case CommandByte::POSITION_CONTROL: {
+        if (!sim.motor_enabled) {
+          return {make_ack_frame_(rx_id, opcode, ResultByte::FAILURE)};
+        }
+
+        const float target_position = decode_float_le_(tx_frame, 1);
+        const float delta = target_position - sim.motor_position;
+        sim.motor_velocity_rpm =
+          std::clamp(delta * (25.0f * kSecondsPerMinute / kTwoPi), -65.0f, 65.0f);
+        sim.motor_position = target_position;
+        sim.motor_torque = std::clamp(delta * 0.5f, -9.8f, 9.8f);
+        return {
+          make_state_frame_(
+            rx_id,
+            opcode,
+            sim.temperature,
+            sim.motor_position,
+            sim.motor_velocity_rpm,
+            sim.motor_torque)};
+      }
+    default:
+      break;
+  }
+
+  return {};
+}
+
+TPCANMsg Hand::make_ack_frame_(uint32_t rx_id, uint8_t opcode, uint8_t result)
+{
+  TPCANMsg frame{};
+  frame.ID = rx_id;
+  frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
+  frame.LEN = 2;
+  frame.DATA[0] = opcode;
+  frame.DATA[1] = result;
+  return frame;
+}
+
+TPCANMsg Hand::make_state_frame_(
+  uint32_t rx_id,
+  uint8_t opcode,
+  uint8_t temperature,
+  float motor_position,
+  float motor_velocity_rpm,
+  float motor_torque)
+{
+  TPCANMsg frame{};
+  frame.ID = rx_id;
+  frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
+  frame.LEN = 8;
+  frame.DATA[0] = opcode;
+  frame.DATA[1] = ResultByte::SUCCESS;
+  frame.DATA[2] = temperature;
+
+  const float clamped_position = std::clamp(motor_position, -12.5f, 12.5f);
+  const uint16_t position_raw = static_cast<uint16_t>(std::lround(
+      (clamped_position + 12.5f) * 65535.0f / 25.0f));
+  frame.DATA[3] = static_cast<uint8_t>(position_raw & 0xFF);
+  frame.DATA[4] = static_cast<uint8_t>((position_raw >> 8) & 0xFF);
+
+  const float clamped_velocity = std::clamp(motor_velocity_rpm, -65.0f, 65.0f);
+  const uint16_t velocity_raw = static_cast<uint16_t>(std::lround(
+      (clamped_velocity + 65.0f) * 4095.0f / 130.0f));
+  frame.DATA[5] = static_cast<uint8_t>((velocity_raw >> 4) & 0xFF);
+
+  const float clamped_torque = std::clamp(motor_torque, -9.8f, 9.8f);
+  const uint16_t torque_raw = static_cast<uint16_t>(std::lround(
+      2048.0f + clamped_torque * (2047.0f / 9.8f)));
+  frame.DATA[6] = static_cast<uint8_t>(((velocity_raw & 0x0F) << 4) | ((torque_raw >> 8) & 0x0F));
+  frame.DATA[7] = static_cast<uint8_t>(torque_raw & 0xFF);
+
+  return frame;
+}
+
+float Hand::decode_float_le_(const TPCANMsg & frame, size_t offset)
+{
+  if (offset + sizeof(float) > frame.LEN) {
+    return 0.0f;
+  }
+
+  float value = 0.0f;
+  std::memcpy(&value, &frame.DATA[offset], sizeof(float));
+  return value;
+}
 
 bool Hand::zero_actuators_()
 {

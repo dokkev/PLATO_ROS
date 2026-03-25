@@ -101,7 +101,7 @@ aristo_hardware_interface/config/ft_collision_test.yaml
 ros2 launch aristo_hardware_interface plato2_finger_hardware.launch.py
 
 # Terminal 2: Set controller gains (if needed)
-ros2 run joint_position_controller position_control_node
+ros2 run joint_impedance_controller impedance_trajectory_controller_node
 ```
 
 ### 2. Run the Collision Test
@@ -237,5 +237,5 @@ ros2 run rqt_console rqt_console
 
 ## References
 - FT Sensor Test Tool: `src/tools/ft_sensor_can_test.cpp`
-- Impedance Controller: `plato2_controllers/joint_impedance_controller`
+- Impedance Controller: `controllers/joint_impedance_controller`
 - FT Sensor CAN Interface: `ft_sensor_can.hpp/cpp`

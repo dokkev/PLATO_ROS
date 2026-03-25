@@ -12,7 +12,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
   rclcpp_lifecycle
   geometry_msgs
-  plato2_interfaces
+  plato_interfaces
   plato_hardware_interface
   Eigen3
 )

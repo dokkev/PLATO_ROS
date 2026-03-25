@@ -44,6 +44,23 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin
 )
 
+install(PROGRAMS
+  script/pcan_hardware_smoke_test.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(pcan_transport_smoke_test
+  src/tools/pcan_transport_smoke_test.cpp
+)
+target_compile_features(pcan_transport_smoke_test PUBLIC cxx_std_17)
+target_link_libraries(pcan_transport_smoke_test
+  PRIVATE ${PROJECT_NAME}
+)
+
+install(TARGETS pcan_transport_smoke_test
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(Eigen3 geometry_msgs rclcpp)
 ament_export_libraries(${PROJECT_NAME})

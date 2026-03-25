@@ -13,7 +13,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
   rclcpp_lifecycle
   can_msgs
-  plato2_interfaces
+  plato_interfaces
   Eigen3
 )
 
@@ -59,6 +59,27 @@ find_package(plato_utils REQUIRED)
 # target_include_directories(can_rate_profiler PRIVATE ${plato_utils_INCLUDE_DIRS})
 # ament_target_dependencies(can_rate_profiler rclcpp plato_utils)
 # install(TARGETS can_rate_profiler DESTINATION lib/${PROJECT_NAME})
+
+add_executable(plato_hand_sim_smoke_test
+  src/tools/plato_hand_sim_smoke_test.cpp
+)
+target_compile_features(plato_hand_sim_smoke_test PUBLIC cxx_std_17)
+target_link_libraries(plato_hand_sim_smoke_test
+  PRIVATE ${PROJECT_NAME}
+)
+
+add_executable(plato_hand_hil_enable_zero_test
+  src/tools/plato_hand_hil_enable_zero_test.cpp
+)
+target_compile_features(plato_hand_hil_enable_zero_test PUBLIC cxx_std_17)
+target_link_libraries(plato_hand_hil_enable_zero_test
+  PRIVATE ${PROJECT_NAME}
+)
+
+install(TARGETS plato_hand_sim_smoke_test
+  plato_hand_hil_enable_zero_test
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
 pluginlib_export_plugin_description_file(hardware_interface plato_hardware_interface.xml)
 

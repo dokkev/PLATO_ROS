@@ -16,7 +16,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>can_msgs</depend>
-  <depend>plato2_interfaces</depend>
+  <depend>plato_interfaces</depend>
   <depend>plato_utils</depend>
   <build_depend>yaml-cpp</build_depend>
   <build_export_depend>yaml-cpp</build_export_depend>

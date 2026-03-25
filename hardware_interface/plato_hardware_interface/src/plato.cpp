@@ -2,14 +2,43 @@
 #include "plato_hardware_interface/utils/plato_hand_config_loader.hpp"
 #include "plato_hardware_interface/utils/parameter_utils.hpp"
 
+#include <chrono>
 #include <exception>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <pluginlib/class_list_macros.hpp>
 
 namespace plato_hardware_interface
 {
+
+namespace
+{
+
+std::chrono::microseconds parse_nonnegative_microseconds_parameter(
+  const std::string & value, const char * parameter_name)
+{
+  long long parsed = 0;
+  try {
+    parsed = std::stoll(value);
+  } catch (const std::exception &) {
+    throw std::invalid_argument(
+            std::string("Hardware parameter '") + parameter_name +
+            "' must be a non-negative integer (microseconds)");
+  }
+
+  if (parsed < 0) {
+    throw std::invalid_argument(
+            std::string("Hardware parameter '") + parameter_name +
+            "' must be >= 0 (microseconds)");
+  }
+
+  return std::chrono::microseconds(parsed);
+}
+
+}  // namespace
 
 hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interface::HardwareInfo & info)
 {
@@ -42,9 +71,38 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
     }
   }
 
+  std::string actuator_offset_yaml_path_override;
+  const auto actuator_offset_path_it = info_.hardware_parameters.find("actuator_offset_yaml_path");
+  if (actuator_offset_path_it != info_.hardware_parameters.end()) {
+    actuator_offset_yaml_path_override = actuator_offset_path_it->second;
+  }
+
+  std::optional<std::chrono::microseconds> direct_tx_inter_frame_gap_override;
+  const auto direct_tx_gap_it = info_.hardware_parameters.find("direct_tx_inter_frame_gap_us");
+  if (direct_tx_gap_it != info_.hardware_parameters.end()) {
+    try {
+      direct_tx_inter_frame_gap_override = parse_nonnegative_microseconds_parameter(
+        direct_tx_gap_it->second, "direct_tx_inter_frame_gap_us");
+    } catch (const std::exception & e) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("PlatoHardware"),
+        "Invalid Plato hardware parameter: %s",
+        e.what());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
+
   try {
+    auto hand_config = plato_hand::load_default_plato_hand_config();
+    if (!actuator_offset_yaml_path_override.empty()) {
+      hand_config.actuator_offset_yaml_path = actuator_offset_yaml_path_override;
+    }
+    if (direct_tx_inter_frame_gap_override.has_value()) {
+      hand_config.direct_tx_inter_frame_gap = *direct_tx_inter_frame_gap_override;
+    }
+
     // Hand constructor validates the actuator config count and initializes all RobotIO buffers.
-    hand_ = std::make_unique<plato_hand::Hand>(plato_hand::load_default_plato_hand_config());
+    hand_ = std::make_unique<plato_hand::Hand>(std::move(hand_config));
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       rclcpp::get_logger("PlatoHardware"),
@@ -105,8 +163,12 @@ std::vector<hardware_interface::CommandInterface> PlatoHardware::export_command_
 hardware_interface::CallbackReturn PlatoHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  hand_->reset_joint_commands(std::numeric_limits<double>::quiet_NaN());
-  hand_->enable(zeroing_requested_);
+  hand_->reset_joint_commands(0.0);
+  if (!hand_->enable(zeroing_requested_)) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("PlatoHardware"),
+      "One or more actuators failed to enable. Continuing activation.");
+  }
 
   RCLCPP_INFO(rclcpp::get_logger("PlatoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -115,7 +177,10 @@ hardware_interface::CallbackReturn PlatoHardware::on_activate(
 hardware_interface::CallbackReturn PlatoHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  hand_->disable();
+  if (!hand_->disable()) {
+    RCLCPP_ERROR(rclcpp::get_logger("PlatoHardware"), "Failed to disable one or more actuators.");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   hand_->reset_joint_commands(std::numeric_limits<double>::quiet_NaN());
   RCLCPP_INFO(rclcpp::get_logger("PlatoHardware"), "Deactivated");
   return hardware_interface::CallbackReturn::SUCCESS;

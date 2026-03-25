@@ -10,6 +10,9 @@
 namespace can_protocol
 {
 
+using can_hardware_common::can_protocol_helpers::encode_float_le;
+using can_hardware_common::can_protocol_helpers::encode_u24_le;
+
 namespace
 {
 auto logger() { return rclcpp::get_logger("can_protocol"); }
@@ -93,15 +96,15 @@ void MsgEncoder::stop_control(TPCANMsg & msg)
 void MsgEncoder::set_torque(TPCANMsg & msg, float torque, uint32_t duration)
 {
   msg.DATA[0] = CommandByte::TORQUE_CONTROL;
-  can_hardware_common::can_protocol_helpers::encode_float_le(msg, torque, 1);
-  can_hardware_common::can_protocol_helpers::encode_u24_le(msg, duration, 5);
+  encode_float_le(msg, torque, 1);
+  encode_u24_le(msg, duration, 5);
 }
 
 void MsgEncoder::set_position(TPCANMsg & msg, float position, uint32_t duration)
 {
   msg.DATA[0] = CommandByte::POSITION_CONTROL;
-  can_hardware_common::can_protocol_helpers::encode_float_le(msg, position, 1);
-  can_hardware_common::can_protocol_helpers::encode_u24_le(msg, duration, 5);
+  encode_float_le(msg, position, 1);
+  encode_u24_le(msg, duration, 5);
 }
 
 void MsgDecoder::get_states(
@@ -136,25 +139,25 @@ SteadywinProtocol::SteadywinProtocol(
 actuator::TxCommand SteadywinProtocol::make_enable_motor_command()
 {
   MsgEncoder::start_motor(onoff_msg_);
-  return {onoff_msg_, std::chrono::milliseconds(100)};
+  return {onoff_msg_, CommandByte::START_MOTOR};
 }
 
 actuator::TxCommand SteadywinProtocol::make_disable_motor_command()
 {
   MsgEncoder::stop_motor(onoff_msg_);
-  return {onoff_msg_, std::chrono::milliseconds(100)};
+  return {onoff_msg_, CommandByte::STOP_MOTOR};
 }
 
 actuator::TxCommand SteadywinProtocol::make_stop_control_command()
 {
   MsgEncoder::stop_control(onoff_msg_);
-  return {onoff_msg_};
+  return {onoff_msg_, CommandByte::STOP_CONTROL};
 }
 
 actuator::TxCommand SteadywinProtocol::make_torque_command(float motor_torque)
 {
   MsgEncoder::set_torque(cmd_msg_, motor_torque, 0);
-  return {cmd_msg_};
+  return {cmd_msg_, CommandByte::TORQUE_CONTROL};
 }
 
 actuator::TxCommand SteadywinProtocol::make_position_command(
@@ -162,7 +165,7 @@ actuator::TxCommand SteadywinProtocol::make_position_command(
   uint32_t duration)
 {
   MsgEncoder::set_position(cmd_msg_, motor_position, duration);
-  return {cmd_msg_};
+  return {cmd_msg_, CommandByte::POSITION_CONTROL};
 }
 
 actuator::TxCommand SteadywinProtocol::make_servo_position_command(
@@ -170,7 +173,7 @@ actuator::TxCommand SteadywinProtocol::make_servo_position_command(
   uint32_t current_milliamps)
 {
   MsgEncoder::set_position(cmd_msg_, motor_position, current_milliamps);
-  return {cmd_msg_};
+  return {cmd_msg_, CommandByte::POSITION_CONTROL};
 }
 
 void SteadywinProtocol::process_message(const TPCANMsg & msg, plato_actuator::Actuator & actuator)

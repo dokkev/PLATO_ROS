@@ -14,7 +14,8 @@ find_library(PCAN_LIB NAMES pcanbasic PATHS /usr/local/lib /usr/lib /lib REQUIRE
 find_path(PCAN_INCLUDE_DIR NAMES PCANBasic.h PATHS /usr/local/include /usr/include REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
-  src/can_bus_manager.cpp
+  src/can_transport.cpp
+  src/command_scheduler.cpp
   src/ft_sensor.cpp
   src/pcan_interface.cpp
 )

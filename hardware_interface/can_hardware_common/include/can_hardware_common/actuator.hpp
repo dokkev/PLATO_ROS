@@ -19,7 +19,7 @@ struct ActuatorTarget
   float torque = 0.0f;
 };
 
-struct ActuatorFeedback
+struct ActuatorState
 {
   float position = 0.0f;
   float velocity = 0.0f;
@@ -43,6 +43,31 @@ struct ActuatorCoreConfig
   float gear_ratio = 0.0f;
 };
 
+// ── Reply/retry specification for CAN commands ──
+
+struct ReplySpec
+{
+  bool enabled = true;
+  uint32_t expected_rx_id = 0;
+  uint8_t expected_opcode = 0;
+  uint8_t success_byte = 0x00;
+};
+
+struct RetryPolicy
+{
+  std::chrono::microseconds holdoff = std::chrono::microseconds(500);
+  std::size_t max_attempts = 0;  // 0 = unlimited within service budget
+  bool latest_only = true;
+};
+
+struct CommandRequest
+{
+  uint32_t key = 0;
+  TPCANMsg frame{};
+  ReplySpec reply{};
+  RetryPolicy retry{};
+};
+
 }  // namespace can_hardware_common
 
 namespace actuator
@@ -64,10 +89,11 @@ struct Config
   Limits limits;
 };
 
+// Legacy TxCommand kept for protocol layer. Actuator wraps this into CommandRequest.
 struct TxCommand
 {
   TPCANMsg frame{};
-  std::chrono::milliseconds post_send_delay{0};
+  uint8_t expected_response_opcode = 0;
 };
 
 }  // namespace actuator

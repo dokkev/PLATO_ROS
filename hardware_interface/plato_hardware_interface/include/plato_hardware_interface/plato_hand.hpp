@@ -1,11 +1,12 @@
 #ifndef PLATO_HARDWARE_INTERFACE__PLATO_HAND_HPP_
 #define PLATO_HARDWARE_INTERFACE__PLATO_HAND_HPP_
 
-#include <array>
+#include <chrono>
 #include <mutex>
 #include <vector>
 
-#include "can_hardware_common/can_bus_manager.hpp"
+#include "can_hardware_common/can_transport.hpp"
+#include "can_hardware_common/command_scheduler.hpp"
 #include "can_hardware_common/robot.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/five_bar_linkage.hpp"
@@ -27,63 +28,51 @@ public:
   Hand & operator=(Hand &&) = delete;
   ~Hand() = default;
 
-  void enable(bool automatic_zeroing = false);
-  void disable();
-
-  size_t get_num_actuators() const { return kNumActuators; }
+  bool enable(bool automatic_zeroing = false);
+  bool disable();
   bool read();
   bool write_joint_commands();
 
   void print_motor_positions();
 
 private:
-  enum class ZeroingResult
-  {
-    kFailed,
-    kRuntimeOnly,
-    kRuntimeAndPersisted,
-  };
-
-  struct RxDispatchEntry
-  {
-    uint32_t rx_id = 0;
-    size_t actuator_index = 0;
-  };
+  using SteadyClock = std::chrono::steady_clock;
+  using TransactionResult = can_hardware_common::CanCommandScheduler::TransactionResult;
 
   static constexpr size_t kThumbRollIndex = 0;
   static constexpr size_t kThumbYawIndex = 1;
   static constexpr size_t kThumbMcpIndex = 2;
-  static constexpr size_t kThumbPipIndex = 3;
-  static constexpr size_t kIndexMcpIndex = 4;
-  static constexpr size_t kIndexPipIndex = 5;
-  static constexpr size_t kMiddleMcpIndex = 6;
-  static constexpr size_t kMiddlePipIndex = 7;
+  static constexpr size_t kServoWriteDivisor = 10;
+  // Spread geared-joint torque TX across cycles to reduce per-cycle write latency at high rates.
+  static constexpr size_t kTorqueWriteStride = 2;
+  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{100};
+  static constexpr std::chrono::microseconds kDirectTxFrameTimeout{500};
+  static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
+  // Thumb servo channels can acknowledge lifecycle commands around ~17 ms on hardware.
+  // Keep timeout comfortably above that to avoid false startup timeouts.
+  static constexpr std::chrono::microseconds kResponseTimeout{25000};
+  static constexpr std::size_t kLifecycleCommandRetries = 2;
+  static constexpr size_t kZeroingProbeRounds = 3;
 
-  bool enable_all_actuators();
-  bool disable_all_actuators();
-  TPCANStatus send_command_(const actuator::TxCommand & command);
-  void read_joint_states_();
-  bool has_zeroing_feedback_() const;
-  void request_feedback_probe_();
-  ZeroingResult set_current_position_as_zero_(bool persist_offsets = true);
-  void print_hardware_info_(const char * actuator_total_label = "Total Actuators") const;
-  void initialize_rx_dispatch_table_();
-  static void dispatch_rx_frame_static_(void * context, const TPCANMsg & frame);
-  void dispatch_rx_frame_(const TPCANMsg & frame);
-  void print_actuator_info_() const;
+  bool send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout);
+  bool zero_actuators_();
+  void update_joint_states_locked_();
+  void mark_rx_frame_();
+  bool has_fresh_rx_(SteadyClock::time_point now) const;
 
-  can_hardware_common::CanBusManager can_bus_manager_;
+  can_hardware_common::CanTransport transport_;
+  FiveBarLinkage::Transmission transmission_;
+  can_hardware_common::CanCommandScheduler scheduler_;
   mutable std::mutex state_mutex_;
   std::vector<plato_actuator::Actuator> actuators_;
-  std::array<RxDispatchEntry, kNumActuators> rx_dispatch_table_{};
-
-  FiveBarLinkage::Transmission transmission_;
 
   std::string actuator_offset_yaml_path_;
   std::vector<plato_actuator::Config> actuator_configs_;
-  size_t consecutive_read_failures_ = 0;
-  bool zeroing_pending_ = false;
-  size_t zeroing_probe_cooldown_cycles_ = 0;
+  size_t write_cycle_count_ = 0;
+  SteadyClock::time_point last_rx_time_{};
+  size_t rx_frame_count_ = 0;
+  size_t stale_write_cycle_count_ = 0;
+  bool has_observed_rx_ = false;
 };
 
 }  // namespace plato_hand

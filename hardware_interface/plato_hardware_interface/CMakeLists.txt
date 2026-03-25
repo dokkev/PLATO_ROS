@@ -51,6 +51,15 @@ target_link_libraries(${PROJECT_NAME}
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE PLATO_HARDWARE_INTERFACE_BUILDING_DLL)
 
+find_package(plato_utils REQUIRED)
+
+# TODO: Update profiler to use new CanTransport/CanCommandScheduler API
+# add_executable(can_rate_profiler src/can_rate_profiler_node.cpp)
+# target_link_libraries(can_rate_profiler ${PROJECT_NAME})
+# target_include_directories(can_rate_profiler PRIVATE ${plato_utils_INCLUDE_DIRS})
+# ament_target_dependencies(can_rate_profiler rclcpp plato_utils)
+# install(TARGETS can_rate_profiler DESTINATION lib/${PROJECT_NAME})
+
 pluginlib_export_plugin_description_file(hardware_interface plato_hardware_interface.xml)
 
 install(DIRECTORY include/

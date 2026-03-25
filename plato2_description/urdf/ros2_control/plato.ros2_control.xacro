@@ -1,7 +1,7 @@
 <?xml version="0.06.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="plato_ros2_control" params="name fake_hardware='false' zeroing='false'">
+  <xacro:macro name="plato_ros2_control" params="name fake_hardware='false' zeroing='false' direct_tx_inter_frame_gap_us='100'">
     <xacro:property name="use_mock" value="${fake_hardware == 'true' or fake_hardware == 'True' or fake_hardware == '1' or fake_hardware == 1 or fake_hardware == True}"/>
 
     <ros2_control name="${name}" type="system">
@@ -12,6 +12,7 @@
         <xacro:unless value="${use_mock}">
           <plugin>plato_hardware_interface/PlatoHardware</plugin>
           <param name="zeroing">${zeroing}</param>
+          <param name="direct_tx_inter_frame_gap_us">${direct_tx_inter_frame_gap_us}</param>
         </xacro:unless>
       </hardware>
 

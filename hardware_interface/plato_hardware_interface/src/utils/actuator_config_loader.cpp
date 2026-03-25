@@ -46,6 +46,18 @@ uint8_t parse_u8(const YAML::Node & node, const char * key)
   return static_cast<uint8_t>(parsed);
 }
 
+uint32_t parse_u32_or_default(const YAML::Node & node, const char * key, uint32_t default_value)
+{
+  const auto value = node[key];
+  if (!value) {
+    return default_value;
+  }
+  if (!value.IsScalar()) {
+    throw std::runtime_error(std::string("Missing scalar field: ") + key);
+  }
+  return static_cast<uint32_t>(std::stoul(value.as<std::string>(), nullptr, 0));
+}
+
 int8_t parse_direction(const YAML::Node & node)
 {
   const auto raw = require_scalar(node, "direction");
@@ -87,6 +99,7 @@ Config parse_config(const YAML::Node & node)
   config.core.torque_constant = parse_float(node, "torque_constant");
   config.core.gear_ratio = parse_float(node, "gear_ratio");
   config.limits = parse_limits(node);
+  config.servo_current_milliamps = parse_u32_or_default(node, "servo_current_milliamps", 0);
   return config;
 }
 

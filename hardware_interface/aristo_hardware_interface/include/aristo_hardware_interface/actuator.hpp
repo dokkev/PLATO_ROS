@@ -44,7 +44,7 @@ public:
   void process_message(const TPCANMsg & msg);
 
   const Config & get_config() const { return config_; }
-  const can_hardware_common::ActuatorFeedback & get_feedback() const { return feedback_; }
+  const can_hardware_common::ActuatorState & get_feedback() const { return feedback_; }
   const can_hardware_common::ActuatorStatus & get_status() const { return status_; }
 
   uint32_t get_tx_id() const { return config_.core.can_tx_id; }
@@ -88,7 +88,7 @@ private:
 
   Config config_;
   std::unique_ptr<mit_can_protocol::MITProtocol> protocol_;
-  can_hardware_common::ActuatorFeedback feedback_;
+  can_hardware_common::ActuatorState feedback_;
   can_hardware_common::ActuatorStatus status_;
   float motor_position_ = 0.0f;
   bool motor_enabled_ = false;

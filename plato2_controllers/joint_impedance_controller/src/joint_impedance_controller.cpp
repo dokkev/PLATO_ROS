@@ -194,6 +194,7 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
   std::fill(velocity_errors_.begin(), velocity_errors_.end(), 0.0);
   std::fill(feedback_efforts_.begin(), feedback_efforts_.end(), 0.0);
   std::fill(desired_efforts_.begin(), desired_efforts_.end(), 0.0);
+  state_publish_counter_ = 0;
 
   RCLCPP_INFO(get_node()->get_logger(), "Activated successfully");
   return controller_interface::CallbackReturn::SUCCESS;
@@ -209,6 +210,7 @@ controller_interface::CallbackReturn JointImpedanceController::on_deactivate(
   std::fill(velocity_errors_.begin(), velocity_errors_.end(), 0.0);
   std::fill(feedback_efforts_.begin(), feedback_efforts_.end(), 0.0);
   std::fill(desired_efforts_.begin(), desired_efforts_.end(), 0.0);
+  state_publish_counter_ = 0;
   
   // Zero all commands
   const size_t num_joints = joint_names_.size();
@@ -324,8 +326,10 @@ controller_interface::return_type JointImpedanceController::update(
       "Skipping controller-side impedance torque on joints without finite state feedback; sending effort_ff only.");
   }
 
-  // Publish state
-  publish_state(time, commands);
+  // Publish controller debug state at a reduced rate to lower update-stage jitter.
+  if ((state_publish_counter_++ % state_publish_divisor_) == 0) {
+    publish_state(time, commands);
+  }
 
   return controller_interface::return_type::OK;
 }

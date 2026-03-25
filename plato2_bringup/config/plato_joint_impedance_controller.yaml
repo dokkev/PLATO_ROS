@@ -1,7 +1,7 @@
 plato:
   controller_manager:
     ros__parameters:
-      update_rate: 100
+      update_rate: 10
 
       plato_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster

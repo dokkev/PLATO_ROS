@@ -3,6 +3,7 @@
 
   <xacro:arg name="fake_hardware" default="false"/>
   <xacro:arg name="zeroing" default="false"/>
+  <xacro:arg name="direct_tx_inter_frame_gap_us" default="100"/>
 
   <xacro:include filename="$(find plato2_description)/urdf/xacro/plato_description.xacro"/>
   <xacro:include filename="$(find plato2_description)/urdf/ros2_control/plato.ros2_control.xacro"/>
@@ -11,6 +12,7 @@
   <xacro:plato_ros2_control
     name="plato_ros2_control"
     fake_hardware="$(arg fake_hardware)"
-    zeroing="$(arg zeroing)"/>
+    zeroing="$(arg zeroing)"
+    direct_tx_inter_frame_gap_us="$(arg direct_tx_inter_frame_gap_us)"/>
 
 </robot>

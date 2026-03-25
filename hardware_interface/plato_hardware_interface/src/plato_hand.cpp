@@ -1,13 +1,11 @@
 #include "plato_hardware_interface/plato_hand.hpp"
 
-#include <algorithm>
 #include <array>
-#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
-#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -18,11 +16,8 @@ namespace plato_hand
 
 namespace
 {
-constexpr float kSteadywinTorqueScale = 8.0f;
-constexpr float kSteadywinTorqueLimit = 9.8f;
 constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
-constexpr size_t kMaxTransientReadFailures = 5;
-constexpr size_t kZeroingProbeRetryPeriodCycles = 10;
+constexpr double kDefaultJointStateValue = 0.0;
 
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -38,31 +33,15 @@ static_assert(
 static_assert(
   Hand::kNumActuators == FiveBarLinkage::Transmission::kNumActuators,
   "Plato hand actuator dimension must match five-bar transmission");
-
-void accumulate_poll_result(
-  can_hardware_common::CanBusManager::PollResult & aggregate,
-  const can_hardware_common::CanBusManager::PollResult & update)
-{
-  aggregate.processed_frames += update.processed_frames;
-  aggregate.hit_frame_budget = aggregate.hit_frame_budget || update.hit_frame_budget;
-
-  const auto is_nonfatal_status = [](TPCANStatus status) {
-      return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
-    };
-
-  if (is_nonfatal_status(aggregate.read_status) && !is_nonfatal_status(update.read_status)) {
-    aggregate.read_status = update.read_status;
-  } else if (
-    aggregate.read_status == PCAN_ERROR_QRCVEMPTY &&
-    update.read_status == PCAN_ERROR_OK)
-  {
-    aggregate.read_status = PCAN_ERROR_OK;
-  }
-}
 }  // namespace
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Lifecycle
+// ════════════════════════════════════════════════════════════════════════════
 
 Hand::Hand(PlatoHandConfig config)
 : transmission_(config.linkage_config),
+  scheduler_(transport_),  // must follow transport_ and transmission_ in member order
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_configs_(std::move(config.actuator_configs))
 {
@@ -72,384 +51,265 @@ Hand::Hand(PlatoHandConfig config)
             " actuator configs, got " + std::to_string(actuator_configs_.size()));
   }
 
-  initialize_joint_buffers(kNumJoints, kInvalidStateValue);
+  initialize_joint_buffers(kNumJoints, kDefaultJointStateValue);
   initialize_actuator_buffers(kNumActuators, kInvalidStateValue);
 
   actuators_.reserve(kNumActuators);
-  for (const auto & config : actuator_configs_) {
-    actuators_.emplace_back(config);
+  for (const auto & cfg : actuator_configs_) {
+    actuators_.emplace_back(cfg);
   }
 
-  initialize_rx_dispatch_table_();
+  transport_.add_rx_observer([this](const TPCANMsg & frame) {
+    (void)frame;
+    mark_rx_frame_();
+  });
 
-  print_actuator_info_();
-}
-
-bool Hand::enable_all_actuators()
-{
-  TPCANStatus first_error = PCAN_ERROR_OK;
-  for (auto & actuator : actuators_) {
-    const TPCANStatus status = send_command_(actuator.enable_motor());
-    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
-      first_error = status;
+  // Three RX observers: freshness timestamp, actuator state parsing, scheduler matching.
+  transport_.add_rx_observer([this](const TPCANMsg & frame) {
+    if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || frame.LEN < 2) {
+      return;
     }
-  }
-
-  if (first_error != PCAN_ERROR_OK) {
-    RCLCPP_ERROR_THROTTLE(
-      logger(), throttle_clock(), 1000,
-      "Failed to enable one or more Plato actuators (transport status 0x%X)",
-      first_error);
-    return false;
-  }
-
-  return true;
-}
-
-bool Hand::disable_all_actuators()
-{
-  TPCANStatus first_error = PCAN_ERROR_OK;
-  for (auto & actuator : actuators_) {
-    const TPCANStatus status = send_command_(actuator.disable_motor());
-    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
-      first_error = status;
+    for (size_t i = 0; i < kNumActuators; ++i) {
+      if (actuators_[i].get_rx_id() == frame.ID) {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        actuators_[i].process_message(frame);
+        return;
+      }
     }
-  }
+  });
 
-  if (first_error != PCAN_ERROR_OK) {
-    RCLCPP_ERROR_THROTTLE(
-      logger(), throttle_clock(), 1000,
-      "Failed to disable one or more Plato actuators (transport status 0x%X)",
-      first_error);
-    return false;
-  }
+  transport_.add_rx_observer([this](const TPCANMsg & frame) {
+    scheduler_.observe_rx(frame);
+  });
 
-  return true;
-}
-
-void Hand::print_hardware_info_(const char * actuator_total_label) const
-{
-  auto logger = rclcpp::get_logger("plato_hardware_interface");
-  RCLCPP_INFO(logger, "================== Actuators Info ===================");
-  RCLCPP_INFO(logger, "%s: %zu", actuator_total_label, actuators_.size());
-
-  for (size_t i = 0; i < actuators_.size(); ++i) {
+  RCLCPP_INFO(logger(), "================== Actuators Info ===================");
+  RCLCPP_INFO(logger(), "Total Number of Actuators: %zu", kNumActuators);
+  for (size_t i = 0; i < kNumActuators; ++i) {
     RCLCPP_INFO(
-      logger, "Actuator %zu - TX: 0x%02X, RX: 0x%02X",
+      logger(), "Actuator %zu - TX: 0x%02X, RX: 0x%02X",
       i + 1, actuators_[i].get_tx_id(), actuators_[i].get_rx_id());
   }
+
+  // Deterministic paced direct TX path for write_joint_commands().
+  transport_.set_min_inter_frame_gap(config.direct_tx_inter_frame_gap);
+  RCLCPP_INFO(
+    logger(),
+    "Direct TX inter-frame gap: %ld us",
+    static_cast<long>(config.direct_tx_inter_frame_gap.count()));
 }
 
-void Hand::initialize_rx_dispatch_table_()
+bool Hand::enable(bool automatic_zeroing)
 {
-  for (size_t actuator_index = 0; actuator_index < kNumActuators; ++actuator_index) {
-    rx_dispatch_table_[actuator_index] = {
-      actuators_[actuator_index].get_rx_id(),
-      actuator_index};
+  bool success = true;
+
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    const auto req = actuators_[i].make_enable_request(static_cast<uint32_t>(i));
+    const auto res = scheduler_.execute_blocking(
+      req, kResponseTimeout, kLifecycleCommandRetries);
+    if (res.status != TransactionResult::Status::kConfirmed) {
+      RCLCPP_ERROR(logger(), "Enable actuator %zu: %s",
+        i + 1, TransactionResult::status_label(res.status));
+      success = false;
+    }
+  }
+  if (automatic_zeroing) {
+    success = zero_actuators_() && success;
   }
 
-  std::sort(
-    rx_dispatch_table_.begin(),
-    rx_dispatch_table_.end(),
-    [](const RxDispatchEntry & lhs, const RxDispatchEntry & rhs) {
-      return lhs.rx_id < rhs.rx_id;
-    });
+  return success;
 }
 
-void Hand::dispatch_rx_frame_static_(void * context, const TPCANMsg & frame)
+bool Hand::disable()
 {
-  static_cast<Hand *>(context)->dispatch_rx_frame_(frame);
-}
+  bool success = true;
 
-void Hand::dispatch_rx_frame_(const TPCANMsg & frame)
-{
-  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD) {
-    return;
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    const auto req = actuators_[i].make_disable_request(static_cast<uint32_t>(i));
+    const auto res = scheduler_.execute_blocking(
+      req, kResponseTimeout, kLifecycleCommandRetries);
+    if (res.status != TransactionResult::Status::kConfirmed) {
+      RCLCPP_ERROR(logger(), "Disable actuator %zu: %s",
+        i + 1, TransactionResult::status_label(res.status));
+      success = false;
+    }
   }
 
-  const auto entry_it = std::lower_bound(
-    rx_dispatch_table_.begin(),
-    rx_dispatch_table_.end(),
-    frame.ID,
-    [](const RxDispatchEntry & entry, uint32_t rx_id) {
-      return entry.rx_id < rx_id;
-    });
-  if (entry_it == rx_dispatch_table_.end() || entry_it->rx_id != frame.ID) {
-    return;
-  }
-
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  actuators_[entry_it->actuator_index].process_message(frame);
-}
-
-void Hand::enable(bool automatic_zeroing)
-{
-  consecutive_read_failures_ = 0;
-  zeroing_pending_ = automatic_zeroing;
-  zeroing_probe_cooldown_cycles_ = 0;
-  (void)enable_all_actuators();
-
-  if (zeroing_pending_) {
-    RCLCPP_INFO(
-      logger(),
-      "Automatic Plato zeroing requested; waiting for a full actuator feedback snapshot.");
-  }
-}
-
-void Hand::disable()
-{
-  consecutive_read_failures_ = 0;
-  zeroing_pending_ = false;
-  zeroing_probe_cooldown_cycles_ = 0;
-  (void)disable_all_actuators();
+  return success;
 }
 
 bool Hand::read()
 {
-  auto poll_result = can_bus_manager_.poll_once({this, &Hand::dispatch_rx_frame_static_});
-  if (poll_result.hit_frame_budget && poll_result.read_status == PCAN_ERROR_OK) {
-    const auto extra_poll_result =
-      can_bus_manager_.poll_once({this, &Hand::dispatch_rx_frame_static_});
-    accumulate_poll_result(poll_result, extra_poll_result);
-  }
-
-  if (
-    poll_result.read_status != PCAN_ERROR_OK &&
-    poll_result.read_status != PCAN_ERROR_QRCVEMPTY)
-  {
-    ++consecutive_read_failures_;
+  const auto rx = transport_.process_rx();
+  if (rx.is_bus_error()) {
     RCLCPP_WARN_THROTTLE(
-      logger(), throttle_clock(), 1000,
-      "Plato CAN receive failed with status 0x%X (%zu consecutive failures)",
-      poll_result.read_status, consecutive_read_failures_);
-    if (consecutive_read_failures_ >= kMaxTransientReadFailures) {
-      return false;
-    }
-  } else {
-    consecutive_read_failures_ = 0;
+      logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
+    return false;
   }
 
-  read_joint_states_();
-
-  if (zeroing_pending_) {
-    if (has_zeroing_feedback_()) {
-      const ZeroingResult zeroing_result = set_current_position_as_zero_(true);
-      if (zeroing_result != ZeroingResult::kFailed) {
-        zeroing_pending_ = false;
-        zeroing_probe_cooldown_cycles_ = 0;
-        if (zeroing_result == ZeroingResult::kRuntimeOnly) {
-          RCLCPP_ERROR(
-            logger(),
-            "Automatic Plato zeroing applied in memory, but persisting actuator offsets failed.");
-        }
-      } else {
-        zeroing_probe_cooldown_cycles_ = kZeroingProbeRetryPeriodCycles;
-        RCLCPP_ERROR(
-          logger(),
-          "Automatic Plato zeroing failed after feedback became available.");
-      }
-    } else if (zeroing_probe_cooldown_cycles_ == 0) {
-      request_feedback_probe_();
-      zeroing_probe_cooldown_cycles_ = kZeroingProbeRetryPeriodCycles;
-    } else {
-      --zeroing_probe_cooldown_cycles_;
-    }
-  }
-
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  update_joint_states_locked_();
   return true;
 }
 
 bool Hand::write_joint_commands()
 {
-  enum class WritePreconditionFailure
-  {
-    kNone,
-    kInvalidJointCommand,
-    kMissingActuatorFeedback,
-  };
+  std::array<TPCANMsg, kNumActuators> tx_frames{};
+  size_t tx_count = 0;
 
-  bool feedback_probe_needed = false;
-  WritePreconditionFailure precondition_failure = WritePreconditionFailure::kNone;
-
-  std::array<actuator::TxCommand, kNumActuators> commands{};
-  size_t command_count = 0;
-
+  // 1) Validate command snapshot
+  // 2) Joint->actuator mapping
+  // 3) Build direct TX frames
+  // 4) Capture desired-command history (delivery-agnostic)
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    const auto joint_command = joint_command_view();
+    const auto joint_cmd = joint_command_view();
 
-    if (!joint_command.all_finite()) {
-      precondition_failure = WritePreconditionFailure::kInvalidJointCommand;
-    } else {
-      bool missing_geared_feedback = false;
-      for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-        if (
-          !std::isfinite(actuator_states_.position_at(i)) ||
-          !std::isfinite(actuator_states_.velocity_at(i)) ||
-          !std::isfinite(actuator_states_.effort_at(i)))
-        {
-          missing_geared_feedback = true;
-          break;
-        }
+    if (!joint_cmd.all_finite()) {
+      RCLCPP_WARN_THROTTLE(
+        logger(), throttle_clock(), 1000, "Skipping write: non-finite joint commands.");
+      ++write_cycle_count_;
+      return true;
+    }
+
+    transmission_.joint_to_actuator(
+      joint_commands_, actuator_states_, joint_states_, actuator_commands_);
+    const auto actuator_cmd = actuator_command_view();
+
+    if ((write_cycle_count_ % kServoWriteDivisor) == 0) {
+      tx_frames[tx_count++] = actuators_[kThumbRollIndex].set_servo_hold(
+        static_cast<float>(actuator_cmd.position(kThumbRollIndex))).frame;
+      tx_frames[tx_count++] = actuators_[kThumbYawIndex].set_servo_hold(
+        static_cast<float>(actuator_cmd.position(kThumbYawIndex))).frame;
+    }
+
+    for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
+      const size_t geared_index = i - kThumbMcpIndex;
+      const size_t phase = write_cycle_count_ % kTorqueWriteStride;
+      if ((geared_index % kTorqueWriteStride) != phase) {
+        continue;
       }
-
-      if (missing_geared_feedback) {
-        feedback_probe_needed = true;
-        precondition_failure = WritePreconditionFailure::kMissingActuatorFeedback;
-      }
+      const Eigen::Index idx = static_cast<Eigen::Index>(i);
+      tx_frames[tx_count++] = actuators_[i].set_joint_torque(
+        static_cast<float>(actuator_cmd.effort(idx))).frame;
     }
 
-    if (precondition_failure == WritePreconditionFailure::kNone) {
-      transmission_.joint_to_actuator(joint_commands_, actuator_states_, joint_states_, actuator_commands_);
-      const auto actuator_command = actuator_command_view();
-
-      commands[command_count++] =
-        actuators_[kThumbRollIndex].set_servo_position(
-          static_cast<float>(actuator_command.position(kThumbRollIndex)));
-      commands[command_count++] =
-        actuators_[kThumbYawIndex].set_servo_position(
-          static_cast<float>(actuator_command.position(kThumbYawIndex)));
-
-      for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-        const Eigen::Index index = static_cast<Eigen::Index>(i);
-        float actuator_torque = static_cast<float>(actuator_command.effort(index)) *
-          kSteadywinTorqueScale;
-        actuator_torque = std::clamp(actuator_torque, -kSteadywinTorqueLimit, kSteadywinTorqueLimit);
-        commands[command_count++] = actuators_[i].set_joint_torque(actuator_torque);
-      }
-    }
-  }
-
-  if (feedback_probe_needed) {
-    request_feedback_probe_();
-  }
-
-  if (precondition_failure != WritePreconditionFailure::kNone) {
-    switch (precondition_failure) {
-      case WritePreconditionFailure::kInvalidJointCommand:
-        RCLCPP_WARN_THROTTLE(
-          logger(), throttle_clock(), 1000,
-          "Skipping Plato write because the joint command buffer contains non-finite values.");
-        break;
-      case WritePreconditionFailure::kMissingActuatorFeedback:
-        RCLCPP_WARN_THROTTLE(
-          logger(), throttle_clock(), 1000,
-          "Skipping Plato write because actuator feedback is incomplete; sent a feedback probe.");
-        break;
-      case WritePreconditionFailure::kNone:
-        break;
-    }
-    return true;
-  }
-
-  TPCANStatus first_error = PCAN_ERROR_OK;
-  for (size_t i = 0; i < command_count; ++i) {
-    const TPCANStatus status = send_command_(commands[i]);
-    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
-      first_error = status;
-    }
-  }
-
-  if (first_error == PCAN_ERROR_OK) {
-    std::lock_guard<std::mutex> lock(state_mutex_);
+    ++write_cycle_count_;
     capture_joint_commands();
     capture_actuator_commands();
-    return true;
   }
 
-  RCLCPP_ERROR_THROTTLE(
-    logger(), throttle_clock(), 1000,
-    "Plato write path failed with transport status 0x%X",
-    first_error);
+  const auto now = SteadyClock::now();
+  if (!has_fresh_rx_(now)) {
+    // Fast recovery path: try one RX drain only when freshness check fails.
+    const auto rx_probe = transport_.process_rx();
+    if (rx_probe.is_bus_error()) {
+      RCLCPP_WARN_THROTTLE(
+        logger(),
+        throttle_clock(),
+        1000,
+        "CAN receive error while probing stale RX: status 0x%X",
+        rx_probe.status);
+      return false;
+    }
+
+    if (has_fresh_rx_(SteadyClock::now())) {
+      stale_write_cycle_count_ = 0;
+    } else {
+      ++stale_write_cycle_count_;
+      const long rx_age_ms = has_observed_rx_
+        ? static_cast<long>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_rx_time_).count())
+        : -1L;
+      RCLCPP_WARN_THROTTLE(
+        logger(),
+        throttle_clock(),
+        1000,
+        "Skipping direct TX: RX stale (age=%ld ms, stale_cycles=%zu, total_rx=%zu)",
+        rx_age_ms,
+        stale_write_cycle_count_,
+        rx_frame_count_);
+      return true;
+    }
+  } else {
+    stale_write_cycle_count_ = 0;
+  }
+
+  for (size_t i = 0; i < tx_count; ++i) {
+    if (!send_frame_blocking_(tx_frames[i], kDirectTxFrameTimeout)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout)
+{
+  const auto now = SteadyClock::now();
+  const auto next_send_time = transport_.next_send_time();
+  if (next_send_time > now) {
+    const auto wait = std::chrono::duration_cast<std::chrono::microseconds>(next_send_time - now);
+    if (wait > timeout) {
+      RCLCPP_WARN_THROTTLE(
+        logger(),
+        throttle_clock(),
+        1000,
+        "CAN direct TX pacing timeout on ID 0x%X (wait=%ldus)",
+        frame.ID,
+        static_cast<long>(wait.count()));
+      return false;
+    }
+    std::this_thread::sleep_until(next_send_time);
+  }
+
+  const TPCANStatus tx_status = transport_.send_if_ready(frame);
+  if (tx_status == PCAN_ERROR_OK) {
+    return true;
+  }
+  if (tx_status == PCAN_ERROR_QXMTFULL) {
+    RCLCPP_WARN_THROTTLE(
+      logger(),
+      throttle_clock(),
+      1000,
+      "CAN direct TX dropped by pacing on ID 0x%X",
+      frame.ID);
+    return false;
+  }
+
+  RCLCPP_WARN_THROTTLE(
+    logger(),
+    throttle_clock(),
+    1000,
+    "CAN direct TX error on ID 0x%X: status 0x%X",
+    frame.ID,
+    tx_status);
   return false;
 }
 
-TPCANStatus Hand::send_command_(const actuator::TxCommand & command)
+// ════════════════════════════════════════════════════════════════════════════
+//  Helpers
+// ════════════════════════════════════════════════════════════════════════════
+
+bool Hand::zero_actuators_()
 {
-  return can_bus_manager_.send_frame(command.frame, command.post_send_delay);
-}
+  bool success = true;
 
-void Hand::read_joint_states_()
-{
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  joint_states_.fill(kInvalidStateValue);
-
-  bool has_full_geared_feedback = true;
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    actuator_states_.position_at(i) = kInvalidStateValue;
-    actuator_states_.velocity_at(i) = kInvalidStateValue;
-    actuator_states_.effort_at(i) = kInvalidStateValue;
-
-    if (!actuators_[i].has_feedback()) {
-      if (i >= kThumbMcpIndex) {
-        has_full_geared_feedback = false;
+  for (size_t round = 0; round < kZeroingProbeRounds; ++round) {
+    for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
+      const auto req = actuators_[i].make_torque_request(static_cast<uint32_t>(i), 0.0f);
+      const auto res = scheduler_.execute_blocking(
+        req, kResponseTimeout, kLifecycleCommandRetries);
+      if (res.status != TransactionResult::Status::kConfirmed) {
+        RCLCPP_WARN(
+          logger(),
+          "Zeroing probe failed for actuator %zu: %s",
+          i + 1,
+          TransactionResult::status_label(res.status));
+        success = false;
       }
-      continue;
-    }
-
-    const auto & feedback = actuators_[i].get_feedback();
-    actuator_states_.position_at(i) = feedback.position;
-    actuator_states_.velocity_at(i) = feedback.velocity;
-    actuator_states_.effort_at(i) = feedback.torque;
-  }
-
-  if (!has_full_geared_feedback) {
-    return;
-  }
-
-  transmission_.actuator_to_joint(actuator_states_, joint_states_);
-}
-
-bool Hand::has_zeroing_feedback_() const
-{
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  return std::all_of(
-    actuators_.begin() + static_cast<std::ptrdiff_t>(kThumbMcpIndex),
-    actuators_.end(),
-    [](const auto & actuator) { return actuator.has_feedback(); });
-}
-
-void Hand::request_feedback_probe_()
-{
-  std::vector<actuator::TxCommand> commands;
-  commands.reserve(kNumActuators - kThumbMcpIndex);
-
-  {
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    for (size_t actuator_index = 0; actuator_index < actuators_.size(); ++actuator_index) {
-      auto & actuator = actuators_[actuator_index];
-      if (actuator.has_feedback()) {
-        continue;
-      }
-
-      if (actuator_index == kThumbRollIndex || actuator_index == kThumbYawIndex) {
-        continue;
-      }
-
-      // Steadywin only returns state on control replies, so use a zero-torque command as a
-      // non-driving feedback probe for geared joints that have not reported yet.
-      commands.push_back(actuator.set_joint_torque(0.0f));
     }
   }
 
-  TPCANStatus first_error = PCAN_ERROR_OK;
-  for (const auto & command : commands) {
-    const TPCANStatus status = send_command_(command);
-    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
-      first_error = status;
-    }
-  }
-
-  if (first_error != PCAN_ERROR_OK) {
-    RCLCPP_WARN_THROTTLE(
-      logger(), throttle_clock(), 1000,
-      "Plato feedback probe failed with transport status 0x%X",
-      first_error);
-  }
-}
-
-Hand::ZeroingResult Hand::set_current_position_as_zero_(bool persist_offsets)
-{
   plato_actuator::PositionOffsets offsets;
   offsets.reserve(kNumActuators);
 
@@ -457,77 +317,114 @@ Hand::ZeroingResult Hand::set_current_position_as_zero_(bool persist_offsets)
     std::lock_guard<std::mutex> lock(state_mutex_);
 
     for (size_t i = 0; i < kNumActuators; ++i) {
-      if (i == kThumbRollIndex || i == kThumbYawIndex) {
+      const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
+
+      if (is_servo) {
+        offsets.push_back(actuator_configs_[i].core.position_offset);
         continue;
       }
 
-      if (!actuators_[i].has_feedback()) {
+      if (!actuators_[i].is_initialized()) {
         RCLCPP_WARN(
           logger(),
-          "Cannot zero actuator %zu because no feedback has been received yet",
+          "Zeroing skipped for actuator %zu: no valid feedback; keeping previous offset.",
           i + 1);
-        return ZeroingResult::kFailed;
-      }
-    }
-
-    for (size_t i = 0; i < kNumActuators; ++i) {
-      if (i == kThumbRollIndex || i == kThumbYawIndex) {
         offsets.push_back(actuator_configs_[i].core.position_offset);
-
-        if (actuators_[i].has_feedback()) {
-          const auto & feedback = actuators_[i].get_feedback();
-          actuator_states_.position_at(i) = feedback.position;
-          actuator_states_.velocity_at(i) = feedback.velocity;
-          actuator_states_.effort_at(i) = feedback.torque;
-        }
+        success = false;
         continue;
       }
 
       if (!actuators_[i].set_current_position_as_zero()) {
         RCLCPP_WARN(
           logger(),
-          "Cannot zero actuator %zu because software zeroing preconditions changed unexpectedly",
+          "Zeroing failed for actuator %zu: unable to set current position as zero.",
           i + 1);
-        return ZeroingResult::kFailed;
+        offsets.push_back(actuator_configs_[i].core.position_offset);
+        success = false;
+        continue;
       }
 
       actuator_configs_[i].core.position_offset = actuators_[i].get_position_offset();
       offsets.push_back(actuators_[i].get_position_offset());
-
-      const auto & feedback = actuators_[i].get_feedback();
-      actuator_states_.position_at(i) = feedback.position;
-      actuator_states_.velocity_at(i) = feedback.velocity;
-      actuator_states_.effort_at(i) = feedback.torque;
     }
 
-    transmission_.actuator_to_joint(actuator_states_, joint_states_);
+    update_joint_states_locked_();
   }
 
-  if (persist_offsets) {
-    try {
-      plato_actuator::save_plato_actuator_position_offsets(offsets, actuator_offset_yaml_path_);
-    } catch (const std::exception & e) {
-      RCLCPP_ERROR(logger(), "Failed to persist Plato actuator offsets: %s", e.what());
-      return ZeroingResult::kRuntimeOnly;
+  try {
+    plato_actuator::save_plato_actuator_position_offsets(offsets, actuator_offset_yaml_path_);
+    if (success) {
+      RCLCPP_INFO(logger(), "Zeroing complete, offsets saved.");
+    } else {
+      RCLCPP_WARN(logger(), "Zeroing completed with warnings; offsets were saved.");
     }
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(logger(), "Zeroing completed with warnings and failed to save offsets: %s", e.what());
+    success = false;
   }
 
-  RCLCPP_INFO(logger(), "Set current Plato actuator positions as software zero");
-  return persist_offsets ? ZeroingResult::kRuntimeAndPersisted : ZeroingResult::kRuntimeOnly;
+  return success;
+}
+
+void Hand::update_joint_states_locked_()
+{
+  bool all_initialized = true;
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    if (!actuators_[i].is_initialized()) {
+      all_initialized = false;
+      continue;
+    }
+    const auto & state = actuators_[i].get_state();
+    actuator_states_.position_at(i) = state.position;
+    actuator_states_.velocity_at(i) = state.velocity;
+    actuator_states_.effort_at(i) = state.torque;
+  }
+
+  if (!all_initialized) {
+    return;
+  }
+
+  can_hardware_common::RobotIO::JointState joint_state_candidate = joint_states_;
+  transmission_.actuator_to_joint(actuator_states_, joint_state_candidate);
+  if (!joint_state_candidate.const_view().all_finite()) {
+    RCLCPP_WARN_THROTTLE(
+      logger(),
+      throttle_clock(),
+      1000,
+      "Skipping joint-state update: transmission output contains non-finite values.");
+    return;
+  }
+
+  // Preserve storage addresses exported via ros2_control state interfaces.
+  // Reassigning joint_states_ would invalidate those pointers.
+  auto dst = joint_states_.view();
+  const auto src = joint_state_candidate.const_view();
+  dst.position = src.position;
+  dst.velocity = src.velocity;
+  dst.effort = src.effort;
+}
+
+void Hand::mark_rx_frame_()
+{
+  last_rx_time_ = SteadyClock::now();
+  has_observed_rx_ = true;
+  ++rx_frame_count_;
+}
+
+bool Hand::has_fresh_rx_(SteadyClock::time_point now) const
+{
+  if (!has_observed_rx_) {
+    return false;
+  }
+  return (now - last_rx_time_) <= kRxStaleTimeout;
 }
 
 void Hand::print_motor_positions()
 {
-  auto logger = rclcpp::get_logger("plato_hardware_interface");
   std::lock_guard<std::mutex> lock(state_mutex_);
-  for (size_t i = 0; i < actuators_.size(); ++i) {
-    RCLCPP_INFO(logger, "J%zu Motor Position: %.4f", i + 1, actuators_[i].get_motor_position());
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    RCLCPP_INFO(logger(), "J%zu Motor Position: %.4f", i + 1, actuators_[i].get_motor_position());
   }
-}
-
-void Hand::print_actuator_info_() const
-{
-  print_hardware_info_("Total Number of Actuators");
 }
 
 }  // namespace plato_hand

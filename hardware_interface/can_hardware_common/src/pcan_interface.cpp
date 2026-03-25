@@ -1,8 +1,11 @@
 #include "can_hardware_common/pcan_interface.hpp"
 
+#include <poll.h>
+
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace pcan_interface
 {
@@ -130,6 +133,11 @@ PCANInterface::PCANInterface()
             "Failed to initialize PCAN channel " + format_channel_name(kChannelHandle_) +
             " at " + bitrate_to_string(kChannelBitrate_) + ": " + format_error(init_status));
   }
+
+  int fd = -1;
+  if (CAN_GetValue(kChannelHandle_, PCAN_RECEIVE_EVENT, &fd, sizeof(fd)) == PCAN_ERROR_OK) {
+    receive_event_fd_ = fd;
+  }
 }
 
 PCANInterface::~PCANInterface() noexcept
@@ -151,6 +159,53 @@ TPCANStatus PCANInterface::read(TPCANMsg & msg, TPCANTimestamp * timestamp)
   TPCANTimestamp * timestamp_ptr = timestamp != nullptr ? timestamp : &local_timestamp;
   std::lock_guard<std::mutex> lock(io_mutex_);
   return CAN_Read(kChannelHandle_, &msg, timestamp_ptr);
+}
+
+TPCANStatus PCANInterface::read_with_timeout(
+  TPCANMsg & msg, std::chrono::microseconds timeout)
+{
+  // Try immediate non-blocking read.
+  {
+    std::lock_guard<std::mutex> lock(io_mutex_);
+    TPCANTimestamp ts{};
+    const TPCANStatus status = CAN_Read(kChannelHandle_, &msg, &ts);
+    if (status != PCAN_ERROR_QRCVEMPTY) {
+      return status;
+    }
+  }
+
+  // Block until the receive-event fd signals data or timeout expires.
+  if (receive_event_fd_ >= 0) {
+    struct pollfd pfd{};
+    pfd.fd = receive_event_fd_;
+    pfd.events = POLLIN;
+    const long us = timeout.count();
+    struct timespec ts_timeout{};
+    ts_timeout.tv_sec = us / 1000000;
+    ts_timeout.tv_nsec = (us % 1000000) * 1000;
+    if (::ppoll(&pfd, 1, &ts_timeout, nullptr) <= 0) {
+      return PCAN_ERROR_QRCVEMPTY;
+    }
+  } else {
+    std::this_thread::sleep_for(timeout);
+  }
+
+  std::lock_guard<std::mutex> lock(io_mutex_);
+  TPCANTimestamp ts{};
+  return CAN_Read(kChannelHandle_, &msg, &ts);
+}
+
+TPCANStatus PCANInterface::get_bus_status()
+{
+  std::lock_guard<std::mutex> lock(io_mutex_);
+  return CAN_GetStatus(kChannelHandle_);
+}
+
+TPCANStatus PCANInterface::get_value(
+  TPCANParameter parameter, void * buffer, uint32_t buffer_length)
+{
+  std::lock_guard<std::mutex> lock(io_mutex_);
+  return CAN_GetValue(kChannelHandle_, parameter, buffer, buffer_length);
 }
 
 std::string PCANInterface::format_error(TPCANStatus status)

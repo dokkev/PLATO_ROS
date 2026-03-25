@@ -12,6 +12,7 @@ def generate_launch_description():
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
     zeroing = LaunchConfiguration("zeroing")
+    direct_tx_inter_frame_gap_us = LaunchConfiguration("direct_tx_inter_frame_gap_us")
 
     declared_arguments = [
         DeclareLaunchArgument("gui", default_value="true", description="Start RViz2 automatically."),
@@ -21,6 +22,11 @@ def generate_launch_description():
             "zeroing",
             default_value="false",
             description="Set current actuator positions as software zero after the first full feedback snapshot.",
+        ),
+        DeclareLaunchArgument(
+            "direct_tx_inter_frame_gap_us",
+            default_value="100",
+            description="Minimum delay between consecutive CAN TX frames in microseconds.",
         ),
     ]
 
@@ -32,6 +38,9 @@ def generate_launch_description():
             " ",
             "zeroing:=",
             zeroing,
+            " ",
+            "direct_tx_inter_frame_gap_us:=",
+            direct_tx_inter_frame_gap_us,
         ]
     )
     rviz_config = PathJoinSubstitution([FindPackageShare("plato2_description"), "rviz", "plato2.rviz"])
@@ -54,7 +63,7 @@ def generate_launch_description():
     robot_state_pub = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[robot_description, {"use_sim_time": use_sim_time}, {"publish_rate": 200.0}],
+        parameters=[robot_description, {"use_sim_time": use_sim_time}, {"publish_rate": 100.0}],
         output="both",
         namespace=plato_ns,
     )

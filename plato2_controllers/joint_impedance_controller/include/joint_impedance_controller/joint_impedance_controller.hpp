@@ -83,6 +83,8 @@ private:
   // Parameters
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
+  size_t state_publish_divisor_ = 10;
+  size_t state_publish_counter_ = 0;
 };
 
 }  // namespace joint_impedance_controller

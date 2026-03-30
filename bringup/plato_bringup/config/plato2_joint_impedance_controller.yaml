@@ -23,7 +23,7 @@ plato2:
 
   joint_impedance_controller:
     ros__parameters:
-      compute_impedance_torque: false
+      compute_impedance_torque: true
       joints:
         - joint1
         - joint2

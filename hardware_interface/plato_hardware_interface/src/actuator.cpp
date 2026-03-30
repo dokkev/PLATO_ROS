@@ -15,24 +15,34 @@ namespace
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
 
-void validate_direction(const Config & config)
+can_hardware_common::ActuatorCoreConfig make_core_config(const StaticConfig & config)
 {
-  if (config.core.direction != 1 && config.core.direction != -1) {
+  can_hardware_common::ActuatorCoreConfig core;
+  core.can_tx_id = config.can_tx_id;
+  core.can_rx_id = config.can_rx_id;
+  core.direction = config.direction;
+  core.torque_constant = config.torque_constant;
+  core.gear_ratio = config.gear_ratio;
+  return core;
+}
+
+void validate_direction(const StaticConfig & config)
+{
+  if (config.direction != 1 && config.direction != -1) {
     throw std::invalid_argument("Plato actuator direction must be +1 or -1");
   }
 }
 }  // namespace
 
 Actuator::Actuator(const Config & config)
-: config_(config),
-  protocol_(std::make_unique<can_protocol::SteadywinProtocol>(config.core))
+: static_config_(config.static_config),
+  position_offset_(config.position_offset),
+  protocol_(std::make_unique<can_protocol::SteadywinProtocol>(make_core_config(config.static_config)))
 {
-  validate_direction(config_);
+  validate_direction(static_config_);
 }
 
 Actuator::Actuator(Actuator &&) noexcept = default;
-
-Actuator & Actuator::operator=(Actuator &&) noexcept = default;
 
 Actuator::~Actuator() = default;
 
@@ -42,7 +52,7 @@ can_hardware_common::CommandRequest Actuator::to_request_(
   can_hardware_common::CommandRequest req;
   req.key = key;
   req.frame = cmd.frame;
-  req.reply.expected_rx_id = config_.core.can_rx_id;
+  req.reply.expected_rx_id = static_config_.can_rx_id;
   req.reply.expected_opcode = cmd.expected_response_opcode;
   req.reply.success_byte = 0x00;
   return req;
@@ -89,9 +99,9 @@ actuator::TxCommand Actuator::stop_control()
 actuator::TxCommand Actuator::set_joint_torque(float joint_torque)
 {
   joint_torque = clamp_torque_near_bounds_(joint_torque);
-  if (std::isfinite(config_.limits.effort_limit)) {
+  if (std::isfinite(static_config_.limits.effort_limit)) {
     joint_torque = std::clamp(
-      joint_torque, -config_.limits.effort_limit, config_.limits.effort_limit);
+      joint_torque, -static_config_.limits.effort_limit, static_config_.limits.effort_limit);
   }
 
   float motor_torque = map_joint_to_motor_frame_(joint_torque) * kMotorTorqueScale;
@@ -102,13 +112,13 @@ actuator::TxCommand Actuator::set_joint_torque(float joint_torque)
 
 actuator::TxCommand Actuator::set_joint_position(float joint_position, uint32_t duration_ms)
 {
-  if (std::isfinite(config_.limits.position_limit_min) &&
-    std::isfinite(config_.limits.position_limit_max))
+  if (std::isfinite(static_config_.limits.position_limit_min) &&
+    std::isfinite(static_config_.limits.position_limit_max))
   {
     joint_position = std::clamp(
       joint_position,
-      config_.limits.position_limit_min,
-      config_.limits.position_limit_max);
+      static_config_.limits.position_limit_min,
+      static_config_.limits.position_limit_max);
   }
 
   return protocol_->make_position_command(
@@ -118,13 +128,13 @@ actuator::TxCommand Actuator::set_joint_position(float joint_position, uint32_t 
 
 actuator::TxCommand Actuator::set_servo_position(float joint_position, uint32_t current_milliamps)
 {
-  if (std::isfinite(config_.limits.position_limit_min) &&
-    std::isfinite(config_.limits.position_limit_max))
+  if (std::isfinite(static_config_.limits.position_limit_min) &&
+    std::isfinite(static_config_.limits.position_limit_max))
   {
     joint_position = std::clamp(
       joint_position,
-      config_.limits.position_limit_min,
-      config_.limits.position_limit_max);
+      static_config_.limits.position_limit_min,
+      static_config_.limits.position_limit_max);
   }
 
   return protocol_->make_servo_position_command(
@@ -134,7 +144,7 @@ actuator::TxCommand Actuator::set_servo_position(float joint_position, uint32_t 
 
 actuator::TxCommand Actuator::set_servo_hold(float joint_position)
 {
-  return set_servo_position(joint_position, config_.servo_current_milliamps);
+  return set_servo_position(joint_position, static_config_.servo_current_milliamps);
 }
 
 actuator::TxCommand Actuator::set_servo_idle(float joint_position)
@@ -148,7 +158,7 @@ bool Actuator::set_current_position_as_zero()
     return false;
   }
 
-  config_.core.position_offset = motor_position_;
+  position_offset_ = motor_position_;
   state_.position = 0.0f;
   return true;
 }
@@ -183,27 +193,33 @@ void Actuator::apply_motor_feedback(
 
 float Actuator::clamp_torque_near_bounds_(float joint_torque) const
 {
+  if (!static_config_.soft_stop_enabled) {
+    return joint_torque;
+  }
+
   if (!is_initialized_) {
     return joint_torque;
   }
 
-  if (!std::isfinite(config_.limits.position_limit_min) ||
-    !std::isfinite(config_.limits.position_limit_max))
+  if (!std::isfinite(static_config_.limits.position_limit_min) ||
+    !std::isfinite(static_config_.limits.position_limit_max))
   {
     return joint_torque;
   }
 
-  const float min_limit_threshold = config_.limits.position_limit_min + kJointLimitSafetyMargin;
-  const float max_limit_threshold = config_.limits.position_limit_max - kJointLimitSafetyMargin;
+  const float min_limit_threshold = static_config_.limits.position_limit_min + kJointLimitSafetyMargin;
+  const float max_limit_threshold = static_config_.limits.position_limit_max - kJointLimitSafetyMargin;
 
   if (state_.position < min_limit_threshold && joint_torque < 0.0f) {
-    float norm_dist = (state_.position - config_.limits.position_limit_min) / kJointLimitSafetyMargin;
+    float norm_dist =
+      (state_.position - static_config_.limits.position_limit_min) / kJointLimitSafetyMargin;
     norm_dist = std::clamp(norm_dist, 0.0f, 1.0f);
     return joint_torque * norm_dist * norm_dist;
   }
 
   if (state_.position > max_limit_threshold && joint_torque > 0.0f) {
-    float norm_dist = (config_.limits.position_limit_max - state_.position) / kJointLimitSafetyMargin;
+    float norm_dist =
+      (static_config_.limits.position_limit_max - state_.position) / kJointLimitSafetyMargin;
     norm_dist = std::clamp(norm_dist, 0.0f, 1.0f);
     return joint_torque * norm_dist * norm_dist;
   }
@@ -213,17 +229,17 @@ float Actuator::clamp_torque_near_bounds_(float joint_torque) const
 
 float Actuator::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
 {
-  const float direction = static_cast<float>(config_.core.direction);
+  const float direction = static_cast<float>(static_config_.direction);
   return apply_offset ?
-         (joint_value * direction) + config_.core.position_offset :
+         (joint_value * direction) + position_offset_ :
          joint_value * direction;
 }
 
 float Actuator::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
 {
-  const float direction = static_cast<float>(config_.core.direction);
+  const float direction = static_cast<float>(static_config_.direction);
   return apply_offset ?
-         (motor_value - config_.core.position_offset) * direction :
+         (motor_value - position_offset_) * direction :
          motor_value * direction;
 }
 

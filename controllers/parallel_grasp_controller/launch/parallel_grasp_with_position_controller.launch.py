@@ -13,13 +13,13 @@ def generate_launch_description():
     jpc_pkg_dir = get_package_share_directory('joint_impedance_controller')
     estimator_pkg_dir = get_package_share_directory('plato_state_estimator')
 
-    controller_params_default = os.path.join(jpc_pkg_dir, 'config', 'impedance_trajectory_presets.yaml')
+    controller_params_default = os.path.join(jpc_pkg_dir, 'config', 'impedance_preset.yaml')
     estimator_params_default = os.path.join(estimator_pkg_dir, 'config', 'object_state_estimator.yaml')
 
     controller_params_arg = DeclareLaunchArgument(
         'controller_params_file',
         default_value=controller_params_default,
-        description='Path to impedance presets YAML for joint position controller'
+        description='Path to impedance preset YAML for joint position controller'
     )
 
     estimator_params_arg = DeclareLaunchArgument(

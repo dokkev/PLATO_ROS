@@ -21,11 +21,13 @@ set(msg_files
 
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  msg/GraspCommands.msg
   msg/Trajectory.msg
   msg/SavedNames.msg
   msg/ImpedanceCommands.msg
   msg/ImpedanceControllerState.msg
   msg/ImpedanceParams.msg
+  srv/SaveJointPosition.srv
   DEPENDENCIES trajectory_msgs
  )
 ament_export_dependencies(

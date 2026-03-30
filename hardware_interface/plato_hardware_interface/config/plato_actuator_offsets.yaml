@@ -4,14 +4,14 @@ offsets:
   - name: thumb_yaw
     offset: 0
   - name: thumb_mcp
-    offset: 0.54074192
+    offset: 0.664721489
   - name: thumb_pip
-    offset: -12.2520409
+    offset: 10.6841755
   - name: index_mcp
-    offset: 7.02124786
+    offset: 6.98233795
   - name: index_pip
-    offset: 8.96906281
+    offset: 9.71980667
   - name: middle_mcp
-    offset: 0.442320824
+    offset: 0.345426559
   - name: middle_pip
-    offset: 2.10822487
+    offset: 1.02254486

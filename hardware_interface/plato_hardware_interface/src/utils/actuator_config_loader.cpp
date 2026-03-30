@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -77,11 +78,35 @@ float parse_float(const YAML::Node & node, const char * key)
   return value.as<float>();
 }
 
+float parse_float_or_default(const YAML::Node & node, const char * key, float default_value)
+{
+  const auto value = node[key];
+  if (!value) {
+    return default_value;
+  }
+  if (!value.IsScalar()) {
+    throw std::runtime_error(std::string("Missing scalar field: ") + key);
+  }
+  return value.as<float>();
+}
+
+bool parse_bool_or_default(const YAML::Node & node, const char * key, bool default_value)
+{
+  const auto value = node[key];
+  if (!value) {
+    return default_value;
+  }
+  if (!value.IsScalar()) {
+    throw std::runtime_error(std::string("Missing scalar field: ") + key);
+  }
+  return value.as<bool>();
+}
+
 actuator::Limits parse_limits(const YAML::Node & node)
 {
-  const auto limits_node = node["limits"];
+  const auto limits_node = node["joint_pos_limit_rad"];
   if (!limits_node || !limits_node.IsMap()) {
-    throw std::runtime_error("Missing limits map");
+    throw std::runtime_error("Missing joint_pos_limit_rad map");
   }
 
   actuator::Limits limits;
@@ -93,13 +118,17 @@ actuator::Limits parse_limits(const YAML::Node & node)
 Config parse_config(const YAML::Node & node)
 {
   Config config;
-  config.core.can_tx_id = parse_u8(node, "tx_id");
-  config.core.can_rx_id = parse_u8(node, "rx_id");
-  config.core.direction = parse_direction(node);
-  config.core.torque_constant = parse_float(node, "torque_constant");
-  config.core.gear_ratio = parse_float(node, "gear_ratio");
-  config.limits = parse_limits(node);
-  config.servo_current_milliamps = parse_u32_or_default(node, "servo_current_milliamps", 0);
+  config.static_config.can_tx_id = parse_u8(node, "tx_id");
+  config.static_config.can_rx_id = parse_u8(node, "rx_id");
+  config.static_config.direction = parse_direction(node);
+  config.static_config.torque_constant = parse_float(node, "torque_constant");
+  config.static_config.gear_ratio = parse_float(node, "gear_ratio");
+  config.static_config.limits = parse_limits(node);
+  config.static_config.servo_current_milliamps =
+    parse_u32_or_default(node, "servo_current_milliamps", 0);
+  config.static_config.soft_stop_enabled = parse_bool_or_default(node, "soft_stop_enabled", true);
+  config.static_config.effort_limit_nm = parse_float_or_default(
+    node, "effort_limit_nm", std::numeric_limits<float>::infinity());
   return config;
 }
 
@@ -109,10 +138,10 @@ void validate_can_ids(const std::vector<Config> & configs)
   std::set<uint8_t> rx_ids;
 
   for (const auto & config : configs) {
-    if (!tx_ids.insert(config.core.can_tx_id).second) {
+    if (!tx_ids.insert(config.static_config.can_tx_id).second) {
       throw std::runtime_error("Duplicate tx_id found in actuator config");
     }
-    if (!rx_ids.insert(config.core.can_rx_id).second) {
+    if (!rx_ids.insert(config.static_config.can_rx_id).second) {
       throw std::runtime_error("Duplicate rx_id found in actuator config");
     }
   }

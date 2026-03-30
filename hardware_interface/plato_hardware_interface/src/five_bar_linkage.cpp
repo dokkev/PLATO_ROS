@@ -1,5 +1,6 @@
 #include "plato_hardware_interface/five_bar_linkage.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -21,11 +22,30 @@ constexpr size_t kIndexMcpIndex = 4;
 constexpr size_t kIndexPipIndex = 5;
 constexpr size_t kMiddleMcpIndex = 6;
 constexpr size_t kMiddlePipIndex = 7;
+constexpr float kInfinity = std::numeric_limits<float>::infinity();
+
+float clamp_joint_effort_command(float joint_effort, float joint_effort_limit)
+{
+  if (!std::isfinite(joint_effort_limit)) {
+    return joint_effort;
+  }
+  return std::clamp(joint_effort, -joint_effort_limit, joint_effort_limit);
+}
 
 }  // namespace
 
 Transmission::Transmission(FiveBarLinkageConfig config)
-: config_(config)
+: Transmission(
+    config,
+    JointArray::Constant(kInfinity))
+{
+}
+
+Transmission::Transmission(
+  FiveBarLinkageConfig config,
+  const JointArray & joint_effort_limits)
+: config_(config),
+  joint_effort_limits_(joint_effort_limits)
 {
 }
 
@@ -146,8 +166,12 @@ void Transmission::joint_to_actuator(
     }
 
     if (std::isfinite(torque_ratio) && std::abs(torque_ratio) > kEpsilon) {
+      const float joint_effort =
+        clamp_joint_effort_command(
+        static_cast<float>(joint_command_view.effort(index)),
+        joint_effort_limits_(index));
       actuator_efforts(index) =
-        static_cast<float>(joint_command_view.effort(index)) / torque_ratio;
+        joint_effort / torque_ratio;
       actuator_stiffness(index) =
         static_cast<float>(joint_command_view.stiffness(index)) / torque_ratio;
       actuator_damping(index) =

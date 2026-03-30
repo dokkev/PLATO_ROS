@@ -14,6 +14,8 @@
 #include "std_msgs/msg/string.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "plato_interfaces/msg/impedance_commands.hpp"
+#include "plato_interfaces/srv/save_joint_position.hpp"
+#include "plato_utils/joint_position_storage.hpp"
 #include "sdr_grasp_msgs/msg/tactile.hpp"
 #include "sdr_grasp_msgs/msg/grasp_control.hpp"
 #include "sdr_grasp_msgs/msg/grasp_request.hpp"
@@ -31,6 +33,12 @@
 #define ROS_HZ (100)  // Hz
 
 using GraspControl = sdr_grasp_msgs::msg::GraspControl;
+
+namespace
+{
+const std::vector<std::string> kOrderedJointNames{
+  "joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7", "joint8"};
+}  // namespace
 
 class ParallelGraspNode : public rclcpp::Node {
 public:
@@ -105,7 +113,9 @@ private:
   };
 
   void GetParameters() {
-    // Add any parameters if needed
+    joint_positions_yaml_path_ = this->declare_parameter<std::string>(
+      "joint_positions_yaml_path",
+      plato::storage::default_joint_position_yaml_path("parallel_grasp_controller"));
   }
 
   void StartROS() {
@@ -176,6 +186,14 @@ private:
       "parallel_grasp_node/start_release",
       std::bind(&ParallelGraspNode::StartRelease, this, std::placeholders::_1, std::placeholders::_2));
 
+    save_joint_position_server_ = this->create_service<plato_interfaces::srv::SaveJointPosition>(
+      "save_joint_position",
+      std::bind(
+        &ParallelGraspNode::SaveJointPositionToYaml,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
     // Timer for control loop
     using namespace std::chrono_literals;
     timer_ = this->create_wall_timer(
@@ -203,6 +221,7 @@ private:
     release_stop_.reset();
     start_grasp_server_.reset();
     start_release_server_.reset();
+    save_joint_position_server_.reset();
     timer_.reset();
   }
 
@@ -503,6 +522,48 @@ private:
     start_release_ = true;
   }
 
+  void SaveJointPositionToYaml(
+    const std::shared_ptr<plato_interfaces::srv::SaveJointPosition::Request> request,
+    const std::shared_ptr<plato_interfaces::srv::SaveJointPosition::Response> response)
+  {
+    response->saved_path = joint_positions_yaml_path_;
+
+    if (sorted_positions_.size() != kOrderedJointNames.size()) {
+      response->success = false;
+      response->message = "Current sorted joint positions are not available yet.";
+      RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+      return;
+    }
+
+    std::string saved_name;
+    std::string error_message;
+    const bool success = plato::storage::save_joint_position_yaml(
+      joint_positions_yaml_path_,
+      request->name,
+      kOrderedJointNames,
+      sorted_positions_,
+      &saved_name,
+      &error_message);
+
+    response->success = success;
+    response->saved_name = saved_name;
+    if (success) {
+      response->message = "Saved current joint positions to YAML.";
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Saved joint positions as '%s' to %s",
+        response->saved_name.c_str(),
+        response->saved_path.c_str());
+    } else {
+      response->message = error_message;
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Failed to save joint positions to %s: %s",
+        response->saved_path.c_str(),
+        response->message.c_str());
+    }
+  }
+
   void CallStartAdaptiveGrasp() {
     auto request = std::make_shared<grasp_srvs::srv::StartAdaptiveGraspCtrl::Request>();
     // No request fields for adaptive grasp
@@ -725,6 +786,7 @@ private:
 
   bool is_exit_process_ = false;
   bool is_busy_ = false;
+  std::string joint_positions_yaml_path_;
 
   std::vector<sdr_grasp_msgs::msg::GraspRequest> grasp_requests_;
   sdr_grasp_msgs::msg::GraspControl grasp_info_;
@@ -739,6 +801,7 @@ private:
   rclcpp::Client<grasp_srvs::srv::TactileZeroReset>::SharedPtr zero_reset_start_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_grasp_server_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_release_server_;
+  rclcpp::Service<plato_interfaces::srv::SaveJointPosition>::SharedPtr save_joint_position_server_;
   rclcpp::Subscription<sdr_grasp_msgs::msg::Tactile>::SharedPtr tac_stat_fin0_sub_;
   rclcpp::Subscription<sdr_grasp_msgs::msg::Tactile>::SharedPtr tac_stat_fin1_sub_;
   rclcpp::Subscription<sdr_grasp_msgs::msg::GraspControl>::SharedPtr des_force_fin0_sub_;

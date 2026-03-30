@@ -45,6 +45,7 @@ ament_target_dependencies(parallel_grasp_node
   rclcpp
   std_msgs
   sensor_msgs
+  plato_interfaces
   plato_utils
   Eigen3
 )

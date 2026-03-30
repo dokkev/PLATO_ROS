@@ -5,48 +5,30 @@ import tty
 import threading
 import rclpy
 from rclpy.node import Node
-from std_srvs.srv import Trigger
+from std_msgs.msg import Float64
 
 
 class ImpedanceGainKeyboard(Node):
     def __init__(self):
         super().__init__('impedance_gain_keyboard')
         self._lock = threading.Lock()
-        self._clients = {
-            '0': self._make_client('zero', '/impedance_trajectory_controller_node/impedance_gains/zero'),
-            '1': self._make_client('soft', '/impedance_trajectory_controller_node/impedance_gains/soft'),
-            '2': self._make_client('medium', '/impedance_trajectory_controller_node/impedance_gains/medium'),
-            '3': self._make_client('hard', '/impedance_trajectory_controller_node/impedance_gains/hard'),
-        }
-        self.get_logger().info("Impedance gain keyboard: 0=zero, 1=soft, 2=medium, 3=hard, q=quit")
+        self._publisher = self.create_publisher(
+            Float64,
+            '/impedance_trajectory_controller_node/impedance_level',
+            10,
+        )
+        self.get_logger().info(
+            "Impedance gain keyboard: 0-9=set level, a=10, q=quit")
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._key_loop, daemon=True)
         self._thread.start()
 
-    def _make_client(self, label: str, service_name: str):
-        client = self.create_client(Trigger, service_name)
-        if not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn(f"Service {service_name} ({label}) not available yet.")
-        return client
-
-    def _call(self, key: str):
+    def _publish_level(self, level: float):
         with self._lock:
-            client = self._clients.get(key)
-            if client is None:
-                return
-            if not client.service_is_ready():
-                self.get_logger().warn(f"Service {client.srv_name} not ready.")
-                return
-            req = Trigger.Request()
-            future = client.call_async(req)
-            future.add_done_callback(lambda f, k=key: self._log_result(k, f))
-
-    def _log_result(self, key: str, future):
-        try:
-            resp = future.result()
-            self.get_logger().info(f"Key {key}: {resp.message} (success={resp.success})")
-        except Exception as exc:
-            self.get_logger().error(f"Key {key}: service call failed: {exc}")
+            msg = Float64()
+            msg.data = float(level)
+            self._publisher.publish(msg)
+            self.get_logger().info(f"Impedance level -> {level:.1f}")
 
     def _key_loop(self):
         fd = sys.stdin.fileno()
@@ -55,8 +37,10 @@ class ImpedanceGainKeyboard(Node):
         try:
             while rclpy.ok() and not self._stop.is_set():
                 ch = sys.stdin.read(1)
-                if ch in ('0', '1', '2', '3'):
-                    self._call(ch)
+                if ch.isdigit():
+                    self._publish_level(float(ch))
+                elif ch in ('a', 'A'):
+                    self._publish_level(10.0)
                 elif ch in ('q', 'Q'):
                     self.get_logger().info("Quitting keyboard control.")
                     rclpy.shutdown()

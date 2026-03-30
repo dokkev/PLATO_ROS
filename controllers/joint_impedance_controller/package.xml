@@ -25,7 +25,6 @@
   <depend>trajectory_msgs</depend>
   <depend>pluginlib</depend>
   <depend>plato_interfaces</depend>
-  <depend>std_srvs</depend>
   <depend>plato_utils</depend>
 
   <!-- Runtime dependencies -->

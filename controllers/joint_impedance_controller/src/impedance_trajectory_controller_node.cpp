@@ -2,23 +2,36 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <stdexcept>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "plato_interfaces/msg/impedance_commands.hpp"
+#include "plato_utils/yaml_helpers.hpp"
 #include "joint_impedance_controller/impedance_trajectory_controller.hpp"
-#include "joint_impedance_controller/impedance_gain_handler.hpp"
+#include "joint_impedance_controller/impedance_handler.hpp"
 
 class ImpedanceTrajectoryControllerNode : public rclcpp::Node {
 public:
   ImpedanceTrajectoryControllerNode()
     : Node("impedance_trajectory_controller_node"),
       controller_(8),
-      gain_handler_(*this),
       steady_clock_(RCL_STEADY_TIME) {
+    const auto impedance_preset_yaml_path = this->declare_parameter<std::string>(
+        "impedance_preset_yaml_path",
+        plato::yaml::package_share_file_path(
+            "joint_impedance_controller", "config/impedance_preset.yaml"));
+    const auto default_impedance_level = this->declare_parameter<double>(
+        "default_impedance_level", 6.0);
+    const auto impedance_level_topic = this->declare_parameter<std::string>(
+        "impedance_level_topic", "~/impedance_level");
     const auto position_topic = this->declare_parameter<std::string>(
         "position_command_topic", "/plato2/joint_impedance_trajectory_controller/commands");
+    const auto goal_command_topic = this->declare_parameter<std::string>(
+        "goal_command_topic", "/plato2/joint_impedance_trajectory_controller/goal_command");
     const auto joint_state_topic = this->declare_parameter<std::string>(
         "joint_state_topic", "/plato2/joint_states");
     const auto impedance_topic = this->declare_parameter<std::string>(
@@ -26,9 +39,26 @@ public:
     default_goal_duration_sec_ = this->declare_parameter<double>("default_goal_duration_sec", 0.25);
     const double control_rate_hz = this->declare_parameter<double>("control_rate_hz", 100.0);
 
+    impedance_handler_ = std::make_unique<joint_impedance_controller::ImpedanceHandler>(
+        static_cast<int>(controller_.dof()), impedance_preset_yaml_path);
+    std::string error;
+    if (!impedance_handler_->set_level(default_impedance_level, &error)) {
+      throw std::runtime_error(
+          "Failed to set default impedance level " + std::to_string(default_impedance_level) +
+          "': " + error);
+    }
+
+    impedance_level_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        impedance_level_topic, 10,
+        std::bind(&ImpedanceTrajectoryControllerNode::impedanceLevelCallback, this, std::placeholders::_1));
+
     position_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
         position_topic, 10,
         std::bind(&ImpedanceTrajectoryControllerNode::positionCallback, this, std::placeholders::_1));
+
+    goal_command_sub_ = this->create_subscription<plato_interfaces::msg::ImpedanceCommands>(
+        goal_command_topic, 10,
+        std::bind(&ImpedanceTrajectoryControllerNode::goalCommandCallback, this, std::placeholders::_1));
 
     joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
         joint_state_topic, rclcpp::SensorDataQoS(),
@@ -46,11 +76,28 @@ public:
         period, std::bind(&ImpedanceTrajectoryControllerNode::updateLoop, this));
 
     RCLCPP_INFO(this->get_logger(),
-                "impedance_trajectory_controller_node started (rate=%.1fHz, goal_duration=%.3fs)",
-                safe_rate_hz, default_goal_duration_sec_);
+                "impedance_trajectory_controller_node started (rate=%.1fHz, goal_duration=%.3fs, level=%.2f)",
+                safe_rate_hz, default_goal_duration_sec_,
+                impedance_handler_->active_level());
   }
 
 private:
+  void impedanceLevelCallback(const std_msgs::msg::Float64::SharedPtr msg) {
+    if (!msg) {
+      return;
+    }
+
+    std::string error;
+    if (!impedance_handler_->set_level(msg->data, &error)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to set impedance level %.3f: %s",
+                   msg->data, error.c_str());
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Impedance level set to %.3f",
+                impedance_handler_->active_level());
+  }
+
   void positionCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
     if (!msg) {
       return;
@@ -60,6 +107,22 @@ private:
       return;
     }
     controller_.setGoal(msg->data, default_goal_duration_sec_);
+  }
+
+  void goalCommandCallback(const plato_interfaces::msg::ImpedanceCommands::SharedPtr msg) {
+    if (!msg) {
+      return;
+    }
+    if (msg->position.empty()) {
+      controller_.holdPosition();
+      return;
+    }
+
+    if (!msg->stiffness.empty() || !msg->damping.empty()) {
+      impedance_handler_->set_custom_gains(msg->stiffness, msg->damping);
+    }
+
+    controller_.setGoal(msg->position, default_goal_duration_sec_, msg->effort_ff);
   }
 
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
@@ -78,7 +141,7 @@ private:
     last_update_time_ = now;
     has_last_update_time_ = true;
 
-    auto gains = gain_handler_.getGains();
+    auto gains = impedance_handler_->gains();
     controller_.setGains(gains.stiffness, gains.damping);
     const auto impedance_cmd = controller_.update(dt_sec);
 
@@ -92,8 +155,10 @@ private:
   }
 
   ImpedanceTrajectoryController controller_;
-  impedance_trajectory_controller::ImpedanceGainHandler gain_handler_;
+  std::unique_ptr<joint_impedance_controller::ImpedanceHandler> impedance_handler_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr impedance_level_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr position_sub_;
+  rclcpp::Subscription<plato_interfaces::msg::ImpedanceCommands>::SharedPtr goal_command_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
   rclcpp::Publisher<plato_interfaces::msg::ImpedanceCommands>::SharedPtr impedance_pub_;
   rclcpp::TimerBase::SharedPtr update_timer_;

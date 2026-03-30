@@ -2,6 +2,7 @@
 #define PLATO_HARDWARE_INTERFACE__ACTUATOR_HPP_
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include "can_hardware_common/actuator.hpp"
 #include "plato_hardware_interface/can_protocol.hpp"
@@ -9,11 +10,23 @@
 namespace plato_actuator
 {
 
-struct Config
+struct StaticConfig
 {
-  can_hardware_common::ActuatorCoreConfig core;
+  uint8_t can_tx_id = 0;
+  uint8_t can_rx_id = 0;
+  int8_t direction = 1;
+  float torque_constant = 0.0f;
+  float gear_ratio = 0.0f;
   actuator::Limits limits;
   uint32_t servo_current_milliamps = 0;
+  bool soft_stop_enabled = true;
+  float effort_limit_nm = std::numeric_limits<float>::infinity();
+};
+
+struct Config
+{
+  StaticConfig static_config;
+  float position_offset = 0.0f;
 };
 
 class Actuator
@@ -23,7 +36,7 @@ public:
   Actuator(const Actuator &) = delete;
   Actuator & operator=(const Actuator &) = delete;
   Actuator(Actuator &&) noexcept;
-  Actuator & operator=(Actuator &&) noexcept;
+  Actuator & operator=(Actuator &&) = delete;
   ~Actuator();
 
   /// High-level API: returns CommandRequest ready for scheduler.
@@ -48,14 +61,15 @@ public:
 
   void process_message(const TPCANMsg & msg);
 
-  const Config & get_config() const { return config_; }
+  Config get_config() const { return {static_config_, position_offset_}; }
+  const StaticConfig & get_static_config() const { return static_config_; }
   const can_hardware_common::ActuatorState & get_state() const { return state_; }
   const can_hardware_common::ActuatorStatus & get_status() const { return status_; }
 
-  uint32_t get_tx_id() const { return config_.core.can_tx_id; }
-  uint32_t get_rx_id() const { return config_.core.can_rx_id; }
+  uint32_t get_tx_id() const { return static_config_.can_tx_id; }
+  uint32_t get_rx_id() const { return static_config_.can_rx_id; }
   float get_motor_position() const { return motor_position_; }
-  float get_position_offset() const { return config_.core.position_offset; }
+  float get_position_offset() const { return position_offset_; }
   bool is_enabled() const { return motor_enabled_; }
   bool is_initialized() const { return is_initialized_; }
 
@@ -76,7 +90,8 @@ private:
   float map_joint_to_motor_frame_(float joint_value, bool apply_offset = false) const;
   float map_motor_to_joint_frame_(float motor_value, bool apply_offset = false) const;
 
-  Config config_;
+  const StaticConfig static_config_;
+  float position_offset_ = 0.0f;
   std::unique_ptr<can_protocol::SteadywinProtocol> protocol_;
   can_hardware_common::ActuatorState state_;
   can_hardware_common::ActuatorStatus status_;

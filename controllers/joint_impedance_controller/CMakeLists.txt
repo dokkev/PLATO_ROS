@@ -22,7 +22,6 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   control_msgs
   trajectory_msgs
   plato_interfaces
-  std_srvs
   plato_utils
 )
 
@@ -56,22 +55,35 @@ ament_target_dependencies(joint_impedance_controller PUBLIC ${THIS_PACKAGE_INCLU
 
 pluginlib_export_plugin_description_file(controller_interface joint_impedance_controller_plugin.xml)
 
+add_library(joint_impedance_controller_impedance_handler SHARED
+  src/impedance_handler.cpp
+)
+target_compile_features(joint_impedance_controller_impedance_handler PUBLIC cxx_std_17)
+target_include_directories(joint_impedance_controller_impedance_handler PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/joint_impedance_controller>
+)
+ament_target_dependencies(joint_impedance_controller_impedance_handler
+  plato_utils
+)
+
 add_executable(impedance_trajectory_controller_node
   src/impedance_trajectory_controller_node.cpp
   src/impedance_trajectory_controller.cpp
-  src/impedance_gain_handler.cpp
 )
 target_compile_features(impedance_trajectory_controller_node PUBLIC cxx_std_17)
 target_include_directories(impedance_trajectory_controller_node PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/joint_impedance_controller>
 )
+target_link_libraries(impedance_trajectory_controller_node
+  joint_impedance_controller_impedance_handler
+)
 ament_target_dependencies(impedance_trajectory_controller_node
   rclcpp
   std_msgs
   sensor_msgs
   plato_interfaces
-  std_srvs
   plato_utils
 )
 
@@ -94,6 +106,19 @@ if(BUILD_TESTING)
     target_compile_features(joint_impedance_trajectory_controller_test PUBLIC cxx_std_17)
   endif()
 
+  ament_add_gtest(joint_impedance_handler_test
+    test/impedance_handler_test.cpp
+  )
+  if(TARGET joint_impedance_handler_test)
+    target_include_directories(joint_impedance_handler_test PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(joint_impedance_handler_test
+      joint_impedance_controller_impedance_handler
+    )
+    target_compile_features(joint_impedance_handler_test PUBLIC cxx_std_17)
+  endif()
+
   add_launch_test(
     test/joint_impedance_trajectory_controller_mock_hw.test.py
     TIMEOUT 180
@@ -107,6 +132,7 @@ install(
 install(
   TARGETS
     joint_impedance_controller
+    joint_impedance_controller_impedance_handler
     joint_impedance_controller_parameters
   EXPORT export_joint_impedance_controller
   RUNTIME DESTINATION bin

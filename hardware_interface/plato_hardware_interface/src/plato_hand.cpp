@@ -38,6 +38,47 @@ static_assert(
 static_assert(
   Hand::kNumActuators == FiveBarLinkage::Transmission::kNumActuators,
   "Plato hand actuator dimension must match five-bar transmission");
+
+FiveBarLinkage::Transmission::JointArray build_joint_effort_limits(
+  const std::vector<plato_actuator::Config> & actuator_configs)
+{
+  if (actuator_configs.size() != Hand::kNumActuators) {
+    throw std::invalid_argument(
+            "Plato hand expects exactly " + std::to_string(Hand::kNumActuators) +
+            " actuator configs when building effort limits, got " +
+            std::to_string(actuator_configs.size()));
+  }
+
+  FiveBarLinkage::Transmission::JointArray limits =
+    FiveBarLinkage::Transmission::JointArray::Constant(
+    std::numeric_limits<float>::infinity());
+  for (size_t i = 0; i < actuator_configs.size(); ++i) {
+    limits(static_cast<Eigen::Index>(i)) = actuator_configs[i].static_config.effort_limit_nm;
+  }
+  return limits;
+}
+
+std::vector<plato_actuator::StaticConfig> extract_static_configs(
+  const std::vector<plato_actuator::Config> & actuator_configs)
+{
+  std::vector<plato_actuator::StaticConfig> static_configs;
+  static_configs.reserve(actuator_configs.size());
+  for (const auto & config : actuator_configs) {
+    static_configs.push_back(config.static_config);
+  }
+  return static_configs;
+}
+
+std::vector<float> extract_position_offsets(
+  const std::vector<plato_actuator::Config> & actuator_configs)
+{
+  std::vector<float> position_offsets;
+  position_offsets.reserve(actuator_configs.size());
+  for (const auto & config : actuator_configs) {
+    position_offsets.push_back(config.position_offset);
+  }
+  return position_offsets;
+}
 }  // namespace
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -45,22 +86,23 @@ static_assert(
 // ════════════════════════════════════════════════════════════════════════════
 
 Hand::Hand(PlatoHandConfig config)
-: transmission_(config.linkage_config),
+: transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
   scheduler_(transport_),  // must follow transport_ and transmission_ in member order
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
-  actuator_configs_(std::move(config.actuator_configs))
+  actuator_static_configs_(extract_static_configs(config.actuator_configs)),
+  actuator_position_offsets_(extract_position_offsets(config.actuator_configs))
 {
-  if (actuator_configs_.size() != kNumActuators) {
+  if (actuator_static_configs_.size() != kNumActuators) {
     throw std::invalid_argument(
             "Plato hand expects exactly " + std::to_string(kNumActuators) +
-            " actuator configs, got " + std::to_string(actuator_configs_.size()));
+            " actuator configs, got " + std::to_string(actuator_static_configs_.size()));
   }
 
   initialize_joint_buffers(kNumJoints, kDefaultJointStateValue);
   initialize_actuator_buffers(kNumActuators, kInvalidStateValue);
 
   actuators_.reserve(kNumActuators);
-  for (const auto & cfg : actuator_configs_) {
+  for (const auto & cfg : config.actuator_configs) {
     actuators_.emplace_back(cfg);
   }
 
@@ -508,7 +550,7 @@ bool Hand::zero_actuators_()
       const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
 
       if (is_servo) {
-        offsets.push_back(actuator_configs_[i].core.position_offset);
+        offsets.push_back(actuator_position_offsets_[i]);
         continue;
       }
 
@@ -517,7 +559,7 @@ bool Hand::zero_actuators_()
           logger(),
           "Zeroing skipped for actuator %zu: no valid feedback; keeping previous offset.",
           i + 1);
-        offsets.push_back(actuator_configs_[i].core.position_offset);
+        offsets.push_back(actuator_position_offsets_[i]);
         success = false;
         continue;
       }
@@ -527,13 +569,13 @@ bool Hand::zero_actuators_()
           logger(),
           "Zeroing failed for actuator %zu: unable to set current position as zero.",
           i + 1);
-        offsets.push_back(actuator_configs_[i].core.position_offset);
+        offsets.push_back(actuator_position_offsets_[i]);
         success = false;
         continue;
       }
 
-      actuator_configs_[i].core.position_offset = actuators_[i].get_position_offset();
-      offsets.push_back(actuators_[i].get_position_offset());
+      actuator_position_offsets_[i] = actuators_[i].get_position_offset();
+      offsets.push_back(actuator_position_offsets_[i]);
     }
 
     update_joint_states_locked_();

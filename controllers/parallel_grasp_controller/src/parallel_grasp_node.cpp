@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "plato_interfaces/srv/save_joint_position.hpp"
+#include "plato_utils/joint_position_storage.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/float64.hpp"
@@ -24,7 +26,10 @@ class ParallelGraspNode : public rclcpp::Node
 public:
   ParallelGraspNode()
   : Node("parallel_grasp_node"),
-    controller_()
+    controller_(),
+    joint_positions_yaml_path_(this->declare_parameter<std::string>(
+        "joint_positions_yaml_path",
+        plato::storage::default_joint_position_yaml_path("parallel_grasp_controller")))
   {
     using std::placeholders::_1;
 
@@ -47,12 +52,24 @@ public:
     position_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/plato2/joint_impedance_trajectory_controller/commands", 10);
 
+    save_joint_position_srv_ = this->create_service<plato_interfaces::srv::SaveJointPosition>(
+      "save_joint_position",
+      std::bind(
+        &ParallelGraspNode::save_joint_position_callback,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
     RCLCPP_INFO(this->get_logger(), "parallel_grasp_node ready");
     RCLCPP_INFO(this->get_logger(), "Expecting commands: [u, phi, f] where:");
     RCLCPP_INFO(this->get_logger(), "  u   = grasp distance [0,1] (0=closed, 1=open)");
     RCLCPP_INFO(this->get_logger(), "  phi = contact angle [0,1] (0=parallel, 1=flexed)");
     RCLCPP_INFO(this->get_logger(), "  f   = desired force (optional, activates force control when > 0)");
     RCLCPP_INFO(this->get_logger(), "Subscribing to /object_state/minimal_force and /object_state/measured_force");
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Joint position save service available at %s/save_joint_position",
+      this->get_fully_qualified_name());
   }
 
 private:
@@ -128,17 +145,62 @@ private:
     position_pub_->publish(cmd_msg);
   }
 
+  void save_joint_position_callback(
+    const std::shared_ptr<plato_interfaces::srv::SaveJointPosition::Request> request,
+    std::shared_ptr<plato_interfaces::srv::SaveJointPosition::Response> response)
+  {
+    response->saved_path = joint_positions_yaml_path_;
+
+    if (last_positions_.size() != kJointNames.size()) {
+      response->success = false;
+      response->message = "Current joint positions have not been received yet.";
+      RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+      return;
+    }
+
+    const std::vector<std::string> joint_names(kJointNames.begin(), kJointNames.end());
+    std::string saved_name;
+    std::string error_message;
+    const bool success = plato::storage::save_joint_position_yaml(
+      joint_positions_yaml_path_,
+      request->name,
+      joint_names,
+      last_positions_,
+      &saved_name,
+      &error_message);
+
+    response->success = success;
+    response->saved_name = saved_name;
+    if (success) {
+      response->message = "Saved current joint positions to YAML.";
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Saved joint positions as '%s' to %s",
+        response->saved_name.c_str(),
+        response->saved_path.c_str());
+    } else {
+      response->message = error_message;
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Failed to save joint positions to %s: %s",
+        response->saved_path.c_str(),
+        response->message.c_str());
+    }
+  }
+
   ParallelGraspController controller_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr command_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr minimal_force_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr measured_force_sub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr position_pub_;
+  rclcpp::Service<plato_interfaces::srv::SaveJointPosition>::SharedPtr save_joint_position_srv_;
 
   std::vector<double> last_positions_;
   const std::vector<double> zero_positions_ = std::vector<double>(kJointNames.size(), 0.0);
   double minimal_force_ = 0.0;
   double measured_force_ = 0.0;
+  std::string joint_positions_yaml_path_;
 };
 
 int main(int argc, char ** argv)

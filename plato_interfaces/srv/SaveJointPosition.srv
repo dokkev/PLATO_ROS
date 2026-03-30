@@ -1,0 +1,6 @@
+string name
+---
+bool success
+string message
+string saved_name
+string saved_path

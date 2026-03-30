@@ -90,7 +90,8 @@ private:
   std::vector<SimActuatorState> simulator_states_;
 
   std::string actuator_offset_yaml_path_;
-  std::vector<plato_actuator::Config> actuator_configs_;
+  const std::vector<plato_actuator::StaticConfig> actuator_static_configs_;
+  std::vector<float> actuator_position_offsets_;
   size_t write_cycle_count_ = 0;
   SteadyClock::time_point last_rx_time_{};
   size_t rx_frame_count_ = 0;

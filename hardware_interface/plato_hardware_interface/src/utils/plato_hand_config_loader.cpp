@@ -92,7 +92,7 @@ PlatoHandConfig load_plato_hand_config(const std::string & config_dir)
   }
 
   for (size_t i = 0; i < actuator_configs.size(); ++i) {
-    actuator_configs[i].core.position_offset = actuator_offsets[i];
+    actuator_configs[i].position_offset = actuator_offsets[i];
   }
 
   return PlatoHandConfig{

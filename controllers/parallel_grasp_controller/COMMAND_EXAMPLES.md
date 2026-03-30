@@ -153,3 +153,21 @@ Maximum flexion angle can be adjusted in the header file:
 // parallel_grasp_controller.hpp
 static constexpr double max_flexion_angle = 0.785;  // π/4 rad (~45°)
 ```
+
+---
+
+## Save Current Joint Position To YAML
+
+Both nodes expose a `save_joint_position` service using `plato_interfaces/srv/SaveJointPosition`.
+
+Save from `parallel_grasp_node` with an explicit name:
+```bash
+ros2 service call /parallel_grasp_node/save_joint_position plato_interfaces/srv/SaveJointPosition "{name: pinch_ready}"
+```
+
+Save from `grasp_node` with an explicit name:
+```bash
+ros2 service call /grasp_node/save_joint_position plato_interfaces/srv/SaveJointPosition "{name: contact_pose}"
+```
+
+If `name` is empty, a timestamp-based name is generated automatically.

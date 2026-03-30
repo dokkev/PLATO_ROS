@@ -14,13 +14,13 @@ def generate_launch_description():
     estimator_pkg_dir = get_package_share_directory('plato_state_estimator')
     tactile_pkg_dir = get_package_share_directory('tactile_sensing')
 
-    default_controller_params = os.path.join(pkg_dir, 'config', 'impedance_trajectory_presets.yaml')
+    default_controller_params = os.path.join(pkg_dir, 'config', 'impedance_preset.yaml')
     default_estimator_params = os.path.join(estimator_pkg_dir, 'config', 'object_state_estimator.yaml')
 
     controller_params_arg = DeclareLaunchArgument(
         'controller_params_file',
         default_value=default_controller_params,
-        description='Path to impedance presets YAML'
+        description='Path to impedance preset YAML'
     )
 
     estimator_params_arg = DeclareLaunchArgument(
@@ -31,10 +31,12 @@ def generate_launch_description():
 
     controller_node = Node(
         package='joint_impedance_controller',
-        executable='impedance_trajectory_controller_node',  # Updated controller node
+        executable='impedance_trajectory_controller_node',
         name='impedance_trajectory_controller_node',
         output='screen',
-        parameters=[LaunchConfiguration('controller_params_file')],
+        parameters=[{
+            'impedance_preset_yaml_path': LaunchConfiguration('controller_params_file'),
+        }],
     )
 
     object_state_estimator_node = Node(

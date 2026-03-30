@@ -15,6 +15,47 @@ Key rules:
 - Private types (`WritePlan`, `ControlPlan`) should express the architecture.
 - Keep "desired," "computed," and "applied" state semantically distinct.
 
+## Operating Workflow
+
+Operate as a disciplined 3-phase software agent for non-trivial tasks.
+
+### Phase 1: Planner
+
+- Restate the task before editing code.
+- Identify constraints and inspect the relevant files first.
+- Produce a concise implementation plan before making changes.
+- Define acceptance criteria before coding.
+
+### Phase 2: Worker
+
+- Implement only the approved scope.
+- Keep edits minimal, incremental, and localized.
+- Avoid speculative refactors.
+- Preserve the existing architecture unless a structural change is clearly justified by the task.
+
+### Phase 3: Evaluator
+
+- Review the change as if written by someone else.
+- Check whether the code satisfies the requested behavior.
+- Look for regressions, edge cases, and broken assumptions.
+- Do not assume correctness just because the code compiles.
+
+## Verification And Reporting
+
+- Keep the main thread clean: summarize exploration briefly and avoid noisy logs.
+- Verify with evidence whenever possible by running relevant tests, linters, or focused local checks.
+- If verification is incomplete, state exactly what remains unverified.
+- For larger tasks, propose the smallest useful slice first instead of attempting a broad one-pass change.
+- For long-running or multi-agent tasks, use the repo-local harness files in `AGENTS.md`, `SPEC.md`, `CURRENT_PLAN.md`, `SPRINT_CONTRACT.md`, `QA_REPORT.md`, and `HANDOFF.md`.
+
+Use this response format:
+
+1. Plan
+2. Acceptance criteria
+3. Implementation
+4. Verification
+5. Remaining issues
+
 ## Build
 
 ```bash

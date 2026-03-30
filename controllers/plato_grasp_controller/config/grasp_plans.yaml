@@ -1,0 +1,24 @@
+tasks:
+  soft_pick:
+    pos_preset_name: soft_contact
+    impedance_level: 3.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.05, 0.05, 0.05, 0.05, 0.0, 0.0]
+      grasp_duration_sec: 2.0
+
+  medium_pick:
+    pos_preset_name: medium_contact
+    impedance_level: 6.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.10, 0.10, 0.10, 0.10, 0.0, 0.0]
+      grasp_duration_sec: 2.0
+
+  index_pinch:
+    pos_preset_name: index_pinch_position
+    impedance_level: 5.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.20, 0.20, 0.0, 0.0]
+      grasp_duration_sec: 0.0

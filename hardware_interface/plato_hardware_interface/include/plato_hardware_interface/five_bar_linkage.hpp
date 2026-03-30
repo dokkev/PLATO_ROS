@@ -35,6 +35,7 @@ public:
   using JointArray = Eigen::Array<float, static_cast<Eigen::Index>(kNumJoints), 1>;
 
   explicit Transmission(FiveBarLinkageConfig config);
+  Transmission(FiveBarLinkageConfig config, const JointArray & joint_effort_limits);
 
   void actuator_to_joint(
     const can_hardware_common::RobotIO::ActuatorState & actuator_state,
@@ -54,6 +55,7 @@ private:
     JointArray & torque_ratios) const;
 
   FiveBarLinkageConfig config_;
+  JointArray joint_effort_limits_;
 };
 
 Kinematics compute_kinematics(

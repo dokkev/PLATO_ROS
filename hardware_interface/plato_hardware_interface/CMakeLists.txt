@@ -76,8 +76,17 @@ target_link_libraries(plato_hand_hil_enable_zero_test
   PRIVATE ${PROJECT_NAME}
 )
 
+add_executable(plato_hand_hil_gap_sweep
+  src/tools/plato_hand_hil_gap_sweep.cpp
+)
+target_compile_features(plato_hand_hil_gap_sweep PUBLIC cxx_std_17)
+target_link_libraries(plato_hand_hil_gap_sweep
+  PRIVATE ${PROJECT_NAME}
+)
+
 install(TARGETS plato_hand_sim_smoke_test
   plato_hand_hil_enable_zero_test
+  plato_hand_hil_gap_sweep
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -90,7 +90,8 @@ Hand::Hand(PlatoHandConfig config)
   scheduler_(transport_),  // must follow transport_ and transmission_ in member order
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_static_configs_(extract_static_configs(config.actuator_configs)),
-  actuator_position_offsets_(extract_position_offsets(config.actuator_configs))
+  actuator_position_offsets_(extract_position_offsets(config.actuator_configs)),
+  direct_tx_frame_timeout_(config.direct_tx_inter_frame_gap * 4)
 {
   if (actuator_static_configs_.size() != kNumActuators) {
     throw std::invalid_argument(
@@ -150,6 +151,10 @@ Hand::Hand(PlatoHandConfig config)
     logger(),
     "Direct TX inter-frame gap: %ld us",
     static_cast<long>(config.direct_tx_inter_frame_gap.count()));
+  RCLCPP_INFO(
+    logger(),
+    "Direct TX frame timeout: %ld us",
+    static_cast<long>(direct_tx_frame_timeout_.count()));
   if (transport_simulator_enabled_) {
     RCLCPP_WARN(
       logger(),
@@ -237,6 +242,7 @@ bool Hand::write_joint_commands()
 {
   std::array<TPCANMsg, kNumActuators> tx_frames{};
   size_t tx_count = 0;
+  bool have_initialized_actuator_feedback = false;
 
   // 1) Validate command snapshot
   // 2) Joint->actuator mapping
@@ -257,6 +263,11 @@ bool Hand::write_joint_commands()
       joint_commands_, actuator_states_, joint_states_, actuator_commands_);
     const auto actuator_cmd = actuator_command_view();
 
+    have_initialized_actuator_feedback = std::any_of(
+      actuators_.begin(),
+      actuators_.end(),
+      [](const auto & actuator) { return actuator.is_initialized(); });
+
     if ((write_cycle_count_ % kServoWriteDivisor) == 0) {
       tx_frames[tx_count++] = actuators_[kThumbRollIndex].set_servo_hold(
         static_cast<float>(actuator_cmd.position(kThumbRollIndex))).frame;
@@ -265,11 +276,6 @@ bool Hand::write_joint_commands()
     }
 
     for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-      const size_t geared_index = i - kThumbMcpIndex;
-      const size_t phase = write_cycle_count_ % kTorqueWriteStride;
-      if ((geared_index % kTorqueWriteStride) != phase) {
-        continue;
-      }
       const Eigen::Index idx = static_cast<Eigen::Index>(i);
       tx_frames[tx_count++] = actuators_[i].set_joint_torque(
         static_cast<float>(actuator_cmd.effort(idx))).frame;
@@ -281,7 +287,7 @@ bool Hand::write_joint_commands()
   }
 
   const auto now = SteadyClock::now();
-  if (!has_fresh_rx_(now)) {
+  if (have_initialized_actuator_feedback && !has_fresh_rx_(now)) {
     // Fast recovery path: try one RX drain only when freshness check fails.
     const auto rx_probe = transport_.process_rx();
     if (rx_probe.is_bus_error()) {
@@ -306,18 +312,17 @@ bool Hand::write_joint_commands()
         logger(),
         throttle_clock(),
         1000,
-        "Skipping direct TX: RX stale (age=%ld ms, stale_cycles=%zu, total_rx=%zu)",
+        "RX stale; attempting direct TX recovery (age=%ld ms, stale_cycles=%zu, total_rx=%zu)",
         rx_age_ms,
         stale_write_cycle_count_,
         rx_frame_count_);
-      return true;
     }
   } else {
     stale_write_cycle_count_ = 0;
   }
 
   for (size_t i = 0; i < tx_count; ++i) {
-    if (!send_frame_blocking_(tx_frames[i], kDirectTxFrameTimeout)) {
+    if (!send_frame_blocking_(tx_frames[i], direct_tx_frame_timeout_)) {
       return false;
     }
   }
@@ -550,6 +555,7 @@ bool Hand::zero_actuators_()
       const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
 
       if (is_servo) {
+        // Preserve the existing offsets for joint1/joint2 thumb servo channels during zeroing.
         offsets.push_back(actuator_position_offsets_[i]);
         continue;
       }
@@ -598,10 +604,23 @@ bool Hand::zero_actuators_()
 
 void Hand::update_joint_states_locked_()
 {
-  bool all_initialized = true;
+  bool all_required_feedback_ready = true;
+  std::string missing_feedback_ids;
   for (size_t i = 0; i < kNumActuators; ++i) {
     if (!actuators_[i].is_initialized()) {
-      all_initialized = false;
+      if (i == kThumbRollIndex || i == kThumbYawIndex) {
+        // Thumb servo channels may not report continuous state feedback on hold commands.
+        // Preserve joint-state updates by mirroring their commanded hold position.
+        actuator_states_.position_at(i) = joint_commands_.position_at(i);
+        actuator_states_.velocity_at(i) = 0.0;
+        actuator_states_.effort_at(i) = 0.0;
+        continue;
+      }
+      all_required_feedback_ready = false;
+      if (!missing_feedback_ids.empty()) {
+        missing_feedback_ids += ", ";
+      }
+      missing_feedback_ids += std::to_string(i + 1);
       continue;
     }
     const auto & state = actuators_[i].get_state();
@@ -610,7 +629,13 @@ void Hand::update_joint_states_locked_()
     actuator_states_.effort_at(i) = state.torque;
   }
 
-  if (!all_initialized) {
+  if (!all_required_feedback_ready) {
+    RCLCPP_WARN_THROTTLE(
+      logger(),
+      throttle_clock(),
+      1000,
+      "Skipping joint-state update: waiting for actuator feedback from [%s]",
+      missing_feedback_ids.c_str());
     return;
   }
 

@@ -43,11 +43,8 @@ private:
   static constexpr size_t kThumbRollIndex = 0;
   static constexpr size_t kThumbYawIndex = 1;
   static constexpr size_t kThumbMcpIndex = 2;
-  static constexpr size_t kServoWriteDivisor = 10;
-  // Spread geared-joint torque TX across cycles to reduce per-cycle write latency at high rates.
-  static constexpr size_t kTorqueWriteStride = 2;
-  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{100};
-  static constexpr std::chrono::microseconds kDirectTxFrameTimeout{500};
+  static constexpr size_t kServoWriteDivisor = 1;
+  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{500};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
   // Thumb servo channels can acknowledge lifecycle commands around ~17 ms on hardware.
   // Keep timeout comfortably above that to avoid false startup timeouts.
@@ -92,6 +89,7 @@ private:
   std::string actuator_offset_yaml_path_;
   const std::vector<plato_actuator::StaticConfig> actuator_static_configs_;
   std::vector<float> actuator_position_offsets_;
+  std::chrono::microseconds direct_tx_frame_timeout_{std::chrono::microseconds(2000)};
   size_t write_cycle_count_ = 0;
   SteadyClock::time_point last_rx_time_{};
   size_t rx_frame_count_ = 0;

@@ -41,6 +41,8 @@ public:
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
 
 private:
+  std::shared_ptr<CmdType> make_hold_command() const;
+
   /// @brief Publish controller state (called from update loop)
   void publish_state(const rclcpp::Time & time, const CmdType& command);
 

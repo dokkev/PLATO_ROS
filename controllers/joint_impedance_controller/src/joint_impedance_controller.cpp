@@ -27,7 +27,7 @@ void set_command_interface_value(
 double read_state_interface_value(
   const hardware_interface::LoanedStateInterface & state_interface)
 {
-  return state_interface.get_optional().value_or(std::numeric_limits<double>::quiet_NaN());
+  return state_interface.get_value();
 }
 
 bool command_is_finite(const CmdType & commands, size_t index)
@@ -39,6 +39,26 @@ bool command_is_finite(const CmdType & commands, size_t index)
          std::isfinite(commands.effort_ff[index]);
 }
 }  // namespace
+
+std::shared_ptr<CmdType> JointImpedanceController::make_hold_command() const
+{
+  auto command = std::make_shared<CmdType>();
+  const size_t num_joints = joint_names_.size();
+
+  command->position.resize(num_joints, 0.0);
+  command->velocity.resize(num_joints, 0.0);
+  command->stiffness.resize(num_joints, 0.0);
+  command->damping.resize(num_joints, 0.0);
+  command->effort_ff.resize(num_joints, 0.0);
+
+  for (size_t i = 0; i < num_joints; ++i) {
+    if (i < positions_.size() && std::isfinite(positions_[i])) {
+      command->position[i] = positions_[i];
+    }
+  }
+
+  return command;
+}
 
 JointImpedanceController::JointImpedanceController()
 : controller_interface::ControllerInterface()
@@ -136,6 +156,7 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   const auto num_joints = joint_names_.size();
+  read_state_interfaces();
 
   // Clear and reserve interface vectors (prevents reallocation)
   position_command_interfaces_.clear();
@@ -189,7 +210,7 @@ controller_interface::CallbackReturn JointImpedanceController::on_activate(
   }
 
   // Reset command buffer
-  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(make_hold_command());
   std::fill(position_errors_.begin(), position_errors_.end(), 0.0);
   std::fill(velocity_errors_.begin(), velocity_errors_.end(), 0.0);
   std::fill(feedback_efforts_.begin(), feedback_efforts_.end(), 0.0);

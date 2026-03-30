@@ -2,6 +2,7 @@
 #include "plato_hardware_interface/utils/plato_hand_config_loader.hpp"
 #include "plato_hardware_interface/utils/parameter_utils.hpp"
 
+#include <rclcpp/logging.hpp>
 #include <chrono>
 #include <exception>
 #include <limits>

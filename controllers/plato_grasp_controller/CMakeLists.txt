@@ -49,7 +49,14 @@ target_compile_features(plato_grasp_controller_node PUBLIC c_std_99 cxx_std_17)
 target_link_libraries(plato_grasp_controller_node plato_grasp_controller_core)
 ament_target_dependencies(plato_grasp_controller_node rclcpp)
 
-install(TARGETS plato_grasp_controller_node
+add_executable(joint_position_saver
+  src/joint_position_saver_main.cpp
+)
+target_compile_features(joint_position_saver PUBLIC c_std_99 cxx_std_17)
+target_link_libraries(joint_position_saver plato_grasp_controller_core)
+ament_target_dependencies(joint_position_saver rclcpp)
+
+install(TARGETS plato_grasp_controller_node joint_position_saver
   DESTINATION lib/${PROJECT_NAME}
 )
 

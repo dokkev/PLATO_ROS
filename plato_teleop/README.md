@@ -150,6 +150,18 @@ ros2 launch plato_teleop spacemouse_twist.launch.py
 ros2 launch plato_teleop spacemouse_state_machine.launch.py
 ```
 
+### Grasp Task Keyboard
+```bash
+# Launch keyboard teleop for grasp tasks
+ros2 launch plato_teleop grasp_task_keyboard.launch.py
+```
+
+Default bindings:
+- `0` publishes `idle` to `/plato2/plato_grasp_controller/task`
+- `1` publishes `dorsal_index_pinch` to `/plato2/plato_grasp_controller/task`
+- `h` prints help
+- `q` quits
+
 ### Running Both Simultaneously
 
 **Note:** Both `spacemouse_twist` and `spacemouse_state_machine` access the SpaceMouse hardware directly. You can run them simultaneously - each node will independently read the device:

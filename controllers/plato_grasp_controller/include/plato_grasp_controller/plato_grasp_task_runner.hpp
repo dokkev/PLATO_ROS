@@ -32,6 +32,7 @@ public:
   {
     ActionType type = ActionType::None;
     std::string pos_preset_name;
+    bool use_current_position = false;
     double impedance_level = 0.0;
     std::optional<GraspPlanConfig> grasp_plan;
   };

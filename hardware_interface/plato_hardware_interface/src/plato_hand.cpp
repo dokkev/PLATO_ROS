@@ -23,6 +23,8 @@ constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
+constexpr double kMaxServoCurrentCommandMilliamps =
+  static_cast<double>(std::numeric_limits<uint32_t>::max());
 
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -78,6 +80,31 @@ std::vector<float> extract_position_offsets(
     position_offsets.push_back(config.position_offset);
   }
   return position_offsets;
+}
+
+uint32_t clamp_servo_current_command(double servo_current_milliamps)
+{
+  const double clamped =
+    std::clamp(servo_current_milliamps, 0.0, kMaxServoCurrentCommandMilliamps);
+  return static_cast<uint32_t>(std::llround(clamped));
+}
+
+TPCANMsg make_servo_position_command(
+  plato_actuator::Actuator & actuator,
+  double actuator_position,
+  double servo_current_milliamps)
+{
+  const auto joint_position = static_cast<float>(actuator_position);
+  if (!std::isfinite(servo_current_milliamps)) {
+    return actuator.set_servo_hold(joint_position).frame;
+  }
+
+  const auto current_command = clamp_servo_current_command(servo_current_milliamps);
+  if (current_command == 0U) {
+    return actuator.set_servo_idle(joint_position).frame;
+  }
+
+  return actuator.set_servo_position(joint_position, current_command).frame;
 }
 }  // namespace
 
@@ -269,10 +296,14 @@ bool Hand::write_joint_commands()
       [](const auto & actuator) { return actuator.is_initialized(); });
 
     if ((write_cycle_count_ % kServoWriteDivisor) == 0) {
-      tx_frames[tx_count++] = actuators_[kThumbRollIndex].set_servo_hold(
-        static_cast<float>(actuator_cmd.position(kThumbRollIndex))).frame;
-      tx_frames[tx_count++] = actuators_[kThumbYawIndex].set_servo_hold(
-        static_cast<float>(actuator_cmd.position(kThumbYawIndex))).frame;
+      tx_frames[tx_count++] = make_servo_position_command(
+        actuators_[kThumbRollIndex],
+        actuator_cmd.position(kThumbRollIndex),
+        actuator_cmd.servo_current(kThumbRollIndex));
+      tx_frames[tx_count++] = make_servo_position_command(
+        actuators_[kThumbYawIndex],
+        actuator_cmd.position(kThumbYawIndex),
+        actuator_cmd.servo_current(kThumbYawIndex));
     }
 
     for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {

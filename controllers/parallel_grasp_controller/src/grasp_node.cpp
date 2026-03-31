@@ -43,7 +43,7 @@ const std::vector<std::string> kOrderedJointNames{
 class ParallelGraspNode : public rclcpp::Node {
 public:
   ParallelGraspNode()
-    : Node("parallel_grasp_node")
+    : Node("grasp_node")
   {
     is_exit_process_ = false;
     GetParameters();
@@ -187,7 +187,7 @@ private:
       std::bind(&ParallelGraspNode::StartRelease, this, std::placeholders::_1, std::placeholders::_2));
 
     save_joint_position_server_ = this->create_service<plato_interfaces::srv::SaveJointPosition>(
-      "save_joint_position",
+      "~/save_joint_position",
       std::bind(
         &ParallelGraspNode::SaveJointPositionToYaml,
         this,

@@ -77,7 +77,7 @@ std::vector<hardware_interface::StateInterface> AristoHardware::export_state_int
 std::vector<hardware_interface::CommandInterface> AristoHardware::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-  command_interfaces.reserve(info_.joints.size() * 5);
+  command_interfaces.reserve(info_.joints.size() * 6);
   auto & joint_commands = hand_->joint_commands();
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
@@ -90,6 +90,8 @@ std::vector<hardware_interface::CommandInterface> AristoHardware::export_command
       joint_name, hardware_interface::HW_IF_EFFORT, &joint_commands.effort_at(i));
     command_interfaces.emplace_back(joint_name, "stiffness", &joint_commands.stiffness_at(i));
     command_interfaces.emplace_back(joint_name, "damping", &joint_commands.damping_at(i));
+    command_interfaces.emplace_back(
+      joint_name, "servo_current_milliamps", &joint_commands.servo_current_at(i));
   }
 
   return command_interfaces;

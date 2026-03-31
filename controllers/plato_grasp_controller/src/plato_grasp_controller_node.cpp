@@ -119,7 +119,7 @@ PlatoGraspControllerNode::PlatoGraspControllerNode(const rclcpp::NodeOptions & o
 
   save_joint_position_srv_ =
     this->create_service<plato_interfaces::srv::SaveJointPosition>(
-    "save_joint_position",
+    "~/save_joint_position",
     std::bind(
       &PlatoGraspControllerNode::handle_save_joint_position,
       this,
@@ -170,7 +170,7 @@ void PlatoGraspControllerNode::handle_motion_state_command(
 
   task_runner_->cancel_task();
   std::string error;
-  if (!publish_motion_plan(pos_preset_name, manual_motion_impedance_level_, &error)) {
+  if (!publish_motion_plan(pos_preset_name, false, manual_motion_impedance_level_, &error)) {
     RCLCPP_ERROR(
       this->get_logger(),
       "Failed to apply motion target '%s': %s",
@@ -213,6 +213,7 @@ void PlatoGraspControllerNode::handle_task_command(
   if (action.type == PlatoGraspTaskRunner::ActionType::PublishMotionPlan) {
     if (!publish_motion_plan(
         action.pos_preset_name,
+        action.use_current_position,
         action.impedance_level,
         &error))
     {
@@ -259,6 +260,7 @@ void PlatoGraspControllerNode::handle_task_update()
     case PlatoGraspTaskRunner::ActionType::PublishMotionHold:
       if (!publish_motion_plan(
           action.pos_preset_name,
+          action.use_current_position,
           action.impedance_level,
           &error))
       {
@@ -332,11 +334,16 @@ void PlatoGraspControllerNode::handle_save_joint_position(
 
 bool PlatoGraspControllerNode::publish_motion_plan(
   const std::string & pos_preset_name,
+  bool use_current_position,
   double impedance_level,
   std::string * error_out)
 {
   PlatoGraspPlannedCommand planned_command;
-  if (!planner_->make_motion_command(pos_preset_name, &planned_command, error_out)) {
+  if (use_current_position) {
+    if (!planner_->make_current_motion_command(&planned_command, error_out)) {
+      return false;
+    }
+  } else if (!planner_->make_motion_command(pos_preset_name, &planned_command, error_out)) {
     return false;
   }
 

@@ -110,7 +110,37 @@ bool PlatoGraspPlanner::make_motion_command(
   command_out->effort_ff.assign(command_out->position.size(), 0.0);
 
   active_target_positions_ = std::move(ordered_positions);
+  has_active_target_ = true;
   active_pos_preset_name_ = pos_preset_name;
+  phase_ = Phase::Motion;
+  return true;
+}
+
+bool PlatoGraspPlanner::make_current_motion_command(
+  PlatoGraspPlannedCommand * command_out,
+  std::string * error_out)
+{
+  if (command_out == nullptr) {
+    if (error_out != nullptr) {
+      *error_out = "Motion command output pointer is null.";
+    }
+    return false;
+  }
+
+  if (!has_joint_state_) {
+    if (error_out != nullptr) {
+      *error_out = "Current joint positions have not been received yet.";
+    }
+    return false;
+  }
+
+  command_out->position = last_positions_;
+  command_out->velocity.assign(command_out->position.size(), 0.0);
+  command_out->effort_ff.assign(command_out->position.size(), 0.0);
+
+  active_target_positions_ = last_positions_;
+  has_active_target_ = true;
+  active_pos_preset_name_.clear();
   phase_ = Phase::Motion;
   return true;
 }
@@ -126,7 +156,7 @@ bool PlatoGraspPlanner::make_grasp_command(
     }
     return false;
   }
-  if (active_pos_preset_name_.empty()) {
+  if (!has_active_target_) {
     if (error_out != nullptr) {
       *error_out = "Cannot apply grasp plan before a motion target has been selected.";
     }

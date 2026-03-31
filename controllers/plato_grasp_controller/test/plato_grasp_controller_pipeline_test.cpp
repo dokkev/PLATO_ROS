@@ -142,7 +142,7 @@ protected:
         received_commands_.push_back(*msg);
       });
     save_client_ = test_node_->create_client<plato_interfaces::srv::SaveJointPosition>(
-      "/save_joint_position");
+      "/plato_grasp_controller_node/save_joint_position");
   }
 
   void TearDown() override
@@ -158,6 +158,12 @@ protected:
   {
     return
       R"(tasks:
+  idle:
+    use_current_position: true
+    impedance_level: 0.0
+    wait_sec: 0.0
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   pick:
     pos_preset_name: saved_contact
     impedance_level: 4.0
@@ -264,7 +270,8 @@ protected:
 
 TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
 {
-  ASSERT_TRUE(spin_until(
+  ASSERT_TRUE(
+    spin_until(
       [this]() {return save_client_->wait_for_service(0s);}, 2s));
 
   for (int i = 0; i < 5; ++i) {
@@ -275,10 +282,11 @@ TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
   auto request = std::make_shared<plato_interfaces::srv::SaveJointPosition::Request>();
   request->name = "saved_contact";
   auto future = save_client_->async_send_request(request);
-  ASSERT_TRUE(spin_until(
+  ASSERT_TRUE(
+    spin_until(
       [&future]() {
         return future.wait_for(0s) == std::future_status::ready;
-    }, 2s));
+      }, 2s));
 
   const auto response = future.get();
   ASSERT_TRUE(response->success) << response->message;
@@ -288,12 +296,13 @@ TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
   std::vector<std::string> saved_joint_names;
   std::vector<double> saved_positions;
   std::string error;
-  ASSERT_TRUE(plato::storage::load_joint_position_yaml(
-    saved_joint_positions_path_,
-    "saved_contact",
-    &saved_joint_names,
-    &saved_positions,
-    &error)) << error;
+  ASSERT_TRUE(
+    plato::storage::load_joint_position_yaml(
+      saved_joint_positions_path_,
+      "saved_contact",
+      &saved_joint_names,
+      &saved_positions,
+      &error)) << error;
   EXPECT_EQ(saved_positions, expected_positions());
 
   publish_string(motion_state_pub_, "saved_contact");
@@ -310,7 +319,8 @@ TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
 
   const auto baseline_count = command_count();
   publish_string(task_pub_, "pick");
-  ASSERT_TRUE(spin_until(
+  ASSERT_TRUE(
+    spin_until(
       [this, baseline_count]() {
         return command_count() >= baseline_count + 3;
       }, 3s));
@@ -331,6 +341,30 @@ TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
   EXPECT_EQ(task_hold_command.effort_ff, std::vector<double>(8, 0.0));
   expect_vectors_near(task_hold_command.stiffness, motion_command.stiffness);
   expect_vectors_near(task_hold_command.damping, motion_command.damping);
+}
+
+TEST_F(PlatoGraspControllerPipelineTest, IdleTaskHoldsCurrentPositionWithZeroImpedance)
+{
+  for (int i = 0; i < 5; ++i) {
+    publish_joint_state_sample();
+    spin_for(20ms);
+  }
+
+  publish_string(task_pub_, "idle");
+  ASSERT_TRUE(spin_until([this]() {return command_count() >= 2;}, 2s));
+
+  const auto idle_motion_command = command_at(0);
+  const auto idle_grasp_command = command_at(1);
+
+  EXPECT_EQ(idle_motion_command.position, expected_positions());
+  EXPECT_EQ(idle_motion_command.effort_ff, std::vector<double>(8, 0.0));
+  expect_vectors_near(idle_motion_command.stiffness, std::vector<double>(8, 0.0));
+  expect_vectors_near(idle_motion_command.damping, std::vector<double>(8, 0.0));
+
+  EXPECT_EQ(idle_grasp_command.position, expected_positions());
+  EXPECT_EQ(idle_grasp_command.effort_ff, std::vector<double>(8, 0.0));
+  expect_vectors_near(idle_grasp_command.stiffness, std::vector<double>(8, 0.0));
+  expect_vectors_near(idle_grasp_command.damping, std::vector<double>(8, 0.0));
 }
 
 ::testing::Environment * const kRclcppEnvironment =

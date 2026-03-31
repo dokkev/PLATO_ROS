@@ -53,7 +53,7 @@ public:
       "/plato2/joint_impedance_trajectory_controller/commands", 10);
 
     save_joint_position_srv_ = this->create_service<plato_interfaces::srv::SaveJointPosition>(
-      "save_joint_position",
+      "~/save_joint_position",
       std::bind(
         &ParallelGraspNode::save_joint_position_callback,
         this,

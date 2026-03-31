@@ -26,7 +26,8 @@ public:
         velocity(command.velocity_data(), static_cast<Eigen::Index>(size_)),
         effort(command.effort_data(), static_cast<Eigen::Index>(size_)),
         stiffness(command.stiffness_data(), static_cast<Eigen::Index>(size_)),
-        damping(command.damping_data(), static_cast<Eigen::Index>(size_))
+        damping(command.damping_data(), static_cast<Eigen::Index>(size_)),
+        servo_current(command.servo_current_data(), static_cast<Eigen::Index>(size_))
       {
         command.validate_sizes();
       }
@@ -52,6 +53,7 @@ public:
       Eigen::Map<const Eigen::ArrayXd> effort;
       Eigen::Map<const Eigen::ArrayXd> stiffness;
       Eigen::Map<const Eigen::ArrayXd> damping;
+      Eigen::Map<const Eigen::ArrayXd> servo_current;
     };
 
     struct PreviousConstView
@@ -97,6 +99,7 @@ public:
       effort_.assign(size, value);
       stiffness_.assign(size, value);
       damping_.assign(size, value);
+      servo_current_.assign(size, kInvalidValue);
       invalidate_previous(size);
     }
 
@@ -108,6 +111,7 @@ public:
       std::fill(effort_.begin(), effort_.end(), value);
       std::fill(stiffness_.begin(), stiffness_.end(), value);
       std::fill(damping_.begin(), damping_.end(), value);
+      std::fill(servo_current_.begin(), servo_current_.end(), kInvalidValue);
       invalidate_previous();
     }
 
@@ -141,7 +145,8 @@ public:
       return position_.size() == velocity_.size() &&
              position_.size() == effort_.size() &&
              position_.size() == stiffness_.size() &&
-             position_.size() == damping_.size();
+             position_.size() == damping_.size() &&
+             position_.size() == servo_current_.size();
     }
 
     bool previous_sizes_consistent() const
@@ -195,6 +200,8 @@ public:
     const double & stiffness_at(size_t index) const { return stiffness_.at(index); }
     double & damping_at(size_t index) { return damping_.at(index); }
     const double & damping_at(size_t index) const { return damping_.at(index); }
+    double & servo_current_at(size_t index) { return servo_current_.at(index); }
+    const double & servo_current_at(size_t index) const { return servo_current_.at(index); }
 
     double * position_data() { return position_.data(); }
     const double * position_data() const { return position_.data(); }
@@ -206,6 +213,8 @@ public:
     const double * stiffness_data() const { return stiffness_.data(); }
     double * damping_data() { return damping_.data(); }
     const double * damping_data() const { return damping_.data(); }
+    double * servo_current_data() { return servo_current_.data(); }
+    const double * servo_current_data() const { return servo_current_.data(); }
 
     const double * previous_position_data() const { return previous_position_.data(); }
     const double * previous_velocity_data() const { return previous_velocity_.data(); }
@@ -217,6 +226,7 @@ public:
     std::vector<double> effort_;
     std::vector<double> stiffness_;
     std::vector<double> damping_;
+    std::vector<double> servo_current_;
     std::vector<double> previous_position_;
     std::vector<double> previous_velocity_;
     std::vector<double> previous_effort_;

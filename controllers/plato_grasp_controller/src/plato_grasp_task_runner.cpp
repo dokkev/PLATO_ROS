@@ -40,6 +40,7 @@ bool PlatoGraspTaskRunner::start_task(
 
   action_out->type = ActionType::PublishMotionPlan;
   action_out->pos_preset_name = active_task_config_.pos_preset_name;
+  action_out->use_current_position = active_task_config_.use_current_position;
   action_out->impedance_level = active_task_config_.impedance_level;
   action_out->grasp_plan.reset();
   return true;
@@ -83,6 +84,7 @@ bool PlatoGraspTaskRunner::update(
       state_elapsed_sec_ = 0.0;
       action_out->type = ActionType::PublishGraspPlan;
       action_out->pos_preset_name = active_task_config_.pos_preset_name;
+      action_out->use_current_position = active_task_config_.use_current_position;
       action_out->impedance_level = active_task_config_.impedance_level;
       action_out->grasp_plan = active_task_config_.grasp_plan;
       return true;
@@ -95,6 +97,7 @@ bool PlatoGraspTaskRunner::update(
       }
       action_out->type = ActionType::PublishMotionHold;
       action_out->pos_preset_name = active_task_config_.pos_preset_name;
+      action_out->use_current_position = active_task_config_.use_current_position;
       action_out->impedance_level = active_task_config_.impedance_level;
       action_out->grasp_plan.reset();
       cancel_task();

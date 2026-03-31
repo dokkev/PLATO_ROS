@@ -33,6 +33,7 @@ private:
     std::shared_ptr<plato_interfaces::srv::SaveJointPosition::Response> response);
   bool publish_motion_plan(
     const std::string & pos_preset_name,
+    bool use_current_position,
     double impedance_level,
     std::string * error_out);
   bool publish_grasp(

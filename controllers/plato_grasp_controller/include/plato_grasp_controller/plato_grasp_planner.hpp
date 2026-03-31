@@ -16,6 +16,7 @@ struct GraspPlanConfig
 struct GraspTaskConfig
 {
   std::string pos_preset_name;
+  bool use_current_position = false;
   double impedance_level = 0.0;
   double wait_sec = 0.0;
   GraspPlanConfig grasp_plan;
@@ -57,6 +58,10 @@ public:
     PlatoGraspPlannedCommand * command_out,
     std::string * error_out);
 
+  bool make_current_motion_command(
+    PlatoGraspPlannedCommand * command_out,
+    std::string * error_out);
+
   bool make_grasp_command(
     const GraspPlanConfig & grasp_plan,
     PlatoGraspPlannedCommand * command_out,
@@ -73,6 +78,7 @@ private:
   std::vector<double> last_positions_;
   std::vector<double> active_target_positions_;
   bool has_joint_state_ = false;
+  bool has_active_target_ = false;
   Phase phase_ = Phase::Idle;
   std::string active_pos_preset_name_;
 };

@@ -66,8 +66,8 @@ std::vector<double> parse_effort_directions(
   }
   if (node.size() != expected_size) {
     throw std::runtime_error(
-      "grasp_force.effort_direction must contain exactly " +
-      std::to_string(expected_size) + " values.");
+            "grasp_force.effort_direction must contain exactly " +
+            std::to_string(expected_size) + " values.");
   }
 
   std::vector<double> directions;
@@ -76,7 +76,7 @@ std::vector<double> parse_effort_directions(
     const auto direction = item.as<double>();
     if (!std::isfinite(direction) || std::abs(direction) < 1e-9) {
       throw std::runtime_error(
-        "grasp_force.effort_direction values must be finite and non-zero.");
+              "grasp_force.effort_direction values must be finite and non-zero.");
     }
     directions.push_back(direction);
   }
@@ -100,8 +100,8 @@ std::vector<double> parse_effort_vector_exact(
 
   if (static_cast<int>(effort_ff.size()) != joint_count) {
     throw std::runtime_error(
-      "grasp_force.effort_ff must contain exactly " +
-      std::to_string(joint_count) + " values.");
+            "grasp_force.effort_ff must contain exactly " +
+            std::to_string(joint_count) + " values.");
   }
 
   return effort_ff;
@@ -117,7 +117,7 @@ std::vector<double> parse_legacy_effort_vector(
   const auto effort_scalar_node = grasp_force_node["effort_ff"];
   if (!effort_scalar_node || effort_scalar_node.IsSequence()) {
     throw std::runtime_error(
-      "Legacy grasp_force requires scalar effort_ff with joint_names.");
+            "Legacy grasp_force requires scalar effort_ff with joint_names.");
   }
 
   const auto effort_scalar = effort_scalar_node.as<double>();
@@ -230,10 +230,17 @@ bool load_task_configs(
 
     try {
       GraspTaskConfig task;
+      const auto use_current_position_node = task_node["use_current_position"];
+      if (use_current_position_node) {
+        task.use_current_position = use_current_position_node.as<bool>();
+      }
+
       const auto pos_preset_name_node = task_node["pos_preset_name"] ?
         task_node["pos_preset_name"] : task_node["motion_plan_name"];
-      task.pos_preset_name = trim_copy(pos_preset_name_node.as<std::string>());
-      if (task.pos_preset_name.empty()) {
+      if (pos_preset_name_node) {
+        task.pos_preset_name = trim_copy(pos_preset_name_node.as<std::string>());
+      }
+      if (!task.use_current_position && task.pos_preset_name.empty()) {
         throw std::runtime_error("pos_preset_name is empty.");
       }
       task.impedance_level = parse_impedance_level(task_node);

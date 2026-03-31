@@ -2,7 +2,7 @@ actuators:
   - name: thumb_roll
     tx_id: 0x11
     rx_id: 0x21
-    servo_current_milliamps: 300
+    servo_current_milliamps: 0
     soft_stop_enabled: true
     direction: 1
     torque_constant: 1.17
@@ -14,7 +14,7 @@ actuators:
   - name: thumb_yaw
     tx_id: 0x12
     rx_id: 0x22
-    servo_current_milliamps: 300
+    servo_current_milliamps: 0
     soft_stop_enabled: true
     direction: 1
     torque_constant: 1.17

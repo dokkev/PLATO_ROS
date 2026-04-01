@@ -1,1 +1,6 @@
-{dorsal_index_pinch: {joint_names: [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8], position: [1.1869611740112305, -0.10166358947753906, -0.0400543212890625, -0.16447710990905762, 0.40321922302246094, 1.0339295864105225, 0.64545631408691406, 1.892879843711853]}, saved_contact: {joint_names: [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8], position: [1.1869611740112305, -0.10166358947753906, -0.0400543212890625, -0.16371464729309082, 0.40321922302246094, 1.0339295864105225, 0.64545631408691406, 1.892879843711853]}}
+lateral_pinch:
+  joint_names: [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8]
+  position: [1.187, -0.102, -0.04, -0.164, 0.403, 1.034, 0.645, 1.893]
+index_pinch:
+  joint_names: [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8]
+  position: [0.00, 0.00, 0.193, -0.265, 0.251, 0.811, 0.884, 1.154]

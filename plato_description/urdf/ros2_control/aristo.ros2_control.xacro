@@ -24,7 +24,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -37,7 +36,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -50,7 +48,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -63,7 +60,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -77,7 +73,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -90,7 +85,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -103,7 +97,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -116,7 +109,6 @@
                 <command_interface name="effort"/>
                 <command_interface name="stiffness"/>
                 <command_interface name="damping"/>
-                <command_interface name="servo_current_milliamps"/>
 
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>

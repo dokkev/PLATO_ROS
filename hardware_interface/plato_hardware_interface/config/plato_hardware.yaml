@@ -1,1 +1,2 @@
 direct_tx_inter_frame_gap_us: 220
+servo_stiffness_scale: 50

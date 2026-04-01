@@ -72,10 +72,11 @@ PlatoGraspControllerNode::PlatoGraspControllerNode(const rclcpp::NodeOptions & o
       plato::storage::default_joint_position_yaml_path("plato_grasp_controller"))),
   plan_config_yaml_path_(this->declare_parameter<std::string>(
       "plan_config_yaml_path",
-      plato::yaml::package_share_file_path("plato_grasp_controller", "config/grasp_plans.yaml"))),
+      plato::yaml::package_source_or_share_file_path(
+        "plato_grasp_controller", "config/grasp_plans.yaml"))),
   impedance_preset_yaml_path_(this->declare_parameter<std::string>(
       "impedance_preset_yaml_path",
-      plato::yaml::package_share_file_path(
+      plato::yaml::package_source_or_share_file_path(
         "joint_impedance_controller",
         "config/impedance_preset.yaml"))),
   manual_motion_impedance_level_(

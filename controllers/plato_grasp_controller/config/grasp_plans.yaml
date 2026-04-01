@@ -6,10 +6,37 @@ tasks:
     grasp_plan:
       effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-  dorsal_index_pinch:
-    pos_preset_name: dorsal_index_pinch
+  lateral_pinch_ready:
+    pos_preset_name: lateral_pinch
+    impedance_level: 5.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      grasp_duration_sec: 1.0
+
+
+  lateral_pinch:
+    pos_preset_name: lateral_pinch
     impedance_level: 10.0
     wait_sec: 0.5
     grasp_plan:
       effort_ff: [0.0, 0.0, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0]
+      grasp_duration_sec: 1.0
+
+
+  index_pinch_ready:
+    pos_preset_name: index_pinch
+    impedance_level: 10.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      grasp_duration_sec: 0.0
+
+
+  index_pinch:
+    pos_preset_name: index_pinch
+    impedance_level: 10.0
+    wait_sec: 0.5
+    grasp_plan:
+      effort_ff: [0.0, 0.0, -0.8, -0.8, 0.8, 0.8, 0.0, 0.0]
       grasp_duration_sec: 1.0

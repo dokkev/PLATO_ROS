@@ -148,7 +148,6 @@ void Transmission::joint_to_actuator(
   JointArray actuator_efforts = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
   JointArray actuator_stiffness = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
   JointArray actuator_damping = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-  JointArray actuator_servo_current = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
 
   for (size_t i = 0; i < kNumActuators; ++i) {
     const Eigen::Index index = static_cast<Eigen::Index>(i);
@@ -178,10 +177,6 @@ void Transmission::joint_to_actuator(
       actuator_damping(index) =
         static_cast<float>(joint_command_view.damping(index)) / torque_ratio;
     }
-
-    actuator_servo_current(index) =
-      static_cast<float>(joint_command_view.servo_current(index));
-
   }
 
   for (size_t i = 0; i < kNumActuators; ++i) {
@@ -191,7 +186,6 @@ void Transmission::joint_to_actuator(
     actuator_command.effort_at(i) = static_cast<double>(actuator_efforts(index));
     actuator_command.stiffness_at(i) = static_cast<double>(actuator_stiffness(index));
     actuator_command.damping_at(i) = static_cast<double>(actuator_damping(index));
-    actuator_command.servo_current_at(i) = static_cast<double>(actuator_servo_current(index));
   }
 }
 

@@ -4,6 +4,7 @@
 
 #include <rclcpp/logging.hpp>
 #include <chrono>
+#include <cmath>
 #include <exception>
 #include <limits>
 #include <optional>
@@ -37,6 +38,27 @@ std::chrono::microseconds parse_nonnegative_microseconds_parameter(
   }
 
   return std::chrono::microseconds(parsed);
+}
+
+double parse_nonnegative_double_parameter(
+  const std::string & value, const char * parameter_name)
+{
+  double parsed = 0.0;
+  try {
+    parsed = std::stod(value);
+  } catch (const std::exception &) {
+    throw std::invalid_argument(
+            std::string("Hardware parameter '") + parameter_name +
+            "' must be a non-negative number");
+  }
+
+  if (!std::isfinite(parsed) || parsed < 0.0) {
+    throw std::invalid_argument(
+            std::string("Hardware parameter '") + parameter_name +
+            "' must be a finite value >= 0");
+  }
+
+  return parsed;
 }
 
 }  // namespace
@@ -93,6 +115,21 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
     }
   }
 
+  std::optional<double> servo_stiffness_scale_override;
+  const auto servo_stiffness_scale_it = info_.hardware_parameters.find("servo_stiffness_scale");
+  if (servo_stiffness_scale_it != info_.hardware_parameters.end()) {
+    try {
+      servo_stiffness_scale_override = parse_nonnegative_double_parameter(
+        servo_stiffness_scale_it->second, "servo_stiffness_scale");
+    } catch (const std::exception & e) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("PlatoHardware"),
+        "Invalid Plato hardware parameter: %s",
+        e.what());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
+
   try {
     auto hand_config = plato_hand::load_default_plato_hand_config();
     if (!actuator_offset_yaml_path_override.empty()) {
@@ -100,6 +137,9 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
     }
     if (direct_tx_inter_frame_gap_override.has_value()) {
       hand_config.direct_tx_inter_frame_gap = *direct_tx_inter_frame_gap_override;
+    }
+    if (servo_stiffness_scale_override.has_value()) {
+      hand_config.servo_stiffness_scale = *servo_stiffness_scale_override;
     }
 
     // Hand constructor validates the actuator config count and initializes all RobotIO buffers.
@@ -143,7 +183,7 @@ std::vector<hardware_interface::StateInterface> PlatoHardware::export_state_inte
 std::vector<hardware_interface::CommandInterface> PlatoHardware::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-  command_interfaces.reserve(info_.joints.size() * 6);
+  command_interfaces.reserve(info_.joints.size() * 5);
   auto & joint_commands = hand_->joint_commands();
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
@@ -156,8 +196,6 @@ std::vector<hardware_interface::CommandInterface> PlatoHardware::export_command_
       joint_name, hardware_interface::HW_IF_EFFORT, &joint_commands.effort_at(i));
     command_interfaces.emplace_back(joint_name, "stiffness", &joint_commands.stiffness_at(i));
     command_interfaces.emplace_back(joint_name, "damping", &joint_commands.damping_at(i));
-    command_interfaces.emplace_back(
-      joint_name, "servo_current_milliamps", &joint_commands.servo_current_at(i));
   }
 
   return command_interfaces;

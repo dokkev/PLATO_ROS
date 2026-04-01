@@ -25,6 +25,7 @@ constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
 constexpr double kMaxServoCurrentCommandMilliamps =
   static_cast<double>(std::numeric_limits<uint32_t>::max());
+constexpr double kMaxDerivedThumbServoCurrentMilliamps = 1000.0;
 
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -92,14 +93,23 @@ uint32_t clamp_servo_current_command(double servo_current_milliamps)
 TPCANMsg make_servo_position_command(
   plato_actuator::Actuator & actuator,
   double actuator_position,
-  double servo_current_milliamps)
+  double stiffness,
+  double servo_stiffness_scale)
 {
   const auto joint_position = static_cast<float>(actuator_position);
-  if (!std::isfinite(servo_current_milliamps)) {
+  double resolved_servo_current_milliamps = std::numeric_limits<double>::quiet_NaN();
+  if (std::isfinite(stiffness) && servo_stiffness_scale > 0.0) {
+    resolved_servo_current_milliamps = std::clamp(
+      std::abs(stiffness) * servo_stiffness_scale,
+      0.0,
+      kMaxDerivedThumbServoCurrentMilliamps);
+  }
+
+  if (!std::isfinite(resolved_servo_current_milliamps)) {
     return actuator.set_servo_hold(joint_position).frame;
   }
 
-  const auto current_command = clamp_servo_current_command(servo_current_milliamps);
+  const auto current_command = clamp_servo_current_command(resolved_servo_current_milliamps);
   if (current_command == 0U) {
     return actuator.set_servo_idle(joint_position).frame;
   }
@@ -118,7 +128,8 @@ Hand::Hand(PlatoHandConfig config)
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_static_configs_(extract_static_configs(config.actuator_configs)),
   actuator_position_offsets_(extract_position_offsets(config.actuator_configs)),
-  direct_tx_frame_timeout_(config.direct_tx_inter_frame_gap * 4)
+  direct_tx_frame_timeout_(config.direct_tx_inter_frame_gap * 4),
+  servo_stiffness_scale_(config.servo_stiffness_scale)
 {
   if (actuator_static_configs_.size() != kNumActuators) {
     throw std::invalid_argument(
@@ -299,11 +310,13 @@ bool Hand::write_joint_commands()
       tx_frames[tx_count++] = make_servo_position_command(
         actuators_[kThumbRollIndex],
         actuator_cmd.position(kThumbRollIndex),
-        actuator_cmd.servo_current(kThumbRollIndex));
+        actuator_cmd.stiffness(kThumbRollIndex),
+        servo_stiffness_scale_);
       tx_frames[tx_count++] = make_servo_position_command(
         actuators_[kThumbYawIndex],
         actuator_cmd.position(kThumbYawIndex),
-        actuator_cmd.servo_current(kThumbYawIndex));
+        actuator_cmd.stiffness(kThumbYawIndex),
+        servo_stiffness_scale_);
     }
 
     for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {

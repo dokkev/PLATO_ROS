@@ -90,6 +90,7 @@ private:
   const std::vector<plato_actuator::StaticConfig> actuator_static_configs_;
   std::vector<float> actuator_position_offsets_;
   std::chrono::microseconds direct_tx_frame_timeout_{std::chrono::microseconds(2000)};
+  double servo_stiffness_scale_ = 0.0;
   size_t write_cycle_count_ = 0;
   SteadyClock::time_point last_rx_time_{};
   size_t rx_frame_count_ = 0;

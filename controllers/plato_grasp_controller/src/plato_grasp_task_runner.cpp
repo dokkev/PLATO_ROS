@@ -90,6 +90,11 @@ bool PlatoGraspTaskRunner::update(
       return true;
     case State::Grasping:
       if (active_task_config_.grasp_duration_sec <= 0.0) {
+        action_out->type = ActionType::PublishGraspPlan;
+        action_out->pos_preset_name = active_task_config_.pos_preset_name;
+        action_out->use_current_position = active_task_config_.use_current_position;
+        action_out->impedance_level = active_task_config_.impedance_level;
+        action_out->grasp_plan = active_task_config_.grasp_plan;
         return true;
       }
       if (state_elapsed_sec_ < active_task_config_.grasp_duration_sec) {

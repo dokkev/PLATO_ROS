@@ -16,9 +16,18 @@ def generate_launch_description():
         executable='grasp_task_keyboard',
         name='grasp_task_keyboard',
         output='screen',
+        emulate_tty=True,
         parameters=[
             {'task_topic': LaunchConfiguration('task_topic')},
-            {'bindings': ['0:idle', '1:dorsal_index_pinch']},
+            {
+                'bindings': [
+                    '0:idle',
+                    '1:index_pinch_ready',
+                    '2:index_pinch',
+                    '3:lateral_pinch_ready',
+                    '4:lateral_pinch',
+                ]
+            },
         ],
     )
 

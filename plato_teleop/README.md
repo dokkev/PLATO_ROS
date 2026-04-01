@@ -158,7 +158,10 @@ ros2 launch plato_teleop grasp_task_keyboard.launch.py
 
 Default bindings:
 - `0` publishes `idle` to `/plato2/plato_grasp_controller/task`
-- `1` publishes `dorsal_index_pinch` to `/plato2/plato_grasp_controller/task`
+- `1` publishes `index_pinch_ready` to `/plato2/plato_grasp_controller/task`
+- `2` publishes `index_pinch` to `/plato2/plato_grasp_controller/task`
+- `3` publishes `lateral_pinch_ready` to `/plato2/plato_grasp_controller/task`
+- `4` publishes `lateral_pinch` to `/plato2/plato_grasp_controller/task`
 - `h` prints help
 - `q` quits
 

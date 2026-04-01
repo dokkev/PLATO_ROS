@@ -326,7 +326,13 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerKeepsGraspActiveWhenDurationIsZero)
   EXPECT_TRUE(action.grasp_plan.has_value());
 
   ASSERT_TRUE(runner.update(10.0, &action, &error)) << error;
-  EXPECT_EQ(action.type, plato_grasp_controller::PlatoGraspTaskRunner::ActionType::None);
+  EXPECT_EQ(
+    action.type,
+    plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
+  EXPECT_TRUE(action.grasp_plan.has_value());
+  EXPECT_EQ(
+    action.grasp_plan->grasp_force_effort_ff,
+    std::vector<double>({0.0, 0.0, 0.2, 0.2, 0.0, 0.0, 0.0, 0.0}));
   EXPECT_TRUE(runner.is_active());
   EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Grasping);
 }

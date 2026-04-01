@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import termios
 import threading
@@ -14,6 +15,7 @@ class GraspTaskKeyboard(Node):
         super().__init__('grasp_task_keyboard')
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._input_stream = None
 
         self._task_topic = self.declare_parameter(
             'task_topic',
@@ -21,7 +23,13 @@ class GraspTaskKeyboard(Node):
         ).value
         binding_specs = self.declare_parameter(
             'bindings',
-            ['0:idle', '1:dorsal_index_pinch'],
+            [
+                '0:idle',
+                '1:index_pinch_ready',
+                '2:index_pinch',
+                '3:lateral_pinch_ready',
+                '4:lateral_pinch',
+            ],
         ).value
 
         self._bindings = self._parse_bindings(binding_specs)
@@ -76,13 +84,31 @@ class GraspTaskKeyboard(Node):
             self._publisher.publish(message)
             self.get_logger().info(f"Triggered grasp task '{task_name}'")
 
+    def _resolve_input_stream(self):
+        if sys.stdin.isatty():
+            return sys.stdin
+
+        try:
+            self._input_stream = open('/dev/tty', 'r', encoding='utf-8', buffering=1)
+            return self._input_stream
+        except OSError as exc:
+            self.get_logger().error(
+                f"Keyboard teleop requires a TTY, but stdin is not interactive and /dev/tty "
+                f"could not be opened: {exc}"
+            )
+            return None
+
     def _key_loop(self):
-        fd = sys.stdin.fileno()
+        input_stream = self._resolve_input_stream()
+        if input_stream is None:
+            return
+
+        fd = input_stream.fileno()
         old_settings = termios.tcgetattr(fd)
         tty.setcbreak(fd)
         try:
             while rclpy.ok() and not self._stop.is_set():
-                ch = sys.stdin.read(1)
+                ch = input_stream.read(1)
                 if not ch:
                     continue
 
@@ -100,6 +126,9 @@ class GraspTaskKeyboard(Node):
 
     def destroy_node(self):
         self._stop.set()
+        if self._input_stream is not None:
+            self._input_stream.close()
+            self._input_stream = None
         return super().destroy_node()
 
 

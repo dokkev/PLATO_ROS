@@ -23,7 +23,11 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "use_trajectory",
             default_value="false",
-            description="If true, route grasp commands through the impedance trajectory controller. If false, publish directly to the joint impedance controller.",
+            description=(
+                "If true, route grasp commands through the impedance trajectory "
+                "controller. If false, publish directly to the joint "
+                "impedance controller."
+            ),
         ),
         DeclareLaunchArgument(
             "joint_state_topic",

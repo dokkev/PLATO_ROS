@@ -178,6 +178,13 @@ protected:
     grasp_plan:
       effort_ff: [0.0, 0.0, 0.15, 0.2, 0.25, 0.3, 0.0, 0.0]
       grasp_duration_sec: 0.05
+  hold_pick:
+    pos_preset_name: saved_contact
+    impedance_level: 4.0
+    wait_sec: 0.02
+    grasp_plan:
+      effort_ff: [0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0]
+      grasp_duration_sec: 0.0
 )";
   }
 
@@ -414,6 +421,49 @@ TEST_F(PlatoGraspControllerPipelineTest, FractionalImpedanceLevelInterpolatesPub
     motion_command.damping,
     std::vector<double>({0.0875, 0.0875, 0.13125, 0.13125, 0.13125, 0.13125, 0.04375, 0.04375}),
     1e-9);
+}
+
+TEST_F(PlatoGraspControllerPipelineTest, ZeroDurationGraspKeepsRepublishingEffortFeedforward)
+{
+  ASSERT_TRUE(
+    spin_until(
+      [this]() {return save_client_->wait_for_service(0s);}, 2s));
+
+  for (int i = 0; i < 5; ++i) {
+    publish_joint_state_sample();
+    spin_for(20ms);
+  }
+
+  auto request = std::make_shared<plato_interfaces::srv::SaveJointPosition::Request>();
+  request->name = "saved_contact";
+  auto future = save_client_->async_send_request(request);
+  ASSERT_TRUE(
+    spin_until(
+      [&future]() {
+        return future.wait_for(0s) == std::future_status::ready;
+      }, 2s));
+  ASSERT_TRUE(future.get()->success);
+
+  const auto baseline_count = command_count();
+  publish_string(task_pub_, "hold_pick");
+  ASSERT_TRUE(
+    spin_until(
+      [this, baseline_count]() {
+        return command_count() >= baseline_count + 4;
+      }, 3s));
+
+  const auto motion_command = command_at(baseline_count);
+  const auto first_grasp_command = command_at(baseline_count + 1);
+  const auto repeated_grasp_command = command_at(baseline_count + 2);
+
+  EXPECT_EQ(motion_command.effort_ff, std::vector<double>(8, 0.0));
+  EXPECT_EQ(
+    first_grasp_command.effort_ff,
+    std::vector<double>({0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0}));
+  EXPECT_EQ(repeated_grasp_command.position, expected_positions());
+  EXPECT_EQ(repeated_grasp_command.stiffness, first_grasp_command.stiffness);
+  EXPECT_EQ(repeated_grasp_command.damping, first_grasp_command.damping);
+  EXPECT_EQ(repeated_grasp_command.effort_ff, first_grasp_command.effort_ff);
 }
 
 ::testing::Environment * const kRclcppEnvironment =

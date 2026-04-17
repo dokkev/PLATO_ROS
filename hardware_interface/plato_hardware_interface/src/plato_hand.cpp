@@ -25,7 +25,7 @@ constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
 constexpr double kMaxServoCurrentCommandMilliamps =
   static_cast<double>(std::numeric_limits<uint32_t>::max());
-constexpr double kMaxDerivedThumbServoCurrentMilliamps = 1000.0;
+constexpr double kMaxDerivedThumbServoCurrentMilliamps = 2000.0;
 
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -41,6 +41,31 @@ static_assert(
 static_assert(
   Hand::kNumActuators == FiveBarLinkage::Transmission::kNumActuators,
   "Plato hand actuator dimension must match five-bar transmission");
+
+bool is_thumb_servo_index(size_t index)
+{
+  return index == 0 || index == 1;
+}
+
+bool tolerate_thumb_lifecycle_result(
+  const can_hardware_common::CanCommandScheduler::TransactionResult & result,
+  bool enabling)
+{
+  if (result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kConfirmed) {
+    return true;
+  }
+  if (result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kTimeout) {
+    return true;
+  }
+  if (
+    enabling &&
+    result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kRejected &&
+    result.result_byte == ResultByte::FAILURE)
+  {
+    return true;
+  }
+  return false;
+}
 
 FiveBarLinkage::Transmission::JointArray build_joint_effort_limits(
   const std::vector<plato_actuator::Config> & actuator_configs)
@@ -230,6 +255,18 @@ bool Hand::enable(bool automatic_zeroing)
     const auto req = actuators_[i].make_enable_request(static_cast<uint32_t>(i));
     const auto res = scheduler_.execute_blocking(
       req, kResponseTimeout, kLifecycleCommandRetries);
+    if (is_thumb_servo_index(i) && tolerate_thumb_lifecycle_result(res, true)) {
+      actuators_[i].set_motor_enabled(true);
+      if (res.status != TransactionResult::Status::kConfirmed) {
+        RCLCPP_WARN(
+          logger(),
+          "Enable thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
+          i + 1,
+          TransactionResult::status_label(res.status),
+          res.result_byte);
+      }
+      continue;
+    }
     if (res.status != TransactionResult::Status::kConfirmed) {
       RCLCPP_ERROR(logger(), "Enable actuator %zu: %s",
         i + 1, TransactionResult::status_label(res.status));
@@ -252,6 +289,18 @@ bool Hand::disable()
     const auto req = actuators_[i].make_disable_request(static_cast<uint32_t>(i));
     const auto res = scheduler_.execute_blocking(
       req, kResponseTimeout, kLifecycleCommandRetries);
+    if (is_thumb_servo_index(i) && tolerate_thumb_lifecycle_result(res, false)) {
+      actuators_[i].set_motor_enabled(false);
+      if (res.status != TransactionResult::Status::kConfirmed) {
+        RCLCPP_WARN(
+          logger(),
+          "Disable thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
+          i + 1,
+          TransactionResult::status_label(res.status),
+          res.result_byte);
+      }
+      continue;
+    }
     if (res.status != TransactionResult::Status::kConfirmed) {
       RCLCPP_ERROR(logger(), "Disable actuator %zu: %s",
         i + 1, TransactionResult::status_label(res.status));
@@ -648,8 +697,8 @@ bool Hand::zero_actuators_()
 
 void Hand::update_joint_states_locked_()
 {
-  bool all_required_feedback_ready = true;
-  std::string missing_feedback_ids;
+  bool used_fallback_feedback = false;
+  std::string fallback_feedback_ids;
   for (size_t i = 0; i < kNumActuators; ++i) {
     if (!actuators_[i].is_initialized()) {
       if (i == kThumbRollIndex || i == kThumbYawIndex) {
@@ -660,11 +709,25 @@ void Hand::update_joint_states_locked_()
         actuator_states_.effort_at(i) = 0.0;
         continue;
       }
-      all_required_feedback_ready = false;
-      if (!missing_feedback_ids.empty()) {
-        missing_feedback_ids += ", ";
+
+      const bool have_cached_feedback =
+        std::isfinite(actuator_states_.position_at(i)) &&
+        std::isfinite(actuator_states_.velocity_at(i)) &&
+        std::isfinite(actuator_states_.effort_at(i));
+      if (!have_cached_feedback) {
+        actuator_states_.position_at(i) = 0.0;
+        actuator_states_.velocity_at(i) = 0.0;
+        actuator_states_.effort_at(i) = 0.0;
       }
-      missing_feedback_ids += std::to_string(i + 1);
+
+      used_fallback_feedback = true;
+      if (!fallback_feedback_ids.empty()) {
+        fallback_feedback_ids += ", ";
+      }
+      fallback_feedback_ids += std::to_string(i + 1);
+      if (!have_cached_feedback) {
+        fallback_feedback_ids += "*";
+      }
       continue;
     }
     const auto & state = actuators_[i].get_state();
@@ -673,14 +736,13 @@ void Hand::update_joint_states_locked_()
     actuator_states_.effort_at(i) = state.torque;
   }
 
-  if (!all_required_feedback_ready) {
+  if (used_fallback_feedback) {
     RCLCPP_WARN_THROTTLE(
       logger(),
       throttle_clock(),
       1000,
-      "Skipping joint-state update: waiting for actuator feedback from [%s]",
-      missing_feedback_ids.c_str());
-    return;
+      "Joint-state update using fallback feedback for actuator(s) [%s] ('*' means zero fallback; others use cached state)",
+      fallback_feedback_ids.c_str());
   }
 
   can_hardware_common::RobotIO::JointState joint_state_candidate = joint_states_;

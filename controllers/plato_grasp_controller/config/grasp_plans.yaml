@@ -4,39 +4,29 @@ tasks:
     impedance_level: 0.0
     wait_sec: 0.0
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      grasp_duration_sec: 0.0
 
   lateral_pinch_ready:
     pos_preset_name: lateral_pinch
-    impedance_level: 10.0
-    wait_sec: 0.5
-    grasp_plan:
-      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-      grasp_duration_sec: 1.0
+    impedance_level: 3.0
 
 
   lateral_pinch:
     pos_preset_name: lateral_pinch
     impedance_level: 10.0
-    wait_sec: 0.5
     grasp_plan:
-      effort_ff: [0.0, 0.0, -2.0, -2.0, 0.0, 0.0, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, -0.2, -0.2, 0.0, 0.0, 0.0, 0.0]
       grasp_duration_sec: 30.0
 
 
   index_pinch_ready:
     pos_preset_name: index_pinch
-    impedance_level: 10.0
-    wait_sec: 0.5
-    grasp_plan:
-      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-      grasp_duration_sec: 0.0
+    impedance_level: 3.0
 
 
   index_pinch:
     pos_preset_name: index_pinch
     impedance_level: 10.0
-    wait_sec: 0.5
     grasp_plan:
-      effort_ff: [0.0, 0.0, -2.0, -2.0, 2.0, 2.0, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, -0.2, -0.2, 0.2, 0.2, 0.0, 0.0]
       grasp_duration_sec: 30.0

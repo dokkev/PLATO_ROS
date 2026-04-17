@@ -10,7 +10,7 @@ namespace plato_grasp_controller
 
 struct GraspPlanConfig
 {
-  std::vector<double> grasp_force_effort_ff;
+  std::vector<double> grasp_closure_offsets;
 };
 
 struct GraspTaskConfig
@@ -19,7 +19,7 @@ struct GraspTaskConfig
   bool use_current_position = false;
   double impedance_level = 0.0;
   double wait_sec = 0.0;
-  GraspPlanConfig grasp_plan;
+  std::optional<GraspPlanConfig> grasp_plan;
   double grasp_duration_sec = 0.0;
 };
 

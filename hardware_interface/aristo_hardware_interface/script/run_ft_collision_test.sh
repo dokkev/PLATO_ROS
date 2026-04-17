@@ -17,13 +17,13 @@ if [ -z "$ROS_DISTRO" ]; then
 fi
 
 # Default parameters
-VELOCITY=${1:-0.1}
-FORCE_THRESHOLD=${2:-2.0}
-TORQUE_THRESHOLD=${3:-0.1}
+VELOCITY=${1:-0.05}
+FORCE_THRESHOLD=${2:-0.6}
+TORQUE_THRESHOLD=${3:-0.02}
 AUTO_START=${4:-false}
 
 echo "Launch Parameters:"
-echo "  Joint 4 Velocity:    $VELOCITY rad/s"
+echo "  Joint 5 Velocity:    $VELOCITY rad/s"
 echo "  Force Threshold:     $FORCE_THRESHOLD N"
 echo "  Torque Threshold:    $TORQUE_THRESHOLD Nm"
 echo "  Auto Start:          $AUTO_START"
@@ -34,9 +34,10 @@ echo ""
 echo "Starting in 3 seconds... (Ctrl+C to cancel)"
 sleep 3
 
-# Launch the node
-ros2 launch aristo_hardware_interface ft_collision_test.launch.py \
-    joint4_velocity:=$VELOCITY \
-    force_threshold:=$FORCE_THRESHOLD \
-    torque_threshold:=$TORQUE_THRESHOLD \
-    auto_start:=$AUTO_START
+# Run the node directly
+ros2 run aristo_hardware_interface ft_collision_test_node \
+    --ros-args \
+    -p joint5_velocity:=$VELOCITY \
+    -p force_threshold:=$FORCE_THRESHOLD \
+    -p torque_threshold:=$TORQUE_THRESHOLD \
+    -p auto_start:=$AUTO_START

@@ -286,7 +286,7 @@ void PlatoGraspControllerNode::handle_task_update()
           RCLCPP_ERROR(this->get_logger(), "Task update produced an empty grasp command.");
           return;
         }
-        if (!publish_grasp(*action.grasp_plan, &error)) {
+        if (!publish_grasp(*action.grasp_plan, action.impedance_level, &error)) {
           task_runner_->cancel_task();
           RCLCPP_ERROR(
             this->get_logger(),
@@ -363,10 +363,15 @@ bool PlatoGraspControllerNode::publish_motion_plan(
 
 bool PlatoGraspControllerNode::publish_grasp(
   const GraspPlanConfig & grasp_plan,
+  double impedance_level,
   std::string * error_out)
 {
   PlatoGraspPlannedCommand planned_command;
   if (!planner_->make_grasp_command(grasp_plan, &planned_command, error_out)) {
+    return false;
+  }
+
+  if (!impedance_handler_->activate(impedance_level, error_out)) {
     return false;
   }
 

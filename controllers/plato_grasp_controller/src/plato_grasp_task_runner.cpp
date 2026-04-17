@@ -80,6 +80,10 @@ bool PlatoGraspTaskRunner::update(
       if (state_elapsed_sec_ < active_task_config_.wait_sec) {
         return true;
       }
+      if (!active_task_config_.grasp_plan.has_value()) {
+        cancel_task();
+        return true;
+      }
       state_ = State::Grasping;
       state_elapsed_sec_ = 0.0;
       action_out->type = ActionType::PublishGraspPlan;
@@ -100,11 +104,11 @@ bool PlatoGraspTaskRunner::update(
       if (state_elapsed_sec_ < active_task_config_.grasp_duration_sec) {
         return true;
       }
-      action_out->type = ActionType::PublishMotionHold;
+      action_out->type = ActionType::PublishGraspPlan;
       action_out->pos_preset_name = active_task_config_.pos_preset_name;
       action_out->use_current_position = active_task_config_.use_current_position;
       action_out->impedance_level = active_task_config_.impedance_level;
-      action_out->grasp_plan.reset();
+      action_out->grasp_plan = active_task_config_.grasp_plan;
       cancel_task();
       return true;
   }

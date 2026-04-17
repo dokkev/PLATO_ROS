@@ -38,6 +38,7 @@ private:
     std::string * error_out);
   bool publish_grasp(
     const GraspPlanConfig & grasp_plan,
+    double impedance_level,
     std::string * error_out);
 
   int joint_count_;

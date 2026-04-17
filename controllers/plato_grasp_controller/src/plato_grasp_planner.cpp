@@ -164,8 +164,12 @@ bool PlatoGraspPlanner::make_grasp_command(
   }
 
   command_out->position = active_target_positions_;
+  const auto closure_offset = parsing::make_grasp_closure_offset_vector(grasp_plan, joint_count_);
+  for (size_t i = 0; i < command_out->position.size() && i < closure_offset.size(); ++i) {
+    command_out->position[i] += closure_offset[i];
+  }
   command_out->velocity.assign(command_out->position.size(), 0.0);
-  command_out->effort_ff = parsing::make_effort_ff_vector(grasp_plan, joint_count_);
+  command_out->effort_ff.assign(command_out->position.size(), 0.0);
 
   phase_ = Phase::Grasp;
   return true;

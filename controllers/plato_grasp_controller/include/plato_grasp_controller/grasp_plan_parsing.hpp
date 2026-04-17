@@ -18,7 +18,7 @@ bool load_task_configs(
   std::unordered_map<std::string, GraspTaskConfig> * task_configs_out,
   std::string * error_out = nullptr);
 
-std::vector<double> make_effort_ff_vector(
+std::vector<double> make_grasp_closure_offset_vector(
   const GraspPlanConfig & grasp_plan,
   int joint_count);
 

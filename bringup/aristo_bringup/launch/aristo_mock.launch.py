@@ -24,7 +24,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "plato_ns", default_value="plato2",
-            description="Namespace for Plato2 hand."
+            description="Namespace for Aristo hand."
         ),
         DeclareLaunchArgument(
             "use_sim_time", default_value="false",
@@ -48,6 +48,7 @@ def generate_launch_description():
         "config",
         "plato2_joint_impedance_controller.yaml",
     ])
+    controller_manager_path = PathJoinSubstitution(["/", plato_ns, "controller_manager"])
 
     # --- Nodes ---
     control_node = Node(
@@ -83,7 +84,7 @@ def generate_launch_description():
         executable="spawner",
         arguments=[
             "plato2_joint_state_broadcaster",
-            "--controller-manager", "/plato2/controller_manager",
+            "--controller-manager", controller_manager_path,
         ],
         namespace=plato_ns,
         output="screen",
@@ -94,7 +95,7 @@ def generate_launch_description():
         executable="spawner",
         arguments=[
             "joint_impedance_controller",
-            "--controller-manager", "/plato2/controller_manager",
+            "--controller-manager", controller_manager_path,
         ],
         namespace=plato_ns,
         output="screen",

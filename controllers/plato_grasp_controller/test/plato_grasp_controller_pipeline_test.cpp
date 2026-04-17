@@ -163,27 +163,27 @@ protected:
     impedance_level: 0.0
     wait_sec: 0.0
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      grasp_duration_sec: 0.0
   pick:
     pos_preset_name: saved_contact
-    impedance_level: 4.0
+    impedance_level: 8.0
     wait_sec: 0.05
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, -0.1, -0.1, 0.1, 0.1, 0.0, 0.0]
       grasp_duration_sec: 0.05
   fractional_pick:
     pos_preset_name: saved_contact
-    impedance_level: 3.5
+    impedance_level: 7.5
     wait_sec: 0.05
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.15, 0.2, 0.25, 0.3, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, -0.1, -0.1, 0.1, 0.1, 0.0, 0.0]
       grasp_duration_sec: 0.05
   hold_pick:
     pos_preset_name: saved_contact
-    impedance_level: 4.0
+    impedance_level: 8.0
     wait_sec: 0.02
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, -0.1, -0.1, 0.1, 0.1, 0.0, 0.0]
       grasp_duration_sec: 0.0
 )";
   }
@@ -250,6 +250,11 @@ protected:
   std::vector<double> expected_positions() const
   {
     return {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8};
+  }
+
+  std::vector<double> expected_grasp_positions() const
+  {
+    return {0.1, 0.2, 0.2, 0.3, 0.6, 0.7, 0.7, 0.8};
   }
 
   void publish_string(
@@ -345,16 +350,26 @@ TEST_F(PlatoGraspControllerPipelineTest, RunsSaveMotionAndTaskPipeline)
 
   EXPECT_EQ(task_motion_command.position, expected_positions());
   EXPECT_EQ(task_motion_command.effort_ff, std::vector<double>(8, 0.0));
+  expect_vectors_near(
+    task_motion_command.stiffness,
+    std::vector<double>({2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 1.0, 1.0}));
+  expect_vectors_near(
+    task_motion_command.damping,
+    std::vector<double>({0.2, 0.2, 0.3, 0.3, 0.3, 0.3, 0.1, 0.1}));
 
-  EXPECT_EQ(
-    task_grasp_command.effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0}));
-  EXPECT_EQ(task_grasp_command.position, expected_positions());
+  EXPECT_EQ(task_grasp_command.effort_ff, std::vector<double>(8, 0.0));
+  expect_vectors_near(task_grasp_command.position, expected_grasp_positions());
+  expect_vectors_near(
+    task_grasp_command.stiffness,
+    std::vector<double>({2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 1.0, 1.0}));
+  expect_vectors_near(
+    task_grasp_command.damping,
+    std::vector<double>({0.2, 0.2, 0.3, 0.3, 0.3, 0.3, 0.1, 0.1}));
 
-  EXPECT_EQ(task_hold_command.position, expected_positions());
+  expect_vectors_near(task_hold_command.position, expected_grasp_positions());
   EXPECT_EQ(task_hold_command.effort_ff, std::vector<double>(8, 0.0));
-  expect_vectors_near(task_hold_command.stiffness, motion_command.stiffness);
-  expect_vectors_near(task_hold_command.damping, motion_command.damping);
+  expect_vectors_near(task_hold_command.stiffness, task_grasp_command.stiffness);
+  expect_vectors_near(task_hold_command.damping, task_grasp_command.damping);
 }
 
 TEST_F(PlatoGraspControllerPipelineTest, IdleTaskHoldsCurrentPositionWithZeroImpedance)
@@ -415,15 +430,15 @@ TEST_F(PlatoGraspControllerPipelineTest, FractionalImpedanceLevelInterpolatesPub
   EXPECT_EQ(motion_command.effort_ff, std::vector<double>(8, 0.0));
   expect_vectors_near(
     motion_command.stiffness,
-    std::vector<double>({0.875, 0.875, 1.3125, 1.3125, 1.3125, 1.3125, 0.4375, 0.4375}),
+    std::vector<double>({1.875, 1.875, 2.8125, 2.8125, 2.8125, 2.8125, 0.9375, 0.9375}),
     1e-9);
   expect_vectors_near(
     motion_command.damping,
-    std::vector<double>({0.0875, 0.0875, 0.13125, 0.13125, 0.13125, 0.13125, 0.04375, 0.04375}),
+    std::vector<double>({0.1875, 0.1875, 0.28125, 0.28125, 0.28125, 0.28125, 0.09375, 0.09375}),
     1e-9);
 }
 
-TEST_F(PlatoGraspControllerPipelineTest, ZeroDurationGraspKeepsRepublishingEffortFeedforward)
+TEST_F(PlatoGraspControllerPipelineTest, ZeroDurationGraspKeepsRepublishingHighImpedanceCommand)
 {
   ASSERT_TRUE(
     spin_until(
@@ -457,10 +472,14 @@ TEST_F(PlatoGraspControllerPipelineTest, ZeroDurationGraspKeepsRepublishingEffor
   const auto repeated_grasp_command = command_at(baseline_count + 2);
 
   EXPECT_EQ(motion_command.effort_ff, std::vector<double>(8, 0.0));
-  EXPECT_EQ(
-    first_grasp_command.effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.25, 0.3, 0.35, 0.0, 0.0}));
-  EXPECT_EQ(repeated_grasp_command.position, expected_positions());
+  EXPECT_EQ(first_grasp_command.effort_ff, std::vector<double>(8, 0.0));
+  expect_vectors_near(
+    first_grasp_command.stiffness,
+    std::vector<double>({2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 1.0, 1.0}));
+  expect_vectors_near(
+    first_grasp_command.damping,
+    std::vector<double>({0.2, 0.2, 0.3, 0.3, 0.3, 0.3, 0.1, 0.1}));
+  expect_vectors_near(repeated_grasp_command.position, expected_grasp_positions());
   EXPECT_EQ(repeated_grasp_command.stiffness, first_grasp_command.stiffness);
   EXPECT_EQ(repeated_grasp_command.damping, first_grasp_command.damping);
   EXPECT_EQ(repeated_grasp_command.effort_ff, first_grasp_command.effort_ff);

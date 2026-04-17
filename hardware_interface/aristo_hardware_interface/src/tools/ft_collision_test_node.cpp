@@ -30,6 +30,9 @@ public:
         this->declare_parameter<double>("control_rate", 100.0);    // Hz
         this->declare_parameter<bool>("auto_start", false);
         this->declare_parameter<std::string>("ft_topic", "/plato2/ft_sensor2/wrench");
+        this->declare_parameter<std::string>("joint_state_topic", "/plato2/joint_states_smoothed");
+        this->declare_parameter<std::string>(
+            "impedance_command_topic", "/plato2/joint_impedance_controller/commands");
                 this->declare_parameter<bool>("decouple_joint6", true); // cancel PIP effect to keep fingertip world-stationary
         this->declare_parameter<std::string>("force_component", "norm"); // norm|fx|fy|fz
         this->declare_parameter<std::string>("torque_component", "norm"); // norm|tx|ty|tz
@@ -45,6 +48,8 @@ public:
         double control_rate = this->get_parameter("control_rate").as_double();
         bool auto_start = this->get_parameter("auto_start").as_bool();
         ft_topic_ = this->get_parameter("ft_topic").as_string();
+        joint_state_topic_ = this->get_parameter("joint_state_topic").as_string();
+        impedance_command_topic_ = this->get_parameter("impedance_command_topic").as_string();
                 decouple_joint6_ = this->get_parameter("decouple_joint6").as_bool();
         force_component_ = this->get_parameter("force_component").as_string();
         torque_component_ = this->get_parameter("torque_component").as_string();
@@ -62,14 +67,14 @@ public:
         
         // Subscribe to smoothed joint states for effort tracking
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-            "/plato2/joint_states_smoothed",
+            joint_state_topic_,
             rclcpp::SensorDataQoS(),
             std::bind(&FTCollisionTestNode::joint_state_callback, this, std::placeholders::_1)
         );
         
         // Publisher for impedance commands
         impedance_pub_ = this->create_publisher<plato_interfaces::msg::ImpedanceCommands>(
-            "/plato2/joint_impedance_controller/commands",
+            impedance_command_topic_,
             10
         );
         
@@ -90,6 +95,8 @@ public:
         RCLCPP_INFO(this->get_logger(), "  - Joint 5 Range: [%.2f, %.2f] rad", joint5_min_, joint5_max_);
         RCLCPP_INFO(this->get_logger(), "  - Control Rate: %.1f Hz", control_rate);
         RCLCPP_INFO(this->get_logger(), "  - FT Topic: %s", ft_topic_.c_str());
+        RCLCPP_INFO(this->get_logger(), "  - Joint State Topic: %s", joint_state_topic_.c_str());
+        RCLCPP_INFO(this->get_logger(), "  - Impedance Topic: %s", impedance_command_topic_.c_str());
         RCLCPP_INFO(this->get_logger(), "  - Decouple Joint6 (world hold): %s", decouple_joint6_ ? "true" : "false");
         RCLCPP_INFO(this->get_logger(), "  - Force Component: %s", force_component_.c_str());
         RCLCPP_INFO(this->get_logger(), "  - Torque Component: %s", torque_component_.c_str());
@@ -423,6 +430,8 @@ private:
     rclcpp::Time collision_time_;
     geometry_msgs::msg::WrenchStamped::SharedPtr latest_wrench_;
     std::string ft_topic_;
+    std::string joint_state_topic_;
+    std::string impedance_command_topic_;
     bool decouple_joint6_;
     std::string force_component_;
     std::string torque_component_;

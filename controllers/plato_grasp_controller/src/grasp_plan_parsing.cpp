@@ -18,6 +18,9 @@ namespace parsing
 namespace
 {
 
+constexpr double kClosureEpsilon = 1e-9;
+constexpr double kDefaultLegacyGraspClosureScale = 0.1;
+
 std::string trim_copy(const std::string & input)
 {
   const auto first = input.find_first_not_of(" \t\r\n");
@@ -84,30 +87,35 @@ std::vector<double> parse_effort_directions(
   return directions;
 }
 
-std::vector<double> parse_effort_vector_exact(
+std::vector<double> parse_closure_vector_exact(
   const YAML::Node & node,
-  int joint_count)
+  int joint_count,
+  const char * field_name)
 {
   if (!node || !node.IsSequence()) {
-    throw std::runtime_error("grasp_force.effort_ff must be a sequence.");
+    throw std::runtime_error(std::string(field_name) + " must be a sequence.");
   }
 
-  std::vector<double> effort_ff;
-  effort_ff.reserve(node.size());
+  std::vector<double> values;
+  values.reserve(node.size());
   for (const auto & item : node) {
-    effort_ff.push_back(item.as<double>());
+    const double value = item.as<double>();
+    if (!std::isfinite(value)) {
+      throw std::runtime_error(std::string(field_name) + " values must be finite.");
+    }
+    values.push_back(value);
   }
 
-  if (static_cast<int>(effort_ff.size()) != joint_count) {
+  if (static_cast<int>(values.size()) != joint_count) {
     throw std::runtime_error(
-            "grasp_force.effort_ff must contain exactly " +
+            std::string(field_name) + " must contain exactly " +
             std::to_string(joint_count) + " values.");
   }
 
-  return effort_ff;
+  return values;
 }
 
-std::vector<double> parse_legacy_effort_vector(
+std::vector<double> parse_legacy_closure_weights(
   const YAML::Node & grasp_force_node,
   int joint_count)
 {
@@ -121,30 +129,95 @@ std::vector<double> parse_legacy_effort_vector(
   }
 
   const auto effort_scalar = effort_scalar_node.as<double>();
-  std::vector<double> effort_ff(static_cast<size_t>(joint_count), 0.0);
+  std::vector<double> closure_weights(static_cast<size_t>(joint_count), 0.0);
   for (size_t i = 0; i < joint_names.size(); ++i) {
     const int joint_index = plato::joint_state::joint_index_for_name(joint_names[i], joint_count);
     if (joint_index >= 0) {
-      effort_ff[static_cast<size_t>(joint_index)] = effort_scalar * effort_directions[i];
+      closure_weights[static_cast<size_t>(joint_index)] = effort_scalar * effort_directions[i];
     }
   }
-  return effort_ff;
+  return closure_weights;
 }
 
-double parse_impedance_level(const YAML::Node & node)
+double parse_nonnegative_scalar(
+  const YAML::Node & node,
+  const char * field_name)
 {
-  const auto impedance_level_node = node["impedance_level"] ?
-    node["impedance_level"] : node["impedance_preset_val"];
+  const double value = node.as<double>();
+  if (!std::isfinite(value) || value < 0.0) {
+    throw std::runtime_error(std::string(field_name) + " must be finite and >= 0.0.");
+  }
+  return value;
+}
+
+std::vector<double> scale_closure_weights(
+  const std::vector<double> & weights,
+  double closure_scale,
+  int joint_count)
+{
+  std::vector<double> closure_offsets(static_cast<size_t>(joint_count), 0.0);
+  const auto copy_count = std::min(closure_offsets.size(), weights.size());
+  std::copy_n(weights.begin(), copy_count, closure_offsets.begin());
+
+  if (!(closure_scale > 0.0)) {
+    std::fill(closure_offsets.begin(), closure_offsets.end(), 0.0);
+    return closure_offsets;
+  }
+
+  double max_abs_weight = 0.0;
+  for (const double value : closure_offsets) {
+    max_abs_weight = std::max(max_abs_weight, std::abs(value));
+  }
+
+  if (max_abs_weight <= kClosureEpsilon) {
+    std::fill(closure_offsets.begin(), closure_offsets.end(), 0.0);
+    return closure_offsets;
+  }
+
+  for (double & value : closure_offsets) {
+    value = (value / max_abs_weight) * closure_scale;
+  }
+  return closure_offsets;
+}
+
+double parse_impedance_level_value(
+  const YAML::Node & node,
+  const char * field_name)
+{
+  const auto impedance_level_node = node[field_name];
   if (!impedance_level_node) {
-    throw std::runtime_error("impedance_level is missing.");
+    throw std::runtime_error(std::string(field_name) + " is missing.");
   }
 
   const auto impedance_level = impedance_level_node.as<double>();
   if (!std::isfinite(impedance_level) || impedance_level < 0.0 || impedance_level > 10.0) {
-    throw std::runtime_error("impedance_level must be finite and within [0.0, 10.0].");
+    throw std::runtime_error(
+            std::string(field_name) + " must be finite and within [0.0, 10.0].");
   }
 
   return impedance_level;
+}
+
+double parse_task_impedance_level(
+  const YAML::Node & task_node,
+  bool has_grasp_plan)
+{
+  if (task_node["impedance_level"]) {
+    return parse_impedance_level_value(task_node, "impedance_level");
+  }
+  if (task_node["impedance_preset_val"]) {
+    return parse_impedance_level_value(task_node, "impedance_preset_val");
+  }
+  if (has_grasp_plan && task_node["grasp_impedance_level"]) {
+    return parse_impedance_level_value(task_node, "grasp_impedance_level");
+  }
+  if (task_node["motion_impedance_level"]) {
+    return parse_impedance_level_value(task_node, "motion_impedance_level");
+  }
+  if (task_node["grasp_impedance_level"]) {
+    return parse_impedance_level_value(task_node, "grasp_impedance_level");
+  }
+  throw std::runtime_error("impedance_level is missing.");
 }
 
 std::optional<GraspPlanConfig> parse_optional_task_grasp_plan(
@@ -165,11 +238,48 @@ std::optional<GraspPlanConfig> parse_optional_task_grasp_plan(
   }
 
   GraspPlanConfig grasp_plan;
-  const auto effort_node = grasp_node["effort_ff"];
-  if (effort_node && effort_node.IsSequence()) {
-    grasp_plan.grasp_force_effort_ff = parse_effort_vector_exact(effort_node, joint_count);
+  const auto closure_scale_node = grasp_node["grasp_closure_scale"] ?
+    grasp_node["grasp_closure_scale"] : grasp_node["closure_scale"];
+  if (closure_scale_node) {
+    if (closure_scale_node.IsSequence()) {
+      grasp_plan.grasp_closure_offsets =
+        parse_closure_vector_exact(closure_scale_node, joint_count, "grasp_closure_scale");
+    } else {
+      const auto closure_direction_node = grasp_node["closure_direction"] ?
+        grasp_node["closure_direction"] : grasp_node["effort_ff"];
+      std::vector<double> closure_weights(static_cast<size_t>(joint_count), 0.0);
+      if (!closure_direction_node) {
+        if (parse_nonnegative_scalar(closure_scale_node, "grasp_closure_scale") > 0.0) {
+          throw std::runtime_error(
+                  "Scalar grasp_closure_scale requires closure_direction or legacy effort_ff.");
+        }
+      } else if (closure_direction_node.IsSequence()) {
+        closure_weights = parse_closure_vector_exact(
+          closure_direction_node, joint_count, "closure_direction");
+      } else {
+        closure_weights = parse_legacy_closure_weights(grasp_node, joint_count);
+      }
+
+      grasp_plan.grasp_closure_offsets = scale_closure_weights(
+        closure_weights,
+        parse_nonnegative_scalar(closure_scale_node, "grasp_closure_scale"),
+        joint_count);
+    }
   } else {
-    grasp_plan.grasp_force_effort_ff = parse_legacy_effort_vector(grasp_node, joint_count);
+    const auto closure_direction_node = grasp_node["closure_direction"] ?
+      grasp_node["closure_direction"] : grasp_node["effort_ff"];
+    if (!closure_direction_node) {
+      grasp_plan.grasp_closure_offsets.assign(static_cast<size_t>(joint_count), 0.0);
+    } else if (closure_direction_node.IsSequence()) {
+      const auto closure_weights = parse_closure_vector_exact(
+        closure_direction_node, joint_count, "closure_direction");
+      grasp_plan.grasp_closure_offsets = scale_closure_weights(
+        closure_weights, kDefaultLegacyGraspClosureScale, joint_count);
+    } else {
+      const auto closure_weights = parse_legacy_closure_weights(grasp_node, joint_count);
+      grasp_plan.grasp_closure_offsets = scale_closure_weights(
+        closure_weights, kDefaultLegacyGraspClosureScale, joint_count);
+    }
   }
 
   const auto grasp_duration_node = grasp_node["grasp_duration_sec"];
@@ -243,8 +353,6 @@ bool load_task_configs(
       if (!task.use_current_position && task.pos_preset_name.empty()) {
         throw std::runtime_error("pos_preset_name is empty.");
       }
-      task.impedance_level = parse_impedance_level(task_node);
-
       const auto wait_node = task_node["wait_sec"];
       if (wait_node) {
         task.wait_sec = std::max(0.0, wait_node.as<double>());
@@ -252,10 +360,8 @@ bool load_task_configs(
 
       const auto grasp_plan = parse_optional_task_grasp_plan(
         task_node, valid_joint_count, &task.grasp_duration_sec);
-      if (!grasp_plan.has_value()) {
-        throw std::runtime_error("Task is missing inline grasp_plan.");
-      }
-      task.grasp_plan = *grasp_plan;
+      task.grasp_plan = grasp_plan;
+      task.impedance_level = parse_task_impedance_level(task_node, task.grasp_plan.has_value());
 
       const auto grasp_duration_node = task_node["grasp_duration_sec"];
       if (grasp_duration_node) {
@@ -275,18 +381,14 @@ bool load_task_configs(
   return true;
 }
 
-std::vector<double> make_effort_ff_vector(
+std::vector<double> make_grasp_closure_offset_vector(
   const GraspPlanConfig & grasp_plan,
   int joint_count)
 {
-  if (static_cast<int>(grasp_plan.grasp_force_effort_ff.size()) == joint_count) {
-    return grasp_plan.grasp_force_effort_ff;
-  }
-
-  std::vector<double> effort_ff(static_cast<size_t>(joint_count), 0.0);
-  const auto copy_count = std::min(effort_ff.size(), grasp_plan.grasp_force_effort_ff.size());
-  std::copy_n(grasp_plan.grasp_force_effort_ff.begin(), copy_count, effort_ff.begin());
-  return effort_ff;
+  std::vector<double> closure_offset(static_cast<size_t>(joint_count), 0.0);
+  const auto copy_count = std::min(closure_offset.size(), grasp_plan.grasp_closure_offsets.size());
+  std::copy_n(grasp_plan.grasp_closure_offsets.begin(), copy_count, closure_offset.begin());
+  return closure_offset;
 }
 
 }  // namespace parsing

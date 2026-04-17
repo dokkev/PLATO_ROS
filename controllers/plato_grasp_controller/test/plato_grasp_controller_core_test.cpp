@@ -58,6 +58,11 @@ std::vector<double> make_expected_ordered_positions()
   return {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8};
 }
 
+std::vector<double> make_expected_pick_grasp_positions()
+{
+  return {0.1, 0.2, 0.34, 0.46, 0.58, 0.7, 0.7, 0.8};
+}
+
 std::vector<std::string> make_scrambled_joint_names()
 {
   return {"joint4", "joint2", "joint8", "joint1", "joint6", "joint3", "joint5", "joint7"};
@@ -86,15 +91,12 @@ std::string make_plan_yaml()
   idle:
     use_current_position: true
     impedance_level: 0.0
-    wait_sec: 0.0
-    grasp_plan:
-      effort_ff: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   pick:
     pos_preset_name: captured_pose
-    impedance_level: 5.0
+    impedance_level: 9.0
     wait_sec: 0.15
     grasp_plan:
-      effort_ff: [0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0]
+      grasp_closure_scale: [0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0]
       grasp_duration_sec: 0.25
 )";
 }
@@ -132,12 +134,13 @@ TEST(PlatoGraspControllerCoreTest, ParsesPlansTasksAndImpedanceLevels)
   EXPECT_DOUBLE_EQ(tasks.at("idle").impedance_level, 0.0);
   EXPECT_EQ(tasks.at("pick").pos_preset_name, "captured_pose");
   EXPECT_FALSE(tasks.at("pick").use_current_position);
-  EXPECT_DOUBLE_EQ(tasks.at("pick").impedance_level, 5.0);
+  EXPECT_DOUBLE_EQ(tasks.at("pick").impedance_level, 9.0);
   EXPECT_DOUBLE_EQ(tasks.at("pick").wait_sec, 0.15);
   EXPECT_DOUBLE_EQ(tasks.at("pick").grasp_duration_sec, 0.25);
+  ASSERT_TRUE(tasks.at("pick").grasp_plan.has_value());
   EXPECT_EQ(
-    tasks.at("pick").grasp_plan.grasp_force_effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0}));
+    tasks.at("pick").grasp_plan->grasp_closure_offsets,
+    std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0}));
 }
 
 TEST(PlatoGraspControllerCoreTest, PlannerSavesJointStateAndBuildsMotionAndGraspCommands)
@@ -189,12 +192,10 @@ TEST(PlatoGraspControllerCoreTest, PlannerSavesJointStateAndBuildsMotionAndGrasp
 
   plato_grasp_controller::PlatoGraspPlannedCommand grasp_command;
   const plato_grasp_controller::GraspPlanConfig grasp_plan{
-    std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0})};
+    std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0})};
   ASSERT_TRUE(planner.make_grasp_command(grasp_plan, &grasp_command, &error)) << error;
-  EXPECT_EQ(grasp_command.position, make_expected_ordered_positions());
-  EXPECT_EQ(
-    grasp_command.effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0}));
+  expect_vectors_near(grasp_command.position, make_expected_pick_grasp_positions());
+  EXPECT_EQ(grasp_command.effort_ff, std::vector<double>(8, 0.0));
   EXPECT_EQ(planner.phase(), plato_grasp_controller::PlatoGraspPlanner::Phase::Grasp);
 }
 
@@ -208,7 +209,7 @@ TEST(PlatoGraspControllerCoreTest, GraspCommandRequiresActiveMotionPlan)
   plato_grasp_controller::PlatoGraspPlanner planner(8, saved_positions_path);
   plato_grasp_controller::PlatoGraspPlannedCommand grasp_command;
   const plato_grasp_controller::GraspPlanConfig grasp_plan{
-    std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0})};
+    std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0})};
   std::string error;
   EXPECT_FALSE(planner.make_grasp_command(grasp_plan, &grasp_command, &error));
   EXPECT_NE(error.find("before a motion target"), std::string::npos);
@@ -253,10 +254,10 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPublishesMotionThenGraspThenHold)
     plato_grasp_controller::GraspTaskConfig{
     "captured_pose",
     false,
-    5.0,
+    9.0,
     0.10,
     plato_grasp_controller::GraspPlanConfig{
-      std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0})},
+      std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0})},
     0.20});
 
   plato_grasp_controller::PlatoGraspTaskRunner runner(std::move(task_configs));
@@ -269,7 +270,7 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPublishesMotionThenGraspThenHold)
     plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishMotionPlan);
   EXPECT_EQ(action.pos_preset_name, "captured_pose");
   EXPECT_FALSE(action.use_current_position);
-  EXPECT_DOUBLE_EQ(action.impedance_level, 5.0);
+  EXPECT_DOUBLE_EQ(action.impedance_level, 9.0);
   EXPECT_TRUE(runner.is_active());
   EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Waiting);
 
@@ -283,8 +284,9 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPublishesMotionThenGraspThenHold)
     plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
   ASSERT_TRUE(action.grasp_plan.has_value());
   EXPECT_EQ(
-    action.grasp_plan->grasp_force_effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.3, 0.4, 0.5, 0.0, 0.0}));
+    action.grasp_plan->grasp_closure_offsets,
+    std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0}));
+  EXPECT_DOUBLE_EQ(action.impedance_level, 9.0);
   EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Grasping);
 
   ASSERT_TRUE(runner.update(0.19, &action, &error)) << error;
@@ -294,9 +296,13 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPublishesMotionThenGraspThenHold)
   ASSERT_TRUE(runner.update(0.01, &action, &error)) << error;
   EXPECT_EQ(
     action.type,
-    plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishMotionHold);
+    plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
   EXPECT_EQ(action.pos_preset_name, "captured_pose");
-  EXPECT_DOUBLE_EQ(action.impedance_level, 5.0);
+  EXPECT_DOUBLE_EQ(action.impedance_level, 9.0);
+  ASSERT_TRUE(action.grasp_plan.has_value());
+  EXPECT_EQ(
+    action.grasp_plan->grasp_closure_offsets,
+    std::vector<double>({0.0, 0.0, 0.04, 0.06, 0.08, 0.1, 0.0, 0.0}));
   EXPECT_FALSE(runner.is_active());
   EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Idle);
 }
@@ -307,10 +313,10 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerKeepsGraspActiveWhenDurationIsZero)
   plato_grasp_controller::GraspTaskConfig task;
   task.pos_preset_name = "captured_pose";
   task.use_current_position = false;
-  task.impedance_level = 4.0;
+  task.impedance_level = 8.0;
   task.wait_sec = 0.0;
   task.grasp_plan = plato_grasp_controller::GraspPlanConfig{
-    std::vector<double>({0.0, 0.0, 0.2, 0.2, 0.0, 0.0, 0.0, 0.0})};
+    std::vector<double>({0.0, 0.0, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0})};
   task.grasp_duration_sec = 0.0;
   task_configs.emplace("hold_pick", task);
 
@@ -324,6 +330,7 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerKeepsGraspActiveWhenDurationIsZero)
     action.type,
     plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
   EXPECT_TRUE(action.grasp_plan.has_value());
+  EXPECT_DOUBLE_EQ(action.impedance_level, 8.0);
 
   ASSERT_TRUE(runner.update(10.0, &action, &error)) << error;
   EXPECT_EQ(
@@ -331,8 +338,8 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerKeepsGraspActiveWhenDurationIsZero)
     plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
   EXPECT_TRUE(action.grasp_plan.has_value());
   EXPECT_EQ(
-    action.grasp_plan->grasp_force_effort_ff,
-    std::vector<double>({0.0, 0.0, 0.2, 0.2, 0.0, 0.0, 0.0, 0.0}));
+    action.grasp_plan->grasp_closure_offsets,
+    std::vector<double>({0.0, 0.0, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0}));
   EXPECT_TRUE(runner.is_active());
   EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Grasping);
 }
@@ -343,10 +350,6 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPropagatesUseCurrentPositionTasks)
   plato_grasp_controller::GraspTaskConfig task;
   task.use_current_position = true;
   task.impedance_level = 0.0;
-  task.wait_sec = 0.0;
-  task.grasp_plan = plato_grasp_controller::GraspPlanConfig{
-    std::vector<double>(8, 0.0)};
-  task.grasp_duration_sec = 0.0;
   task_configs.emplace("idle", task);
 
   plato_grasp_controller::PlatoGraspTaskRunner runner(std::move(task_configs));
@@ -362,10 +365,7 @@ TEST(PlatoGraspControllerCoreTest, TaskRunnerPropagatesUseCurrentPositionTasks)
   EXPECT_DOUBLE_EQ(action.impedance_level, 0.0);
 
   ASSERT_TRUE(runner.update(0.0, &action, &error)) << error;
-  EXPECT_EQ(
-    action.type,
-    plato_grasp_controller::PlatoGraspTaskRunner::ActionType::PublishGraspPlan);
-  EXPECT_TRUE(action.use_current_position);
-  ASSERT_TRUE(action.grasp_plan.has_value());
-  EXPECT_EQ(action.grasp_plan->grasp_force_effort_ff, std::vector<double>(8, 0.0));
+  EXPECT_EQ(action.type, plato_grasp_controller::PlatoGraspTaskRunner::ActionType::None);
+  EXPECT_FALSE(runner.is_active());
+  EXPECT_EQ(runner.state(), plato_grasp_controller::PlatoGraspTaskRunner::State::Idle);
 }

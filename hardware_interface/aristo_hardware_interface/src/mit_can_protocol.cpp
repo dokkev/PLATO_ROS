@@ -309,25 +309,25 @@ MITProtocol::MITProtocol(const can_hardware_common::ActuatorCoreConfig & config)
 actuator::TxCommand MITProtocol::make_enable_motor_command()
 {
   encoder_.start_motor(onoff_msg_);
-  return {onoff_msg_, std::chrono::milliseconds(100)};
+  return actuator::TxCommand{onoff_msg_, 0};
 }
 
 actuator::TxCommand MITProtocol::make_disable_motor_command()
 {
   encoder_.stop_motor(onoff_msg_);
-  return {onoff_msg_, std::chrono::milliseconds(100)};
+  return actuator::TxCommand{onoff_msg_, 0};
 }
 
 actuator::TxCommand MITProtocol::make_stop_control_command()
 {
   encoder_.stop_control(onoff_msg_);
-  return {onoff_msg_};
+  return actuator::TxCommand{onoff_msg_, 0};
 }
 
 actuator::TxCommand MITProtocol::make_torque_command(float motor_torque)
 {
   encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
-  return {cmd_msg_};
+  return actuator::TxCommand{cmd_msg_, 0};
 }
 
 std::optional<actuator::TxCommand> MITProtocol::make_impedance_command(
@@ -346,13 +346,13 @@ std::optional<actuator::TxCommand> MITProtocol::make_impedance_command(
 actuator::TxCommand MITProtocol::make_zero_position_command()
 {
   encoder_.set_zero_position(onoff_msg_);
-  return {onoff_msg_};
+  return actuator::TxCommand{onoff_msg_, 0};
 }
 
 actuator::TxCommand MITProtocol::make_default_can_limits_command()
 {
   encoder_.set_default_can_limits(config_msg_);
-  return {config_msg_, std::chrono::milliseconds(100)};
+  return actuator::TxCommand{config_msg_, 0};
 }
 
 void MITProtocol::process_message(const TPCANMsg & msg, aristo_actuator::Actuator & actuator)

@@ -34,7 +34,6 @@ std::string handle_name(TPCANHandle handle)
     case PCAN_PCIBUS15:
     case PCAN_PCIBUS16:
       return "PCAN_PCI";
-
     case PCAN_USBBUS1:
     case PCAN_USBBUS2:
     case PCAN_USBBUS3:
@@ -52,7 +51,6 @@ std::string handle_name(TPCANHandle handle)
     case PCAN_USBBUS15:
     case PCAN_USBBUS16:
       return "PCAN_USB";
-
     case PCAN_LANBUS1:
     case PCAN_LANBUS2:
     case PCAN_LANBUS3:
@@ -70,7 +68,6 @@ std::string handle_name(TPCANHandle handle)
     case PCAN_LANBUS15:
     case PCAN_LANBUS16:
       return "PCAN_LAN";
-
     default:
       return "UNKNOWN";
   }
@@ -81,46 +78,20 @@ std::string format_channel_name(TPCANHandle handle)
   const BYTE channel_number =
     (handle < 0x100) ? static_cast<BYTE>(handle & 0x0F) : static_cast<BYTE>(handle & 0xFF);
   char buffer[64] = {};
-
   std::snprintf(
     buffer, sizeof(buffer), "%s %u (%Xh)", handle_name(handle).c_str(), channel_number, handle);
-
   return buffer;
 }
 
 std::string bitrate_to_string(TPCANBaudrate bitrate)
 {
   switch (bitrate) {
-    case PCAN_BAUD_1M:
-      return "1 MBit/sec";
-    case PCAN_BAUD_800K:
-      return "800 kBit/sec";
-    case PCAN_BAUD_500K:
-      return "500 kBit/sec";
-    case PCAN_BAUD_250K:
-      return "250 kBit/sec";
-    case PCAN_BAUD_125K:
-      return "125 kBit/sec";
-    case PCAN_BAUD_100K:
-      return "100 kBit/sec";
-    case PCAN_BAUD_95K:
-      return "95,238 kBit/sec";
-    case PCAN_BAUD_83K:
-      return "83,333 kBit/sec";
-    case PCAN_BAUD_50K:
-      return "50 kBit/sec";
-    case PCAN_BAUD_47K:
-      return "47,619 kBit/sec";
-    case PCAN_BAUD_33K:
-      return "33,333 kBit/sec";
-    case PCAN_BAUD_20K:
-      return "20 kBit/sec";
-    case PCAN_BAUD_10K:
-      return "10 kBit/sec";
-    case PCAN_BAUD_5K:
-      return "5 kBit/sec";
-    default:
-      return "Unknown Bitrate";
+    case PCAN_BAUD_1M: return "1 MBit/sec";
+    case PCAN_BAUD_800K: return "800 kBit/sec";
+    case PCAN_BAUD_500K: return "500 kBit/sec";
+    case PCAN_BAUD_250K: return "250 kBit/sec";
+    case PCAN_BAUD_125K: return "125 kBit/sec";
+    default: return "Unknown Bitrate";
   }
 }
 }  // namespace
@@ -146,44 +117,43 @@ PCANInterface::~PCANInterface() noexcept
   (void)CAN_Uninitialize(kChannelHandle_);
 }
 
-TPCANStatus PCANInterface::write(const TPCANMsg & msg)
+TPCANStatus PCANInterface::write(const TPCANMsg & tx_frame)
 {
-  TPCANMsg writable_msg = msg;
+  TPCANMsg writable_msg = tx_frame;
   std::lock_guard<std::mutex> lock(io_mutex_);
   return CAN_Write(kChannelHandle_, &writable_msg);
 }
 
-TPCANStatus PCANInterface::read(TPCANMsg & msg, TPCANTimestamp * timestamp)
+TPCANStatus PCANInterface::read(TPCANMsg & rx_frame, TPCANTimestamp * timestamp)
 {
   TPCANTimestamp local_timestamp{};
   TPCANTimestamp * timestamp_ptr = timestamp != nullptr ? timestamp : &local_timestamp;
   std::lock_guard<std::mutex> lock(io_mutex_);
-  return CAN_Read(kChannelHandle_, &msg, timestamp_ptr);
+  return CAN_Read(kChannelHandle_, &rx_frame, timestamp_ptr);
 }
 
 TPCANStatus PCANInterface::read_with_timeout(
-  TPCANMsg & msg, std::chrono::microseconds timeout)
+  TPCANMsg & rx_frame,
+  std::chrono::microseconds timeout)
 {
-  // Try immediate non-blocking read.
   {
     std::lock_guard<std::mutex> lock(io_mutex_);
-    TPCANTimestamp ts{};
-    const TPCANStatus status = CAN_Read(kChannelHandle_, &msg, &ts);
+    TPCANTimestamp timestamp{};
+    const TPCANStatus status = CAN_Read(kChannelHandle_, &rx_frame, &timestamp);
     if (status != PCAN_ERROR_QRCVEMPTY) {
       return status;
     }
   }
 
-  // Block until the receive-event fd signals data or timeout expires.
   if (receive_event_fd_ >= 0) {
-    struct pollfd pfd{};
-    pfd.fd = receive_event_fd_;
-    pfd.events = POLLIN;
-    const long us = timeout.count();
-    struct timespec ts_timeout{};
-    ts_timeout.tv_sec = us / 1000000;
-    ts_timeout.tv_nsec = (us % 1000000) * 1000;
-    if (::ppoll(&pfd, 1, &ts_timeout, nullptr) <= 0) {
+    struct pollfd poll_fd{};
+    poll_fd.fd = receive_event_fd_;
+    poll_fd.events = POLLIN;
+    const long timeout_us = timeout.count();
+    struct timespec timeout_spec{};
+    timeout_spec.tv_sec = timeout_us / 1000000;
+    timeout_spec.tv_nsec = (timeout_us % 1000000) * 1000;
+    if (::ppoll(&poll_fd, 1, &timeout_spec, nullptr) <= 0) {
       return PCAN_ERROR_QRCVEMPTY;
     }
   } else {
@@ -191,8 +161,8 @@ TPCANStatus PCANInterface::read_with_timeout(
   }
 
   std::lock_guard<std::mutex> lock(io_mutex_);
-  TPCANTimestamp ts{};
-  return CAN_Read(kChannelHandle_, &msg, &ts);
+  TPCANTimestamp timestamp{};
+  return CAN_Read(kChannelHandle_, &rx_frame, &timestamp);
 }
 
 TPCANStatus PCANInterface::get_bus_status()
@@ -202,7 +172,9 @@ TPCANStatus PCANInterface::get_bus_status()
 }
 
 TPCANStatus PCANInterface::get_value(
-  TPCANParameter parameter, void * buffer, uint32_t buffer_length)
+  TPCANParameter parameter,
+  void * buffer,
+  uint32_t buffer_length)
 {
   std::lock_guard<std::mutex> lock(io_mutex_);
   return CAN_GetValue(kChannelHandle_, parameter, buffer, buffer_length);
@@ -213,10 +185,11 @@ std::string PCANInterface::format_error(TPCANStatus status)
   char buffer[256] = {};
   if (CAN_GetErrorText(status, kPcanLangEnglish, buffer) != PCAN_ERROR_OK) {
     std::snprintf(
-      buffer, sizeof(buffer), "An error occurred. Error-code's text (%Xh) couldn't be retrieved",
+      buffer,
+      sizeof(buffer),
+      "An error occurred. Error-code text (%Xh) could not be retrieved",
       status);
   }
-
   return buffer;
 }
 

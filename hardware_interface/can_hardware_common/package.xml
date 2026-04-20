@@ -3,15 +3,13 @@
 <package format="3">
   <name>can_hardware_common</name>
   <version>0.0.0</version>
-  <description>Shared CAN transport and base utilities for Plato and Aristo hardware interfaces.</description>
+  <description>Transport-centered CAN utilities: PCAN transport, pacing, request queueing, and shared frame/time types.</description>
   <maintainer email="dongho@utexas.edu">dk</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>eigen</depend>
-  <depend>geometry_msgs</depend>
-  <depend>rclcpp</depend>
 
+  <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

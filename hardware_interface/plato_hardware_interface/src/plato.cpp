@@ -240,7 +240,7 @@ hardware_interface::return_type PlatoHardware::read(
 hardware_interface::return_type PlatoHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  if (!hand_->write_joint_commands()) {
+  if (!hand_->write()) {
     return hardware_interface::return_type::ERROR;
   }
 

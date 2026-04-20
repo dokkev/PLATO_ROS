@@ -1,10 +1,10 @@
 #ifndef ARISTO_HARDWARE_INTERFACE__ACTUATOR_HPP_
 #define ARISTO_HARDWARE_INTERFACE__ACTUATOR_HPP_
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
-#include "aristo_hardware_interface/hardware_config/actuator_config.hpp"
 #include "can_hardware_common/actuator.hpp"
 
 namespace mit_can_protocol
@@ -99,135 +99,6 @@ private:
   static constexpr float kSoftLimitMargin = 0.174f;
   static constexpr float kSoftLimitHysteresis = 0.02f;
 };
-
-namespace detail
-{
-
-inline can_hardware_common::ActuatorCoreConfig make_base_config(
-  uint8_t tx_id,
-  uint8_t rx_id,
-  float offset,
-  char direction,
-  float torque_constant,
-  float gear_ratio)
-{
-  return {tx_id, rx_id, offset, direction, torque_constant, gear_ratio};
-}
-
-inline actuator::Limits make_limits(
-  float position_limit_max,
-  float position_limit_min,
-  float velocity_limit,
-  float effort_limit,
-  float stiffness_limit,
-  float damping_limit)
-{
-  actuator::Limits limits;
-  limits.position_limit_max = position_limit_max;
-  limits.position_limit_min = position_limit_min;
-  limits.velocity_limit = velocity_limit;
-  limits.effort_limit = effort_limit;
-  limits.stiffness_limit = stiffness_limit;
-  limits.damping_limit = damping_limit;
-  return limits;
-}
-
-}  // namespace detail
-
-namespace ActuatorConfigFactory
-{
-
-inline Config create_thumb_roll_config()
-{
-  return {
-    detail::make_base_config(
-      MotorTxID::MOTOR1,
-      MotorRxID::MOTOR1,
-      MotorOffset::MOTOR1,
-      MotorDirection::MOTOR1,
-      GIM3505::TORQUE_CONSTANT,
-      GIM3505::GEAR_RATIO),
-    detail::make_limits(
-      JointPositionLimit::THUMB_ROLL_MAX,
-      JointPositionLimit::THUMB_ROLL_MIN,
-      JointVelocityLimit::THUMB_ROLL,
-      JointEffortLimit::THUMB_ROLL,
-      JointStiffnessLimit::THUMB_ROLL,
-      JointDampingLimit::THUMB_ROLL)
-  };
-}
-
-inline Config create_thumb_yaw_config()
-{
-  return {
-    detail::make_base_config(
-      MotorTxID::MOTOR2,
-      MotorRxID::MOTOR2,
-      MotorOffset::MOTOR2,
-      MotorDirection::MOTOR2,
-      GIM3505::TORQUE_CONSTANT,
-      GIM3505::GEAR_RATIO),
-    detail::make_limits(
-      JointPositionLimit::THUMB_YAW_MAX,
-      JointPositionLimit::THUMB_YAW_MIN,
-      JointVelocityLimit::THUMB_YAW,
-      JointEffortLimit::THUMB_YAW,
-      JointStiffnessLimit::THUMB_YAW,
-      JointDampingLimit::THUMB_YAW)
-  };
-}
-
-inline Config create_mcp_config(uint8_t motor_num)
-{
-  const uint8_t tx_id = MotorTxID::MOTOR1 + motor_num - 1;
-  const uint8_t rx_id = MotorRxID::MOTOR1 + motor_num - 1;
-  const float * offsets = &MotorOffset::MOTOR1;
-  const char * directions = &MotorDirection::MOTOR1;
-
-  return {
-    detail::make_base_config(
-      tx_id,
-      rx_id,
-      offsets[motor_num - 1],
-      directions[motor_num - 1],
-      GIM3505::TORQUE_CONSTANT,
-      GIM3505::GEAR_RATIO),
-    detail::make_limits(
-      JointPositionLimit::MCP_MAX,
-      JointPositionLimit::MCP_MIN,
-      JointVelocityLimit::MCP,
-      JointEffortLimit::MCP,
-      JointStiffnessLimit::MCP,
-      JointDampingLimit::MCP)
-  };
-}
-
-inline Config create_pip_config(uint8_t motor_num)
-{
-  const uint8_t tx_id = MotorTxID::MOTOR1 + motor_num - 1;
-  const uint8_t rx_id = MotorRxID::MOTOR1 + motor_num - 1;
-  const float * offsets = &MotorOffset::MOTOR1;
-  const char * directions = &MotorDirection::MOTOR1;
-
-  return {
-    detail::make_base_config(
-      tx_id,
-      rx_id,
-      offsets[motor_num - 1],
-      directions[motor_num - 1],
-      GIM3505::TORQUE_CONSTANT,
-      GIM3505::GEAR_RATIO),
-    detail::make_limits(
-      JointPositionLimit::PIP_MAX,
-      JointPositionLimit::PIP_MIN,
-      JointVelocityLimit::PIP,
-      JointEffortLimit::PIP,
-      JointStiffnessLimit::PIP,
-      JointDampingLimit::PIP)
-  };
-}
-
-}  // namespace ActuatorConfigFactory
 
 }  // namespace aristo_actuator
 

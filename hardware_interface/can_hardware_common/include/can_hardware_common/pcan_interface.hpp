@@ -22,18 +22,10 @@ public:
   PCANInterface(PCANInterface &&) = delete;
   PCANInterface & operator=(PCANInterface &&) = delete;
 
-  TPCANStatus write(const TPCANMsg & msg);
-  TPCANStatus read(TPCANMsg & msg, TPCANTimestamp * timestamp = nullptr);
-
-  /// Blocking read: tries an immediate read, then waits on the receive-event fd
-  /// via ppoll() for up to @p timeout before retrying once.
-  /// Returns PCAN_ERROR_OK on success or PCAN_ERROR_QRCVEMPTY on timeout.
-  TPCANStatus read_with_timeout(TPCANMsg & msg, std::chrono::microseconds timeout);
-
-  /// Query the CAN controller error state via CAN_GetStatus().
+  TPCANStatus write(const TPCANMsg & tx_frame);
+  TPCANStatus read(TPCANMsg & rx_frame, TPCANTimestamp * timestamp = nullptr);
+  TPCANStatus read_with_timeout(TPCANMsg & rx_frame, std::chrono::microseconds timeout);
   TPCANStatus get_bus_status();
-
-  /// Read a PCAN channel parameter via CAN_GetValue().
   TPCANStatus get_value(TPCANParameter parameter, void * buffer, uint32_t buffer_length);
 
   static std::string format_error(TPCANStatus status);

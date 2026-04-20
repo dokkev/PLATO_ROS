@@ -1,21 +1,22 @@
-# aristo_bringup.launch.py
-import os
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-import xacro
 
 
 def generate_launch_description():
-    # --- Args ---
     gui = LaunchConfiguration("gui")
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    robot_description_xacro_path = LaunchConfiguration("robot_description_xacro_path")
+    controller_config_path = LaunchConfiguration("controller_config_path")
+    rviz_config_path = LaunchConfiguration("rviz_config_path")
+    controller_manager_name = LaunchConfiguration("controller_manager_name")
+    joint_state_broadcaster_name = LaunchConfiguration("joint_state_broadcaster_name")
+    joint_impedance_controller_name = LaunchConfiguration("joint_impedance_controller_name")
 
     declared_arguments = [
         DeclareLaunchArgument(
@@ -30,31 +31,60 @@ def generate_launch_description():
             "use_sim_time", default_value="false",
             description="Use simulated clock if true."
         ),
+        DeclareLaunchArgument(
+            "robot_description_xacro_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("plato_description"), "urdf", "aristo.urdf.xacro"]
+            ),
+            description="Absolute path to the Aristo robot description xacro.",
+        ),
+        DeclareLaunchArgument(
+            "controller_config_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("aristo_bringup"), "config", "ros2_controllers.yaml"]
+            ),
+            description="Absolute path to the ros2_control controller manager parameters YAML.",
+        ),
+        DeclareLaunchArgument(
+            "rviz_config_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("plato_description"), "rviz", "plato2.rviz"]
+            ),
+            description="Absolute path to the RViz config file.",
+        ),
+        DeclareLaunchArgument(
+            "controller_manager_name",
+            default_value="controller_manager",
+            description="Controller manager node name inside the namespace.",
+        ),
+        DeclareLaunchArgument(
+            "joint_state_broadcaster_name",
+            default_value="plato2_joint_state_broadcaster",
+            description="Joint state broadcaster controller name.",
+        ),
+        DeclareLaunchArgument(
+            "joint_impedance_controller_name",
+            default_value="joint_impedance_controller",
+            description="Joint impedance controller name.",
+        ),
     ]
 
-    # --- URDF via xacro ---
-    pkg_share = get_package_share_directory("plato_description")
-    xacro_file = os.path.join(pkg_share, "urdf", "aristo_mock_hardware.urdf.xacro")
-    rviz_config = PathJoinSubstitution(
-        [FindPackageShare("plato_description"), "rviz", "plato2.rviz"]
+    robot_description_content = Command(
+        [
+            FindExecutable(name="xacro"),
+            " ",
+            robot_description_xacro_path,
+            " ",
+            "fake_hardware:=true",
+        ]
     )
+    robot_description = {"robot_description": robot_description_content}
+    controller_manager_path = PathJoinSubstitution(["/", plato_ns, controller_manager_name])
 
-    robot_description_xml = xacro.process_file(xacro_file).toxml()
-    robot_description = {"robot_description": robot_description_xml}
-
-    # --- Controllers YAML (position/impedance config) ---
-    position_ctrl_yaml = PathJoinSubstitution([
-        FindPackageShare("aristo_bringup"),
-        "config",
-        "plato2_joint_impedance_controller.yaml",
-    ])
-    controller_manager_path = PathJoinSubstitution(["/", plato_ns, "controller_manager"])
-
-    # --- Nodes ---
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, position_ctrl_yaml, {"use_sim_time": use_sim_time}],
+        parameters=[robot_description, controller_config_path, {"use_sim_time": use_sim_time}],
         output="both",
         namespace=plato_ns,
     )
@@ -74,16 +104,15 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="log",
-        arguments=["-d", rviz_config],
+        arguments=["-d", rviz_config_path],
         condition=IfCondition(gui),
     )
 
-    # Spawners
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
-            "plato2_joint_state_broadcaster",
+            joint_state_broadcaster_name,
             "--controller-manager", controller_manager_path,
         ],
         namespace=plato_ns,
@@ -94,14 +123,13 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=[
-            "joint_impedance_controller",
+            joint_impedance_controller_name,
             "--controller-manager", controller_manager_path,
         ],
         namespace=plato_ns,
         output="screen",
     )
 
-    # --- Ordering: after JS broadcaster spawns, bring up RViz and then main controller ---
     start_rviz_after_jsb = RegisterEventHandler(
         OnProcessExit(
             target_action=joint_state_broadcaster_spawner,

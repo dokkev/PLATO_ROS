@@ -1,6 +1,11 @@
 #include "aristo_hardware_interface/aristo.hpp"
+#include "aristo_hardware_interface/utils/actuator_config_loader.hpp"
+#include "plato_hardware_interface/utils/parameter_utils.hpp"
 
 #include <exception>
+#include <limits>
+#include <string>
+#include <utility>
 #include <pluginlib/class_list_macros.hpp>
 
 namespace aristo_hardware_interface
@@ -23,8 +28,32 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  const auto zeroing_it = info_.hardware_parameters.find("zeroing");
+  if (zeroing_it != info_.hardware_parameters.end()) {
+    try {
+      zeroing_requested_ =
+        plato_hardware_interface::utils::parse_bool_parameter(zeroing_it->second, "zeroing");
+    } catch (const std::exception & e) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("AristoHardware"),
+        "Invalid Aristo hardware parameter: %s",
+        e.what());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
+
+  std::string actuator_config_yaml_path_override;
+  const auto actuator_config_path_it =
+    info_.hardware_parameters.find("actuator_config_yaml_path");
+  if (actuator_config_path_it != info_.hardware_parameters.end()) {
+    actuator_config_yaml_path_override = actuator_config_path_it->second;
+  }
+
   try {
-    hand_ = std::make_unique<aristo_hand::Hand>();
+    auto actuator_configs = actuator_config_yaml_path_override.empty() ?
+      aristo_actuator::load_aristo_actuator_configs() :
+      aristo_actuator::load_aristo_actuator_configs(actuator_config_yaml_path_override);
+    hand_ = std::make_unique<aristo_hand::Hand>(std::move(actuator_configs));
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       rclcpp::get_logger("AristoHardware"),
@@ -32,7 +61,6 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
       e.what());
     return hardware_interface::CallbackReturn::ERROR;
   }
-  hand_->initialize_joint_buffers(aristo_hand::Hand::kNumActuators, 0.0);
   ft_sensor_states_.resize(aristo_hand::Hand::kNumFtSensors);
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -98,9 +126,12 @@ std::vector<hardware_interface::CommandInterface> AristoHardware::export_command
 hardware_interface::CallbackReturn AristoHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  hand_->reset_joint_commands();
-  hand_->enable();
-  hand_->set_current_position_as_zero();
+  hand_->reset_joint_commands(0.0);
+  if (!hand_->enable(zeroing_requested_)) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("AristoHardware"),
+      "One or more Aristo actuators failed to enable/zero. Continuing activation.");
+  }
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -108,8 +139,13 @@ hardware_interface::CallbackReturn AristoHardware::on_activate(
 hardware_interface::CallbackReturn AristoHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  hand_->reset_joint_commands();
-  hand_->disable();
+  if (!hand_->disable()) {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("AristoHardware"),
+      "Failed to disable one or more Aristo actuators.");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  hand_->reset_joint_commands(std::numeric_limits<double>::quiet_NaN());
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Deactivated");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -117,8 +153,9 @@ hardware_interface::CallbackReturn AristoHardware::on_deactivate(
 hardware_interface::return_type AristoHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  hand_->poll_can_bus();
-  hand_->read_joint_states();
+  if (!hand_->read()) {
+    return hardware_interface::return_type::ERROR;
+  }
   hand_->update_ft_sensor_states(ft_sensor_states_);
   return hardware_interface::return_type::OK;
 }
@@ -126,7 +163,9 @@ hardware_interface::return_type AristoHardware::read(
 hardware_interface::return_type AristoHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  hand_->write_joint_commands();
+  if (!hand_->write()) {
+    return hardware_interface::return_type::ERROR;
+  }
   return hardware_interface::return_type::OK;
 }
 

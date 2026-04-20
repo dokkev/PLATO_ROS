@@ -6,17 +6,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(rclcpp REQUIRED)
 
 find_library(PCAN_LIB NAMES pcanbasic PATHS /usr/local/lib /usr/lib /lib REQUIRED)
 find_path(PCAN_INCLUDE_DIR NAMES PCANBasic.h PATHS /usr/local/include /usr/include REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
-  src/can_transport.cpp
   src/command_scheduler.cpp
-  src/ft_sensor.cpp
+  src/can_transport.cpp
   src/pcan_interface.cpp
 )
 
@@ -26,10 +22,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   $<INSTALL_INTERFACE:include>
   ${PCAN_INCLUDE_DIR}
 )
-
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp)
 target_link_libraries(${PROJECT_NAME}
-  PUBLIC Eigen3::Eigen
   PUBLIC ${PCAN_LIB}
 )
 
@@ -49,19 +42,17 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-add_executable(pcan_transport_smoke_test
-  src/tools/pcan_transport_smoke_test.cpp
-)
-target_compile_features(pcan_transport_smoke_test PUBLIC cxx_std_17)
-target_link_libraries(pcan_transport_smoke_test
-  PRIVATE ${PROJECT_NAME}
-)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
 
-install(TARGETS pcan_transport_smoke_test
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
-)
+  ament_add_gtest(command_scheduler_test
+    test/command_scheduler_test.cpp
+  )
+  target_link_libraries(command_scheduler_test
+    ${PROJECT_NAME}
+  )
+endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(Eigen3 geometry_msgs rclcpp)
 ament_export_libraries(${PROJECT_NAME})
 ament_package()

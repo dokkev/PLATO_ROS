@@ -23,10 +23,6 @@ constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
-constexpr double kMaxServoCurrentCommandMilliamps =
-  static_cast<double>(std::numeric_limits<uint32_t>::max());
-constexpr double kMaxDerivedThumbServoCurrentMilliamps = 2000.0;
-
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
 rclcpp::Clock & throttle_clock()
@@ -34,6 +30,15 @@ rclcpp::Clock & throttle_clock()
   static rclcpp::Clock clock(RCL_STEADY_TIME);
   return clock;
 }
+
+rclcpp::Clock & snapshot_clock()
+{
+  static rclcpp::Clock clock(RCL_STEADY_TIME);
+  return clock;
+}
+
+using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
+using WritePlan = can_hardware_common::core::WritePlan;
 
 static_assert(
   Hand::kNumJoints == FiveBarLinkage::Transmission::kNumJoints,
@@ -108,39 +113,6 @@ std::vector<float> extract_position_offsets(
   return position_offsets;
 }
 
-uint32_t clamp_servo_current_command(double servo_current_milliamps)
-{
-  const double clamped =
-    std::clamp(servo_current_milliamps, 0.0, kMaxServoCurrentCommandMilliamps);
-  return static_cast<uint32_t>(std::llround(clamped));
-}
-
-TPCANMsg make_servo_position_command(
-  plato_actuator::Actuator & actuator,
-  double actuator_position,
-  double stiffness,
-  double servo_stiffness_scale)
-{
-  const auto joint_position = static_cast<float>(actuator_position);
-  double resolved_servo_current_milliamps = std::numeric_limits<double>::quiet_NaN();
-  if (std::isfinite(stiffness) && servo_stiffness_scale > 0.0) {
-    resolved_servo_current_milliamps = std::clamp(
-      std::abs(stiffness) * servo_stiffness_scale,
-      0.0,
-      kMaxDerivedThumbServoCurrentMilliamps);
-  }
-
-  if (!std::isfinite(resolved_servo_current_milliamps)) {
-    return actuator.set_servo_hold(joint_position).frame;
-  }
-
-  const auto current_command = clamp_servo_current_command(resolved_servo_current_milliamps);
-  if (current_command == 0U) {
-    return actuator.set_servo_idle(joint_position).frame;
-  }
-
-  return actuator.set_servo_position(joint_position, current_command).frame;
-}
 }  // namespace
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -149,6 +121,8 @@ TPCANMsg make_servo_position_command(
 
 Hand::Hand(PlatoHandConfig config)
 : transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
+  protocol_(),
+  model_(transmission_),
   scheduler_(transport_),  // must follow transport_ and transmission_ in member order
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_static_configs_(extract_static_configs(config.actuator_configs)),
@@ -164,6 +138,7 @@ Hand::Hand(PlatoHandConfig config)
 
   initialize_joint_buffers(kNumJoints, kDefaultJointStateValue);
   initialize_actuator_buffers(kNumActuators, kInvalidStateValue);
+  state_snapshot_.resize(kNumJoints, kNumActuators);
 
   actuators_.reserve(kNumActuators);
   for (const auto & cfg : config.actuator_configs) {
@@ -178,21 +153,9 @@ Hand::Hand(PlatoHandConfig config)
   }
 
   transport_.add_rx_observer([this](const TPCANMsg & frame) {
-    (void)frame;
-    mark_rx_frame_();
-  });
-
-  // Three RX observers: freshness timestamp, actuator state parsing, scheduler matching.
-  transport_.add_rx_observer([this](const TPCANMsg & frame) {
-    if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || frame.LEN < 2) {
-      return;
-    }
-    for (size_t i = 0; i < kNumActuators; ++i) {
-      if (actuators_[i].get_rx_id() == frame.ID) {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        actuators_[i].process_message(frame);
-        return;
-      }
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    if (protocol_.process_rx_frame(frame, actuators_)) {
+      mark_rx_frame_();
     }
   });
 
@@ -208,7 +171,7 @@ Hand::Hand(PlatoHandConfig config)
       i + 1, actuators_[i].get_tx_id(), actuators_[i].get_rx_id());
   }
 
-  // Deterministic paced direct TX path for write_joint_commands().
+  // Deterministic paced direct TX path for write().
   transport_.set_min_inter_frame_gap(config.direct_tx_inter_frame_gap);
   RCLCPP_INFO(
     logger(),
@@ -245,177 +208,143 @@ Hand::~Hand()
   }
 }
 
-bool Hand::enable(bool automatic_zeroing)
-{
-  enable_requested_ = true;
-  disable_requested_ = false;
-  bool success = true;
-
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    const auto req = actuators_[i].make_enable_request(static_cast<uint32_t>(i));
-    const auto res = scheduler_.execute_blocking(
-      req, kResponseTimeout, kLifecycleCommandRetries);
-    if (is_thumb_servo_index(i) && tolerate_thumb_lifecycle_result(res, true)) {
-      actuators_[i].set_motor_enabled(true);
-      if (res.status != TransactionResult::Status::kConfirmed) {
-        RCLCPP_WARN(
-          logger(),
-          "Enable thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
-          i + 1,
-          TransactionResult::status_label(res.status),
-          res.result_byte);
-      }
-      continue;
-    }
-    if (res.status != TransactionResult::Status::kConfirmed) {
-      RCLCPP_ERROR(logger(), "Enable actuator %zu: %s",
-        i + 1, TransactionResult::status_label(res.status));
-      success = false;
-    }
-  }
-  if (automatic_zeroing) {
-    success = zero_actuators_() && success;
-  }
-
-  return success;
-}
-
-bool Hand::disable()
-{
-  disable_requested_ = true;
-  bool success = true;
-
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    const auto req = actuators_[i].make_disable_request(static_cast<uint32_t>(i));
-    const auto res = scheduler_.execute_blocking(
-      req, kResponseTimeout, kLifecycleCommandRetries);
-    if (is_thumb_servo_index(i) && tolerate_thumb_lifecycle_result(res, false)) {
-      actuators_[i].set_motor_enabled(false);
-      if (res.status != TransactionResult::Status::kConfirmed) {
-        RCLCPP_WARN(
-          logger(),
-          "Disable thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
-          i + 1,
-          TransactionResult::status_label(res.status),
-          res.result_byte);
-      }
-      continue;
-    }
-    if (res.status != TransactionResult::Status::kConfirmed) {
-      RCLCPP_ERROR(logger(), "Disable actuator %zu: %s",
-        i + 1, TransactionResult::status_label(res.status));
-      success = false;
-    }
-  }
-
-  return success;
-}
-
-bool Hand::read()
+bool Hand::update_measurements_()
 {
   const auto rx = transport_.process_rx();
+  last_rx_healthy_ = !rx.is_bus_error();
   if (rx.is_bus_error()) {
     RCLCPP_WARN_THROTTLE(
       logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
     return false;
   }
 
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  update_joint_states_locked_();
   return true;
 }
 
-bool Hand::write_joint_commands()
+void Hand::refresh_state_snapshot_()
 {
-  std::array<TPCANMsg, kNumActuators> tx_frames{};
-  size_t tx_count = 0;
-  bool have_initialized_actuator_feedback = false;
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  model_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
 
-  // 1) Validate command snapshot
-  // 2) Joint->actuator mapping
-  // 3) Build direct TX frames
-  // 4) Capture desired-command history (delivery-agnostic)
+  const auto joint_state = joint_state_view();
+  state_snapshot_.stamp = snapshot_clock().now();
+  state_snapshot_.has_fresh_rx = has_fresh_rx_(SteadyClock::now());
+  state_snapshot_.calibrated = actuator_position_offsets_.size() == kNumActuators;
+  state_snapshot_.sensors_ok = true;
+  state_snapshot_.actuators_ready = model_.actuators_ready(actuators_);
+  state_snapshot_.transport_healthy = last_rx_healthy_;
+  state_snapshot_.lifecycle_busy = false;
+  state_snapshot_.model_ready =
+    actuators_.size() == kNumActuators &&
+    actuator_static_configs_.size() == kNumActuators;
+  state_snapshot_.joint_position = joint_state.position.matrix();
+  state_snapshot_.joint_velocity = joint_state.velocity.matrix();
+  state_snapshot_.joint_effort = joint_state.effort.matrix();
+
+  if (state_snapshot_.actuator_states.size() != kNumActuators) {
+    state_snapshot_.resize(kNumJoints, kNumActuators);
+  }
+  model_.copy_feedback_snapshot(actuators_, state_snapshot_);
+}
+
+can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
+  can_hardware_common::core::LifecycleOperation operation)
+{
+  return protocol_.build_lifecycle_plan(actuators_, operation);
+}
+
+bool Hand::execute_lifecycle_plan_(const LifecyclePlan & plan)
+{
+  if (plan.operation == can_hardware_common::core::LifecycleOperation::kZero) {
+    return execute_zero_lifecycle_();
+  }
+
+  return execute_standard_lifecycle_(plan);
+}
+
+bool Hand::execute_standard_lifecycle_(const LifecyclePlan & plan)
+{
+  const bool enabling = plan.operation == can_hardware_common::core::LifecycleOperation::kEnable;
+  apply_lifecycle_request_flags_(enabling);
+
+  bool success = true;
+  for (size_t i = 0; i < plan.scheduled_requests.size(); ++i) {
+    const auto res = scheduler_.execute_blocking(
+      plan.scheduled_requests[i], kResponseTimeout, kLifecycleCommandRetries);
+    success = handle_standard_lifecycle_result_(i, res, enabling) && success;
+  }
+
+  return success;
+}
+
+bool Hand::execute_zero_lifecycle_()
+{
+  return zero_actuators_();
+}
+
+bool Hand::handle_standard_lifecycle_result_(
+  std::size_t actuator_index,
+  const TransactionResult & result,
+  bool enabling)
+{
+  if (is_thumb_servo_index(actuator_index) && tolerate_thumb_lifecycle_result(result, enabling)) {
+    actuators_[actuator_index].set_motor_enabled(enabling);
+    if (result.status != TransactionResult::Status::kConfirmed) {
+      RCLCPP_WARN(
+        logger(),
+        "%s thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
+        enabling ? "Enable" : "Disable",
+        actuator_index + 1,
+        TransactionResult::status_label(result.status),
+        result.result_byte);
+    }
+    return true;
+  }
+
+  if (result.status != TransactionResult::Status::kConfirmed) {
+    RCLCPP_ERROR(
+      logger(),
+      "%s actuator %zu: %s",
+      enabling ? "Enable" : "Disable",
+      actuator_index + 1,
+      TransactionResult::status_label(result.status));
+    return false;
+  }
+
+  return true;
+}
+
+void Hand::apply_lifecycle_request_flags_(bool enabling)
+{
+  if (enabling) {
+    enable_requested_ = true;
+    disable_requested_ = false;
+    return;
+  }
+
+  disable_requested_ = true;
+}
+
+void Hand::build_ready_write_plan_(WritePlan & plan)
+{
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    const auto joint_cmd = joint_command_view();
-
-    if (!joint_cmd.all_finite()) {
-      RCLCPP_WARN_THROTTLE(
-        logger(), throttle_clock(), 1000, "Skipping write: non-finite joint commands.");
-      ++write_cycle_count_;
-      return true;
-    }
-
-    transmission_.joint_to_actuator(
+    model_.joint_to_actuator_commands(
       joint_commands_, actuator_states_, joint_states_, actuator_commands_);
     const auto actuator_cmd = actuator_command_view();
-
-    have_initialized_actuator_feedback = std::any_of(
-      actuators_.begin(),
-      actuators_.end(),
-      [](const auto & actuator) { return actuator.is_initialized(); });
-
-    if ((write_cycle_count_ % kServoWriteDivisor) == 0) {
-      tx_frames[tx_count++] = make_servo_position_command(
-        actuators_[kThumbRollIndex],
-        actuator_cmd.position(kThumbRollIndex),
-        actuator_cmd.stiffness(kThumbRollIndex),
-        servo_stiffness_scale_);
-      tx_frames[tx_count++] = make_servo_position_command(
-        actuators_[kThumbYawIndex],
-        actuator_cmd.position(kThumbYawIndex),
-        actuator_cmd.stiffness(kThumbYawIndex),
-        servo_stiffness_scale_);
-    }
-
-    for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-      const Eigen::Index idx = static_cast<Eigen::Index>(i);
-      tx_frames[tx_count++] = actuators_[i].set_joint_torque(
-        static_cast<float>(actuator_cmd.effort(idx))).frame;
-    }
-
+    plan.computed_actuator_command.capture(actuator_cmd);
+    protocol_.append_write_frames(
+      actuators_, actuator_cmd, write_cycle_count_, servo_stiffness_scale_, plan.direct_frames);
     ++write_cycle_count_;
-    capture_joint_commands();
-    capture_actuator_commands();
   }
 
-  const auto now = SteadyClock::now();
-  if (have_initialized_actuator_feedback && !has_fresh_rx_(now)) {
-    // Fast recovery path: try one RX drain only when freshness check fails.
-    const auto rx_probe = transport_.process_rx();
-    if (rx_probe.is_bus_error()) {
-      RCLCPP_WARN_THROTTLE(
-        logger(),
-        throttle_clock(),
-        1000,
-        "CAN receive error while probing stale RX: status 0x%X",
-        rx_probe.status);
-      return false;
-    }
+  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
+}
 
-    if (has_fresh_rx_(SteadyClock::now())) {
-      stale_write_cycle_count_ = 0;
-    } else {
-      ++stale_write_cycle_count_;
-      const long rx_age_ms = has_observed_rx_
-        ? static_cast<long>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_rx_time_).count())
-        : -1L;
-      RCLCPP_WARN_THROTTLE(
-        logger(),
-        throttle_clock(),
-        1000,
-        "RX stale; attempting direct TX recovery (age=%ld ms, stale_cycles=%zu, total_rx=%zu)",
-        rx_age_ms,
-        stale_write_cycle_count_,
-        rx_frame_count_);
-    }
-  } else {
-    stale_write_cycle_count_ = 0;
-  }
-
-  for (size_t i = 0; i < tx_count; ++i) {
-    if (!send_frame_blocking_(tx_frames[i], direct_tx_frame_timeout_)) {
+bool Hand::execute_write_plan_(const WritePlan & plan)
+{
+  for (const auto & frame : plan.direct_frames) {
+    if (!send_frame_blocking_(frame, direct_tx_frame_timeout_)) {
       return false;
     }
   }
@@ -620,8 +549,17 @@ float Hand::decode_float_le_(const TPCANMsg & frame, size_t offset)
 
 bool Hand::zero_actuators_()
 {
-  bool success = true;
+  const bool probe_success = run_zeroing_probe_rounds_();
 
+  std::vector<float> offsets;
+  const bool capture_success = capture_zero_offsets_(offsets);
+  const bool save_success = persist_zero_offsets_(offsets, probe_success && capture_success);
+  return probe_success && capture_success && save_success;
+}
+
+bool Hand::run_zeroing_probe_rounds_()
+{
+  bool success = true;
   for (size_t round = 0; round < kZeroingProbeRounds; ++round) {
     for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
       const auto req = actuators_[i].make_torque_request(static_cast<uint32_t>(i), 0.0f);
@@ -638,131 +576,67 @@ bool Hand::zero_actuators_()
     }
   }
 
-  plato_actuator::PositionOffsets offsets;
+  return success;
+}
+
+bool Hand::capture_zero_offsets_(std::vector<float> & offsets)
+{
+  bool success = true;
+  offsets.clear();
   offsets.reserve(kNumActuators);
 
-  {
-    std::lock_guard<std::mutex> lock(state_mutex_);
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  for (size_t i = 0; i < kNumActuators; ++i) {
+    const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
 
-    for (size_t i = 0; i < kNumActuators; ++i) {
-      const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
-
-      if (is_servo) {
-        // Preserve the existing offsets for joint1/joint2 thumb servo channels during zeroing.
-        offsets.push_back(actuator_position_offsets_[i]);
-        continue;
-      }
-
-      if (!actuators_[i].is_initialized()) {
-        RCLCPP_WARN(
-          logger(),
-          "Zeroing skipped for actuator %zu: no valid feedback; keeping previous offset.",
-          i + 1);
-        offsets.push_back(actuator_position_offsets_[i]);
-        success = false;
-        continue;
-      }
-
-      if (!actuators_[i].set_current_position_as_zero()) {
-        RCLCPP_WARN(
-          logger(),
-          "Zeroing failed for actuator %zu: unable to set current position as zero.",
-          i + 1);
-        offsets.push_back(actuator_position_offsets_[i]);
-        success = false;
-        continue;
-      }
-
-      actuator_position_offsets_[i] = actuators_[i].get_position_offset();
+    if (is_servo) {
+      // Preserve the existing offsets for joint1/joint2 thumb servo channels during zeroing.
       offsets.push_back(actuator_position_offsets_[i]);
+      continue;
     }
 
-    update_joint_states_locked_();
+    if (!actuators_[i].is_initialized()) {
+      RCLCPP_WARN(
+        logger(),
+        "Zeroing skipped for actuator %zu: no valid feedback; keeping previous offset.",
+        i + 1);
+      offsets.push_back(actuator_position_offsets_[i]);
+      success = false;
+      continue;
+    }
+
+    if (!actuators_[i].set_current_position_as_zero()) {
+      RCLCPP_WARN(
+        logger(),
+        "Zeroing failed for actuator %zu: unable to set current position as zero.",
+        i + 1);
+      offsets.push_back(actuator_position_offsets_[i]);
+      success = false;
+      continue;
+    }
+
+    actuator_position_offsets_[i] = actuators_[i].get_position_offset();
+    offsets.push_back(actuator_position_offsets_[i]);
   }
 
+  model_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
+  return success;
+}
+
+bool Hand::persist_zero_offsets_(const std::vector<float> & offsets, bool zeroing_success) const
+{
   try {
     plato_actuator::save_plato_actuator_position_offsets(offsets, actuator_offset_yaml_path_);
-    if (success) {
+    if (zeroing_success) {
       RCLCPP_INFO(logger(), "Zeroing complete, offsets saved.");
     } else {
       RCLCPP_WARN(logger(), "Zeroing completed with warnings; offsets were saved.");
     }
+    return true;
   } catch (const std::exception & e) {
     RCLCPP_ERROR(logger(), "Zeroing completed with warnings and failed to save offsets: %s", e.what());
-    success = false;
+    return false;
   }
-
-  return success;
-}
-
-void Hand::update_joint_states_locked_()
-{
-  bool used_fallback_feedback = false;
-  std::string fallback_feedback_ids;
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    if (!actuators_[i].is_initialized()) {
-      if (i == kThumbRollIndex || i == kThumbYawIndex) {
-        // Thumb servo channels may not report continuous state feedback on hold commands.
-        // Preserve joint-state updates by mirroring their commanded hold position.
-        actuator_states_.position_at(i) = joint_commands_.position_at(i);
-        actuator_states_.velocity_at(i) = 0.0;
-        actuator_states_.effort_at(i) = 0.0;
-        continue;
-      }
-
-      const bool have_cached_feedback =
-        std::isfinite(actuator_states_.position_at(i)) &&
-        std::isfinite(actuator_states_.velocity_at(i)) &&
-        std::isfinite(actuator_states_.effort_at(i));
-      if (!have_cached_feedback) {
-        actuator_states_.position_at(i) = 0.0;
-        actuator_states_.velocity_at(i) = 0.0;
-        actuator_states_.effort_at(i) = 0.0;
-      }
-
-      used_fallback_feedback = true;
-      if (!fallback_feedback_ids.empty()) {
-        fallback_feedback_ids += ", ";
-      }
-      fallback_feedback_ids += std::to_string(i + 1);
-      if (!have_cached_feedback) {
-        fallback_feedback_ids += "*";
-      }
-      continue;
-    }
-    const auto & state = actuators_[i].get_state();
-    actuator_states_.position_at(i) = state.position;
-    actuator_states_.velocity_at(i) = state.velocity;
-    actuator_states_.effort_at(i) = state.torque;
-  }
-
-  if (used_fallback_feedback) {
-    RCLCPP_WARN_THROTTLE(
-      logger(),
-      throttle_clock(),
-      1000,
-      "Joint-state update using fallback feedback for actuator(s) [%s] ('*' means zero fallback; others use cached state)",
-      fallback_feedback_ids.c_str());
-  }
-
-  can_hardware_common::RobotIO::JointState joint_state_candidate = joint_states_;
-  transmission_.actuator_to_joint(actuator_states_, joint_state_candidate);
-  if (!joint_state_candidate.const_view().all_finite()) {
-    RCLCPP_WARN_THROTTLE(
-      logger(),
-      throttle_clock(),
-      1000,
-      "Skipping joint-state update: transmission output contains non-finite values.");
-    return;
-  }
-
-  // Preserve storage addresses exported via ros2_control state interfaces.
-  // Reassigning joint_states_ would invalidate those pointers.
-  auto dst = joint_states_.view();
-  const auto src = joint_state_candidate.const_view();
-  dst.position = src.position;
-  dst.velocity = src.velocity;
-  dst.effort = src.effort;
 }
 
 void Hand::mark_rx_frame_()

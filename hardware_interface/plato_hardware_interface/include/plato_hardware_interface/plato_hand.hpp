@@ -8,15 +8,17 @@
 
 #include "can_hardware_common/can_transport.hpp"
 #include "can_hardware_common/command_scheduler.hpp"
-#include "can_hardware_common/robot.hpp"
+#include "can_hardware_common/core/can_hand_base.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/five_bar_linkage.hpp"
 #include "plato_hardware_interface/plato_hand_config.hpp"
+#include "plato_hardware_interface/plato_model.hpp"
+#include "plato_hardware_interface/plato_protocol.hpp"
 
 namespace plato_hand
 {
 
-class Hand : public can_hardware_common::RobotIO
+class Hand : public can_hardware_common::core::CanHandBase
 {
 public:
   static constexpr size_t kNumJoints = 8;
@@ -29,21 +31,19 @@ public:
   Hand & operator=(Hand &&) = delete;
   ~Hand();
 
-  bool enable(bool automatic_zeroing = false);
-  bool disable();
-  bool read();
-  bool write_joint_commands();
+  bool write_joint_commands() { return write(); }
 
   void print_motor_positions();
 
 private:
   using SteadyClock = std::chrono::steady_clock;
   using TransactionResult = can_hardware_common::CanCommandScheduler::TransactionResult;
+  using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
+  using WritePlan = can_hardware_common::core::WritePlan;
 
   static constexpr size_t kThumbRollIndex = 0;
   static constexpr size_t kThumbYawIndex = 1;
   static constexpr size_t kThumbMcpIndex = 2;
-  static constexpr size_t kServoWriteDivisor = 1;
   static constexpr std::chrono::microseconds kDirectTxInterFrameGap{500};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
   // Thumb servo channels can acknowledge lifecycle commands around ~17 ms on hardware.
@@ -52,9 +52,24 @@ private:
   static constexpr std::size_t kLifecycleCommandRetries = 2;
   static constexpr size_t kZeroingProbeRounds = 3;
 
+  bool update_measurements_() override;
+  void refresh_state_snapshot_() override;
+  void build_ready_write_plan_(WritePlan & plan) override;
+  bool execute_write_plan_(const WritePlan & plan) override;
+  LifecyclePlan build_lifecycle_plan_(can_hardware_common::core::LifecycleOperation operation) override;
+  bool execute_lifecycle_plan_(const LifecyclePlan & plan) override;
+  bool execute_standard_lifecycle_(const LifecyclePlan & plan);
+  bool execute_zero_lifecycle_();
+  bool handle_standard_lifecycle_result_(
+    std::size_t actuator_index,
+    const TransactionResult & result,
+    bool enabling);
+  void apply_lifecycle_request_flags_(bool enabling);
   bool send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout);
   bool zero_actuators_();
-  void update_joint_states_locked_();
+  bool run_zeroing_probe_rounds_();
+  bool capture_zero_offsets_(std::vector<float> & offsets);
+  bool persist_zero_offsets_(const std::vector<float> & offsets, bool zeroing_success) const;
   void mark_rx_frame_();
   bool has_fresh_rx_(SteadyClock::time_point now) const;
   void configure_transport_simulator_(bool bypass_hardware);
@@ -80,6 +95,8 @@ private:
 
   can_hardware_common::CanTransport transport_;
   FiveBarLinkage::Transmission transmission_;
+  PlatoProtocol protocol_;
+  PlatoModel model_;
   can_hardware_common::CanCommandScheduler scheduler_;
   mutable std::mutex state_mutex_;
   mutable std::mutex simulator_state_mutex_;
@@ -94,8 +111,8 @@ private:
   size_t write_cycle_count_ = 0;
   SteadyClock::time_point last_rx_time_{};
   size_t rx_frame_count_ = 0;
-  size_t stale_write_cycle_count_ = 0;
   bool has_observed_rx_ = false;
+  bool last_rx_healthy_ = true;
   bool transport_simulator_enabled_ = false;
   bool disable_on_destruction_ = true;
   bool enable_requested_ = false;

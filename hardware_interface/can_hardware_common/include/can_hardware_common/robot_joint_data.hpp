@@ -1,6 +1,0 @@
-#ifndef CAN_HARDWARE_COMMON__ROBOT_JOINT_DATA_HPP_
-#define CAN_HARDWARE_COMMON__ROBOT_JOINT_DATA_HPP_
-
-#include "can_hardware_common/robot.hpp"
-
-#endif  // CAN_HARDWARE_COMMON__ROBOT_JOINT_DATA_HPP_

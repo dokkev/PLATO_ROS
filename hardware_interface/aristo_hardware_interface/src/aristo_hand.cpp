@@ -1,45 +1,68 @@
 #include "aristo_hardware_interface/aristo_hand.hpp"
 
-#include <Eigen/Core>
-
 #include <algorithm>
+#include <chrono>
 #include <iostream>
+#include <string>
+#include <stdexcept>
+#include <thread>
+#include <utility>
 #include <vector>
+
+#include <rclcpp/rclcpp.hpp>
 
 namespace aristo_hand
 {
 
 namespace
 {
-using JointArrayf = Eigen::Array<float, static_cast<Eigen::Index>(Hand::kNumActuators), 1>;
-using JointArrayd = Eigen::Array<double, static_cast<Eigen::Index>(Hand::kNumActuators), 1>;
-using JointMapd = Eigen::Map<JointArrayd>;
-using ConstJointMapd = Eigen::Map<const JointArrayd>;
+using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
+using WritePlan = can_hardware_common::core::WritePlan;
+
+auto logger() { return rclcpp::get_logger("aristo_hardware_interface"); }
+
+rclcpp::Clock & snapshot_clock()
+{
+  static rclcpp::Clock clock(RCL_STEADY_TIME);
+  return clock;
+}
+
+bool is_nonfatal_read_status(TPCANStatus status)
+{
+  return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
+}
 
 void accumulate_poll_result(
-  can_hardware_common::CanBusManager::PollResult & aggregate,
-  const can_hardware_common::CanBusManager::PollResult & update)
+  can_hardware_common::CanTransport::RxResult & aggregate,
+  const can_hardware_common::CanTransport::RxResult & update)
 {
   aggregate.processed_frames += update.processed_frames;
-  aggregate.hit_frame_budget = aggregate.hit_frame_budget || update.hit_frame_budget;
 
-  const auto is_nonfatal_status = [](TPCANStatus status) {
-      return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
-    };
-
-  if (is_nonfatal_status(aggregate.read_status) && !is_nonfatal_status(update.read_status)) {
-    aggregate.read_status = update.read_status;
-  } else if (
-    aggregate.read_status == PCAN_ERROR_QRCVEMPTY &&
-    update.read_status == PCAN_ERROR_OK)
+  if (is_nonfatal_read_status(aggregate.status) && !is_nonfatal_read_status(update.status))
   {
-    aggregate.read_status = PCAN_ERROR_OK;
+    aggregate.status = update.status;
+  } else if (
+    aggregate.status == PCAN_ERROR_QRCVEMPTY &&
+    update.status == PCAN_ERROR_OK)
+  {
+    aggregate.status = PCAN_ERROR_OK;
   }
 }
 }  // namespace
 
-Hand::Hand()
+Hand::Hand(std::vector<aristo_actuator::Config> actuator_configs)
+: actuator_configs_(std::move(actuator_configs))
 {
+  if (actuator_configs_.size() != kNumActuators) {
+    throw std::invalid_argument(
+            "Aristo hand expects exactly " + std::to_string(kNumActuators) +
+            " actuator configs, got " + std::to_string(actuator_configs_.size()));
+  }
+
+  initialize_joint_buffers(kNumActuators, 0.0);
+  initialize_actuator_buffers(kNumActuators, 0.0);
+  state_snapshot_.resize(kNumActuators, kNumActuators);
+
   actuators_.reserve(actuator_configs_.size());
   for (const auto & config : actuator_configs_) {
     actuators_.emplace_back(config);
@@ -50,40 +73,88 @@ Hand::Hand()
     ft_sensors_.emplace_back(config);
   }
 
-  initialize_rx_dispatch_table_();
+  protocol_.initialize_rx_dispatch(actuators_, ft_sensors_);
+  transport_.add_rx_observer([this](const TPCANMsg & frame) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    if (protocol_.process_rx_frame(frame, actuators_, ft_sensors_)) {
+      mark_rx_frame_();
+    }
+  });
+  transport_.set_min_inter_frame_gap(kDirectTxInterFrameGap);
 
   print_actuator_info_();
 }
 
-can_hardware_common::CanBusManager::PollResult Hand::poll_can_bus()
+can_hardware_common::CanTransport::RxResult Hand::poll_can_bus()
 {
-  auto poll_result = can_bus_manager_.poll_once({this, &Hand::dispatch_rx_frame_static_});
-  if (poll_result.hit_frame_budget && poll_result.read_status == PCAN_ERROR_OK) {
-    const auto extra_poll_result =
-      can_bus_manager_.poll_once({this, &Hand::dispatch_rx_frame_static_});
-    accumulate_poll_result(poll_result, extra_poll_result);
+  auto poll_result = transport_.process_rx();
+  if (poll_result.processed_frames > 0 && poll_result.status == PCAN_ERROR_OK) {
+    const auto extra_poll_result = transport_.process_rx();
+    if (extra_poll_result.processed_frames > 0 || extra_poll_result.status != PCAN_ERROR_QRCVEMPTY) {
+      accumulate_poll_result(poll_result, extra_poll_result);
+    }
   }
 
   return poll_result;
 }
 
-void Hand::enable_all_actuators()
+TPCANStatus Hand::enable_all_actuators()
 {
+  TPCANStatus first_error = PCAN_ERROR_OK;
   for (auto & actuator : actuators_) {
-    send_command_(actuator.enable_motor());
+    const TPCANStatus status = send_command_(actuator.enable_motor());
+    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
+      first_error = status;
+    }
   }
+  return first_error;
 }
 
-void Hand::disable_all_actuators()
+TPCANStatus Hand::disable_all_actuators()
 {
+  TPCANStatus first_error = PCAN_ERROR_OK;
   for (auto & actuator : actuators_) {
-    send_command_(actuator.disable_motor());
+    const TPCANStatus status = send_command_(actuator.disable_motor());
+    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
+      first_error = status;
+    }
   }
+  return first_error;
 }
 
 TPCANStatus Hand::send_command_(const actuator::TxCommand & command)
 {
-  return can_bus_manager_.send_frame(command.frame, command.post_send_delay);
+  return send_frame_blocking_(command.frame, kDirectTxFrameTimeout);
+}
+
+TPCANStatus Hand::send_frame_blocking_(
+  const TPCANMsg & frame,
+  std::chrono::microseconds timeout)
+{
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
+  TPCANStatus last_status = PCAN_ERROR_QXMTFULL;
+
+  while (std::chrono::steady_clock::now() < deadline) {
+    const TPCANStatus status = transport_.send_if_ready(frame);
+    if (status == PCAN_ERROR_OK) {
+      return status;
+    }
+    if (status != PCAN_ERROR_QXMTFULL) {
+      return status;
+    }
+
+    last_status = status;
+    const auto next_send = transport_.next_send_time();
+    const auto now = std::chrono::steady_clock::now();
+    if (next_send > now) {
+      const auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(next_send - now);
+      std::this_thread::sleep_for(std::min(std::chrono::microseconds(100), remaining));
+    } else {
+      std::this_thread::sleep_for(std::chrono::microseconds(50));
+    }
+  }
+
+  return last_status;
 }
 
 void Hand::update_ft_sensor_wrenches_(std::vector<geometry_msgs::msg::Wrench> & ft_sensor_states)
@@ -125,191 +196,154 @@ void Hand::print_hardware_info_(const char * actuator_total_label) const
   }
 }
 
-void Hand::initialize_rx_dispatch_table_()
+bool Hand::update_measurements_()
 {
-  size_t dispatch_index = 0;
-  for (size_t actuator_index = 0; actuator_index < actuators_.size(); ++actuator_index) {
-    rx_dispatch_table_[dispatch_index++] = {
-      actuators_[actuator_index].get_rx_id(),
-      DispatchTargetKind::kActuator,
-      actuator_index};
+  last_rx_result_ = poll_can_bus();
+  if (!is_nonfatal_read_status(last_rx_result_.status)) {
+    RCLCPP_WARN(
+      logger(),
+      "CAN read failed while polling Aristo hand (status=0x%X)",
+      last_rx_result_.status);
+    return false;
   }
 
-  for (size_t sensor_index = 0; sensor_index < ft_sensors_.size(); ++sensor_index) {
-    rx_dispatch_table_[dispatch_index++] = {
-      ft_sensors_[sensor_index].get_force_rx_id(),
-      DispatchTargetKind::kForceSensor,
-      sensor_index};
-    rx_dispatch_table_[dispatch_index++] = {
-      ft_sensors_[sensor_index].get_torque_rx_id(),
-      DispatchTargetKind::kTorqueSensor,
-      sensor_index};
-  }
-
-  std::sort(
-    rx_dispatch_table_.begin(),
-    rx_dispatch_table_.end(),
-    [](const RxDispatchEntry & lhs, const RxDispatchEntry & rhs) {
-      return lhs.rx_id < rhs.rx_id;
-    });
+  return true;
 }
 
-void Hand::dispatch_rx_frame_static_(void * context, const TPCANMsg & frame)
+void Hand::refresh_state_snapshot_()
 {
-  static_cast<Hand *>(context)->dispatch_rx_frame_(frame);
-}
-
-void Hand::dispatch_rx_frame_(const TPCANMsg & frame)
-{
-  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD) {
-    return;
-  }
-
-  const auto entry_it = std::lower_bound(
-    rx_dispatch_table_.begin(),
-    rx_dispatch_table_.end(),
-    frame.ID,
-    [](const RxDispatchEntry & entry, uint32_t rx_id) {
-      return entry.rx_id < rx_id;
-    });
-  if (entry_it == rx_dispatch_table_.end() || entry_it->rx_id != frame.ID) {
-    return;
-  }
-
   std::lock_guard<std::mutex> lock(state_mutex_);
-  switch (entry_it->target_kind) {
-    case DispatchTargetKind::kActuator:
-      actuators_[entry_it->target_index].process_message(frame);
-      break;
-    case DispatchTargetKind::kForceSensor:
-    case DispatchTargetKind::kTorqueSensor:
-      ft_sensors_[entry_it->target_index].process_message(frame);
-      break;
+  model_.update_joint_states(actuators_, actuator_states_, joint_states_);
+  const auto joint_state = joint_state_view();
+  const auto ft_sensor_status = summarize_ft_sensor_status_(sensor::FTSensor::SteadyClock::now());
+  state_snapshot_.stamp = snapshot_clock().now();
+  state_snapshot_.has_fresh_rx = has_fresh_rx_(std::chrono::steady_clock::now());
+  state_snapshot_.calibrated = actuator_configs_.size() == kNumActuators;
+  state_snapshot_.sensor_status = ft_sensor_status;
+  state_snapshot_.sensors_ok = ft_sensor_status.ok();
+  state_snapshot_.actuators_ready = model_.actuators_ready(actuators_);
+  state_snapshot_.transport_healthy = is_nonfatal_read_status(last_rx_result_.status);
+  state_snapshot_.lifecycle_busy = false;
+  state_snapshot_.model_ready =
+    actuators_.size() == kNumActuators &&
+    actuator_configs_.size() == kNumActuators;
+  state_snapshot_.joint_position = joint_state.position.matrix();
+  state_snapshot_.joint_velocity = joint_state.velocity.matrix();
+  state_snapshot_.joint_effort = joint_state.effort.matrix();
+
+  if (state_snapshot_.actuator_states.size() != kNumActuators) {
+    state_snapshot_.resize(kNumActuators, kNumActuators);
   }
+  model_.copy_feedback_snapshot(actuators_, state_snapshot_);
 }
 
-void Hand::enable()
+Hand::SensorStatus Hand::summarize_ft_sensor_status_(
+  sensor::FTSensor::SteadyClock::time_point now) const
 {
-  enable_all_actuators();
-}
+  SensorStatus status;
+  status.expected_count = ft_sensors_.size();
 
-void Hand::disable()
-{
-  disable_all_actuators();
-}
-
-void Hand::set_current_position_as_zero()
-{
-  for (auto & actuator : actuators_) {
-    send_command_(actuator.set_current_position_as_zero());
-  }
-}
-
-void Hand::set_default_can_limits()
-{
-  for (auto & actuator : actuators_) {
-    send_command_(actuator.set_default_can_limits());
-  }
-}
-
-TPCANStatus Hand::write_joint_commands()
-{
-  if (joint_commands_.size() != kNumActuators)
-  {
-    return PCAN_ERROR_OK;
+  for (const auto & ft_sensor : ft_sensors_) {
+    if (ft_sensor.has_complete_wrench()) {
+      ++status.available_count;
+    }
+    if (ft_sensor.has_fresh_wrench(now, kFtSensorFreshnessTimeout)) {
+      ++status.fresh_count;
+    }
   }
 
-  std::vector<actuator::TxCommand> commands;
-  commands.reserve(kNumActuators);
+  return status;
+}
+
+can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
+  can_hardware_common::core::LifecycleOperation operation)
+{
+  return protocol_.build_lifecycle_plan(actuators_, operation);
+}
+
+bool Hand::execute_lifecycle_plan_(const LifecyclePlan & plan)
+{
+  return execute_standard_lifecycle_(plan);
+}
+
+bool Hand::execute_standard_lifecycle_(const LifecyclePlan & plan)
+{
+  return execute_direct_frames_(plan.direct_frames, kDirectTxFrameTimeout);
+}
+
+void Hand::build_ready_write_plan_(WritePlan & plan)
+{
+  std::vector<can_hardware_common::ActuatorTarget> impedance_targets;
 
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    const ConstJointMapd joint_position_cmd_map(joint_commands_.position_data());
-    const ConstJointMapd joint_velocity_cmd_map(joint_commands_.velocity_data());
-    const ConstJointMapd joint_stiffness_cmd_map(joint_commands_.stiffness_data());
-    const ConstJointMapd joint_damping_cmd_map(joint_commands_.damping_data());
-    const ConstJointMapd joint_torque_cmd_map(joint_commands_.effort_data());
-
-    JointArrayf joint_position_cmd = joint_position_cmd_map.cast<float>();
-    const JointArrayf joint_velocity_cmd = joint_velocity_cmd_map.cast<float>();
-    const JointArrayf joint_stiffness_cmd = joint_stiffness_cmd_map.cast<float>();
-    const JointArrayf joint_damping_cmd = joint_damping_cmd_map.cast<float>();
-    const JointArrayf joint_torque_cmd = joint_torque_cmd_map.cast<float>();
-
-    // PIP joints are modeled relative to the MCP joint in URDF but actuated from the palm.
-    joint_position_cmd(kThumbPipIndex) += actuators_[kThumbMcpIndex].get_feedback().position;
-    joint_position_cmd(kIndexPipIndex) += actuators_[kIndexMcpIndex].get_feedback().position;
-    joint_position_cmd(kMiddlePipIndex) += actuators_[kMiddleMcpIndex].get_feedback().position;
-
-    for (size_t i = 0; i < kNumActuators; ++i) {
-      const Eigen::Index joint_index = static_cast<Eigen::Index>(i);
-      const can_hardware_common::ActuatorTarget impedance_target{
-        joint_position_cmd(joint_index),
-        joint_velocity_cmd(joint_index),
-        joint_stiffness_cmd(joint_index),
-        joint_damping_cmd(joint_index),
-        joint_torque_cmd(joint_index)};
-
-      if (const auto command = actuators_[i].set_joint_impedance(impedance_target))
-      {
-        commands.push_back(*command);
-      }
-    }
-
+    model_.build_impedance_targets(
+      actuators_, joint_commands_, actuator_commands_, impedance_targets);
+    plan.computed_actuator_command.capture(actuator_command_view());
+    protocol_.append_impedance_frames(actuators_, impedance_targets, plan.direct_frames);
   }
 
+  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
+}
+
+bool Hand::execute_write_plan_(const WritePlan & plan)
+{
+  return execute_direct_frames_(plan.direct_frames, kDirectTxFrameTimeout);
+}
+
+bool Hand::execute_direct_frames_(
+  const std::vector<TPCANMsg> & frames,
+  std::chrono::microseconds timeout)
+{
+  for (const auto & frame : frames) {
+    if (send_frame_blocking_(frame, timeout) != PCAN_ERROR_OK) {
+      return false;
+    }
+  }
+  return true;
+}
+
+TPCANStatus Hand::set_current_position_as_zero()
+{
   TPCANStatus first_error = PCAN_ERROR_OK;
-  for (const auto & command : commands) {
-    const TPCANStatus status = send_command_(command);
+  for (auto & actuator : actuators_) {
+    const TPCANStatus status = send_command_(actuator.set_current_position_as_zero());
     if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
       first_error = status;
     }
   }
-
-  if (first_error == PCAN_ERROR_OK) {
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    joint_commands_.capture_previous();
-  }
-
   return first_error;
 }
 
-void Hand::read_joint_states()
+TPCANStatus Hand::set_default_can_limits()
 {
-  if (joint_states_.size() != kNumActuators)
-  {
-    return;
+  TPCANStatus first_error = PCAN_ERROR_OK;
+  for (auto & actuator : actuators_) {
+    const TPCANStatus status = send_command_(actuator.set_default_can_limits());
+    if (first_error == PCAN_ERROR_OK && status != PCAN_ERROR_OK) {
+      first_error = status;
+    }
   }
-
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  JointArrayf joint_positions = JointArrayf::Zero();
-  JointArrayf joint_velocities = JointArrayf::Zero();
-  JointArrayf joint_efforts = JointArrayf::Zero();
-
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    const auto & states = actuators_[i].get_feedback();
-    const Eigen::Index joint_index = static_cast<Eigen::Index>(i);
-    joint_positions(joint_index) = states.position;
-    joint_velocities(joint_index) = states.velocity;
-    joint_efforts(joint_index) = states.torque;
-  }
-
-  joint_positions(kThumbPipIndex) -= joint_positions(kThumbMcpIndex);
-  joint_positions(kIndexPipIndex) -= joint_positions(kIndexMcpIndex);
-  joint_positions(kMiddlePipIndex) -= joint_positions(kMiddleMcpIndex);
-
-  JointMapd joint_position_map(joint_states_.position_data());
-  JointMapd joint_velocity_map(joint_states_.velocity_data());
-  JointMapd joint_effort_map(joint_states_.effort_data());
-
-  joint_position_map = joint_positions.cast<double>();
-  joint_velocity_map = joint_velocities.cast<double>();
-  joint_effort_map = joint_efforts.cast<double>();
+  return first_error;
 }
 
 void Hand::update_ft_sensor_states(std::vector<geometry_msgs::msg::Wrench> & ft_sensor_states)
 {
   update_ft_sensor_wrenches_(ft_sensor_states);
+}
+
+void Hand::mark_rx_frame_()
+{
+  last_rx_time_ = std::chrono::steady_clock::now();
+  has_observed_rx_ = true;
+}
+
+bool Hand::has_fresh_rx_(std::chrono::steady_clock::time_point now) const
+{
+  if (!has_observed_rx_) {
+    return false;
+  }
+  return (now - last_rx_time_) <= kRxStaleTimeout;
 }
 
 void Hand::print_actuator_info_() const

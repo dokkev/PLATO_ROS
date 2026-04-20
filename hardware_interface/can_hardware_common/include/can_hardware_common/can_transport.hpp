@@ -3,36 +3,34 @@
 
 #include <PCANBasic.h>
 
-#include <atomic>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <deque>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
 
+#include "can_hardware_common/can_frame_types.hpp"
 #include "can_hardware_common/pcan_interface.hpp"
 
 namespace can_hardware_common
 {
 
-/// Frame-level CAN transport: paced TX, RX pump with multi-observer, diagnostics.
-/// No protocol awareness (no opcode matching, no retry logic).
 class CanTransport
 {
 public:
-  using RxObserver = std::function<void(const TPCANMsg & frame)>;
-  using TxSimulator = std::function<std::vector<TPCANMsg>(const TPCANMsg & tx_frame)>;
+  using RxObserver = std::function<void(const RxFrame & rx_frame)>;
+  using TxSimulator = std::function<std::vector<RxFrame>(const TxFrame & tx_frame)>;
 
-  struct RxResult
+  struct RxPollResult
   {
     std::size_t processed_frames = 0;
     TPCANStatus status = PCAN_ERROR_QRCVEMPTY;
-    bool is_bus_error() const
+
+    bool transport_ok() const
     {
-      return status != PCAN_ERROR_OK && status != PCAN_ERROR_QRCVEMPTY;
+      return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
     }
   };
 
@@ -51,50 +49,43 @@ public:
   CanTransport(CanTransport &&) = delete;
   CanTransport & operator=(CanTransport &&) = delete;
 
-  void set_min_inter_frame_gap(std::chrono::microseconds gap);
+  void set_tx_gap(std::chrono::microseconds tx_gap);
+  void set_min_inter_frame_gap(std::chrono::microseconds tx_gap) { set_tx_gap(tx_gap); }
 
-  // ── RX ──
-
-  RxResult process_rx();
-  TPCANStatus read_frame(TPCANMsg & frame, std::chrono::microseconds timeout);
+  RxPollResult poll_rx();
+  RxPollResult process_rx() { return poll_rx(); }
+  TPCANStatus read_frame(RxFrame & rx_frame, std::chrono::microseconds timeout);
 
   void add_rx_observer(RxObserver observer);
   void clear_rx_observers();
-  const std::vector<RxObserver> & rx_observers() const { return rx_observers_; }
 
-  /// Optional TX simulator: inject synthetic RX frames generated from each TX frame.
-  /// If bypass_hardware is true, CAN_Write/CAN_Read are skipped and only simulated frames are used.
   void set_tx_simulator(TxSimulator simulator, bool bypass_hardware = true);
   void clear_tx_simulator();
   bool has_tx_simulator() const;
 
-  // ── TX ──
-
-  /// Non-blocking paced send. Returns PCAN_ERROR_QXMTFULL if gap not ready.
-  TPCANStatus send_if_ready(const TPCANMsg & frame);
-
-  /// Earliest time send_if_ready() can succeed.
-  std::chrono::steady_clock::time_point next_send_time() const;
-
-  // ── Diagnostics ──
+  TPCANStatus send_tx_frame(const TxFrame & tx_frame);
+  TPCANStatus send_if_ready(const TxFrame & tx_frame) { return send_tx_frame(tx_frame); }
+  bool can_send_tx_now(std::chrono::steady_clock::time_point now) const;
+  std::chrono::steady_clock::time_point next_tx_time() const;
+  std::chrono::steady_clock::time_point next_send_time() const { return next_tx_time(); }
 
   BusDiagnostics get_diagnostics();
   static std::string bus_status_string(TPCANStatus status);
 
 private:
-  static constexpr std::size_t kMaxRxPerProcess = 30U;
+  static constexpr std::size_t kMaxRxPerPoll = 30U;
 
   pcan_interface::PCANInterface channel_;
   std::vector<RxObserver> rx_observers_;
 
   mutable std::mutex tx_mutex_;
-  std::chrono::microseconds min_inter_frame_gap_{std::chrono::microseconds(0)};
+  std::chrono::microseconds tx_gap_{0};
   std::chrono::steady_clock::time_point last_tx_time_{};
 
   mutable std::mutex simulator_mutex_;
   TxSimulator tx_simulator_{};
   bool simulator_bypass_hardware_ = false;
-  std::deque<TPCANMsg> injected_rx_frames_;
+  std::deque<RxFrame> injected_rx_frames_;
 };
 
 }  // namespace can_hardware_common

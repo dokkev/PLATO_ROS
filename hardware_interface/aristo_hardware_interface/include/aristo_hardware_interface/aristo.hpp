@@ -51,6 +51,7 @@ public:
 private:
   std::vector<geometry_msgs::msg::Wrench> ft_sensor_states_;
   std::unique_ptr<aristo_hand::Hand> hand_;
+  bool zeroing_requested_ = false;
 };
 
 }  // namespace aristo_hardware_interface

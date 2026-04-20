@@ -29,12 +29,19 @@ def generate_launch_description():
         description='Path to object state estimator configuration YAML'
     )
 
+    hand_namespace_arg = DeclareLaunchArgument(
+        'hand_namespace',
+        default_value='plato2',
+        description='Namespace used to derive default hand topics for trajectory control.',
+    )
+
     controller_node = Node(
         package='joint_impedance_controller',
         executable='impedance_trajectory_controller_node',
         name='impedance_trajectory_controller_node',
         output='screen',
         parameters=[{
+            'hand_namespace': LaunchConfiguration('hand_namespace'),
             'impedance_preset_yaml_path': LaunchConfiguration('controller_params_file'),
         }],
     )
@@ -65,6 +72,7 @@ def generate_launch_description():
         tactile_launch,
         controller_params_arg,
         estimator_params_arg,
+        hand_namespace_arg,
         controller_node,
         object_state_estimator_node,
         # impedance_keyboard_node,

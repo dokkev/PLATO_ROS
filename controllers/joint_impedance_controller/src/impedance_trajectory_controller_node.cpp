@@ -20,6 +20,8 @@ public:
     : Node("impedance_trajectory_controller_node"),
       controller_(8),
       steady_clock_(RCL_STEADY_TIME) {
+    const auto hand_namespace = this->declare_parameter<std::string>(
+        "hand_namespace", "plato2");
     const auto impedance_preset_yaml_path = this->declare_parameter<std::string>(
         "impedance_preset_yaml_path",
         plato::yaml::package_share_file_path(
@@ -29,13 +31,16 @@ public:
     const auto impedance_level_topic = this->declare_parameter<std::string>(
         "impedance_level_topic", "~/impedance_level");
     const auto position_topic = this->declare_parameter<std::string>(
-        "position_command_topic", "/plato2/joint_impedance_trajectory_controller/commands");
+        "position_command_topic",
+        resolve_hand_topic_(hand_namespace, "/joint_impedance_trajectory_controller/commands"));
     const auto goal_command_topic = this->declare_parameter<std::string>(
-        "goal_command_topic", "/plato2/joint_impedance_trajectory_controller/goal_command");
+        "goal_command_topic",
+        resolve_hand_topic_(hand_namespace, "/joint_impedance_trajectory_controller/goal_command"));
     const auto joint_state_topic = this->declare_parameter<std::string>(
-        "joint_state_topic", "/plato2/joint_states");
+        "joint_state_topic", resolve_hand_topic_(hand_namespace, "/joint_states"));
     const auto impedance_topic = this->declare_parameter<std::string>(
-        "impedance_command_topic", "/plato2/joint_impedance_controller/commands");
+        "impedance_command_topic",
+        resolve_hand_topic_(hand_namespace, "/joint_impedance_controller/commands"));
     default_goal_duration_sec_ = this->declare_parameter<double>("default_goal_duration_sec", 0.25);
     const double control_rate_hz = this->declare_parameter<double>("control_rate_hz", 100.0);
 
@@ -152,6 +157,19 @@ private:
     msg_out.damping = impedance_cmd.damping;
     msg_out.effort_ff = impedance_cmd.effort_ff;
     impedance_pub_->publish(msg_out);
+  }
+
+  static std::string resolve_hand_topic_(const std::string & hand_namespace, const char * suffix)
+  {
+    if (hand_namespace.empty()) {
+      return std::string(suffix);
+    }
+
+    if (hand_namespace.front() == '/') {
+      return hand_namespace + suffix;
+    }
+
+    return "/" + hand_namespace + suffix;
   }
 
   ImpedanceTrajectoryController controller_;

@@ -1,4 +1,4 @@
-#include "can_hardware_common/can_transport.hpp"
+#include "can_hardware_common/can_bus.hpp"
 #include "can_hardware_common/command_scheduler.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/utils/plato_hand_config_loader.hpp"
@@ -193,15 +193,15 @@ std::vector<size_t> initialized_indices(const std::vector<plato_actuator::Actuat
 }
 
 void send_streaming_frame(
-  can_hardware_common::CanTransport & transport,
+  can_hardware_common::CanBus & transport,
   const TPCANMsg & frame)
 {
-  const auto next_send = transport.next_send_time();
+  const auto next_send = transport.next_tx_time();
   const auto now = std::chrono::steady_clock::now();
   if (next_send > now) {
     std::this_thread::sleep_until(next_send);
   }
-  (void)transport.send_if_ready(frame);
+  (void)transport.send_tx_frame(frame);
 }
 
 std::chrono::microseconds to_microseconds(std::chrono::steady_clock::duration duration)
@@ -218,8 +218,8 @@ void run_gap_case(const Options & options, int gap_us)
     actuators.emplace_back(cfg);
   }
 
-  can_hardware_common::CanTransport transport;
-  transport.set_min_inter_frame_gap(std::chrono::microseconds(gap_us));
+  can_hardware_common::CanBus transport;
+  transport.set_tx_gap(std::chrono::microseconds(gap_us));
   transport.add_rx_observer([&actuators](const TPCANMsg & frame) {
     for (auto & actuator : actuators) {
       if (actuator.get_rx_id() == frame.ID) {
@@ -270,7 +270,7 @@ void run_gap_case(const Options & options, int gap_us)
       send_streaming_frame(transport, frame);
     }
 
-    const auto rx = transport.process_rx();
+    const auto rx = transport.poll_rx();
     rx_frames += rx.processed_frames;
     const auto cycle_end = std::chrono::steady_clock::now();
     stats.max_cycle_work_time = std::max(

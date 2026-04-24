@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+
 #include "can_hardware_common/actuator.hpp"
 #include "plato_hardware_interface/can_protocol.hpp"
 
@@ -39,13 +40,6 @@ public:
   Actuator & operator=(Actuator &&) = delete;
   ~Actuator();
 
-  /// High-level API: returns CommandRequest ready for scheduler.
-  can_hardware_common::CommandRequest make_enable_request(uint32_t key) const;
-  can_hardware_common::CommandRequest make_disable_request(uint32_t key) const;
-  can_hardware_common::CommandRequest make_torque_request(uint32_t key, float joint_torque);
-  can_hardware_common::CommandRequest make_servo_hold_request(
-    uint32_t key, float joint_position);
-
   /// Low-level: returns TxCommand (used by protocol/zeroing internals).
   actuator::TxCommand enable_motor();
   actuator::TxCommand disable_motor();
@@ -73,26 +67,17 @@ public:
   bool is_enabled() const { return motor_enabled_; }
   bool is_initialized() const { return is_initialized_; }
 
-  void set_status_temperature(uint8_t temperature) { status_.temperature = temperature; }
   void set_motor_enabled(bool enabled) { motor_enabled_ = enabled; }
-  void set_motor_position_raw(float motor_position) { motor_position_ = motor_position; }
-  void apply_motor_feedback(
-    float motor_position,
-    float motor_velocity,
-    float motor_torque,
-    bool position_has_offset,
-    bool velocity_is_rpm);
 
 private:
-  can_hardware_common::CommandRequest to_request_(
-    uint32_t key, const actuator::TxCommand & cmd) const;
+  void apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded);
   float clamp_torque_near_bounds_(float joint_torque) const;
   float map_joint_to_motor_frame_(float joint_value, bool apply_offset = false) const;
   float map_motor_to_joint_frame_(float motor_value, bool apply_offset = false) const;
 
   const StaticConfig static_config_;
   float position_offset_ = 0.0f;
-  std::unique_ptr<can_protocol::SteadywinProtocol> protocol_;
+  std::unique_ptr<CANProtocol> protocol_;
   can_hardware_common::ActuatorState state_;
   can_hardware_common::ActuatorStatus status_;
   float motor_position_ = 0.0f;

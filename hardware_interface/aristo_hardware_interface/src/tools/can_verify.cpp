@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
         }
         // Keep the working bitrate initialized and run single-ID decode
             std::cout << "Using bitrate: " << baud_to_str(res.baud) << ". Listening for up to " << dur_sec << " s...\n";
-            mit_can_protocol::MsgDecoder decoder(1.0f, 1.0f);
+            mit_can_protocol::MsgDecoder decoder;
             const auto t0 = std::chrono::steady_clock::now();
             auto next_tx = t0;
             bool got = false;
@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
     pcan_interface::PCANInterface can;
 
     // Decoder with generic constants (gear_ratio, torque_constant not needed for scaling here)
-    mit_can_protocol::MsgDecoder decoder(1.0f, 1.0f);
+    mit_can_protocol::MsgDecoder decoder;
 
     std::atomic<bool> got_reply{false};
 

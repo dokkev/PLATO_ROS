@@ -2,12 +2,10 @@
 #define PLATO_HARDWARE_INTERFACE__PLATO_HAND_HPP_
 
 #include <chrono>
-#include <cstdint>
 #include <mutex>
 #include <vector>
 
-#include "can_hardware_common/can_transport.hpp"
-#include "can_hardware_common/command_scheduler.hpp"
+#include "can_hardware_common/can_bus.hpp"
 #include "can_hardware_common/core/can_hand_base.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/five_bar_linkage.hpp"
@@ -37,19 +35,14 @@ public:
 
 private:
   using SteadyClock = std::chrono::steady_clock;
-  using TransactionResult = can_hardware_common::CanCommandScheduler::TransactionResult;
   using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
   using WritePlan = can_hardware_common::core::WritePlan;
 
   static constexpr size_t kThumbRollIndex = 0;
   static constexpr size_t kThumbYawIndex = 1;
   static constexpr size_t kThumbMcpIndex = 2;
-  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{500};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
-  // Thumb servo channels can acknowledge lifecycle commands around ~17 ms on hardware.
-  // Keep timeout comfortably above that to avoid false startup timeouts.
   static constexpr std::chrono::microseconds kResponseTimeout{25000};
-  static constexpr std::size_t kLifecycleCommandRetries = 2;
   static constexpr size_t kZeroingProbeRounds = 3;
 
   bool update_measurements_() override;
@@ -60,11 +53,6 @@ private:
   bool execute_lifecycle_plan_(const LifecyclePlan & plan) override;
   bool execute_standard_lifecycle_(const LifecyclePlan & plan);
   bool execute_zero_lifecycle_();
-  bool handle_standard_lifecycle_result_(
-    std::size_t actuator_index,
-    const TransactionResult & result,
-    bool enabling);
-  void apply_lifecycle_request_flags_(bool enabling);
   bool send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout);
   bool zero_actuators_();
   bool run_zeroing_probe_rounds_();
@@ -72,36 +60,13 @@ private:
   bool persist_zero_offsets_(const std::vector<float> & offsets, bool zeroing_success) const;
   void mark_rx_frame_();
   bool has_fresh_rx_(SteadyClock::time_point now) const;
-  void configure_transport_simulator_(bool bypass_hardware);
-  std::vector<TPCANMsg> simulate_tx_frame_(const TPCANMsg & tx_frame);
-  static TPCANMsg make_ack_frame_(uint32_t rx_id, uint8_t opcode, uint8_t result = 0x00);
-  static TPCANMsg make_state_frame_(
-    uint32_t rx_id,
-    uint8_t opcode,
-    uint8_t temperature,
-    float motor_position,
-    float motor_velocity_rpm,
-    float motor_torque);
-  static float decode_float_le_(const TPCANMsg & frame, size_t offset);
 
-  struct SimActuatorState
-  {
-    float motor_position = 0.0F;
-    float motor_velocity_rpm = 0.0F;
-    float motor_torque = 0.0F;
-    bool motor_enabled = false;
-    uint8_t temperature = 30;
-  };
-
-  can_hardware_common::CanTransport transport_;
+  can_hardware_common::CanBus transport_;
   FiveBarLinkage::Transmission transmission_;
   PlatoProtocol protocol_;
   PlatoModel model_;
-  can_hardware_common::CanCommandScheduler scheduler_;
   mutable std::mutex state_mutex_;
-  mutable std::mutex simulator_state_mutex_;
   std::vector<plato_actuator::Actuator> actuators_;
-  std::vector<SimActuatorState> simulator_states_;
 
   std::string actuator_offset_yaml_path_;
   const std::vector<plato_actuator::StaticConfig> actuator_static_configs_;
@@ -113,7 +78,6 @@ private:
   size_t rx_frame_count_ = 0;
   bool has_observed_rx_ = false;
   bool last_rx_healthy_ = true;
-  bool transport_simulator_enabled_ = false;
   bool disable_on_destruction_ = true;
   bool enable_requested_ = false;
   bool disable_requested_ = false;

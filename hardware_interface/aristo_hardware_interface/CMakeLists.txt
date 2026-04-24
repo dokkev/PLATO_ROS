@@ -28,6 +28,7 @@ endforeach()
 
 add_library(${PROJECT_NAME} SHARED
   src/actuator.cpp
+  src/can_protocol.cpp
   src/mit_can_protocol.cpp
   src/aristo_hand.cpp
   src/aristo_model.cpp

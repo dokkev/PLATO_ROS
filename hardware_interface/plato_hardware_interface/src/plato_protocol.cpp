@@ -53,30 +53,24 @@ TPCANMsg make_servo_position_command(
 
 }  // namespace
 
-PlatoProtocol::LifecyclePlan PlatoProtocol::build_lifecycle_plan(
+void PlatoProtocol::append_enable_frames(
   std::vector<plato_actuator::Actuator> & actuators,
-  can_hardware_common::core::LifecycleOperation operation) const
+  std::vector<TPCANMsg> & direct_frames) const
 {
-  LifecyclePlan plan;
-  plan.operation = operation;
-  plan.ready = true;
-
-  if (operation == can_hardware_common::core::LifecycleOperation::kZero) {
-    plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kCustomExecution;
-    return plan;
+  direct_frames.reserve(direct_frames.size() + actuators.size());
+  for (auto & actuator : actuators) {
+    direct_frames.push_back(actuator.enable_motor().frame);
   }
+}
 
-  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kScheduledRequests;
-  plan.scheduled_requests.reserve(actuators.size());
-  for (std::size_t i = 0; i < actuators.size(); ++i) {
-    if (operation == can_hardware_common::core::LifecycleOperation::kEnable) {
-      plan.scheduled_requests.push_back(actuators[i].make_enable_request(static_cast<uint32_t>(i)));
-    } else {
-      plan.scheduled_requests.push_back(actuators[i].make_disable_request(static_cast<uint32_t>(i)));
-    }
+void PlatoProtocol::append_disable_frames(
+  std::vector<plato_actuator::Actuator> & actuators,
+  std::vector<TPCANMsg> & direct_frames) const
+{
+  direct_frames.reserve(direct_frames.size() + actuators.size());
+  for (auto & actuator : actuators) {
+    direct_frames.push_back(actuator.disable_motor().frame);
   }
-
-  return plan;
 }
 
 bool PlatoProtocol::process_rx_frame(

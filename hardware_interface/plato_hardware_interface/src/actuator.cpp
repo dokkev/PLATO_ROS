@@ -12,17 +12,15 @@ namespace plato_actuator
 
 namespace
 {
-constexpr float kTwoPi = 6.28318530717958647692f;
-constexpr float kSecondsPerMinute = 60.0f;
-
-can_hardware_common::ActuatorCoreConfig make_core_config(const StaticConfig & config)
+can_hardware_common::ActuatorCoreConfig make_core_config(const Config & config)
 {
   can_hardware_common::ActuatorCoreConfig core;
-  core.can_tx_id = config.can_tx_id;
-  core.can_rx_id = config.can_rx_id;
-  core.direction = config.direction;
-  core.torque_constant = config.torque_constant;
-  core.gear_ratio = config.gear_ratio;
+  core.can_tx_id = config.static_config.can_tx_id;
+  core.can_rx_id = config.static_config.can_rx_id;
+  core.position_offset = config.position_offset;
+  core.direction = config.static_config.direction;
+  core.torque_constant = config.static_config.torque_constant;
+  core.gear_ratio = config.static_config.gear_ratio;
   return core;
 }
 
@@ -37,7 +35,7 @@ void validate_direction(const StaticConfig & config)
 Actuator::Actuator(const Config & config)
 : static_config_(config.static_config),
   position_offset_(config.position_offset),
-  protocol_(std::make_unique<can_protocol::SteadywinProtocol>(make_core_config(config.static_config)))
+  protocol_(std::make_unique<CANProtocol>(make_core_config(config)))
 {
   validate_direction(static_config_);
 }
@@ -45,41 +43,6 @@ Actuator::Actuator(const Config & config)
 Actuator::Actuator(Actuator &&) noexcept = default;
 
 Actuator::~Actuator() = default;
-
-can_hardware_common::CommandRequest Actuator::to_request_(
-  uint32_t key, const actuator::TxCommand & cmd) const
-{
-  can_hardware_common::CommandRequest req;
-  req.key = key;
-  req.frame = cmd.frame;
-  req.reply.expected_rx_id = static_config_.can_rx_id;
-  req.reply.expected_opcode = cmd.expected_response_opcode;
-  req.reply.success_byte = 0x00;
-  return req;
-}
-
-can_hardware_common::CommandRequest Actuator::make_enable_request(uint32_t key) const
-{
-  // const_cast needed because protocol is not const-correct (it mutates internal msg buffers).
-  return to_request_(key, const_cast<Actuator *>(this)->enable_motor());
-}
-
-can_hardware_common::CommandRequest Actuator::make_disable_request(uint32_t key) const
-{
-  return to_request_(key, const_cast<Actuator *>(this)->disable_motor());
-}
-
-can_hardware_common::CommandRequest Actuator::make_torque_request(
-  uint32_t key, float joint_torque)
-{
-  return to_request_(key, set_joint_torque(joint_torque));
-}
-
-can_hardware_common::CommandRequest Actuator::make_servo_hold_request(
-  uint32_t key, float joint_position)
-{
-  return to_request_(key, set_servo_hold(joint_position));
-}
 
 actuator::TxCommand Actuator::enable_motor()
 {
@@ -121,9 +84,7 @@ actuator::TxCommand Actuator::set_joint_position(float joint_position, uint32_t 
       static_config_.limits.position_limit_max);
   }
 
-  return protocol_->make_position_command(
-    map_joint_to_motor_frame_(joint_position, true),
-    duration_ms);
+  return protocol_->make_position_command(joint_position, duration_ms);
 }
 
 actuator::TxCommand Actuator::set_servo_position(float joint_position, uint32_t current_milliamps)
@@ -137,9 +98,7 @@ actuator::TxCommand Actuator::set_servo_position(float joint_position, uint32_t 
       static_config_.limits.position_limit_max);
   }
 
-  return protocol_->make_servo_position_command(
-    map_joint_to_motor_frame_(joint_position, true),
-    current_milliamps);
+  return protocol_->make_servo_position_command(joint_position, current_milliamps);
 }
 
 actuator::TxCommand Actuator::set_servo_hold(float joint_position)
@@ -159,6 +118,7 @@ bool Actuator::set_current_position_as_zero()
   }
 
   position_offset_ = motor_position_;
+  protocol_->set_position_offset(position_offset_);
   state_.position = 0.0f;
   return true;
 }
@@ -169,26 +129,12 @@ void Actuator::process_message(const TPCANMsg & msg)
     return;
   }
 
-  protocol_->process_message(msg, *this);
-}
-
-void Actuator::apply_motor_feedback(
-  float motor_position,
-  float motor_velocity,
-  float motor_torque,
-  bool position_has_offset,
-  bool velocity_is_rpm)
-{
-  set_motor_position_raw(motor_position);
-
-  if (velocity_is_rpm) {
-    motor_velocity = motor_velocity * kTwoPi / kSecondsPerMinute;
+  const auto decoded = protocol_->decode(msg);
+  if (!decoded) {
+    return;
   }
 
-  state_.position = map_motor_to_joint_frame_(motor_position, position_has_offset);
-  state_.velocity = map_motor_to_joint_frame_(motor_velocity);
-  state_.torque = map_motor_to_joint_frame_(motor_torque);
-  is_initialized_ = true;
+  apply_decoded_feedback_(*decoded);
 }
 
 float Actuator::clamp_torque_near_bounds_(float joint_torque) const
@@ -241,6 +187,34 @@ float Actuator::map_motor_to_joint_frame_(float motor_value, bool apply_offset) 
   return apply_offset ?
          (motor_value - position_offset_) * direction :
          motor_value * direction;
+}
+
+void Actuator::apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded)
+{
+  if (decoded.motor_position) {
+    motor_position_ = *decoded.motor_position;
+  }
+
+  if (decoded.has_state) {
+    state_ = decoded.state;
+    is_initialized_ = true;
+  }
+
+  if (decoded.temperature) {
+    status_.temperature = *decoded.temperature;
+  }
+
+  if (decoded.in_oc_mode) {
+    status_.in_oc_mode = *decoded.in_oc_mode;
+  }
+
+  if (decoded.has_fault) {
+    status_.has_fault = *decoded.has_fault;
+  }
+
+  if (decoded.motor_enabled) {
+    motor_enabled_ = *decoded.motor_enabled;
+  }
 }
 
 }  // namespace plato_actuator

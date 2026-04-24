@@ -131,7 +131,7 @@ private:
   {
     const auto & tc = test_cases_.at(test_case_index_);
 
-    can_bus_manager_.set_min_inter_frame_gap(tc.min_inter_frame_gap);
+    can_bus_manager_.set_tx_gap(tc.min_inter_frame_gap);
 
     stats_ = {};
     warmup_done_ = false;
@@ -158,12 +158,12 @@ private:
       }
 
       if (!warmup_done_) {
-        can_bus_manager_.send_if_ready(frame);
+        can_bus_manager_.send_tx_frame(frame);
         continue;
       }
 
       ++stats_.enqueue_count;
-      const TPCANStatus status = can_bus_manager_.send_if_ready(frame);
+      const TPCANStatus status = can_bus_manager_.send_tx_frame(frame);
       if (status == PCAN_ERROR_OK) {
         ++stats_.sent_count;
       } else if (status == PCAN_ERROR_QXMTFULL) {
@@ -176,7 +176,7 @@ private:
 
   void rx_timer_cb_()
   {
-    const auto rx = can_bus_manager_.process_rx();
+    const auto rx = can_bus_manager_.poll_rx();
 
     if (warmup_done_ && rx.is_bus_error()) {
       ++stats_.drain_bus_error_count;

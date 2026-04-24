@@ -1,12 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <limits>
 #include <vector>
 
 #include "aristo_hardware_interface/actuator.hpp"
 #include "aristo_hardware_interface/aristo_protocol.hpp"
-#include "can_hardware_common/core/lifecycle_plan.hpp"
 
 namespace
 {
@@ -19,9 +17,12 @@ aristo_actuator::Config make_aristo_config(std::uint8_t tx_id, std::uint8_t rx_i
   config.core.direction = 1;
   config.core.torque_constant = 0.1f;
   config.core.gear_ratio = 1.0f;
-  config.limits.position_limit_min = -std::numeric_limits<float>::infinity();
-  config.limits.position_limit_max = std::numeric_limits<float>::infinity();
-  config.limits.effort_limit = std::numeric_limits<float>::infinity();
+  config.limits.position_limit_min = -3.14f;
+  config.limits.position_limit_max = 3.14f;
+  config.limits.velocity_limit = 10.0f;
+  config.limits.effort_limit = 5.0f;
+  config.limits.stiffness_limit = 500.0f;
+  config.limits.damping_limit = 5.0f;
   return config;
 }
 
@@ -41,48 +42,36 @@ TEST(AristoProtocolTest, EnableBuildsDirectFrames)
 {
   auto actuators = make_aristo_actuators(4);
   aristo_hand::AristoProtocol protocol;
+  std::vector<TPCANMsg> direct_frames;
 
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kEnable);
+  protocol.append_enable_frames(actuators, direct_frames);
 
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kEnable);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kDirectFrames);
-  EXPECT_TRUE(plan.scheduled_requests.empty());
-  ASSERT_EQ(plan.direct_frames.size(), actuators.size());
-  EXPECT_EQ(plan.direct_frames.front().ID, actuators.front().enable_motor().frame.ID);
+  ASSERT_EQ(direct_frames.size(), actuators.size());
+  EXPECT_EQ(direct_frames.front().ID, actuators.front().enable_motor().frame.ID);
 }
 
 TEST(AristoProtocolTest, DisableBuildsDirectFrames)
 {
   auto actuators = make_aristo_actuators(3);
   aristo_hand::AristoProtocol protocol;
+  std::vector<TPCANMsg> direct_frames;
 
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kDisable);
+  protocol.append_disable_frames(actuators, direct_frames);
 
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kDisable);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kDirectFrames);
-  EXPECT_TRUE(plan.scheduled_requests.empty());
-  ASSERT_EQ(plan.direct_frames.size(), actuators.size());
-  EXPECT_EQ(plan.direct_frames.front().ID, actuators.front().disable_motor().frame.ID);
+  ASSERT_EQ(direct_frames.size(), actuators.size());
+  EXPECT_EQ(direct_frames.front().ID, actuators.front().disable_motor().frame.ID);
 }
 
 TEST(AristoProtocolTest, ZeroBuildsDirectFrames)
 {
   auto actuators = make_aristo_actuators(2);
   aristo_hand::AristoProtocol protocol;
+  std::vector<TPCANMsg> direct_frames;
 
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kZero);
+  protocol.append_zero_frames(actuators, direct_frames);
 
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kZero);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kDirectFrames);
-  EXPECT_TRUE(plan.scheduled_requests.empty());
-  ASSERT_EQ(plan.direct_frames.size(), actuators.size());
-  EXPECT_EQ(plan.direct_frames.front().ID, actuators.front().set_current_position_as_zero().frame.ID);
+  ASSERT_EQ(direct_frames.size(), actuators.size());
+  EXPECT_EQ(direct_frames.front().ID, actuators.front().set_current_position_as_zero().frame.ID);
 }
 
 }  // namespace

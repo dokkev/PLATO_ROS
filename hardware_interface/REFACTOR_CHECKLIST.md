@@ -3,7 +3,7 @@
 ## Architecture Principles
 
 - [x] PCANInterface: raw driver wrapper only
-- [x] CanBusManager → CanTransport: transport/pacing/RX dispatch only
+- [x] CanBusManager → CanBus: transport/pacing/RX dispatch only
 - [x] send_and_wait() moved out of transport into scheduler
 - [x] Hand: joint↔actuator mapping + request generation only
 - [x] Streaming write: latest-only semantics confirmed
@@ -31,9 +31,9 @@
 - [x] read_with_timeout() semantics documented in header comment
 - [x] Thread-safety: io_mutex_ protects all I/O, ppoll outside lock is safe
 
-## 3. CanBusManager → CanTransport
+## 3. CanBusManager → CanBus
 
-- [x] Renamed to CanTransport (new file can_transport.hpp/cpp)
+- [x] Renamed to CanBus (new file can_bus.hpp/cpp)
 - [x] send_and_wait() removed from transport
 - [x] Single RxHandler → multi-observer (add_rx_observer / clear_rx_observers)
 - [x] process_rx() max frame cap retained (kMaxRxPerProcess = 30)
@@ -120,7 +120,7 @@
 - [x] Step 2: CanCommandScheduler with execute_blocking + streaming service
 - [x] Step 3: Move streaming scheduler from Hand → CanCommandScheduler
 - [x] Step 4: Hand slim down (no pending_, last_rx_, next_send_index_)
-- [x] Step 5: CanTransport created (no send_and_wait, multi-observer)
+- [x] Step 5: CanBus created (no send_and_wait, multi-observer)
 - [x] Step 6: PCANInterface review (kept as-is, already raw-only)
 - [x] Step 7: Old can_bus_manager.hpp/cpp deleted
 - [ ] Step 8: Update profiler node to new API (deferred — commented out of build)

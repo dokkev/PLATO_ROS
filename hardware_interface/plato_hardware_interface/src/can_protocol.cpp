@@ -2,10 +2,10 @@
 
 #include <chrono>
 #include <cstring>
+#include <cmath>
+#include <stdexcept>
 
 #include <rclcpp/rclcpp.hpp>
-
-#include "plato_hardware_interface/actuator.hpp"
 
 namespace can_protocol
 {
@@ -15,6 +15,9 @@ using can_hardware_common::can_protocol_helpers::encode_u24_le;
 
 namespace
 {
+constexpr float kTwoPi = 6.28318530717958647692f;
+constexpr float kSecondsPerMinute = 60.0f;
+
 auto logger() { return rclcpp::get_logger("can_protocol"); }
 
 rclcpp::Clock & throttle_clock()
@@ -127,136 +130,156 @@ void MsgDecoder::get_states(
   torque = torque_int * torque_scale_ - torque_offset_;
 }
 
-SteadywinProtocol::SteadywinProtocol(
-  const can_hardware_common::ActuatorCoreConfig & config)
-: tx_id_(config.can_tx_id),
+}  // namespace can_protocol
+
+namespace plato_actuator
+{
+
+CANProtocol::CANProtocol(const can_hardware_common::ActuatorCoreConfig & config)
+: config_(config),
+  tx_id_(config.can_tx_id),
   decoder_(config.gear_ratio, config.torque_constant),
   onoff_msg_(make_message_(config.can_tx_id, 8)),
   cmd_msg_(make_message_(config.can_tx_id, 8))
 {
+  validate_direction_(config_);
 }
 
-actuator::TxCommand SteadywinProtocol::make_enable_motor_command()
+std::optional<actuator::TxCommand> CANProtocol::make_impedance_command(
+  const can_hardware_common::ActuatorTarget &)
 {
-  MsgEncoder::start_motor(onoff_msg_);
-  return {onoff_msg_, CommandByte::START_MOTOR};
+  return std::nullopt;
 }
 
-actuator::TxCommand SteadywinProtocol::make_disable_motor_command()
+actuator::TxCommand CANProtocol::make_enable_motor_command()
 {
-  MsgEncoder::stop_motor(onoff_msg_);
-  return {onoff_msg_, CommandByte::STOP_MOTOR};
+  can_protocol::MsgEncoder::start_motor(onoff_msg_);
+  return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand SteadywinProtocol::make_stop_control_command()
+actuator::TxCommand CANProtocol::make_disable_motor_command()
 {
-  MsgEncoder::stop_control(onoff_msg_);
-  return {onoff_msg_, CommandByte::STOP_CONTROL};
+  can_protocol::MsgEncoder::stop_motor(onoff_msg_);
+  return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand SteadywinProtocol::make_torque_command(float motor_torque)
+actuator::TxCommand CANProtocol::make_stop_control_command()
 {
-  MsgEncoder::set_torque(cmd_msg_, motor_torque, 0);
-  return {cmd_msg_, CommandByte::TORQUE_CONTROL};
+  can_protocol::MsgEncoder::stop_control(onoff_msg_);
+  return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand SteadywinProtocol::make_position_command(
-  float motor_position,
+actuator::TxCommand CANProtocol::make_torque_command(float motor_torque)
+{
+  can_protocol::MsgEncoder::set_torque(cmd_msg_, motor_torque, 0);
+  return actuator::TxCommand{cmd_msg_};
+}
+
+actuator::TxCommand CANProtocol::make_position_command(
+  float joint_position,
   uint32_t duration)
 {
-  MsgEncoder::set_position(cmd_msg_, motor_position, duration);
-  return {cmd_msg_, CommandByte::POSITION_CONTROL};
+  can_protocol::MsgEncoder::set_position(
+    cmd_msg_, map_joint_to_motor_frame_(joint_position, true), duration);
+  return actuator::TxCommand{cmd_msg_};
 }
 
-actuator::TxCommand SteadywinProtocol::make_servo_position_command(
-  float motor_position,
+actuator::TxCommand CANProtocol::make_servo_position_command(
+  float joint_position,
   uint32_t current_milliamps)
 {
-  MsgEncoder::set_position(cmd_msg_, motor_position, current_milliamps);
-  return {cmd_msg_, CommandByte::POSITION_CONTROL};
+  can_protocol::MsgEncoder::set_position(
+    cmd_msg_, map_joint_to_motor_frame_(joint_position, true), current_milliamps);
+  return actuator::TxCommand{cmd_msg_};
 }
 
-void SteadywinProtocol::process_message(const TPCANMsg & msg, plato_actuator::Actuator & actuator)
+std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
+  const can_hardware_common::RxFrame & msg)
 {
-  if (!is_supported_rx_frame(msg)) {
+  if (!can_protocol::is_supported_rx_frame(msg)) {
     RCLCPP_WARN_THROTTLE(
-      logger(), throttle_clock(), 1000,
+      can_protocol::logger(), can_protocol::throttle_clock(), 1000,
       "Ignoring unsupported Plato CAN frame type 0x%02X for actuator ID 0x%02X",
       msg.MSGTYPE, tx_id_);
-    return;
+    return std::nullopt;
   }
 
-  if (msg.LEN < kAckFrameLength) {
+  if (msg.LEN < can_protocol::kAckFrameLength) {
     RCLCPP_WARN_THROTTLE(
-      logger(), throttle_clock(), 1000,
+      can_protocol::logger(), can_protocol::throttle_clock(), 1000,
       "Ignoring short Plato CAN frame for actuator ID 0x%02X: LEN=%u",
       tx_id_, msg.LEN);
-    return;
+    return std::nullopt;
   }
+
+  can_hardware_common::DecodedFeedback decoded;
 
   switch (msg.DATA[0]) {
     case CommandByte::POSITION_CONTROL:
     case CommandByte::SPEED_CONTROL:
-    case CommandByte::TORQUE_CONTROL:
-      if (msg.LEN < kStateFrameLength) {
-        RCLCPP_WARN_THROTTLE(
-          logger(), throttle_clock(), 1000,
-          "Ignoring short Plato state reply for actuator ID 0x%02X: LEN=%u",
-          tx_id_, msg.LEN);
-        return;
-      }
-      if (MsgDecoder::get_result(msg.DATA[1])) {
+    case CommandByte::TORQUE_CONTROL: {
+        if (msg.LEN < can_protocol::kStateFrameLength) {
+          RCLCPP_WARN_THROTTLE(
+            can_protocol::logger(), can_protocol::throttle_clock(), 1000,
+            "Ignoring short Plato state reply for actuator ID 0x%02X: LEN=%u",
+            tx_id_, msg.LEN);
+          return std::nullopt;
+        }
+        if (!can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+          RCLCPP_ERROR(can_protocol::logger(), "Actuator ID 0x%02X control failed", tx_id_);
+          return std::nullopt;
+        }
+
         uint8_t temperature = 0;
         float motor_position = 0.0f;
         float motor_velocity = 0.0f;
         float motor_torque = 0.0f;
         decoder_.get_states(msg, temperature, motor_position, motor_velocity, motor_torque);
-        actuator.set_status_temperature(temperature);
-        actuator.apply_motor_feedback(
-          motor_position,
-          motor_velocity,
-          motor_torque,
-          true,
-          true);
-      } else {
-        RCLCPP_ERROR(logger(), "Actuator ID 0x%02X control failed", tx_id_);
+
+        decoded.has_state = true;
+        decoded.motor_position = motor_position;
+        decoded.temperature = temperature;
+        decoded.state.position = map_motor_to_joint_frame_(motor_position, true);
+        decoded.state.velocity =
+          map_motor_to_joint_frame_(motor_velocity * can_protocol::kTwoPi / can_protocol::kSecondsPerMinute);
+        decoded.state.torque = map_motor_to_joint_frame_(motor_torque);
+        return decoded;
       }
-      break;
     case CommandByte::START_MOTOR:
-      if (MsgDecoder::get_result(msg.DATA[1])) {
-        actuator.set_motor_enabled(true);
+      if (can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+        decoded.motor_enabled = true;
         RCLCPP_INFO(
-          logger(),
+          can_protocol::logger(),
           "Actuator RX 0x%02X acknowledged %s",
-          msg.ID, command_name(msg.DATA[0]));
-      } else {
-        RCLCPP_ERROR(
-          logger(),
-          "Actuator RX 0x%02X returned failure for %s",
-          msg.ID, command_name(msg.DATA[0]));
+          msg.ID, can_protocol::command_name(msg.DATA[0]));
+        return decoded;
       }
-      break;
+      RCLCPP_ERROR(
+        can_protocol::logger(),
+        "Actuator RX 0x%02X returned failure for %s",
+        msg.ID, can_protocol::command_name(msg.DATA[0]));
+      return std::nullopt;
     case CommandByte::STOP_MOTOR:
     case CommandByte::STOP_CONTROL:
-      if (MsgDecoder::get_result(msg.DATA[1])) {
-        actuator.set_motor_enabled(false);
+      if (can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+        decoded.motor_enabled = false;
         RCLCPP_INFO(
-          logger(),
+          can_protocol::logger(),
           "Actuator RX 0x%02X acknowledged %s",
-          msg.ID, command_name(msg.DATA[0]));
-      } else {
-        RCLCPP_ERROR(
-          logger(),
-          "Actuator RX 0x%02X returned failure for %s",
-          msg.ID, command_name(msg.DATA[0]));
+          msg.ID, can_protocol::command_name(msg.DATA[0]));
+        return decoded;
       }
-      break;
+      RCLCPP_ERROR(
+        can_protocol::logger(),
+        "Actuator RX 0x%02X returned failure for %s",
+        msg.ID, can_protocol::command_name(msg.DATA[0]));
+      return std::nullopt;
     default:
-      break;
+      return std::nullopt;
   }
 }
 
-TPCANMsg SteadywinProtocol::make_message_(uint32_t can_id, uint8_t len)
+TPCANMsg CANProtocol::make_message_(uint32_t can_id, uint8_t len)
 {
   TPCANMsg msg;
   std::memset(&msg, 0, sizeof(msg));
@@ -266,4 +289,27 @@ TPCANMsg SteadywinProtocol::make_message_(uint32_t can_id, uint8_t len)
   return msg;
 }
 
-}  // namespace can_protocol
+void CANProtocol::validate_direction_(const can_hardware_common::ActuatorCoreConfig & config)
+{
+  if (config.direction != 1 && config.direction != -1) {
+    throw std::invalid_argument("Plato actuator direction must be +1 or -1");
+  }
+}
+
+float CANProtocol::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
+{
+  const float direction = static_cast<float>(config_.direction);
+  return apply_offset ?
+         (joint_value * direction) + config_.position_offset :
+         joint_value * direction;
+}
+
+float CANProtocol::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
+{
+  const float direction = static_cast<float>(config_.direction);
+  return apply_offset ?
+         (motor_value - config_.position_offset) * direction :
+         motor_value * direction;
+}
+
+}  // namespace plato_actuator

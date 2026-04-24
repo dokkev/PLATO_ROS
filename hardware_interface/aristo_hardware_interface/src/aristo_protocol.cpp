@@ -5,31 +5,34 @@
 namespace aristo_hand
 {
 
-AristoProtocol::LifecyclePlan AristoProtocol::build_lifecycle_plan(
+void AristoProtocol::append_enable_frames(
   std::vector<aristo_actuator::Actuator> & actuators,
-  can_hardware_common::core::LifecycleOperation operation) const
+  std::vector<TPCANMsg> & direct_frames) const
 {
-  LifecyclePlan plan;
-  plan.operation = operation;
-  plan.ready = true;
-  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
-  plan.direct_frames.reserve(actuators.size());
-
+  direct_frames.reserve(direct_frames.size() + actuators.size());
   for (auto & actuator : actuators) {
-    switch (operation) {
-      case can_hardware_common::core::LifecycleOperation::kEnable:
-        plan.direct_frames.push_back(actuator.enable_motor().frame);
-        break;
-      case can_hardware_common::core::LifecycleOperation::kDisable:
-        plan.direct_frames.push_back(actuator.disable_motor().frame);
-        break;
-      case can_hardware_common::core::LifecycleOperation::kZero:
-        plan.direct_frames.push_back(actuator.set_current_position_as_zero().frame);
-        break;
-    }
+    direct_frames.push_back(actuator.enable_motor().frame);
   }
+}
 
-  return plan;
+void AristoProtocol::append_disable_frames(
+  std::vector<aristo_actuator::Actuator> & actuators,
+  std::vector<TPCANMsg> & direct_frames) const
+{
+  direct_frames.reserve(direct_frames.size() + actuators.size());
+  for (auto & actuator : actuators) {
+    direct_frames.push_back(actuator.disable_motor().frame);
+  }
+}
+
+void AristoProtocol::append_zero_frames(
+  std::vector<aristo_actuator::Actuator> & actuators,
+  std::vector<TPCANMsg> & direct_frames) const
+{
+  direct_frames.reserve(direct_frames.size() + actuators.size());
+  for (auto & actuator : actuators) {
+    direct_frames.push_back(actuator.set_current_position_as_zero().frame);
+  }
 }
 
 void AristoProtocol::initialize_rx_dispatch(
@@ -81,7 +84,7 @@ bool AristoProtocol::process_rx_frame(
 
   switch (entry_it->target_kind) {
     case DispatchTargetKind::kActuator:
-      actuators[entry_it->target_index].process_message(frame);
+      actuators[entry_it->target_index].process_rx_frame(frame);
       break;
     case DispatchTargetKind::kForceSensor:
     case DispatchTargetKind::kTorqueSensor:
@@ -97,7 +100,7 @@ void AristoProtocol::append_impedance_frames(
   const std::vector<can_hardware_common::ActuatorTarget> & impedance_targets,
   std::vector<TPCANMsg> & direct_frames) const
 {
-  direct_frames.reserve(impedance_targets.size());
+  direct_frames.reserve(direct_frames.size() + std::min(impedance_targets.size(), actuators.size()));
   for (std::size_t i = 0; i < impedance_targets.size() && i < actuators.size(); ++i) {
     if (const auto command = actuators[i].set_joint_impedance(impedance_targets[i])) {
       direct_frames.push_back(command->frame);

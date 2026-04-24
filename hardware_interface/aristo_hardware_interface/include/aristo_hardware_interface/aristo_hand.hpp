@@ -11,7 +11,7 @@
 #include "aristo_hardware_interface/actuator.hpp"
 #include "aristo_hardware_interface/aristo_model.hpp"
 #include "aristo_hardware_interface/aristo_protocol.hpp"
-#include "can_hardware_common/can_transport.hpp"
+#include "can_hardware_common/can_bus.hpp"
 #include "can_hardware_common/core/can_hand_base.hpp"
 #include "can_hardware_common/ft_sensor.hpp"
 #include "plato_hardware_interface/utils/can_ids.hpp"
@@ -66,7 +66,7 @@ private:
   bool execute_direct_frames_(
     const std::vector<TPCANMsg> & frames,
     std::chrono::microseconds timeout);
-  can_hardware_common::CanTransport::RxResult poll_can_bus();
+  can_hardware_common::CanBus::RxPollResult poll_can_bus();
   TPCANStatus enable_all_actuators();
   TPCANStatus disable_all_actuators();
   TPCANStatus set_current_position_as_zero();
@@ -80,14 +80,14 @@ private:
   SensorStatus summarize_ft_sensor_status_(sensor::FTSensor::SteadyClock::time_point now) const;
   void print_actuator_info_() const;
 
-  can_hardware_common::CanTransport transport_;
+  can_hardware_common::CanBus transport_;
   mutable std::mutex state_mutex_;
   AristoProtocol protocol_;
   AristoModel model_;
   std::vector<aristo_actuator::Actuator> actuators_;
   std::vector<sensor::FTSensor> ft_sensors_;
   std::vector<aristo_actuator::Config> actuator_configs_;
-  can_hardware_common::CanTransport::RxResult last_rx_result_{};
+  can_hardware_common::CanBus::RxPollResult last_rx_result_{};
   std::chrono::steady_clock::time_point last_rx_time_{};
   bool has_observed_rx_ = false;
 

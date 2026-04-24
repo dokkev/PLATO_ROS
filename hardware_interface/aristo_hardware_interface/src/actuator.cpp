@@ -5,16 +5,13 @@
 #include <memory>
 #include <stdexcept>
 
-#include "aristo_hardware_interface/mit_can_protocol.hpp"
+#include "aristo_hardware_interface/can_protocol.hpp"
 
 namespace aristo_actuator
 {
 
 namespace
 {
-constexpr float kTwoPi = 6.28318530717958647692f;
-constexpr float kSecondsPerMinute = 60.0f;
-
 void validate_direction(const Config & config)
 {
   if (config.core.direction != 1 && config.core.direction != -1) {
@@ -25,7 +22,7 @@ void validate_direction(const Config & config)
 
 Actuator::Actuator(const Config & config)
 : config_(config),
-  protocol_(std::make_unique<mit_can_protocol::MITProtocol>(config.core))
+  protocol_(std::make_unique<CANProtocol>(config.core))
 {
   validate_direction(config_);
 }
@@ -68,7 +65,7 @@ actuator::TxCommand Actuator::set_joint_torque(float joint_torque)
     joint_torque = std::clamp(joint_torque, -config_.limits.effort_limit, config_.limits.effort_limit);
   }
 
-  return protocol_->make_torque_command(map_joint_to_motor_frame_(joint_torque));
+  return protocol_->make_torque_command(joint_torque);
 }
 
 std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
@@ -86,9 +83,7 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
     joint_target.torque = 0.0f;
   }
 
-  const can_hardware_common::ActuatorTarget motor_target =
-    make_motor_impedance_target_(joint_target, *this);
-  auto command = protocol_->make_impedance_command(motor_target);
+  auto command = protocol_->make_impedance_command(joint_target);
   if (!command) {
     return std::nullopt;
   }
@@ -96,32 +91,18 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
   return command;
 }
 
-void Actuator::process_message(const TPCANMsg & msg)
+void Actuator::process_rx_frame(const TPCANMsg & msg)
 {
   if (msg.ID != get_rx_id()) {
     return;
   }
 
-  protocol_->process_message(msg, *this);
-}
-
-void Actuator::apply_motor_feedback(
-  float motor_position,
-  float motor_velocity,
-  float motor_torque,
-  bool position_has_offset,
-  bool velocity_is_rpm)
-{
-  set_motor_position_raw(motor_position);
-
-  if (velocity_is_rpm) {
-    motor_velocity = motor_velocity * kTwoPi / kSecondsPerMinute;
+  const auto decoded = protocol_->decode(msg);
+  if (!decoded) {
+    return;
   }
 
-  feedback_.position = map_motor_to_joint_frame_(motor_position, position_has_offset);
-  feedback_.velocity = map_motor_to_joint_frame_(motor_velocity);
-  feedback_.torque = map_motor_to_joint_frame_(motor_torque);
-  has_feedback_ = true;
+  apply_decoded_feedback_(*decoded);
 }
 
 float Actuator::clamp_torque_near_bounds_(float joint_torque) const
@@ -221,32 +202,28 @@ void Actuator::clamp_impedance_target_(can_hardware_common::ActuatorTarget & joi
   }
 }
 
-float Actuator::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
+void Actuator::apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded)
 {
-  const float direction = static_cast<float>(config_.core.direction);
-  return apply_offset ?
-         (joint_value * direction) + config_.core.position_offset :
-         joint_value * direction;
-}
+  if (decoded.has_state) {
+    feedback_ = decoded.state;
+    has_feedback_ = true;
+  }
 
-float Actuator::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
-{
-  const float direction = static_cast<float>(config_.core.direction);
-  return apply_offset ?
-         (motor_value - config_.core.position_offset) * direction :
-         motor_value * direction;
-}
+  if (decoded.temperature) {
+    status_.temperature = *decoded.temperature;
+  }
 
-can_hardware_common::ActuatorTarget Actuator::make_motor_impedance_target_(
-  const can_hardware_common::ActuatorTarget & joint_target,
-  const Actuator & actuator)
-{
-  return can_hardware_common::ActuatorTarget{
-    actuator.map_joint_to_motor_frame_(joint_target.position),
-    actuator.map_joint_to_motor_frame_(joint_target.velocity),
-    joint_target.stiffness,
-    joint_target.damping,
-    actuator.map_joint_to_motor_frame_(joint_target.torque)};
+  if (decoded.in_oc_mode) {
+    status_.in_oc_mode = *decoded.in_oc_mode;
+  }
+
+  if (decoded.has_fault) {
+    status_.has_fault = *decoded.has_fault;
+  }
+
+  if (decoded.motor_enabled) {
+    motor_enabled_ = *decoded.motor_enabled;
+  }
 }
 
 }  // namespace aristo_actuator

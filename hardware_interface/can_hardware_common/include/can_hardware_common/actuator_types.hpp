@@ -49,12 +49,12 @@ namespace actuator
 
 struct Limits
 {
-  float position_limit_max = std::numeric_limits<float>::infinity();
-  float position_limit_min = -std::numeric_limits<float>::infinity();
-  float velocity_limit = std::numeric_limits<float>::infinity();
-  float effort_limit = std::numeric_limits<float>::infinity();
-  float stiffness_limit = std::numeric_limits<float>::infinity();
-  float damping_limit = std::numeric_limits<float>::infinity();
+  float position_limit_max = std::numeric_limits<float>::quiet_NaN();
+  float position_limit_min = std::numeric_limits<float>::quiet_NaN();
+  float velocity_limit = std::numeric_limits<float>::quiet_NaN();
+  float effort_limit = std::numeric_limits<float>::quiet_NaN();
+  float stiffness_limit = std::numeric_limits<float>::quiet_NaN();
+  float damping_limit = std::numeric_limits<float>::quiet_NaN();
 };
 
 struct Config
@@ -66,7 +66,6 @@ struct Config
 struct TxCommand
 {
   can_hardware_common::TxFrame frame{};
-  uint8_t expected_response_opcode = 0;
 };
 
 }  // namespace actuator

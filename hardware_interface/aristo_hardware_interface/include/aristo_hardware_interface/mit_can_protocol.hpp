@@ -2,17 +2,7 @@
 #define ARISTO_HARDWARE_INTERFACE__MIT_CAN_PROTOCOL_HPP_
 
 #include <cstdint>
-#include <optional>
-
 #include "PCANBasic.h"
-
-#include "can_hardware_common/actuator.hpp"
-#include "can_hardware_common/utils/can_helper.hpp"
-
-namespace aristo_actuator
-{
-class Actuator;
-}
 
 namespace mit_can_protocol
 {
@@ -75,32 +65,6 @@ public:
     float & pos_max_rad,
     float & vel_max_rps,
     float & tq_max_nm) const;
-};
-
-class MITProtocol
-{
-public:
-  explicit MITProtocol(const can_hardware_common::ActuatorCoreConfig & config);
-
-  actuator::TxCommand make_enable_motor_command();
-  actuator::TxCommand make_disable_motor_command();
-  actuator::TxCommand make_stop_control_command();
-  actuator::TxCommand make_torque_command(float motor_torque);
-  std::optional<actuator::TxCommand> make_impedance_command(
-    const can_hardware_common::ActuatorTarget & motor_target);
-  actuator::TxCommand make_zero_position_command();
-  actuator::TxCommand make_default_can_limits_command();
-  void process_message(const TPCANMsg & msg, aristo_actuator::Actuator & actuator);
-
-private:
-  static TPCANMsg make_message_(uint32_t can_id, uint8_t len);
-
-  uint8_t tx_id_;
-  MsgEncoder encoder_;
-  MsgDecoder decoder_;
-  TPCANMsg onoff_msg_;
-  TPCANMsg cmd_msg_;
-  TPCANMsg config_msg_;
 };
 
 }  // namespace mit_can_protocol

@@ -11,8 +11,8 @@ find_library(PCAN_LIB NAMES pcanbasic PATHS /usr/local/lib /usr/lib /lib REQUIRE
 find_path(PCAN_INCLUDE_DIR NAMES PCANBasic.h PATHS /usr/local/include /usr/include REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
-  src/command_scheduler.cpp
-  src/can_transport.cpp
+  src/actuator.cpp
+  src/can_bus.cpp
   src/pcan_interface.cpp
 )
 
@@ -36,22 +36,6 @@ install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
-
-install(PROGRAMS
-  script/pcan_hardware_smoke_test.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-
-  ament_add_gtest(command_scheduler_test
-    test/command_scheduler_test.cpp
-  )
-  target_link_libraries(command_scheduler_test
-    ${PROJECT_NAME}
-  )
-endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_libraries(${PROJECT_NAME})

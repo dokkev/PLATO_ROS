@@ -11,15 +11,13 @@ What changed:
 - the common `core/` framework was removed
 - `CanHandBase` was deleted
 - lifecycle execution no longer lives in common
-- duplicate legacy `src/can_transport.cpp` and `src/pcan_interface.cpp` were deleted
+- duplicate legacy transport sources were deleted
 - public headers and sources were flattened to top-level paths
 - the C++ `pcan_transport_smoke_test` source/target was removed
 
 What remains in common:
-- `CanTransport`
+- `CanBus`
 - `PCANInterface`
-- `CommandRequest`
-- `CommandScheduler`
 - shared frame/time/actuator types
 - existing utility headers that are still referenced by frozen hand packages
 
@@ -29,18 +27,19 @@ Validation completed:
 
 ## Current Hard Parts
 
-### 1. `CanTransport` still carries TX simulator support
+### 1. `CanBus` is now transport-only
 
-This is still a hybrid concern.
+This is now intentionally narrow.
 
-Why it is still there:
-- the smoke/test workflow already uses it
-- removing it now would create churn before any hand is reattached
-- transport itself is still the least bad place for the current injected-RX mechanism
+What it owns:
+- PCAN-backed CAN frame send/receive
+- TX pacing
+- RX observer dispatch
+- bounded RX collection helpers
 
 Working recommendation:
-- keep it for now
-- revisit after one hand is reattached on the new minimal common layer
+- keep it small
+- keep response semantics and loop policy in the hand layer
 
 ### 2. `actuator_types.hpp` may still be too semantic for common
 
@@ -58,4 +57,4 @@ The reset only helps if Aristo/Plato do not immediately recreate a new mini fram
 Working recommendation:
 - implement hand-local procedure code
 - keep `write()`, `enable()`, and `disable()` short and direct
-- use common only for transport, queueing, and shared low-level types
+- use common only for bus I/O and shared low-level types

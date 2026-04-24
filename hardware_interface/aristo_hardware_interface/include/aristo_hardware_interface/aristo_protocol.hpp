@@ -7,8 +7,7 @@
 #include <PCANBasic.h>
 
 #include "aristo_hardware_interface/actuator.hpp"
-#include "can_hardware_common/actuator.hpp"
-#include "can_hardware_common/core/lifecycle_plan.hpp"
+#include "can_hardware_common/actuator_types.hpp"
 #include "can_hardware_common/ft_sensor.hpp"
 
 namespace aristo_hand
@@ -17,7 +16,6 @@ namespace aristo_hand
 class AristoProtocol
 {
 public:
-  using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
   enum class DispatchTargetKind
   {
     kActuator,
@@ -32,9 +30,17 @@ public:
     std::size_t target_index = 0;
   };
 
-  LifecyclePlan build_lifecycle_plan(
+  void append_enable_frames(
     std::vector<aristo_actuator::Actuator> & actuators,
-    can_hardware_common::core::LifecycleOperation operation) const;
+    std::vector<TPCANMsg> & direct_frames) const;
+
+  void append_disable_frames(
+    std::vector<aristo_actuator::Actuator> & actuators,
+    std::vector<TPCANMsg> & direct_frames) const;
+
+  void append_zero_frames(
+    std::vector<aristo_actuator::Actuator> & actuators,
+    std::vector<TPCANMsg> & direct_frames) const;
 
   void initialize_rx_dispatch(
     const std::vector<aristo_actuator::Actuator> & actuators,

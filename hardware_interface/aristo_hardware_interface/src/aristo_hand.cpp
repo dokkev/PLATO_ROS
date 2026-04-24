@@ -33,8 +33,8 @@ bool is_nonfatal_read_status(TPCANStatus status)
 }
 
 void accumulate_poll_result(
-  can_hardware_common::CanTransport::RxResult & aggregate,
-  const can_hardware_common::CanTransport::RxResult & update)
+  can_hardware_common::CanBus::RxPollResult & aggregate,
+  const can_hardware_common::CanBus::RxPollResult & update)
 {
   aggregate.processed_frames += update.processed_frames;
 
@@ -80,16 +80,16 @@ Hand::Hand(std::vector<aristo_actuator::Config> actuator_configs)
       mark_rx_frame_();
     }
   });
-  transport_.set_min_inter_frame_gap(kDirectTxInterFrameGap);
+  transport_.set_tx_gap(kDirectTxInterFrameGap);
 
   print_actuator_info_();
 }
 
-can_hardware_common::CanTransport::RxResult Hand::poll_can_bus()
+can_hardware_common::CanBus::RxPollResult Hand::poll_can_bus()
 {
-  auto poll_result = transport_.process_rx();
+  auto poll_result = transport_.poll_rx();
   if (poll_result.processed_frames > 0 && poll_result.status == PCAN_ERROR_OK) {
-    const auto extra_poll_result = transport_.process_rx();
+    const auto extra_poll_result = transport_.poll_rx();
     if (extra_poll_result.processed_frames > 0 || extra_poll_result.status != PCAN_ERROR_QRCVEMPTY) {
       accumulate_poll_result(poll_result, extra_poll_result);
     }
@@ -135,7 +135,7 @@ TPCANStatus Hand::send_frame_blocking_(
   TPCANStatus last_status = PCAN_ERROR_QXMTFULL;
 
   while (std::chrono::steady_clock::now() < deadline) {
-    const TPCANStatus status = transport_.send_if_ready(frame);
+    const TPCANStatus status = transport_.send_tx_frame(frame);
     if (status == PCAN_ERROR_OK) {
       return status;
     }
@@ -144,7 +144,7 @@ TPCANStatus Hand::send_frame_blocking_(
     }
 
     last_status = status;
-    const auto next_send = transport_.next_send_time();
+    const auto next_send = transport_.next_tx_time();
     const auto now = std::chrono::steady_clock::now();
     if (next_send > now) {
       const auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(next_send - now);
@@ -258,7 +258,24 @@ Hand::SensorStatus Hand::summarize_ft_sensor_status_(
 can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
   can_hardware_common::core::LifecycleOperation operation)
 {
-  return protocol_.build_lifecycle_plan(actuators_, operation);
+  LifecyclePlan plan;
+  plan.operation = operation;
+  plan.ready = true;
+  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
+
+  switch (operation) {
+    case can_hardware_common::core::LifecycleOperation::kEnable:
+      protocol_.append_enable_frames(actuators_, plan.direct_frames);
+      break;
+    case can_hardware_common::core::LifecycleOperation::kDisable:
+      protocol_.append_disable_frames(actuators_, plan.direct_frames);
+      break;
+    case can_hardware_common::core::LifecycleOperation::kZero:
+      protocol_.append_zero_frames(actuators_, plan.direct_frames);
+      break;
+  }
+
+  return plan;
 }
 
 bool Hand::execute_lifecycle_plan_(const LifecyclePlan & plan)

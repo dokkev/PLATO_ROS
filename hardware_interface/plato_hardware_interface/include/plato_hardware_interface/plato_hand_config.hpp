@@ -19,8 +19,6 @@ struct PlatoHandConfig
   std::chrono::microseconds direct_tx_inter_frame_gap{std::chrono::microseconds(100)};
   double servo_stiffness_scale{0.0};
   bool disable_on_destruction{true};
-  bool enable_transport_simulator{false};
-  bool transport_simulator_bypass_hardware{true};
 };
 
 }  // namespace plato_hand

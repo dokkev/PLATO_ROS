@@ -1,15 +1,10 @@
 #include "aristo_hardware_interface/mit_can_protocol.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <thread>
-#include <optional>
-
-#include "aristo_hardware_interface/actuator.hpp"
 
 namespace mit_can_protocol
 {
@@ -294,101 +289,6 @@ void MsgDecoder::get_limits(
   pos_max_rad = pos_u16 * 0.1f;
   vel_max_rps = vel_u16 * 0.01f;
   tq_max_nm = tq_u16 * 0.01f;
-}
-
-MITProtocol::MITProtocol(const can_hardware_common::ActuatorCoreConfig & config)
-: tx_id_(config.can_tx_id),
-  encoder_(config.gear_ratio, config.can_tx_id),
-  decoder_(),
-  onoff_msg_(make_message_(config.can_tx_id, 8)),
-  cmd_msg_(make_message_(config.can_tx_id, 8)),
-  config_msg_(make_message_(config.can_tx_id, 7))
-{
-}
-
-actuator::TxCommand MITProtocol::make_enable_motor_command()
-{
-  encoder_.start_motor(onoff_msg_);
-  return actuator::TxCommand{onoff_msg_, 0};
-}
-
-actuator::TxCommand MITProtocol::make_disable_motor_command()
-{
-  encoder_.stop_motor(onoff_msg_);
-  return actuator::TxCommand{onoff_msg_, 0};
-}
-
-actuator::TxCommand MITProtocol::make_stop_control_command()
-{
-  encoder_.stop_control(onoff_msg_);
-  return actuator::TxCommand{onoff_msg_, 0};
-}
-
-actuator::TxCommand MITProtocol::make_torque_command(float motor_torque)
-{
-  encoder_.set_impedance(cmd_msg_, 0.0f, 0.0f, 0.0f, 0.0f, motor_torque);
-  return actuator::TxCommand{cmd_msg_, 0};
-}
-
-std::optional<actuator::TxCommand> MITProtocol::make_impedance_command(
-  const can_hardware_common::ActuatorTarget & motor_target)
-{
-  encoder_.set_impedance(
-    cmd_msg_,
-    motor_target.position,
-    motor_target.velocity,
-    motor_target.stiffness,
-    motor_target.damping,
-    motor_target.torque);
-  return actuator::TxCommand{cmd_msg_};
-}
-
-actuator::TxCommand MITProtocol::make_zero_position_command()
-{
-  encoder_.set_zero_position(onoff_msg_);
-  return actuator::TxCommand{onoff_msg_, 0};
-}
-
-actuator::TxCommand MITProtocol::make_default_can_limits_command()
-{
-  encoder_.set_default_can_limits(config_msg_);
-  return actuator::TxCommand{config_msg_, 0};
-}
-
-void MITProtocol::process_message(const TPCANMsg & msg, aristo_actuator::Actuator & actuator)
-{
-  if (msg.LEN == 8 || (msg.LEN >= 7 && msg.DATA[0] == CMD_READ_STATES)) {
-    float motor_position = 0.0f;
-    float motor_velocity = 0.0f;
-    float motor_torque = 0.0f;
-    float kp = 0.0f;
-    float kd = 0.0f;
-    bool in_oc_mode = false;
-    bool has_fault = false;
-
-    decoder_.get_states(
-      msg,
-      motor_position,
-      motor_velocity,
-      kp,
-      kd,
-      motor_torque,
-      in_oc_mode,
-      has_fault);
-
-    actuator.apply_motor_feedback(motor_position, motor_velocity, motor_torque, false, false);
-    actuator.set_fault_flags(in_oc_mode, has_fault);
-  }
-}
-
-TPCANMsg MITProtocol::make_message_(uint32_t can_id, uint8_t len)
-{
-  TPCANMsg msg;
-  std::memset(&msg, 0, sizeof(msg));
-  msg.ID = can_id;
-  msg.MSGTYPE = PCAN_MESSAGE_STANDARD;
-  msg.LEN = len > 8 ? 8 : len;
-  return msg;
 }
 
 }  // namespace mit_can_protocol

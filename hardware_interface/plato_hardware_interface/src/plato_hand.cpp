@@ -1,9 +1,6 @@
 #include "plato_hardware_interface/plato_hand.hpp"
 
-#include <algorithm>
-#include <array>
 #include <cmath>
-#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -21,8 +18,6 @@ namespace
 {
 constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
-constexpr float kTwoPi = 6.28318530717958647692f;
-constexpr float kSecondsPerMinute = 60.0f;
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
 rclcpp::Clock & throttle_clock()
@@ -37,8 +32,12 @@ rclcpp::Clock & snapshot_clock()
   return clock;
 }
 
-using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
 using WritePlan = can_hardware_common::core::WritePlan;
+
+bool is_nonfatal_read_status(TPCANStatus status)
+{
+  return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
+}
 
 static_assert(
   Hand::kNumJoints == FiveBarLinkage::Transmission::kNumJoints,
@@ -46,31 +45,6 @@ static_assert(
 static_assert(
   Hand::kNumActuators == FiveBarLinkage::Transmission::kNumActuators,
   "Plato hand actuator dimension must match five-bar transmission");
-
-bool is_thumb_servo_index(size_t index)
-{
-  return index == 0 || index == 1;
-}
-
-bool tolerate_thumb_lifecycle_result(
-  const can_hardware_common::CanCommandScheduler::TransactionResult & result,
-  bool enabling)
-{
-  if (result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kConfirmed) {
-    return true;
-  }
-  if (result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kTimeout) {
-    return true;
-  }
-  if (
-    enabling &&
-    result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kRejected &&
-    result.result_byte == ResultByte::FAILURE)
-  {
-    return true;
-  }
-  return false;
-}
 
 FiveBarLinkage::Transmission::JointArray build_joint_effort_limits(
   const std::vector<plato_actuator::Config> & actuator_configs)
@@ -123,7 +97,6 @@ Hand::Hand(PlatoHandConfig config)
 : transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
   protocol_(),
   model_(transmission_),
-  scheduler_(transport_),  // must follow transport_ and transmission_ in member order
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_static_configs_(extract_static_configs(config.actuator_configs)),
   actuator_position_offsets_(extract_position_offsets(config.actuator_configs)),
@@ -145,22 +118,13 @@ Hand::Hand(PlatoHandConfig config)
     actuators_.emplace_back(cfg);
   }
 
-  transport_simulator_enabled_ = config.enable_transport_simulator;
   disable_on_destruction_ = config.disable_on_destruction;
-  simulator_states_.assign(kNumActuators, SimActuatorState{});
-  if (transport_simulator_enabled_) {
-    configure_transport_simulator_(config.transport_simulator_bypass_hardware);
-  }
 
   transport_.add_rx_observer([this](const TPCANMsg & frame) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (protocol_.process_rx_frame(frame, actuators_)) {
       mark_rx_frame_();
     }
-  });
-
-  transport_.add_rx_observer([this](const TPCANMsg & frame) {
-    scheduler_.observe_rx(frame);
   });
 
   RCLCPP_INFO(logger(), "================== Actuators Info ===================");
@@ -172,7 +136,7 @@ Hand::Hand(PlatoHandConfig config)
   }
 
   // Deterministic paced direct TX path for write().
-  transport_.set_min_inter_frame_gap(config.direct_tx_inter_frame_gap);
+  transport_.set_tx_gap(config.direct_tx_inter_frame_gap);
   RCLCPP_INFO(
     logger(),
     "Direct TX inter-frame gap: %ld us",
@@ -181,12 +145,6 @@ Hand::Hand(PlatoHandConfig config)
     logger(),
     "Direct TX frame timeout: %ld us",
     static_cast<long>(direct_tx_frame_timeout_.count()));
-  if (transport_simulator_enabled_) {
-    RCLCPP_WARN(
-      logger(),
-      "Plato hand transport simulator enabled (bypass_hardware=%s)",
-      config.transport_simulator_bypass_hardware ? "true" : "false");
-  }
 }
 
 Hand::~Hand()
@@ -210,9 +168,9 @@ Hand::~Hand()
 
 bool Hand::update_measurements_()
 {
-  const auto rx = transport_.process_rx();
-  last_rx_healthy_ = !rx.is_bus_error();
-  if (rx.is_bus_error()) {
+  const auto rx = transport_.poll_rx();
+  last_rx_healthy_ = is_nonfatal_read_status(rx.status);
+  if (!last_rx_healthy_) {
     RCLCPP_WARN_THROTTLE(
       logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
     return false;
@@ -250,7 +208,28 @@ void Hand::refresh_state_snapshot_()
 can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
   can_hardware_common::core::LifecycleOperation operation)
 {
-  return protocol_.build_lifecycle_plan(actuators_, operation);
+  LifecyclePlan plan;
+  plan.operation = operation;
+  plan.ready = true;
+
+  if (operation == can_hardware_common::core::LifecycleOperation::kZero) {
+    plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kCustomExecution;
+    return plan;
+  }
+
+  plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
+  switch (operation) {
+    case can_hardware_common::core::LifecycleOperation::kEnable:
+      protocol_.append_enable_frames(actuators_, plan.direct_frames);
+      break;
+    case can_hardware_common::core::LifecycleOperation::kDisable:
+      protocol_.append_disable_frames(actuators_, plan.direct_frames);
+      break;
+    case can_hardware_common::core::LifecycleOperation::kZero:
+      break;
+  }
+
+  return plan;
 }
 
 bool Hand::execute_lifecycle_plan_(const LifecyclePlan & plan)
@@ -265,64 +244,25 @@ bool Hand::execute_lifecycle_plan_(const LifecyclePlan & plan)
 bool Hand::execute_standard_lifecycle_(const LifecyclePlan & plan)
 {
   const bool enabling = plan.operation == can_hardware_common::core::LifecycleOperation::kEnable;
-  apply_lifecycle_request_flags_(enabling);
-
-  bool success = true;
-  for (size_t i = 0; i < plan.scheduled_requests.size(); ++i) {
-    const auto res = scheduler_.execute_blocking(
-      plan.scheduled_requests[i], kResponseTimeout, kLifecycleCommandRetries);
-    success = handle_standard_lifecycle_result_(i, res, enabling) && success;
+  if (enabling) {
+    enable_requested_ = true;
+    disable_requested_ = false;
+  } else {
+    disable_requested_ = true;
   }
 
-  return success;
-}
-
-bool Hand::execute_zero_lifecycle_()
-{
-  return zero_actuators_();
-}
-
-bool Hand::handle_standard_lifecycle_result_(
-  std::size_t actuator_index,
-  const TransactionResult & result,
-  bool enabling)
-{
-  if (is_thumb_servo_index(actuator_index) && tolerate_thumb_lifecycle_result(result, enabling)) {
-    actuators_[actuator_index].set_motor_enabled(enabling);
-    if (result.status != TransactionResult::Status::kConfirmed) {
-      RCLCPP_WARN(
-        logger(),
-        "%s thumb servo actuator %zu tolerated without strict confirmation: %s (result_byte=0x%02X)",
-        enabling ? "Enable" : "Disable",
-        actuator_index + 1,
-        TransactionResult::status_label(result.status),
-        result.result_byte);
+  for (const auto & frame : plan.direct_frames) {
+    if (!send_frame_blocking_(frame, kResponseTimeout)) {
+      return false;
     }
-    return true;
-  }
-
-  if (result.status != TransactionResult::Status::kConfirmed) {
-    RCLCPP_ERROR(
-      logger(),
-      "%s actuator %zu: %s",
-      enabling ? "Enable" : "Disable",
-      actuator_index + 1,
-      TransactionResult::status_label(result.status));
-    return false;
   }
 
   return true;
 }
 
-void Hand::apply_lifecycle_request_flags_(bool enabling)
+bool Hand::execute_zero_lifecycle_()
 {
-  if (enabling) {
-    enable_requested_ = true;
-    disable_requested_ = false;
-    return;
-  }
-
-  disable_requested_ = true;
+  return zero_actuators_();
 }
 
 void Hand::build_ready_write_plan_(WritePlan & plan)
@@ -355,7 +295,7 @@ bool Hand::execute_write_plan_(const WritePlan & plan)
 bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout)
 {
   const auto now = SteadyClock::now();
-  const auto next_send_time = transport_.next_send_time();
+  const auto next_send_time = transport_.next_tx_time();
   if (next_send_time > now) {
     const auto wait = std::chrono::duration_cast<std::chrono::microseconds>(next_send_time - now);
     if (wait > timeout) {
@@ -371,7 +311,7 @@ bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microsecond
     std::this_thread::sleep_until(next_send_time);
   }
 
-  const TPCANStatus tx_status = transport_.send_if_ready(frame);
+  const TPCANStatus tx_status = transport_.send_tx_frame(frame);
   if (tx_status == PCAN_ERROR_OK) {
     return true;
   }
@@ -399,154 +339,6 @@ bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microsecond
 //  Helpers
 // ════════════════════════════════════════════════════════════════════════════
 
-void Hand::configure_transport_simulator_(bool bypass_hardware)
-{
-  transport_.set_tx_simulator(
-    [this](const TPCANMsg & tx_frame) {
-      return simulate_tx_frame_(tx_frame);
-    },
-    bypass_hardware);
-}
-
-std::vector<TPCANMsg> Hand::simulate_tx_frame_(const TPCANMsg & tx_frame)
-{
-  if (tx_frame.MSGTYPE != PCAN_MESSAGE_STANDARD || tx_frame.LEN < 1) {
-    return {};
-  }
-
-  std::lock_guard<std::mutex> lock(simulator_state_mutex_);
-
-  size_t actuator_index = kNumActuators;
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    if (actuators_[i].get_tx_id() == tx_frame.ID) {
-      actuator_index = i;
-      break;
-    }
-  }
-  if (actuator_index >= kNumActuators) {
-    return {};
-  }
-
-  auto & sim = simulator_states_[actuator_index];
-  const uint32_t rx_id = actuators_[actuator_index].get_rx_id();
-  const uint8_t opcode = tx_frame.DATA[0];
-
-  switch (opcode) {
-    case CommandByte::START_MOTOR:
-      sim.motor_enabled = true;
-      sim.motor_velocity_rpm = 0.0f;
-      sim.motor_torque = 0.0f;
-      return {make_ack_frame_(rx_id, opcode)};
-    case CommandByte::STOP_MOTOR:
-    case CommandByte::STOP_CONTROL:
-      sim.motor_enabled = false;
-      sim.motor_velocity_rpm = 0.0f;
-      sim.motor_torque = 0.0f;
-      return {make_ack_frame_(rx_id, opcode)};
-    case CommandByte::TORQUE_CONTROL: {
-        if (!sim.motor_enabled) {
-          return {make_ack_frame_(rx_id, opcode, ResultByte::FAILURE)};
-        }
-
-        const float commanded_torque = decode_float_le_(tx_frame, 1);
-        sim.motor_torque = std::clamp(commanded_torque, -9.8f, 9.8f);
-        sim.motor_velocity_rpm =
-          std::clamp(0.90f * sim.motor_velocity_rpm + sim.motor_torque * 8.0f, -65.0f, 65.0f);
-        sim.motor_position += (sim.motor_velocity_rpm * kTwoPi / kSecondsPerMinute) * 0.002f;
-        return {
-          make_state_frame_(
-            rx_id,
-            opcode,
-            sim.temperature,
-            sim.motor_position,
-            sim.motor_velocity_rpm,
-            sim.motor_torque)};
-      }
-    case CommandByte::POSITION_CONTROL: {
-        if (!sim.motor_enabled) {
-          return {make_ack_frame_(rx_id, opcode, ResultByte::FAILURE)};
-        }
-
-        const float target_position = decode_float_le_(tx_frame, 1);
-        const float delta = target_position - sim.motor_position;
-        sim.motor_velocity_rpm =
-          std::clamp(delta * (25.0f * kSecondsPerMinute / kTwoPi), -65.0f, 65.0f);
-        sim.motor_position = target_position;
-        sim.motor_torque = std::clamp(delta * 0.5f, -9.8f, 9.8f);
-        return {
-          make_state_frame_(
-            rx_id,
-            opcode,
-            sim.temperature,
-            sim.motor_position,
-            sim.motor_velocity_rpm,
-            sim.motor_torque)};
-      }
-    default:
-      break;
-  }
-
-  return {};
-}
-
-TPCANMsg Hand::make_ack_frame_(uint32_t rx_id, uint8_t opcode, uint8_t result)
-{
-  TPCANMsg frame{};
-  frame.ID = rx_id;
-  frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
-  frame.LEN = 2;
-  frame.DATA[0] = opcode;
-  frame.DATA[1] = result;
-  return frame;
-}
-
-TPCANMsg Hand::make_state_frame_(
-  uint32_t rx_id,
-  uint8_t opcode,
-  uint8_t temperature,
-  float motor_position,
-  float motor_velocity_rpm,
-  float motor_torque)
-{
-  TPCANMsg frame{};
-  frame.ID = rx_id;
-  frame.MSGTYPE = PCAN_MESSAGE_STANDARD;
-  frame.LEN = 8;
-  frame.DATA[0] = opcode;
-  frame.DATA[1] = ResultByte::SUCCESS;
-  frame.DATA[2] = temperature;
-
-  const float clamped_position = std::clamp(motor_position, -12.5f, 12.5f);
-  const uint16_t position_raw = static_cast<uint16_t>(std::lround(
-      (clamped_position + 12.5f) * 65535.0f / 25.0f));
-  frame.DATA[3] = static_cast<uint8_t>(position_raw & 0xFF);
-  frame.DATA[4] = static_cast<uint8_t>((position_raw >> 8) & 0xFF);
-
-  const float clamped_velocity = std::clamp(motor_velocity_rpm, -65.0f, 65.0f);
-  const uint16_t velocity_raw = static_cast<uint16_t>(std::lround(
-      (clamped_velocity + 65.0f) * 4095.0f / 130.0f));
-  frame.DATA[5] = static_cast<uint8_t>((velocity_raw >> 4) & 0xFF);
-
-  const float clamped_torque = std::clamp(motor_torque, -9.8f, 9.8f);
-  const uint16_t torque_raw = static_cast<uint16_t>(std::lround(
-      2048.0f + clamped_torque * (2047.0f / 9.8f)));
-  frame.DATA[6] = static_cast<uint8_t>(((velocity_raw & 0x0F) << 4) | ((torque_raw >> 8) & 0x0F));
-  frame.DATA[7] = static_cast<uint8_t>(torque_raw & 0xFF);
-
-  return frame;
-}
-
-float Hand::decode_float_le_(const TPCANMsg & frame, size_t offset)
-{
-  if (offset + sizeof(float) > frame.LEN) {
-    return 0.0f;
-  }
-
-  float value = 0.0f;
-  std::memcpy(&value, &frame.DATA[offset], sizeof(float));
-  return value;
-}
-
 bool Hand::zero_actuators_()
 {
   const bool probe_success = run_zeroing_probe_rounds_();
@@ -562,15 +354,11 @@ bool Hand::run_zeroing_probe_rounds_()
   bool success = true;
   for (size_t round = 0; round < kZeroingProbeRounds; ++round) {
     for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-      const auto req = actuators_[i].make_torque_request(static_cast<uint32_t>(i), 0.0f);
-      const auto res = scheduler_.execute_blocking(
-        req, kResponseTimeout, kLifecycleCommandRetries);
-      if (res.status != TransactionResult::Status::kConfirmed) {
+      if (!send_frame_blocking_(actuators_[i].set_joint_torque(0.0f).frame, kResponseTimeout)) {
         RCLCPP_WARN(
           logger(),
-          "Zeroing probe failed for actuator %zu: %s",
-          i + 1,
-          TransactionResult::status_label(res.status));
+          "Zeroing probe direct TX failed for actuator %zu",
+          i + 1);
         success = false;
       }
     }

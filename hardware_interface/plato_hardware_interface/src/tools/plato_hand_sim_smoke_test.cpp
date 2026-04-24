@@ -276,8 +276,6 @@ int main(int argc, char ** argv)
   Summary summary;
   try {
     auto config = plato_hand::load_default_plato_hand_config();
-    config.enable_transport_simulator = true;
-    config.transport_simulator_bypass_hardware = options.bypass_hardware;
     config.direct_tx_inter_frame_gap = std::chrono::microseconds(options.direct_gap_us);
 
     plato_hand::Hand hand(std::move(config));

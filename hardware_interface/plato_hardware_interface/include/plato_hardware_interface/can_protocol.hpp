@@ -2,16 +2,13 @@
 #define PLATO_HARDWARE_INTERFACE__CAN_PROTOCOL_HPP_
 
 #include <cstdint>
+#include <optional>
+
 #include "PCANBasic.h"
 
-#include "can_hardware_common/actuator.hpp"
+#include "can_hardware_common/actuator_protocol.hpp"
 #include "can_hardware_common/utils/can_helper.hpp"
 #include "plato_hardware_interface/utils/can_ids.hpp"
-
-namespace plato_actuator
-{
-class Actuator;
-}
 
 namespace can_protocol
 {
@@ -52,30 +49,44 @@ private:
   float torque_offset_;
 };
 
-class SteadywinProtocol
+}  // namespace can_protocol
+
+namespace plato_actuator
+{
+
+class CANProtocol : public can_hardware_common::ActuatorProtocol
 {
 public:
-  explicit SteadywinProtocol(const can_hardware_common::ActuatorCoreConfig & config);
+  explicit CANProtocol(const can_hardware_common::ActuatorCoreConfig & config);
+
+  std::optional<actuator::TxCommand> make_impedance_command(
+    const can_hardware_common::ActuatorTarget & joint_target) override;
+  actuator::TxCommand make_torque_command(float motor_torque) override;
+  std::optional<can_hardware_common::DecodedFeedback> decode(
+    const can_hardware_common::RxFrame & frame) override;
 
   actuator::TxCommand make_enable_motor_command();
   actuator::TxCommand make_disable_motor_command();
   actuator::TxCommand make_stop_control_command();
-  actuator::TxCommand make_torque_command(float motor_torque);
   actuator::TxCommand make_position_command(
-    float motor_position,
-    uint32_t duration = kDefaultQddPositionDurationMs);
-  actuator::TxCommand make_servo_position_command(float motor_position, uint32_t current_milliamps = 0);
-  void process_message(const TPCANMsg & msg, plato_actuator::Actuator & actuator);
+    float joint_position,
+    uint32_t duration = can_protocol::kDefaultQddPositionDurationMs);
+  actuator::TxCommand make_servo_position_command(float joint_position, uint32_t current_milliamps = 0);
+  void set_position_offset(float position_offset) { config_.position_offset = position_offset; }
 
 private:
   static TPCANMsg make_message_(uint32_t can_id, uint8_t len);
+  static void validate_direction_(const can_hardware_common::ActuatorCoreConfig & config);
+  float map_joint_to_motor_frame_(float joint_value, bool apply_offset = false) const;
+  float map_motor_to_joint_frame_(float motor_value, bool apply_offset = false) const;
 
+  can_hardware_common::ActuatorCoreConfig config_;
   uint8_t tx_id_;
-  MsgDecoder decoder_;
+  can_protocol::MsgDecoder decoder_;
   TPCANMsg onoff_msg_;
   TPCANMsg cmd_msg_;
 };
 
-}  // namespace can_protocol
+}  // namespace plato_actuator
 
 #endif  // PLATO_HARDWARE_INTERFACE__CAN_PROTOCOL_HPP_

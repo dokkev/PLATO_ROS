@@ -6,7 +6,6 @@ Rebuild `can_hardware_common` as a small CAN bus toolbox.
 
 The common package should own only code that would still make sense for an arbitrary CAN device:
 - transport
-- minimal request queueing
 - shared frame/time types
 - very small utilities that are not hand-specific
 
@@ -24,9 +23,7 @@ The common package should **not** own:
 can_hardware_common/
   include/can_hardware_common/
     pcan_interface.hpp
-    can_transport.hpp
-    command_request.hpp
-    command_scheduler.hpp
+    can_bus.hpp
     can_frame_types.hpp
     time_types.hpp
     actuator_types.hpp   # keep only if still genuinely shared
@@ -34,8 +31,7 @@ can_hardware_common/
       can_helper.hpp       # keep only if still used by hand packages
   src/
     pcan_interface.cpp
-    can_transport.cpp
-    command_scheduler.cpp
+    can_bus.cpp
 ```
 
 ## Common Layer Rules
@@ -45,8 +41,7 @@ Use this rule for every file:
 > If this code would not be reused by an arbitrary CAN device, it does not belong in `can_hardware_common`.
 
 Examples:
-- `CanTransport` belongs in common.
-- A latest-only request queue can belong in common.
+- `CanBus` belongs in common.
 - A lifecycle runner does not belong in common.
 - A hand runtime state machine does not belong in common.
 - Confirmation predicates do not belong in common.
@@ -60,7 +55,7 @@ Examples:
 
 ### Phase 1 — Shrink `can_hardware_common`
 
-- [x] keep transport, scheduler, and shared type code
+- [x] keep transport and shared type code
 - [x] remove `core/` from the public/common design
 - [x] remove `CanHandBase`
 - [x] remove lifecycle session execution from common
@@ -70,8 +65,7 @@ Examples:
 
 ### Phase 2 — Keep common minimal
 
-- [x] keep `CommandScheduler` latest-only + FIFO only
-- [x] keep transport pacing inside `CanTransport`
+- [x] keep transport pacing inside `CanBus`
 - [x] remove now-unnecessary top-level include shims by making them the real headers
 - [ ] revisit whether `actuator_types.hpp` is still genuinely common
 - [ ] revisit whether transport-level TX simulator belongs in common long-term
@@ -80,7 +74,6 @@ Examples:
 
 - [x] `colcon build --packages-select can_hardware_common --symlink-install`
 - [x] `colcon test --packages-select can_hardware_common --event-handlers console_direct+`
-- [x] scheduler tests still pass
 - [x] no C++ smoke executable remains under `src/`
 
 ## Acceptance Criteria
@@ -91,7 +84,7 @@ The reset is correct only if all of the following are true:
 - [x] no lifecycle engine remains in common
 - [x] no generic hand base class remains in common
 - [x] common no longer defines a runtime-state framework for hands
-- [x] common still provides working PCAN transport and minimal scheduler behavior
+- [x] common still provides working PCAN bus I/O and pacing behavior
 - [ ] Aristo/Plato are reattached later with hand-local `write()/enable()/disable()` procedures
 
 ## Next Step
@@ -101,4 +94,4 @@ Do **not** grow a new common framework immediately.
 The next real implementation step should be:
 1. choose one hand package
 2. rebuild its `write()/enable()/disable()` as short local procedure code
-3. depend only on `transport/`, `scheduler/`, and shared types from `can_hardware_common`
+3. depend only on `CanBus`, `PCANInterface`, and shared types from `can_hardware_common`

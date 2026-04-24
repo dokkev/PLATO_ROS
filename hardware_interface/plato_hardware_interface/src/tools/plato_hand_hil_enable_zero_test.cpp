@@ -1,4 +1,4 @@
-#include "can_hardware_common/can_transport.hpp"
+#include "can_hardware_common/can_bus.hpp"
 #include "can_hardware_common/command_scheduler.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/utils/plato_hand_config_loader.hpp"
@@ -126,7 +126,7 @@ std::string result_detail(
     std::string(can_hardware_common::CanCommandScheduler::TransactionResult::status_label(
       result.status));
   if (result.status == can_hardware_common::CanCommandScheduler::TransactionResult::Status::kTransportError) {
-    detail += " transport=" + can_hardware_common::CanTransport::bus_status_string(
+    detail += " transport=" + can_hardware_common::CanBus::bus_status_string(
       result.transport_status);
   }
   if (result.result_byte != 0xFF) {
@@ -265,8 +265,8 @@ int main(int argc, char ** argv)
 
   Summary summary;
   try {
-    can_hardware_common::CanTransport transport;
-    transport.set_min_inter_frame_gap(std::chrono::microseconds(options.inter_frame_gap_us));
+    can_hardware_common::CanBus transport;
+    transport.set_tx_gap(std::chrono::microseconds(options.inter_frame_gap_us));
     can_hardware_common::CanCommandScheduler scheduler(transport);
 
     auto config = plato_hand::load_default_plato_hand_config();

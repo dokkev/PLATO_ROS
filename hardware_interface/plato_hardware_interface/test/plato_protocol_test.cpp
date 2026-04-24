@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "can_hardware_common/core/lifecycle_plan.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/can_protocol.hpp"
 #include "plato_hardware_interface/plato_protocol.hpp"
@@ -35,57 +34,30 @@ std::vector<plato_actuator::Actuator> make_plato_actuators(std::size_t count)
   return actuators;
 }
 
-TEST(PlatoProtocolTest, EnableBuildsScheduledLifecycleRequests)
+TEST(PlatoProtocolTest, AppendEnableFramesUsesActuatorEnableCommands)
 {
   auto actuators = make_plato_actuators(4);
   plato_hand::PlatoProtocol protocol;
+  std::vector<TPCANMsg> frames;
 
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kEnable);
+  protocol.append_enable_frames(actuators, frames);
 
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kEnable);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kScheduledRequests);
-  EXPECT_TRUE(plan.direct_frames.empty());
-  ASSERT_EQ(plan.scheduled_requests.size(), actuators.size());
-  EXPECT_EQ(plan.scheduled_requests.front().reply.expected_rx_id, actuators.front().get_rx_id());
-  EXPECT_EQ(
-    plan.scheduled_requests.front().reply.expected_opcode,
-    CommandByte::START_MOTOR);
+  ASSERT_EQ(frames.size(), actuators.size());
+  EXPECT_EQ(frames.front().ID, actuators.front().enable_motor().frame.ID);
+  EXPECT_EQ(frames.front().DATA[0], CommandByte::START_MOTOR);
 }
 
-TEST(PlatoProtocolTest, DisableBuildsScheduledLifecycleRequests)
+TEST(PlatoProtocolTest, AppendDisableFramesUsesActuatorDisableCommands)
 {
   auto actuators = make_plato_actuators(3);
   plato_hand::PlatoProtocol protocol;
+  std::vector<TPCANMsg> frames;
 
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kDisable);
+  protocol.append_disable_frames(actuators, frames);
 
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kDisable);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kScheduledRequests);
-  EXPECT_TRUE(plan.direct_frames.empty());
-  ASSERT_EQ(plan.scheduled_requests.size(), actuators.size());
-  EXPECT_EQ(plan.scheduled_requests.front().reply.expected_rx_id, actuators.front().get_rx_id());
-  EXPECT_EQ(
-    plan.scheduled_requests.front().reply.expected_opcode,
-    CommandByte::STOP_MOTOR);
-}
-
-TEST(PlatoProtocolTest, ZeroUsesCustomExecutionPolicy)
-{
-  auto actuators = make_plato_actuators(2);
-  plato_hand::PlatoProtocol protocol;
-
-  const auto plan = protocol.build_lifecycle_plan(
-    actuators, can_hardware_common::core::LifecycleOperation::kZero);
-
-  EXPECT_TRUE(plan.ready);
-  EXPECT_EQ(plan.operation, can_hardware_common::core::LifecycleOperation::kZero);
-  EXPECT_EQ(plan.dispatch_policy, can_hardware_common::core::DispatchPolicy::kCustomExecution);
-  EXPECT_TRUE(plan.direct_frames.empty());
-  EXPECT_TRUE(plan.scheduled_requests.empty());
+  ASSERT_EQ(frames.size(), actuators.size());
+  EXPECT_EQ(frames.front().ID, actuators.front().disable_motor().frame.ID);
+  EXPECT_EQ(frames.front().DATA[0], CommandByte::STOP_MOTOR);
 }
 
 }  // namespace

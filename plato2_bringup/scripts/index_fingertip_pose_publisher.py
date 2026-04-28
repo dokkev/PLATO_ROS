@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Index Fingertip Pose Publisher
-Publishes the pose of the index_fingertip frame relative to base_link (local frame)
-and relative to world frame (stand)
+Publishes the pose of the index_fingertip frame relative to a local frame
+and relative to a world frame.
 """
 
 import rclpy
@@ -37,30 +37,34 @@ class IndexFingertipPosePublisher(Node):
 
         # Timer to publish pose at a regular rate (e.g., 50 Hz)
         self.declare_parameter('publish_rate', 50.0)
+        self.declare_parameter('local_frame', 'base_link')
         self.declare_parameter('world_frame', 'stand')
+        self.declare_parameter('fingertip_frame', 'index_fingertip')
         rate = self.get_parameter('publish_rate').value
+        self.local_frame = self.get_parameter('local_frame').value
         self.world_frame = self.get_parameter('world_frame').value
+        self.fingertip_frame = self.get_parameter('fingertip_frame').value
         self.timer = self.create_timer(1.0 / rate, self.publish_pose)
 
         self.get_logger().info(f'Index Fingertip Pose Publisher started at {rate} Hz')
-        self.get_logger().info('Publishing to /plato2/index_fingertip_pose_local (base_link)')
+        self.get_logger().info(f'Publishing to /plato2/index_fingertip_pose_local ({self.local_frame})')
         self.get_logger().info(f'Publishing to /plato2/index_fingertip_pose_world ({self.world_frame})')
 
     def publish_pose(self):
         """Get transforms and publish as PoseStamped messages"""
         current_time = self.get_clock().now()
 
-        # Publish local pose (base_link to index_fingertip)
+        # Publish local pose (local_frame to fingertip_frame)
         try:
             transform_local = self.tf_buffer.lookup_transform(
-                'base_link',  # target frame
-                'index_fingertip',  # source frame
+                self.local_frame,  # target frame
+                self.fingertip_frame,  # source frame
                 rclpy.time.Time()  # get latest available
             )
 
             pose_msg_local = PoseStamped()
             pose_msg_local.header.stamp = current_time.to_msg()
-            pose_msg_local.header.frame_id = 'base_link'
+            pose_msg_local.header.frame_id = self.local_frame
 
             pose_msg_local.pose.position.x = transform_local.transform.translation.x
             pose_msg_local.pose.position.y = transform_local.transform.translation.y
@@ -77,15 +81,15 @@ class IndexFingertipPosePublisher(Node):
             if not hasattr(self, '_last_error_time_local') or \
                (current_time - self._last_error_time_local).nanoseconds > 2e9:
                 self.get_logger().warn(
-                    f'Could not transform base_link to index_fingertip: {ex}'
+                    f'Could not transform {self.local_frame} to {self.fingertip_frame}: {ex}'
                 )
                 self._last_error_time_local = current_time
 
-        # Publish world pose (world_frame to index_fingertip_test)
+        # Publish world pose (world_frame to fingertip_frame)
         try:
             transform_world = self.tf_buffer.lookup_transform(
                 self.world_frame,  # target frame (e.g., 'stand')
-                'index_fingertip',  # source frame
+                self.fingertip_frame,  # source frame
                 rclpy.time.Time()  # get latest available
             )
 
@@ -108,7 +112,7 @@ class IndexFingertipPosePublisher(Node):
             if not hasattr(self, '_last_error_time_world') or \
                (current_time - self._last_error_time_world).nanoseconds > 2e9:
                 self.get_logger().warn(
-                    f'Could not transform {self.world_frame} to index_fingertip_test: {ex}'
+                    f'Could not transform {self.world_frame} to {self.fingertip_frame}: {ex}'
                 )
                 self._last_error_time_world = current_time
 

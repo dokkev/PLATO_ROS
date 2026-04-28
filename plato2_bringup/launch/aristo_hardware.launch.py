@@ -16,6 +16,9 @@ def generate_launch_description():
     gui = LaunchConfiguration("gui")
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    fingertip_local_frame = LaunchConfiguration("fingertip_local_frame")
+    fingertip_world_frame = LaunchConfiguration("fingertip_world_frame")
+    fingertip_frame = LaunchConfiguration("fingertip_frame")
 
     declared_arguments = [
         DeclareLaunchArgument(
@@ -29,6 +32,18 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "use_sim_time", default_value="false",
             description="Use simulated clock if true."
+        ),
+        DeclareLaunchArgument(
+            "fingertip_local_frame", default_value="hand_base",
+            description="Frame used for /plato2/index_fingertip_pose_local."
+        ),
+        DeclareLaunchArgument(
+            "fingertip_world_frame", default_value="world",
+            description="Frame used for /plato2/index_fingertip_pose_world."
+        ),
+        DeclareLaunchArgument(
+            "fingertip_frame", default_value="index_fingertip",
+            description="Fingertip TF frame to publish as a pose."
         ),
     ]
 
@@ -90,6 +105,12 @@ def generate_launch_description():
         package="plato2_bringup",
         executable="index_fingertip_pose_publisher.py",
         name="index_fingertip_pose_publisher",
+        parameters=[{
+            "local_frame": fingertip_local_frame,
+            "world_frame": fingertip_world_frame,
+            "fingertip_frame": fingertip_frame,
+            "use_sim_time": use_sim_time,
+        }],
         output="screen",
     )
 
@@ -152,12 +173,12 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_state_pub,
-        static_tf_optimo_to_plato,
+        # static_tf_optimo_to_plato,
         joint_state_broadcaster_spawner,
         start_impedance_after_jsb,
         start_rviz_after_jsb,
         tf_merger,
-        index_fingertip_pose_pub,
+        # index_fingertip_pose_pub,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

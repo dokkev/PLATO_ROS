@@ -14,6 +14,7 @@ from typing import Dict, List
 
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, Int32
 
 
@@ -30,6 +31,19 @@ class RetargetingConverter(Node):
         self.target_topic: str = self.declare_parameter(
             "target_topic", "/plato2/joint_position_controller/commands"
         ).value
+        self.publish_rate_hz: float = float(
+            self.declare_parameter("publish_rate_hz", 50.0).value
+        )
+        self.joint_state_topic: str = self.declare_parameter(
+            "joint_state_topic", "/plato2/joint_states"
+        ).value
+        self.joint_names: List[str] = [
+            str(name)
+            for name in self.declare_parameter(
+                "joint_names",
+                ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7", "joint8"],
+            ).value
+        ]
         self.output_joint_count: int = int(self.declare_parameter("output_joint_count", 8).value)
         self.preset_joint_indices: List[int] = [
             int(index)
@@ -60,11 +74,24 @@ class RetargetingConverter(Node):
             )
 
         self._filtered_cmd: List[float] = []
+        self._latest_joint_positions: List[float] | None = None
 
         self.subscription = self.create_subscription(
             Float64MultiArray, self.source_topic, self.input_callback, 10
         )
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            self.joint_state_topic,
+            self.joint_state_callback,
+            10,
+        )
         self.publisher = self.create_publisher(Float64MultiArray, self.target_topic, 10)
+        self.publish_timer = None
+        if self.publish_rate_hz > 0.0:
+            self.publish_timer = self.create_timer(
+                1.0 / self.publish_rate_hz,
+                self.publish_current_command,
+            )
         if self.thumb_state_enabled:
             self.thumb_state_sub = self.create_subscription(
                 Int32,
@@ -75,7 +102,7 @@ class RetargetingConverter(Node):
 
         self.get_logger().info(
             f"retargeting_converter: source={self.source_topic} -> target={self.target_topic}, "
-            f"alpha={self.filter_alpha:.3f}"
+            f"alpha={self.filter_alpha:.3f}, publish_rate={self.publish_rate_hz:.1f} Hz"
         )
         self.get_logger().info(
             f"retargeting_converter: preset joints={self.preset_joint_indices}, "
@@ -99,6 +126,21 @@ class RetargetingConverter(Node):
             f"Thumb state {state}: joints {self.preset_joint_indices} -> "
             f"{self.preset_joint_positions}"
         )
+        if self._ensure_command_initialized():
+            self._apply_joint_presets(self._filtered_cmd)
+            self.publish_current_command()
+
+    def joint_state_callback(self, msg: JointState) -> None:
+        position_by_name = {
+            name: position
+            for name, position in zip(msg.name, msg.position)
+        }
+        positions: List[float] = []
+        for joint_name in self.joint_names:
+            if joint_name not in position_by_name:
+                return
+            positions.append(float(position_by_name[joint_name]))
+        self._latest_joint_positions = positions
 
     def input_callback(self, msg: Float64MultiArray) -> None:
         if not msg.data:
@@ -117,9 +159,28 @@ class RetargetingConverter(Node):
 
         self._apply_joint_presets(self._filtered_cmd)
 
+        self.publish_current_command()
+
+    def publish_current_command(self) -> None:
+        if not self._filtered_cmd:
+            return
+
         out = Float64MultiArray()
-        out.data = self._filtered_cmd
+        out.data = list(self._filtered_cmd)
         self.publisher.publish(out)
+
+    def _ensure_command_initialized(self) -> bool:
+        if self._filtered_cmd:
+            return True
+
+        if self._latest_joint_positions:
+            self._filtered_cmd = list(self._latest_joint_positions)
+            return True
+
+        self.get_logger().warn(
+            "Thumb state received, but no retargeting command or joint state has been received yet."
+        )
+        return False
 
     def _apply_joint_presets(self, command: List[float]) -> List[float]:
         target_len = max(

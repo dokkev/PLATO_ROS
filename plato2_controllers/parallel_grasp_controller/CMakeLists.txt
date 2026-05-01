@@ -49,9 +49,22 @@ ament_target_dependencies(parallel_grasp_node
   Eigen3
 )
 
+add_executable(fingertip_dist_node src/fingertip_dist_node.cpp src/fingertip_dist_controller.cpp)
+target_include_directories(fingertip_dist_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(fingertip_dist_node PUBLIC c_std_99 cxx_std_20)
+ament_target_dependencies(fingertip_dist_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+)
+
 install(TARGETS grasp_node
   DESTINATION lib/${PROJECT_NAME})
 install(TARGETS parallel_grasp_node
+  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS fingertip_dist_node
   DESTINATION lib/${PROJECT_NAME})
 
 

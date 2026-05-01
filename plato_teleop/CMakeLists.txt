@@ -24,6 +24,10 @@ install(PROGRAMS plato_teleop/impedance_gain_keyboard.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME impedance_gain_keyboard)
 
+install(PROGRAMS plato_teleop/thumb_keyboard_teleop.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME thumb_keyboard_teleop)
+
 install(PROGRAMS plato_teleop/retargeting_converter.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME retargeting_converter)

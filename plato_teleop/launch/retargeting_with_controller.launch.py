@@ -27,6 +27,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "use_sim_time": False,
+            "publish_rate_hz": 50.0,
+            "joint_state_topic": "/plato2/joint_states",
             "preset_joint_indices": [0, 1],
             "preset_joint_positions": [0.0, 0.0],
             "thumb_state_enabled": True,

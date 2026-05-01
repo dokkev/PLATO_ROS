@@ -55,6 +55,7 @@ setup(
             'spacemouse_twist = plato_teleop.spacemouse_twist:main',
             'spacemouse_state_machine = plato_teleop.spacemouse_state_machine:main',
             'impedance_gain_keyboard = plato_teleop.impedance_gain_keyboard:main',
+            'thumb_keyboard_teleop = plato_teleop.thumb_keyboard_teleop:main',
             'retargeting_converter = plato_teleop.retargeting_converter:main',
             'ftip_to_parallel_grasp = plato_teleop.ftip_to_parallel_grasp:main',
         ],

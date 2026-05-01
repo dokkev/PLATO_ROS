@@ -156,7 +156,7 @@ PLATO2Hardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/) 
   // hand_->set_default_can_limits();
 
   // set current position as zero
-  hand_->set_current_position_as_zero();
+  // hand_->set_current_position_as_zero();
   
 
 

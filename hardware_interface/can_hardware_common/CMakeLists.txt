@@ -6,6 +6,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 
 find_library(PCAN_LIB NAMES pcanbasic PATHS /usr/local/lib /usr/lib /lib REQUIRED)
 find_path(PCAN_INCLUDE_DIR NAMES PCANBasic.h PATHS /usr/local/include /usr/include REQUIRED)
@@ -26,6 +27,8 @@ target_link_libraries(${PROJECT_NAME}
   PUBLIC ${PCAN_LIB}
 )
 
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp)
+
 install(DIRECTORY include/
   DESTINATION include
 )
@@ -38,5 +41,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(rclcpp)
 ament_export_libraries(${PROJECT_NAME})
 ament_package()

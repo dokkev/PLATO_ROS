@@ -1,9 +1,8 @@
 #ifndef PLATO_HARDWARE_INTERFACE__FIVE_BAR_LINKAGE_HPP_
 #define PLATO_HARDWARE_INTERFACE__FIVE_BAR_LINKAGE_HPP_
 
+#include <array>
 #include <cstddef>
-
-#include <Eigen/Core>
 
 #include "can_hardware_common/transmission.hpp"
 
@@ -32,7 +31,7 @@ class Transmission : public can_hardware_common::Transmission
 public:
   static constexpr size_t kNumJoints = 8;
   static constexpr size_t kNumActuators = 8;
-  using JointArray = Eigen::Array<float, static_cast<Eigen::Index>(kNumJoints), 1>;
+  using JointArray = std::array<float, kNumJoints>;
 
   explicit Transmission(FiveBarLinkageConfig config);
   Transmission(FiveBarLinkageConfig config, const JointArray & joint_effort_limits);

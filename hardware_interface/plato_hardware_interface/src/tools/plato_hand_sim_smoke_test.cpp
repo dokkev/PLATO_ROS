@@ -138,8 +138,8 @@ CaseStatus run_cycle_case(plato_hand::Hand & hand, const Options & options)
     std::this_thread::sleep_for(std::chrono::microseconds(options.loop_period_us));
   }
 
-  const auto joint_state = hand.joint_state_view();
-  const auto actuator_state = hand.actuator_state_view();
+  const auto & joint_state = hand.joint_states();
+  const auto & actuator_state = hand.actuator_states();
   if (!joint_state.all_finite() || !actuator_state.all_finite()) {
     return report_result("write_read_cycles", CaseStatus::kFail, "non-finite joint/actuator state");
   }
@@ -174,10 +174,10 @@ CaseStatus run_history_case(const plato_hand::Hand & hand)
     return report_result("command_history", CaseStatus::kFail, "previous command history missing");
   }
 
-  if (!hand.previous_joint_command_view().all_finite()) {
+  if (!hand.previous_joint_command().all_finite()) {
     return report_result("command_history", CaseStatus::kFail, "previous joint command is non-finite");
   }
-  if (!hand.previous_actuator_command_view().all_finite()) {
+  if (!hand.previous_actuator_command().all_finite()) {
     return report_result(
       "command_history",
       CaseStatus::kFail,
@@ -189,7 +189,7 @@ CaseStatus run_history_case(const plato_hand::Hand & hand)
 
 CaseStatus run_23_24_update_case(plato_hand::Hand & hand, const Options & options)
 {
-  const auto before = hand.actuator_state_view();
+  const auto & before = hand.actuator_states();
   const double before_24 = before.position(2);
   const double before_23 = before.position(3);
 
@@ -220,7 +220,7 @@ CaseStatus run_23_24_update_case(plato_hand::Hand & hand, const Options & option
     std::this_thread::sleep_for(std::chrono::microseconds(options.loop_period_us));
   }
 
-  const auto after = hand.actuator_state_view();
+  const auto & after = hand.actuator_states();
   const double after_24 = after.position(2);
   const double after_23 = after.position(3);
 

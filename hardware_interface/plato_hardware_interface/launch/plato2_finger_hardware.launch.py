@@ -8,7 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    gui = LaunchConfiguration("gui")
+    rviz = LaunchConfiguration("rviz")
     plato_ns = LaunchConfiguration("plato_ns")
     zeroing = LaunchConfiguration("zeroing")
 
@@ -57,7 +57,7 @@ def generate_launch_description():
         name="rviz2",
         output="log",
         arguments=["-d", rviz_config_file],
-        condition=IfCondition(gui),
+        condition=IfCondition(rviz),
     )
 
     contact_estimation_node = Node(
@@ -97,7 +97,7 @@ def generate_launch_description():
 
     declared_arguments = [
         DeclareLaunchArgument(
-            "gui",
+            "rviz",
             default_value="true",
             description="Start RViz2 automatically with this launch file.",
         ),

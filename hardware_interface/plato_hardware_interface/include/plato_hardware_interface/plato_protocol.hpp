@@ -15,7 +15,7 @@ namespace plato_hand
 class PlatoProtocol
 {
 public:
-  using ActuatorCommandView = can_hardware_common::RobotIO::ActuatorCommand::ConstView;
+  using ActuatorCommand = can_hardware_common::RobotIO::ActuatorCommand;
 
   void append_enable_frames(
     std::vector<plato_actuator::Actuator> & actuators,
@@ -31,7 +31,7 @@ public:
 
   void append_write_frames(
     std::vector<plato_actuator::Actuator> & actuators,
-    const ActuatorCommandView & actuator_cmd,
+    const ActuatorCommand & actuator_cmd,
     std::size_t write_cycle_count,
     double servo_stiffness_scale,
     std::vector<TPCANMsg> & direct_frames) const;

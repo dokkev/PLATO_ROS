@@ -19,6 +19,7 @@ rclcpp::Clock & throttle_clock()
 
 constexpr std::size_t kThumbRollIndex = 0;
 constexpr std::size_t kThumbYawIndex = 1;
+constexpr std::size_t kFirstGimActuatorIndex = 2;
 }  // namespace
 
 void PlatoModel::update_joint_states(
@@ -32,7 +33,7 @@ void PlatoModel::update_joint_states(
   for (std::size_t i = 0; i < actuators.size(); ++i) {
     if (!actuators[i].is_initialized()) {
       if (i == kThumbRollIndex || i == kThumbYawIndex) {
-        actuator_states.position_at(i) = joint_commands.position_at(i);
+        actuator_states.position_at(i) = static_cast<float>(joint_commands.position_at(i));
         actuator_states.velocity_at(i) = 0.0;
         actuator_states.effort_at(i) = 0.0;
         continue;
@@ -76,7 +77,7 @@ void PlatoModel::update_joint_states(
 
   can_hardware_common::RobotIO::JointState joint_state_candidate = joint_states;
   transmission_.actuator_to_joint(actuator_states, joint_state_candidate);
-  if (!joint_state_candidate.const_view().all_finite()) {
+  if (!joint_state_candidate.all_finite()) {
     RCLCPP_WARN_THROTTLE(
       logger(),
       throttle_clock(),
@@ -85,11 +86,7 @@ void PlatoModel::update_joint_states(
     return;
   }
 
-  auto dst = joint_states.view();
-  const auto src = joint_state_candidate.const_view();
-  dst.position = src.position;
-  dst.velocity = src.velocity;
-  dst.effort = src.effort;
+  joint_states.copy_from(joint_state_candidate);
 }
 
 void PlatoModel::joint_to_actuator_commands(
@@ -107,8 +104,12 @@ void PlatoModel::joint_to_actuator_commands(
 
 bool PlatoModel::actuators_ready(const std::vector<plato_actuator::Actuator> & actuators) const
 {
-  return std::any_of(
-    actuators.begin(),
+  if (actuators.size() <= kFirstGimActuatorIndex) {
+    return false;
+  }
+
+  return std::all_of(
+    actuators.begin() + kFirstGimActuatorIndex,
     actuators.end(),
     [](const auto & actuator) { return actuator.is_initialized(); });
 }

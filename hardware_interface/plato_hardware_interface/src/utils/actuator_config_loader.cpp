@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <limits>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -134,15 +133,19 @@ Config parse_config(const YAML::Node & node)
 
 void validate_can_ids(const std::vector<Config> & configs)
 {
-  std::set<uint8_t> tx_ids;
-  std::set<uint8_t> rx_ids;
-
-  for (const auto & config : configs) {
-    if (!tx_ids.insert(config.static_config.can_tx_id).second) {
-      throw std::runtime_error("Duplicate tx_id found in actuator config");
-    }
-    if (!rx_ids.insert(config.static_config.can_rx_id).second) {
-      throw std::runtime_error("Duplicate rx_id found in actuator config");
+  for (std::size_t i = 0; i < configs.size(); ++i) {
+    for (std::size_t j = i + 1; j < configs.size(); ++j) {
+      const bool allowed_shared_dynamixel_mcu = i < 2U && j < 2U;
+      if (!allowed_shared_dynamixel_mcu &&
+        configs[i].static_config.can_tx_id == configs[j].static_config.can_tx_id)
+      {
+        throw std::runtime_error("Duplicate tx_id found in actuator config");
+      }
+      if (!allowed_shared_dynamixel_mcu &&
+        configs[i].static_config.can_rx_id == configs[j].static_config.can_rx_id)
+      {
+        throw std::runtime_error("Duplicate rx_id found in actuator config");
+      }
     }
   }
 }

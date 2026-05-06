@@ -214,7 +214,6 @@ void Hand::refresh_state_snapshot_()
 {
   std::lock_guard<std::mutex> lock(state_mutex_);
   model_.update_joint_states(actuators_, actuator_states_, joint_states_);
-  const auto joint_state = joint_state_view();
   const auto ft_sensor_status = summarize_ft_sensor_status_(sensor::FTSensor::SteadyClock::now());
   state_snapshot_.stamp = snapshot_clock().now();
   state_snapshot_.has_fresh_rx = has_fresh_rx_(std::chrono::steady_clock::now());
@@ -227,13 +226,12 @@ void Hand::refresh_state_snapshot_()
   state_snapshot_.model_ready =
     actuators_.size() == kNumActuators &&
     actuator_configs_.size() == kNumActuators;
-  state_snapshot_.joint_position = joint_state.position.matrix();
-  state_snapshot_.joint_velocity = joint_state.velocity.matrix();
-  state_snapshot_.joint_effort = joint_state.effort.matrix();
-
   if (state_snapshot_.actuator_states.size() != kNumActuators) {
     state_snapshot_.resize(kNumActuators, kNumActuators);
   }
+  std::copy_n(joint_states_.position_data(), kNumActuators, state_snapshot_.joint_position.begin());
+  std::copy_n(joint_states_.velocity_data(), kNumActuators, state_snapshot_.joint_velocity.begin());
+  std::copy_n(joint_states_.effort_data(), kNumActuators, state_snapshot_.joint_effort.begin());
   model_.copy_feedback_snapshot(actuators_, state_snapshot_);
 }
 
@@ -296,7 +294,6 @@ void Hand::build_ready_write_plan_(WritePlan & plan)
     std::lock_guard<std::mutex> lock(state_mutex_);
     model_.build_impedance_targets(
       actuators_, joint_commands_, actuator_commands_, impedance_targets);
-    plan.computed_actuator_command.capture(actuator_command_view());
     protocol_.append_impedance_frames(actuators_, impedance_targets, plan.direct_frames);
   }
 

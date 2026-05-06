@@ -1,5 +1,6 @@
 #include "plato_hardware_interface/plato_hand.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -16,7 +17,7 @@ namespace plato_hand
 
 namespace
 {
-constexpr double kInvalidStateValue = std::numeric_limits<double>::quiet_NaN();
+constexpr float kInvalidStateValue = std::numeric_limits<float>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
@@ -57,10 +58,10 @@ FiveBarLinkage::Transmission::JointArray build_joint_effort_limits(
   }
 
   FiveBarLinkage::Transmission::JointArray limits =
-    FiveBarLinkage::Transmission::JointArray::Constant(
-    std::numeric_limits<float>::infinity());
+    {};
+  limits.fill(std::numeric_limits<float>::infinity());
   for (size_t i = 0; i < actuator_configs.size(); ++i) {
-    limits(static_cast<Eigen::Index>(i)) = actuator_configs[i].static_config.effort_limit_nm;
+    limits[i] = actuator_configs[i].static_config.effort_limit_nm;
   }
   return limits;
 }
@@ -184,7 +185,6 @@ void Hand::refresh_state_snapshot_()
   std::lock_guard<std::mutex> lock(state_mutex_);
   model_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
 
-  const auto joint_state = joint_state_view();
   state_snapshot_.stamp = snapshot_clock().now();
   state_snapshot_.has_fresh_rx = has_fresh_rx_(SteadyClock::now());
   state_snapshot_.calibrated = actuator_position_offsets_.size() == kNumActuators;
@@ -195,13 +195,12 @@ void Hand::refresh_state_snapshot_()
   state_snapshot_.model_ready =
     actuators_.size() == kNumActuators &&
     actuator_static_configs_.size() == kNumActuators;
-  state_snapshot_.joint_position = joint_state.position.matrix();
-  state_snapshot_.joint_velocity = joint_state.velocity.matrix();
-  state_snapshot_.joint_effort = joint_state.effort.matrix();
-
   if (state_snapshot_.actuator_states.size() != kNumActuators) {
     state_snapshot_.resize(kNumJoints, kNumActuators);
   }
+  std::copy_n(joint_states_.position_data(), kNumJoints, state_snapshot_.joint_position.begin());
+  std::copy_n(joint_states_.velocity_data(), kNumJoints, state_snapshot_.joint_velocity.begin());
+  std::copy_n(joint_states_.effort_data(), kNumJoints, state_snapshot_.joint_effort.begin());
   model_.copy_feedback_snapshot(actuators_, state_snapshot_);
 }
 
@@ -271,10 +270,12 @@ void Hand::build_ready_write_plan_(WritePlan & plan)
     std::lock_guard<std::mutex> lock(state_mutex_);
     model_.joint_to_actuator_commands(
       joint_commands_, actuator_states_, joint_states_, actuator_commands_);
-    const auto actuator_cmd = actuator_command_view();
-    plan.computed_actuator_command.capture(actuator_cmd);
     protocol_.append_write_frames(
-      actuators_, actuator_cmd, write_cycle_count_, servo_stiffness_scale_, plan.direct_frames);
+      actuators_,
+      actuator_commands_,
+      write_cycle_count_,
+      servo_stiffness_scale_,
+      plan.direct_frames);
     ++write_cycle_count_;
   }
 
@@ -335,6 +336,29 @@ bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microsecond
   return false;
 }
 
+bool Hand::poll_rx_for_(std::chrono::microseconds budget)
+{
+  const auto deadline = SteadyClock::now() + budget;
+  bool healthy = true;
+
+  while (SteadyClock::now() < deadline) {
+    const auto rx = transport_.poll_rx();
+    last_rx_healthy_ = is_nonfatal_read_status(rx.status);
+    healthy = healthy && last_rx_healthy_;
+    if (!last_rx_healthy_) {
+      RCLCPP_WARN_THROTTLE(
+        logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
+      return false;
+    }
+
+    if (rx.processed_frames == 0U) {
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
+  }
+
+  return healthy;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ════════════════════════════════════════════════════════════════════════════
@@ -362,8 +386,10 @@ bool Hand::run_zeroing_probe_rounds_()
         success = false;
       }
     }
+    success = poll_rx_for_(kResponseTimeout) && success;
   }
 
+  success = poll_rx_for_(kResponseTimeout) && success;
   return success;
 }
 

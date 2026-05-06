@@ -85,23 +85,6 @@ def generate_launch_description():
         namespace=plato_ns,
     )
 
-    optimo_plato_transform_broadcaster = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_tf_broadcaster",
-        arguments=[
-            "0",
-            "0",
-            "0.157",
-            "0.707388",
-            "0.0005629",
-            "0.706825",
-            "0.0005633",
-            "link7_passive",
-            "plato2/base_link",
-        ],
-    )
-
     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
@@ -131,7 +114,6 @@ def generate_launch_description():
         foxglove_graph,
         foxglove_commands,
         foxglove_trajectory,
-        optimo_plato_transform_broadcaster,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

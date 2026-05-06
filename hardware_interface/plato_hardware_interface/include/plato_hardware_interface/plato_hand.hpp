@@ -54,6 +54,7 @@ private:
   bool execute_standard_lifecycle_(const LifecyclePlan & plan);
   bool execute_zero_lifecycle_();
   bool send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout);
+  bool poll_rx_for_(std::chrono::microseconds budget);
   bool zero_actuators_();
   bool run_zeroing_probe_rounds_();
   bool capture_zero_offsets_(std::vector<float> & offsets);

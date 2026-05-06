@@ -43,8 +43,11 @@ TEST(PlatoProtocolTest, AppendEnableFramesUsesActuatorEnableCommands)
   protocol.append_enable_frames(actuators, frames);
 
   ASSERT_EQ(frames.size(), actuators.size());
-  EXPECT_EQ(frames.front().ID, actuators.front().enable_motor().frame.ID);
+  EXPECT_EQ(frames[0].ID, actuators[0].get_tx_id());
   EXPECT_EQ(frames.front().DATA[0], CommandByte::START_MOTOR);
+  EXPECT_EQ(frames.front().DATA[1], 1);
+  EXPECT_EQ(frames[2].ID, actuators[2].enable_motor().frame.ID);
+  EXPECT_EQ(frames[2].DATA[0], CommandByte::START_MOTOR);
 }
 
 TEST(PlatoProtocolTest, AppendDisableFramesUsesActuatorDisableCommands)
@@ -56,8 +59,11 @@ TEST(PlatoProtocolTest, AppendDisableFramesUsesActuatorDisableCommands)
   protocol.append_disable_frames(actuators, frames);
 
   ASSERT_EQ(frames.size(), actuators.size());
-  EXPECT_EQ(frames.front().ID, actuators.front().disable_motor().frame.ID);
+  EXPECT_EQ(frames[0].ID, actuators[0].get_tx_id());
   EXPECT_EQ(frames.front().DATA[0], CommandByte::STOP_MOTOR);
+  EXPECT_EQ(frames.front().DATA[1], 1);
+  EXPECT_EQ(frames[2].ID, actuators[2].disable_motor().frame.ID);
+  EXPECT_EQ(frames[2].DATA[0], CommandByte::STOP_MOTOR);
 }
 
 }  // namespace

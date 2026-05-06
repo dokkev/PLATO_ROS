@@ -12,8 +12,8 @@ actuators:
       max: 3.14159
 
   - name: thumb_yaw
-    tx_id: 0x12
-    rx_id: 0x22
+    tx_id: 0x11
+    rx_id: 0x21
     servo_current_milliamps: 0
     soft_stop_enabled: true
     direction: 1

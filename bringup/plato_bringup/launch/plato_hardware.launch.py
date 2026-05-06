@@ -8,7 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    gui = LaunchConfiguration("gui")
+    rviz = LaunchConfiguration("rviz")
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
     zeroing = LaunchConfiguration("zeroing")
@@ -20,7 +20,7 @@ def generate_launch_description():
     joint_impedance_controller_name = LaunchConfiguration("joint_impedance_controller_name")
 
     declared_arguments = [
-        DeclareLaunchArgument("gui", default_value="true", description="Start RViz2 automatically."),
+        DeclareLaunchArgument("rviz", default_value="true", description="Start RViz2 automatically."),
         DeclareLaunchArgument("plato_ns", default_value="plato2", description="Namespace for Plato hand."),
         DeclareLaunchArgument("use_sim_time", default_value="false", description="Use simulated clock if true."),
         DeclareLaunchArgument(
@@ -101,7 +101,7 @@ def generate_launch_description():
         name="rviz2",
         output="log",
         arguments=["-d", rviz_config_path],
-        condition=IfCondition(gui),
+        condition=IfCondition(rviz),
     )
 
     joint_state_broadcaster_spawner = Node(

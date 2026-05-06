@@ -8,7 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    gui = LaunchConfiguration("gui")
+    rviz = LaunchConfiguration("rviz")
     plato_ns = LaunchConfiguration("plato_ns")
     zeroing = LaunchConfiguration("zeroing")
 
@@ -57,7 +57,7 @@ def generate_launch_description():
         name="rviz2",
         output="log",
         arguments=["-d", rviz_config_file],
-        condition=IfCondition(gui),
+        condition=IfCondition(rviz),
     )
 
     joint_state_broadcaster_spawner = Node(
@@ -72,23 +72,6 @@ def generate_launch_description():
         executable="spawner",
         arguments=["joint_impedance_controller", "--controller-manager", "/plato2/controller_manager"],
         namespace=plato_ns,
-    )
-
-    optimo_plato_transform_broadcaster = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_tf_broadcaster",
-        arguments=[
-            "0",
-            "0",
-            "0.157",
-            "0.707388",
-            "0.0005629",
-            "0.706825",
-            "0.0005633",
-            "/optimo/ee",
-            "/plato2/base_link",
-        ],
     )
 
     delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
@@ -107,7 +90,7 @@ def generate_launch_description():
 
     declared_arguments = [
         DeclareLaunchArgument(
-            "gui",
+            "rviz",
             default_value="true",
             description="Start RViz automatically with this launch file.",
         ),
@@ -129,7 +112,6 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        optimo_plato_transform_broadcaster,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

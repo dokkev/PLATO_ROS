@@ -32,12 +32,19 @@ float clamp_joint_effort_command(float joint_effort, float joint_effort_limit)
   return std::clamp(joint_effort, -joint_effort_limit, joint_effort_limit);
 }
 
+Transmission::JointArray make_joint_array(float value)
+{
+  Transmission::JointArray values{};
+  values.fill(value);
+  return values;
+}
+
 }  // namespace
 
 Transmission::Transmission(FiveBarLinkageConfig config)
 : Transmission(
     config,
-    JointArray::Constant(kInfinity))
+    make_joint_array(kInfinity))
 {
 }
 
@@ -55,36 +62,31 @@ void Transmission::compute_ratios_(
   JointArray & velocity_ratios,
   JointArray & torque_ratios) const
 {
-  position_ratios.setOnes();
-  velocity_ratios.setOnes();
-  torque_ratios.setOnes();
+  position_ratios.fill(1.0f);
+  velocity_ratios.fill(1.0f);
+  torque_ratios.fill(1.0f);
 
   if (actuator_state.size() != kNumActuators) {
     return;
   }
 
-  const auto actuator_state_view = actuator_state.const_view();
-  const JointArray actuator_positions = actuator_state_view.position.cast<float>();
-
   auto apply_kinematics =
-    [this, &actuator_positions, &position_ratios, &velocity_ratios, &torque_ratios](
+    [this, &actuator_state, &position_ratios, &velocity_ratios, &torque_ratios](
       size_t mcp_index,
       size_t pip_index,
       float sign)
     {
-      const Eigen::Index mcp = static_cast<Eigen::Index>(mcp_index);
-      const Eigen::Index pip = static_cast<Eigen::Index>(pip_index);
-      const float mcp_position = actuator_positions(mcp);
-      const float pip_position = actuator_positions(pip);
+      const float mcp_position = static_cast<float>(actuator_state.position_at(mcp_index));
+      const float pip_position = static_cast<float>(actuator_state.position_at(pip_index));
 
       if (!std::isfinite(mcp_position) || !std::isfinite(pip_position)) {
         return;
       }
 
       const auto kinematics = compute_kinematics(config_, sign * mcp_position, sign * pip_position);
-      position_ratios(pip) = kinematics.position_amplification;
-      velocity_ratios(pip) = 1.0f / kinematics.torque_amplification;
-      torque_ratios(pip) = kinematics.torque_amplification;
+      position_ratios[pip_index] = kinematics.position_amplification;
+      velocity_ratios[pip_index] = 1.0f / kinematics.torque_amplification;
+      torque_ratios[pip_index] = kinematics.torque_amplification;
     };
 
   apply_kinematics(kThumbMcpIndex, kThumbPipIndex, 1.0f);
@@ -105,18 +107,15 @@ void Transmission::actuator_to_joint(
   JointArray torque_ratios;
   compute_ratios_(actuator_state, position_ratios, velocity_ratios, torque_ratios);
 
-  const auto actuator_state_view = actuator_state.const_view();
-  const JointArray actuator_positions = actuator_state_view.position.cast<float>();
-  const JointArray actuator_velocities = actuator_state_view.velocity.cast<float>();
-  const JointArray actuator_efforts = actuator_state_view.effort.cast<float>();
+  for (size_t i = 0; i < kNumJoints; ++i) {
+    joint_state.position_at(i) = actuator_state.position_at(i) * position_ratios[i];
+    joint_state.velocity_at(i) = actuator_state.velocity_at(i) * velocity_ratios[i];
 
-  auto joint_state_view = joint_state.view();
-  joint_state_view.position = (actuator_positions * position_ratios).cast<double>();
-  joint_state_view.velocity = (actuator_velocities * velocity_ratios).cast<double>();
-
-  JointArray joint_effort = (actuator_efforts / kSteadywinTorqueScale) * torque_ratios;
-  joint_effort.segment<2>(static_cast<Eigen::Index>(kThumbRollIndex)).setZero();
-  joint_state_view.effort = joint_effort.cast<double>();
+    const bool is_thumb_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
+    joint_state.effort_at(i) = is_thumb_servo ?
+      0.0 :
+      (actuator_state.effort_at(i) / kSteadywinTorqueScale) * torque_ratios[i];
+  }
 }
 
 void Transmission::joint_to_actuator(
@@ -141,51 +140,39 @@ void Transmission::joint_to_actuator(
   JointArray torque_ratios;
   compute_ratios_(actuator_state, position_ratios, velocity_ratios, torque_ratios);
 
-  const auto joint_command_view = joint_command.const_view();
-
-  JointArray actuator_positions = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-  JointArray actuator_velocities = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-  JointArray actuator_efforts = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-  JointArray actuator_stiffness = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-  JointArray actuator_damping = JointArray::Constant(std::numeric_limits<float>::quiet_NaN());
-
   for (size_t i = 0; i < kNumActuators; ++i) {
-    const Eigen::Index index = static_cast<Eigen::Index>(i);
-    const float position_ratio = position_ratios(index);
-    const float velocity_ratio = velocity_ratios(index);
-    const float torque_ratio = torque_ratios(index);
+    const float position_ratio = position_ratios[i];
+    const float velocity_ratio = velocity_ratios[i];
+    const float torque_ratio = torque_ratios[i];
+    float actuator_position = std::numeric_limits<float>::quiet_NaN();
+    float actuator_velocity = std::numeric_limits<float>::quiet_NaN();
+    float actuator_effort = std::numeric_limits<float>::quiet_NaN();
+    float actuator_stiffness = std::numeric_limits<float>::quiet_NaN();
+    float actuator_damping = std::numeric_limits<float>::quiet_NaN();
 
     if (std::isfinite(position_ratio) && std::abs(position_ratio) > kEpsilon) {
-      actuator_positions(index) =
-        static_cast<float>(joint_command_view.position(index)) / position_ratio;
+      actuator_position = static_cast<float>(joint_command.position_at(i)) / position_ratio;
     }
 
     if (std::isfinite(velocity_ratio) && std::abs(velocity_ratio) > kEpsilon) {
-      actuator_velocities(index) =
-        static_cast<float>(joint_command_view.velocity(index)) / velocity_ratio;
+      actuator_velocity = static_cast<float>(joint_command.velocity_at(i)) / velocity_ratio;
     }
 
     if (std::isfinite(torque_ratio) && std::abs(torque_ratio) > kEpsilon) {
       const float joint_effort =
         clamp_joint_effort_command(
-        static_cast<float>(joint_command_view.effort(index)),
-        joint_effort_limits_(index));
-      actuator_efforts(index) =
-        joint_effort / torque_ratio;
-      actuator_stiffness(index) =
-        static_cast<float>(joint_command_view.stiffness(index)) / torque_ratio;
-      actuator_damping(index) =
-        static_cast<float>(joint_command_view.damping(index)) / torque_ratio;
+        static_cast<float>(joint_command.effort_at(i)),
+        joint_effort_limits_[i]);
+      actuator_effort = joint_effort / torque_ratio;
+      actuator_stiffness = static_cast<float>(joint_command.stiffness_at(i)) / torque_ratio;
+      actuator_damping = static_cast<float>(joint_command.damping_at(i)) / torque_ratio;
     }
-  }
 
-  for (size_t i = 0; i < kNumActuators; ++i) {
-    const Eigen::Index index = static_cast<Eigen::Index>(i);
-    actuator_command.position_at(i) = static_cast<double>(actuator_positions(index));
-    actuator_command.velocity_at(i) = static_cast<double>(actuator_velocities(index));
-    actuator_command.effort_at(i) = static_cast<double>(actuator_efforts(index));
-    actuator_command.stiffness_at(i) = static_cast<double>(actuator_stiffness(index));
-    actuator_command.damping_at(i) = static_cast<double>(actuator_damping(index));
+    actuator_command.position_at(i) = actuator_position;
+    actuator_command.velocity_at(i) = actuator_velocity;
+    actuator_command.effort_at(i) = actuator_effort;
+    actuator_command.stiffness_at(i) = actuator_stiffness;
+    actuator_command.damping_at(i) = actuator_damping;
   }
 }
 

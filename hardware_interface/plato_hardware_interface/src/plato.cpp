@@ -206,9 +206,12 @@ hardware_interface::CallbackReturn PlatoHardware::on_activate(
 {
   hand_->reset_joint_commands(0.0);
   if (!hand_->enable(zeroing_requested_)) {
-    RCLCPP_WARN(
+    RCLCPP_ERROR(
       rclcpp::get_logger("PlatoHardware"),
-      "One or more actuators failed to enable. Continuing activation.");
+      zeroing_requested_ ?
+      "Failed to zero and enable Plato GIM3505 actuators." :
+      "Failed to enable one or more GIM3505 actuators.");
+    return hardware_interface::CallbackReturn::ERROR;
   }
 
   RCLCPP_INFO(rclcpp::get_logger("PlatoHardware"), "Activated");

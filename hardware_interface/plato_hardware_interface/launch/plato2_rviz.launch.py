@@ -11,7 +11,7 @@ def generate_launch_description():
     # Declare arguments
     declared_arguments = [
         DeclareLaunchArgument(
-            "gui",
+            "rviz",
             default_value="true",
             description="Start RViz2 automatically with this launch file.",
         ),
@@ -23,7 +23,7 @@ def generate_launch_description():
     ]
 
     # Launch Arguments
-    gui = LaunchConfiguration("gui")
+    rviz = LaunchConfiguration("rviz")
     plato_ns = LaunchConfiguration("plato_ns")
 
     # Include the hardware launch file
@@ -32,7 +32,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [pkg_plato2_hardware, '/launch/plato2_hardware.launch.py']
         ),
-        launch_arguments={'plato_ns': plato_ns}.items()
+        launch_arguments={'plato_ns': plato_ns, 'rviz': 'false'}.items()
     )
 
     # RViz configuration
@@ -46,7 +46,7 @@ def generate_launch_description():
         name="rviz2",
         output="log",
         arguments=["-d", rviz_config_file],
-        condition=IfCondition(gui),
+        condition=IfCondition(rviz),
     )
 
     return LaunchDescription(declared_arguments + [hardware_launch, rviz_node])

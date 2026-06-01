@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 #include <pluginlib/class_list_macros.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 namespace aristo_hardware_interface
 {
@@ -114,7 +115,7 @@ std::vector<hardware_interface::CommandInterface> AristoHardware::export_command
 hardware_interface::CallbackReturn AristoHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  hand_->reset_joint_commands(0.0);
+  hand_->reset_joint_commands(std::numeric_limits<double>::quiet_NaN());
   if (zeroing_requested_) {
     RCLCPP_INFO(
       rclcpp::get_logger("AristoHardware"),
@@ -149,6 +150,7 @@ hardware_interface::return_type AristoHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   if (!hand_->read()) {
+    RCLCPP_ERROR(rclcpp::get_logger("AristoHardware"), "Failed to read Aristo hand state.");
     return hardware_interface::return_type::ERROR;
   }
   return hardware_interface::return_type::OK;
@@ -158,6 +160,7 @@ hardware_interface::return_type AristoHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   if (!hand_->write()) {
+    RCLCPP_ERROR(rclcpp::get_logger("AristoHardware"), "Failed to write Aristo hand command.");
     return hardware_interface::return_type::ERROR;
   }
   return hardware_interface::return_type::OK;

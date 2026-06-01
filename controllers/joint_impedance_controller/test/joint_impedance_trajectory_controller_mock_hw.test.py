@@ -44,7 +44,7 @@ def generate_test_description():
         output="screen",
         parameters=[{
             "control_rate_hz": 100.0,
-            "default_goal_duration_sec": 0.2,
+            "position_filter_alpha": 0.1,
             "joint_state_topic": "/plato2/joint_states",
             "position_command_topic": "/plato2/joint_impedance_trajectory_controller/commands",
             "impedance_command_topic": "/plato2/joint_impedance_controller/commands",

@@ -93,7 +93,7 @@ if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake REQUIRED)
   find_package(ament_cmake_gmock REQUIRED)
   find_package(controller_manager REQUIRED)
-  find_package(ros2_control_test_assets REQUIRED)
+  find_package(ros2_control_test_assets QUIET)
 
   ament_add_gtest(joint_impedance_trajectory_controller_test
     test/joint_impedance_trajectory_controller_test.cpp
@@ -119,10 +119,14 @@ if(BUILD_TESTING)
     target_compile_features(joint_impedance_handler_test PUBLIC cxx_std_17)
   endif()
 
-  add_launch_test(
-    test/joint_impedance_trajectory_controller_mock_hw.test.py
-    TIMEOUT 180
-  )
+  if(ros2_control_test_assets_FOUND)
+    add_launch_test(
+      test/joint_impedance_trajectory_controller_mock_hw.test.py
+      TIMEOUT 180
+    )
+  else()
+    message(STATUS "Skipping mock hardware launch test: ros2_control_test_assets not found")
+  endif()
 endif()
 
 install(

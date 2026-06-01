@@ -45,23 +45,23 @@ TEST(ImpedanceTrajectoryControllerTest, IdleTracksMeasuredState) {
   }
 }
 
-TEST(ImpedanceTrajectoryControllerTest, ExecutesTimeParameterizedGoal) {
+TEST(ImpedanceTrajectoryControllerTest, FiltersTowardGoal) {
   ImpedanceTrajectoryController controller(8);
   controller.setMeasuredState(std::vector<double>(8, 0.0), std::vector<double>(8, 0.0));
 
   const auto goal = std::vector<double>{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
-  controller.setGoal(goal, 1.0);
+  controller.setGoal(goal, 0.5);
 
   const auto halfway = controller.update(0.5);
   for (std::size_t i = 0; i < 8; ++i) {
-    EXPECT_GT(halfway.position[i], 0.0);
-    EXPECT_LT(halfway.position[i], 1.0);
+    EXPECT_NEAR(halfway.position[i], 0.5, 1e-12);
+    EXPECT_NEAR(halfway.velocity[i], 1.0, 1e-12);
   }
 
-  const auto done = controller.update(0.5);
+  const auto later = controller.update(0.5);
   for (std::size_t i = 0; i < 8; ++i) {
-    EXPECT_NEAR(done.position[i], 1.0, 1e-9);
-    EXPECT_NEAR(done.velocity[i], 0.0, 1e-9);
+    EXPECT_NEAR(later.position[i], 0.75, 1e-12);
+    EXPECT_NEAR(later.velocity[i], 0.5, 1e-12);
   }
 }
 
@@ -70,11 +70,11 @@ TEST(ImpedanceTrajectoryControllerTest, PartialGoalDoesNotZeroUnspecifiedJoints)
   const auto measured = makeSeq(10.0, 1.0, 8);
   controller.setMeasuredState(measured, std::vector<double>(8, 0.0));
 
-  controller.setGoal({100.0, 200.0}, 0.1);
+  controller.setGoal({100.0, 200.0}, 0.5);
   const auto cmd = controller.update(0.1);
 
-  EXPECT_NEAR(cmd.position[0], 100.0, 1e-9);
-  EXPECT_NEAR(cmd.position[1], 200.0, 1e-9);
+  EXPECT_NEAR(cmd.position[0], 55.0, 1e-12);
+  EXPECT_NEAR(cmd.position[1], 105.5, 1e-12);
   for (std::size_t i = 2; i < 8; ++i) {
     EXPECT_NEAR(cmd.position[i], measured[i], 1e-9);
   }

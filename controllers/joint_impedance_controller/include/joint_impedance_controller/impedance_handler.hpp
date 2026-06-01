@@ -37,6 +37,10 @@ public:
 
   std::vector<double> anchor_levels() const;
 
+  double default_level() const;
+
+  double filter_alpha() const;
+
 private:
   bool load_presets(std::string * error_out);
   ImpedanceGains interpolate_gains(double level) const;
@@ -57,6 +61,8 @@ private:
   mutable std::mutex mutex_;
   std::vector<LevelAnchor> anchors_;
   std::vector<double> available_anchor_levels_;
+  double default_level_{6.0};
+  double filter_alpha_{0.1};
   std::optional<double> active_level_;
   bool using_custom_gains_{false};
   ImpedanceGains gains_;

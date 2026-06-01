@@ -4,6 +4,7 @@ from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -20,6 +21,8 @@ def generate_launch_description():
     joint_state_broadcaster_name = LaunchConfiguration("joint_state_broadcaster_name")
     joint_impedance_controller_name = LaunchConfiguration("joint_impedance_controller_name")
     actuator_config_yaml_path = LaunchConfiguration("actuator_config_yaml_path")
+    publish_world_pose = LaunchConfiguration("publish_world_pose")
+    world_frame = LaunchConfiguration("world_frame")
 
     declared_arguments = [
         DeclareLaunchArgument("gui", default_value="true", description="Start RViz2 automatically."),
@@ -79,6 +82,16 @@ def generate_launch_description():
                 "Leave empty to use the hardware package default."
             ),
         ),
+        DeclareLaunchArgument(
+            "publish_world_pose",
+            default_value="false",
+            description="Publish index fingertip pose in world_frame when that TF tree is available.",
+        ),
+        DeclareLaunchArgument(
+            "world_frame",
+            default_value="stand",
+            description="World frame for optional index fingertip pose publishing.",
+        ),
     ]
 
     robot_description_content = Command(
@@ -97,7 +110,9 @@ def generate_launch_description():
             actuator_config_yaml_path,
         ]
     )
-    robot_description = {"robot_description": robot_description_content}
+    robot_description = {
+        "robot_description": ParameterValue(robot_description_content, value_type=str)
+    }
     controller_manager_path = PathJoinSubstitution(["/", plato_ns, controller_manager_name])
 
     control_node = Node(
@@ -136,6 +151,12 @@ def generate_launch_description():
         package="aristo_bringup",
         executable="index_fingertip_pose_publisher.py",
         name="index_fingertip_pose_publisher",
+        parameters=[
+            {
+                "publish_world_pose": ParameterValue(publish_world_pose, value_type=bool),
+                "world_frame": world_frame,
+            }
+        ],
         output="screen",
     )
 

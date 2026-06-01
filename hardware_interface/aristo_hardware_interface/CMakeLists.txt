@@ -12,7 +12,6 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   pluginlib
   rclcpp
   rclcpp_lifecycle
-  geometry_msgs
   plato_interfaces
   plato_hardware_interface
   Eigen3
@@ -58,7 +57,7 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY config/
+install(FILES config/aristo_actuators.yaml
   DESTINATION share/${PROJECT_NAME}/config
 )
 

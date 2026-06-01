@@ -15,7 +15,6 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
-  <depend>geometry_msgs</depend>
   <depend>plato_interfaces</depend>
   <depend>plato_hardware_interface</depend>
   <build_depend>yaml-cpp</build_depend>

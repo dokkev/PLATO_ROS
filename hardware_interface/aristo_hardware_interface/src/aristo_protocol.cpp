@@ -36,22 +36,13 @@ void AristoProtocol::append_zero_frames(
 }
 
 void AristoProtocol::initialize_rx_dispatch(
-  const std::vector<aristo_actuator::Actuator> & actuators,
-  const std::vector<sensor::FTSensor> & ft_sensors)
+  const std::vector<aristo_actuator::Actuator> & actuators)
 {
   rx_dispatch_table_.clear();
-  rx_dispatch_table_.reserve(actuators.size() + (2 * ft_sensors.size()));
+  rx_dispatch_table_.reserve(actuators.size());
 
   for (std::size_t actuator_index = 0; actuator_index < actuators.size(); ++actuator_index) {
-    rx_dispatch_table_.push_back(
-      {actuators[actuator_index].get_rx_id(), DispatchTargetKind::kActuator, actuator_index});
-  }
-
-  for (std::size_t sensor_index = 0; sensor_index < ft_sensors.size(); ++sensor_index) {
-    rx_dispatch_table_.push_back(
-      {ft_sensors[sensor_index].get_force_rx_id(), DispatchTargetKind::kForceSensor, sensor_index});
-    rx_dispatch_table_.push_back(
-      {ft_sensors[sensor_index].get_torque_rx_id(), DispatchTargetKind::kTorqueSensor, sensor_index});
+    rx_dispatch_table_.push_back({actuators[actuator_index].get_rx_id(), actuator_index});
   }
 
   std::sort(
@@ -64,8 +55,7 @@ void AristoProtocol::initialize_rx_dispatch(
 
 bool AristoProtocol::process_rx_frame(
   const TPCANMsg & frame,
-  std::vector<aristo_actuator::Actuator> & actuators,
-  std::vector<sensor::FTSensor> & ft_sensors) const
+  std::vector<aristo_actuator::Actuator> & actuators) const
 {
   if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD) {
     return false;
@@ -82,16 +72,7 @@ bool AristoProtocol::process_rx_frame(
     return false;
   }
 
-  switch (entry_it->target_kind) {
-    case DispatchTargetKind::kActuator:
-      actuators[entry_it->target_index].process_rx_frame(frame);
-      break;
-    case DispatchTargetKind::kForceSensor:
-    case DispatchTargetKind::kTorqueSensor:
-      ft_sensors[entry_it->target_index].process_message(frame);
-      break;
-  }
-
+  actuators[entry_it->actuator_index].process_rx_frame(frame);
   return true;
 }
 

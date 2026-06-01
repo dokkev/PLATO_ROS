@@ -2,9 +2,7 @@
 #define ARISTO_HARDWARE_INTERFACE__ARISTO_HPP_
 
 #include <memory>
-#include <vector>
 
-#include <geometry_msgs/msg/wrench.hpp>
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
@@ -49,7 +47,6 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
-  std::vector<geometry_msgs::msg::Wrench> ft_sensor_states_;
   std::unique_ptr<aristo_hand::Hand> hand_;
   bool zeroing_requested_ = false;
 };

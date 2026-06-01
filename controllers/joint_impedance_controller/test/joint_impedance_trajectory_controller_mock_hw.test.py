@@ -25,11 +25,12 @@ except ModuleNotFoundError as exc:
 @pytest.mark.launch_test
 def generate_test_description():
     bringup_share = get_package_share_directory("aristo_bringup")
-    mock_launch_file = os.path.join(bringup_share, "launch", "aristo_mock.launch.py")
+    bringup_launch_file = os.path.join(bringup_share, "launch", "aristo_hardware.launch.py")
 
     mock_bringup = launch.actions.IncludeLaunchDescription(
-        launch.launch_description_sources.PythonLaunchDescriptionSource(mock_launch_file),
+        launch.launch_description_sources.PythonLaunchDescriptionSource(bringup_launch_file),
         launch_arguments={
+            "fake_hardware": "true",
             "gui": "false",
             "plato_ns": "plato2",
             "use_sim_time": "false",

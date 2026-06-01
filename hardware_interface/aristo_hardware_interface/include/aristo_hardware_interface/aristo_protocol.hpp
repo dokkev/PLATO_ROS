@@ -8,7 +8,6 @@
 
 #include "aristo_hardware_interface/actuator.hpp"
 #include "can_hardware_common/actuator_types.hpp"
-#include "can_hardware_common/ft_sensor.hpp"
 
 namespace aristo_hand
 {
@@ -16,18 +15,10 @@ namespace aristo_hand
 class AristoProtocol
 {
 public:
-  enum class DispatchTargetKind
-  {
-    kActuator,
-    kForceSensor,
-    kTorqueSensor,
-  };
-
   struct RxDispatchEntry
   {
     uint32_t rx_id = 0;
-    DispatchTargetKind target_kind = DispatchTargetKind::kActuator;
-    std::size_t target_index = 0;
+    std::size_t actuator_index = 0;
   };
 
   void append_enable_frames(
@@ -42,14 +33,11 @@ public:
     std::vector<aristo_actuator::Actuator> & actuators,
     std::vector<TPCANMsg> & direct_frames) const;
 
-  void initialize_rx_dispatch(
-    const std::vector<aristo_actuator::Actuator> & actuators,
-    const std::vector<sensor::FTSensor> & ft_sensors);
+  void initialize_rx_dispatch(const std::vector<aristo_actuator::Actuator> & actuators);
 
   bool process_rx_frame(
     const TPCANMsg & frame,
-    std::vector<aristo_actuator::Actuator> & actuators,
-    std::vector<sensor::FTSensor> & ft_sensors) const;
+    std::vector<aristo_actuator::Actuator> & actuators) const;
 
   void append_impedance_frames(
     std::vector<aristo_actuator::Actuator> & actuators,

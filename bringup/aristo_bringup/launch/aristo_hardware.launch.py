@@ -11,6 +11,7 @@ def generate_launch_description():
     gui = LaunchConfiguration("gui")
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    fake_hardware = LaunchConfiguration("fake_hardware")
     zeroing = LaunchConfiguration("zeroing")
     robot_description_xacro_path = LaunchConfiguration("robot_description_xacro_path")
     controller_config_path = LaunchConfiguration("controller_config_path")
@@ -25,9 +26,14 @@ def generate_launch_description():
         DeclareLaunchArgument("plato_ns", default_value="plato2", description="Namespace for Aristo hand."),
         DeclareLaunchArgument("use_sim_time", default_value="false", description="Use simulated clock if true."),
         DeclareLaunchArgument(
+            "fake_hardware",
+            default_value="false",
+            description="Use ros2_control mock hardware instead of the Aristo hardware interface.",
+        ),
+        DeclareLaunchArgument(
             "zeroing",
             default_value="false",
-            description="Set current actuator positions as software zero during activation.",
+            description="Run one-shot embedded actuator zeroing during activation.",
         ),
         DeclareLaunchArgument(
             "robot_description_xacro_path",
@@ -80,6 +86,9 @@ def generate_launch_description():
             FindExecutable(name="xacro"),
             " ",
             robot_description_xacro_path,
+            " ",
+            "fake_hardware:=",
+            fake_hardware,
             " ",
             "zeroing:=",
             zeroing,

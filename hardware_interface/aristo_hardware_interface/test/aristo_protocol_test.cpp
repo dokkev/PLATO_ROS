@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include "aristo_hardware_interface/actuator.hpp"
 #include "aristo_hardware_interface/aristo_protocol.hpp"
+#include "aristo_hardware_interface/mit_can_protocol.hpp"
 
 namespace
 {
@@ -72,6 +75,61 @@ TEST(AristoProtocolTest, ZeroBuildsDirectFrames)
 
   ASSERT_EQ(direct_frames.size(), actuators.size());
   EXPECT_EQ(direct_frames.front().ID, actuators.front().set_current_position_as_zero().frame.ID);
+}
+
+TEST(MitCanProtocolTest, SingleByteCommandsClearUnusedPayloadBytes)
+{
+  mit_can_protocol::MsgEncoder encoder(1.0f, 0x0A);
+  TPCANMsg msg{};
+  std::memset(&msg, 0xAA, sizeof(msg));
+
+  encoder.set_zero_position(msg);
+
+  EXPECT_EQ(msg.ID, 0x0A);
+  EXPECT_EQ(msg.MSGTYPE, PCAN_MESSAGE_STANDARD);
+  EXPECT_EQ(msg.LEN, 1);
+  EXPECT_EQ(msg.DATA[0], 0xB1);
+  for (std::size_t i = 1; i < 8; ++i) {
+    EXPECT_EQ(msg.DATA[i], 0) << "DATA[" << i << "] should be deterministic padding";
+  }
+
+  std::memset(&msg, 0xAA, sizeof(msg));
+  encoder.stop_control(msg);
+
+  EXPECT_EQ(msg.ID, 0x0A);
+  EXPECT_EQ(msg.MSGTYPE, PCAN_MESSAGE_STANDARD);
+  EXPECT_EQ(msg.LEN, 1);
+  EXPECT_EQ(msg.DATA[0], 0xCF);
+  for (std::size_t i = 1; i < 8; ++i) {
+    EXPECT_EQ(msg.DATA[i], 0) << "DATA[" << i << "] should be deterministic padding";
+  }
+}
+
+TEST(MitCanProtocolTest, ZeroImpedanceCommandHasStableMidpointEncoding)
+{
+  mit_can_protocol::MsgEncoder encoder(1.0f, 0x0A);
+  TPCANMsg first{};
+  TPCANMsg second{};
+  std::memset(&first, 0xAA, sizeof(first));
+  std::memset(&second, 0x55, sizeof(second));
+
+  encoder.set_impedance(first, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  encoder.set_impedance(second, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+
+  constexpr std::array<uint8_t, 8> kExpectedZeroPayload = {
+    0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x08, 0x00};
+
+  EXPECT_EQ(first.ID, 0x40A);
+  EXPECT_EQ(first.MSGTYPE, PCAN_MESSAGE_STANDARD);
+  EXPECT_EQ(first.LEN, 8);
+  EXPECT_EQ(second.ID, first.ID);
+  EXPECT_EQ(second.MSGTYPE, first.MSGTYPE);
+  EXPECT_EQ(second.LEN, first.LEN);
+
+  for (std::size_t i = 0; i < kExpectedZeroPayload.size(); ++i) {
+    EXPECT_EQ(first.DATA[i], kExpectedZeroPayload[i]);
+    EXPECT_EQ(second.DATA[i], kExpectedZeroPayload[i]);
+  }
 }
 
 }  // namespace

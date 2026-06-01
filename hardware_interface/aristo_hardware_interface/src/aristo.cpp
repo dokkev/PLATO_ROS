@@ -61,8 +61,6 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
       e.what());
     return hardware_interface::CallbackReturn::ERROR;
   }
-  ft_sensor_states_.resize(aristo_hand::Hand::kNumFtSensors);
-
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -76,7 +74,7 @@ hardware_interface::CallbackReturn AristoHardware::on_configure(
 std::vector<hardware_interface::StateInterface> AristoHardware::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> state_interfaces;
-  state_interfaces.reserve(info_.joints.size() * 3 + hand_->get_num_ft_sensors() * 6);
+  state_interfaces.reserve(info_.joints.size() * 3);
   auto & joint_states = hand_->joint_states();
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
@@ -87,16 +85,6 @@ std::vector<hardware_interface::StateInterface> AristoHardware::export_state_int
       joint_name, hardware_interface::HW_IF_VELOCITY, &joint_states.velocity_at(i));
     state_interfaces.emplace_back(
       joint_name, hardware_interface::HW_IF_EFFORT, &joint_states.effort_at(i));
-  }
-
-  for (size_t i = 0; i < hand_->get_num_ft_sensors(); ++i) {
-    const std::string sensor_name = "ft_sensor" + std::to_string(i + 1);
-    state_interfaces.emplace_back(sensor_name, "force.x", &ft_sensor_states_[i].force.x);
-    state_interfaces.emplace_back(sensor_name, "force.y", &ft_sensor_states_[i].force.y);
-    state_interfaces.emplace_back(sensor_name, "force.z", &ft_sensor_states_[i].force.z);
-    state_interfaces.emplace_back(sensor_name, "torque.x", &ft_sensor_states_[i].torque.x);
-    state_interfaces.emplace_back(sensor_name, "torque.y", &ft_sensor_states_[i].torque.y);
-    state_interfaces.emplace_back(sensor_name, "torque.z", &ft_sensor_states_[i].torque.z);
   }
 
   return state_interfaces;
@@ -127,10 +115,17 @@ hardware_interface::CallbackReturn AristoHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   hand_->reset_joint_commands(0.0);
+  if (zeroing_requested_) {
+    RCLCPP_INFO(
+      rclcpp::get_logger("AristoHardware"),
+      "Aristo embedded zeroing requested.");
+  }
   if (!hand_->enable(zeroing_requested_)) {
     RCLCPP_WARN(
       rclcpp::get_logger("AristoHardware"),
-      "One or more Aristo actuators failed to enable/zero. Continuing activation.");
+      zeroing_requested_ ?
+      "One or more Aristo actuators failed to enable/embedded-zero. Continuing activation." :
+      "One or more Aristo actuators failed to enable. Continuing activation.");
   }
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -156,7 +151,6 @@ hardware_interface::return_type AristoHardware::read(
   if (!hand_->read()) {
     return hardware_interface::return_type::ERROR;
   }
-  hand_->update_ft_sensor_states(ft_sensor_states_);
   return hardware_interface::return_type::OK;
 }
 

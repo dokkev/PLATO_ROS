@@ -23,6 +23,14 @@ static constexpr float INV_4095 = 1.0f / 4095.0f;
 static constexpr uint16_t MAX_12BIT = 4095;
 static constexpr uint16_t MAX_16BIT = 65535;
 
+static void reset_message(TPCANMsg & msg, uint32_t can_id, uint8_t len)
+{
+  std::memset(&msg, 0, sizeof(msg));
+  msg.ID = can_id;
+  msg.MSGTYPE = PCAN_MESSAGE_STANDARD;
+  msg.LEN = len > 8 ? 8 : len;
+}
+
 static constexpr uint16_t clamp_u16(float v)
 {
   return (v <= 0.0f) ? 0 : (v >= MAX_16BIT) ? MAX_16BIT : static_cast<uint16_t>(v + 0.5f);
@@ -71,9 +79,7 @@ static void pack_oc_frame(
   float t_max,
   uint8_t tx_id)
 {
-  std::memset(&msg, 0, sizeof(msg));
-  msg.ID = tx_id | STDID_OC_BIT;
-  msg.LEN = 8;
+  reset_message(msg, tx_id | STDID_OC_BIT, 8);
 
   const float pos_val = pos_set ? std::clamp(pos_rad, -pos_max, pos_max) : 0.0f;
   const float vel_val = vel_set ? std::clamp(vel_rps, -vel_max, vel_max) : 0.0f;
@@ -108,8 +114,7 @@ void MsgEncoder::set_can_limits(
   bool set_vel,
   bool set_tq)
 {
-  msg.ID = tx_id_;
-  msg.LEN = 7;
+  reset_message(msg, tx_id_, 7);
   msg.DATA[0] = CMD_CFG_LIMITS;
 
   const uint16_t pos_u16 = to_pos_max_u16(set_pos ? pos_max_rad : POS_MAX);
@@ -126,8 +131,7 @@ void MsgEncoder::set_can_limits(
 
 void MsgEncoder::set_default_can_limits(TPCANMsg & msg)
 {
-  msg.ID = tx_id_;
-  msg.LEN = 7;
+  reset_message(msg, tx_id_, 7);
   msg.DATA[0] = CMD_CFG_LIMITS;
 
   constexpr uint16_t kPosMaxU16 = 955;
@@ -144,8 +148,7 @@ void MsgEncoder::set_default_can_limits(TPCANMsg & msg)
 
 void MsgEncoder::set_zero_position(TPCANMsg & msg)
 {
-  msg.ID = tx_id_;
-  msg.LEN = 1;
+  reset_message(msg, tx_id_, 1);
   msg.DATA[0] = CMD_SET_ZERO;
 }
 
@@ -176,15 +179,13 @@ void MsgEncoder::stop_motor(TPCANMsg & msg)
 
 void MsgEncoder::stop_control(TPCANMsg & msg)
 {
-  msg.ID = tx_id_;
-  msg.LEN = 1;
+  reset_message(msg, tx_id_, 1);
   msg.DATA[0] = CMD_EXIT_OC_MODE;
 }
 
 void MsgEncoder::clear_fault(TPCANMsg & msg)
 {
-  msg.ID = tx_id_;
-  msg.LEN = 1;
+  reset_message(msg, tx_id_, 1);
   msg.DATA[0] = CMD_CLEAR_FAULT;
 }
 

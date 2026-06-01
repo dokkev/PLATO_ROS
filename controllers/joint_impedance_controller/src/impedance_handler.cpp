@@ -18,12 +18,21 @@ namespace
 constexpr const char * kPresetRootKey = "impedance_preset";
 constexpr const char * kMinPresetKey = "min";
 constexpr const char * kMaxPresetKey = "max";
+constexpr const char * kDefaultLevelKey = "default_level";
+constexpr const char * kFilterAlphaKey = "filter_alpha";
 constexpr double kMinSupportedLevel = 0.0;
 constexpr double kMaxSupportedLevel = 10.0;
+constexpr double kFallbackDefaultLevel = 6.0;
+constexpr double kFallbackFilterAlpha = 0.1;
 
 double clamp_level(double level)
 {
   return std::clamp(level, kMinSupportedLevel, kMaxSupportedLevel);
+}
+
+double clamp_filter_alpha(double alpha)
+{
+  return std::clamp(alpha, 0.0, 1.0);
 }
 
 bool parse_required_vector(
@@ -157,6 +166,18 @@ std::vector<double> ImpedanceHandler::anchor_levels() const
   return available_anchor_levels_;
 }
 
+double ImpedanceHandler::default_level() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return default_level_;
+}
+
+double ImpedanceHandler::filter_alpha() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return filter_alpha_;
+}
+
 bool ImpedanceHandler::load_presets(std::string * error_out)
 {
   YAML::Node root;
@@ -176,6 +197,8 @@ bool ImpedanceHandler::load_presets(std::string * error_out)
 
   std::vector<LevelAnchor> loaded_anchors;
   std::vector<double> loaded_anchor_levels;
+  double loaded_default_level = kFallbackDefaultLevel;
+  double loaded_filter_alpha = kFallbackFilterAlpha;
   const auto min_node = preset_root[kMinPresetKey];
   const auto max_node = preset_root[kMaxPresetKey];
   if (!min_node || !max_node) {
@@ -200,11 +223,62 @@ bool ImpedanceHandler::load_presets(std::string * error_out)
       return false;
     }
 
-    if (key != kMinPresetKey && key != kMaxPresetKey) {
+    if (
+      key != kMinPresetKey && key != kMaxPresetKey &&
+      key != kDefaultLevelKey && key != kFilterAlphaKey)
+    {
       if (error_out != nullptr) {
         *error_out =
           "Impedance preset YAML only supports '" + std::string(kMinPresetKey) +
-          "' and '" + std::string(kMaxPresetKey) + "' keys. Unsupported key: '" + key + "'.";
+          "', '" + std::string(kMaxPresetKey) + "', '" + std::string(kDefaultLevelKey) +
+          "', and '" + std::string(kFilterAlphaKey) +
+          "' keys. Unsupported key: '" + key + "'.";
+      }
+      return false;
+    }
+  }
+
+  const auto default_level_node = preset_root[kDefaultLevelKey];
+  if (default_level_node) {
+    if (!default_level_node.IsScalar()) {
+      if (error_out != nullptr) {
+        *error_out =
+          "Impedance preset key '" + std::string(kDefaultLevelKey) +
+          "' must be a scalar number.";
+      }
+      return false;
+    }
+
+    try {
+      loaded_default_level = clamp_level(default_level_node.as<double>());
+    } catch (const std::exception & ex) {
+      if (error_out != nullptr) {
+        *error_out =
+          "Failed to parse impedance preset key '" + std::string(kDefaultLevelKey) +
+          "': " + ex.what();
+      }
+      return false;
+    }
+  }
+
+  const auto filter_alpha_node = preset_root[kFilterAlphaKey];
+  if (filter_alpha_node) {
+    if (!filter_alpha_node.IsScalar()) {
+      if (error_out != nullptr) {
+        *error_out =
+          "Impedance preset key '" + std::string(kFilterAlphaKey) +
+          "' must be a scalar number.";
+      }
+      return false;
+    }
+
+    try {
+      loaded_filter_alpha = clamp_filter_alpha(filter_alpha_node.as<double>());
+    } catch (const std::exception & ex) {
+      if (error_out != nullptr) {
+        *error_out =
+          "Failed to parse impedance preset key '" + std::string(kFilterAlphaKey) +
+          "': " + ex.what();
       }
       return false;
     }
@@ -275,6 +349,8 @@ bool ImpedanceHandler::load_presets(std::string * error_out)
   std::lock_guard<std::mutex> lock(mutex_);
   anchors_ = std::move(loaded_anchors);
   available_anchor_levels_ = std::move(loaded_anchor_levels);
+  default_level_ = loaded_default_level;
+  filter_alpha_ = loaded_filter_alpha;
   return true;
 }
 

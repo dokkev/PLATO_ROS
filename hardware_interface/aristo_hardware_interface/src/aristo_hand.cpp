@@ -101,6 +101,16 @@ TPCANStatus Hand::send_frame_blocking_(
   TPCANStatus last_status = PCAN_ERROR_QXMTFULL;
 
   while (std::chrono::steady_clock::now() < deadline) {
+    const auto next_send = transport_.next_tx_time();
+    const auto now = std::chrono::steady_clock::now();
+    if (next_send > now) {
+      if (next_send >= deadline) {
+        return PCAN_ERROR_QXMTFULL;
+      }
+      std::this_thread::sleep_until(next_send);
+      continue;
+    }
+
     const TPCANStatus status = transport_.send_tx_frame(frame);
     if (status == PCAN_ERROR_OK) {
       return status;
@@ -110,14 +120,8 @@ TPCANStatus Hand::send_frame_blocking_(
     }
 
     last_status = status;
-    const auto next_send = transport_.next_tx_time();
-    const auto now = std::chrono::steady_clock::now();
-    if (next_send > now) {
-      const auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(next_send - now);
-      std::this_thread::sleep_for(std::min(std::chrono::microseconds(100), remaining));
-    } else {
-      std::this_thread::sleep_for(std::chrono::microseconds(50));
-    }
+    (void)poll_can_bus();
+    std::this_thread::sleep_for(std::chrono::microseconds(50));
   }
 
   return last_status;
@@ -223,9 +227,20 @@ bool Hand::execute_direct_frames_(
   std::chrono::microseconds timeout)
 {
   for (const auto & frame : frames) {
-    if (send_frame_blocking_(frame, timeout) != PCAN_ERROR_OK) {
+    const TPCANStatus status = send_frame_blocking_(frame, timeout);
+    if (status != PCAN_ERROR_OK) {
+      const auto diagnostics = can_hardware_common::CanBus::format_diagnostics(
+        transport_.get_diagnostics());
+      RCLCPP_ERROR(
+        logger(),
+        "Failed to send Aristo CAN frame ID=0x%X len=%u status=%s diagnostics={%s}",
+        frame.ID,
+        frame.LEN,
+        can_hardware_common::CanBus::bus_status_string(status).c_str(),
+        diagnostics.c_str());
       return false;
     }
+    (void)poll_can_bus();
   }
   return true;
 }

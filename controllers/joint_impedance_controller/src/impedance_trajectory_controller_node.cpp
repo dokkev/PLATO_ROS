@@ -26,8 +26,6 @@ public:
         "impedance_preset_yaml_path",
         plato::yaml::package_share_file_path(
             "joint_impedance_controller", "config/impedance_preset.yaml"));
-    const auto default_impedance_level = this->declare_parameter<double>(
-        "default_impedance_level", 6.0);
     const auto impedance_level_topic = this->declare_parameter<std::string>(
         "impedance_level_topic", "~/impedance_level");
     const auto position_topic = this->declare_parameter<std::string>(
@@ -41,11 +39,21 @@ public:
     const auto impedance_topic = this->declare_parameter<std::string>(
         "impedance_command_topic",
         resolve_hand_topic_(hand_namespace, "/joint_impedance_controller/commands"));
-    default_goal_duration_sec_ = this->declare_parameter<double>("default_goal_duration_sec", 0.25);
+    const auto legacy_goal_duration_sec =
+        this->declare_parameter<double>("default_goal_duration_sec", 0.25);
+    const auto legacy_filter_time_constant_sec =
+        this->declare_parameter<double>(
+            "position_filter_time_constant_sec", legacy_goal_duration_sec);
+    (void)legacy_filter_time_constant_sec;
     const double control_rate_hz = this->declare_parameter<double>("control_rate_hz", 100.0);
 
     impedance_handler_ = std::make_unique<joint_impedance_controller::ImpedanceHandler>(
         static_cast<int>(controller_.dof()), impedance_preset_yaml_path);
+    const auto default_impedance_level = this->declare_parameter<double>(
+        "default_impedance_level", impedance_handler_->default_level());
+    position_filter_alpha_ = this->declare_parameter<double>(
+        "position_filter_alpha", impedance_handler_->filter_alpha());
+    position_filter_alpha_ = std::clamp(position_filter_alpha_, 0.0, 1.0);
     std::string error;
     if (!impedance_handler_->set_level(default_impedance_level, &error)) {
       throw std::runtime_error(
@@ -81,8 +89,8 @@ public:
         period, std::bind(&ImpedanceTrajectoryControllerNode::updateLoop, this));
 
     RCLCPP_INFO(this->get_logger(),
-                "impedance_trajectory_controller_node started (rate=%.1fHz, goal_duration=%.3fs, level=%.2f)",
-                safe_rate_hz, default_goal_duration_sec_,
+                "impedance_trajectory_controller_node started (rate=%.1fHz, filter_alpha=%.3f, level=%.2f)",
+                safe_rate_hz, position_filter_alpha_,
                 impedance_handler_->active_level());
   }
 
@@ -111,7 +119,7 @@ private:
       controller_.holdPosition();
       return;
     }
-    controller_.setGoal(msg->data, default_goal_duration_sec_);
+    controller_.setGoal(msg->data, position_filter_alpha_);
   }
 
   void goalCommandCallback(const plato_interfaces::msg::ImpedanceCommands::SharedPtr msg) {
@@ -127,7 +135,7 @@ private:
       impedance_handler_->set_custom_gains(msg->stiffness, msg->damping);
     }
 
-    controller_.setGoal(msg->position, default_goal_duration_sec_, msg->effort_ff);
+    controller_.setGoal(msg->position, position_filter_alpha_, msg->effort_ff);
   }
 
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
@@ -184,7 +192,7 @@ private:
   rclcpp::Clock steady_clock_;
   rclcpp::Time last_update_time_{0, 0, RCL_STEADY_TIME};
   bool has_last_update_time_{false};
-  double default_goal_duration_sec_{0.25};
+  double position_filter_alpha_{0.1};
 };
 
 int main(int argc, char* argv[]) {

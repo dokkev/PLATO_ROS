@@ -32,7 +32,6 @@
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
-  <exec_depend>ros2_control_test_assets</exec_depend>
   <exec_depend>plato_state_estimator</exec_depend>
   <exec_depend>plato_teleop</exec_depend>
   <exec_depend>tactile_sensing</exec_depend>
@@ -44,6 +43,7 @@
   <test_depend>launch_testing_ament_cmake</test_depend>
   <test_depend>launch_ros</test_depend>
   <test_depend>rclpy</test_depend>
+  <test_depend>ros2_control_test_assets</test_depend>
   <test_depend>aristo_bringup</test_depend>
 
   <export>

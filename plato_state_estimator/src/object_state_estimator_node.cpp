@@ -128,23 +128,18 @@ void ObjectStateEstimatorNode::updateTimerCallback() {
 
     // Track measured force using the best available tactile source
     double measured_force = 0.0;
-    int8_t measured_source = -1;  // -1 = none, 0 = tactile0, 1 = tactile1
     bool sensor0_contact = tactile0.contact_state >= TactileData::FEW_CONTACTS;
     bool sensor1_contact = tactile1.contact_state >= TactileData::FEW_CONTACTS;
     if (sensor0_contact && sensor1_contact) {
-        if (tactile0.force_z >= tactile1.force_z) {
-            measured_force = tactile0.force_z;
-            measured_source = 0;
-        } else {
-            measured_force = tactile1.force_z;
-            measured_source = 1;
-        }
-    } else if (sensor0_contact) {
+      if (tactile0.force_z >= tactile1.force_z) {
         measured_force = tactile0.force_z;
-        measured_source = 0;
-    } else if (sensor1_contact) {
+      } else {
         measured_force = tactile1.force_z;
-        measured_source = 1;
+      }
+    } else if (sensor0_contact) {
+      measured_force = tactile0.force_z;
+    } else if (sensor1_contact) {
+      measured_force = tactile1.force_z;
     }
 
     // Update estimator

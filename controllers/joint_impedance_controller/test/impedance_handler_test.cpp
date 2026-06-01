@@ -66,7 +66,9 @@ TEST(ImpedanceHandlerTest, InterpolatesFromMinMaxPreset)
   TempDir temp_dir;
   temp_dir.write_file(
     "impedance_preset.yaml",
-    R"(impedance_preset:
+R"(impedance_preset:
+  default_level: 6.0
+  filter_alpha: 0.25
   min:
     stiffness: [0.0, 0.0, 0.0, 0.0]
     damping: [0.0, 0.0, 0.0, 0.0]
@@ -85,6 +87,29 @@ TEST(ImpedanceHandlerTest, InterpolatesFromMinMaxPreset)
   expect_vectors_near(gains.stiffness, std::vector<double>({1.0, 2.0, 3.0, 4.0}));
   expect_vectors_near(gains.damping, std::vector<double>({0.1, 0.2, 0.3, 0.4}));
   EXPECT_EQ(handler.anchor_levels(), std::vector<double>({0.0, 10.0}));
+  EXPECT_DOUBLE_EQ(handler.default_level(), 6.0);
+  EXPECT_DOUBLE_EQ(handler.filter_alpha(), 0.25);
+}
+
+TEST(ImpedanceHandlerTest, UsesFallbackPresetScalarsWhenUnset)
+{
+  TempDir temp_dir;
+  temp_dir.write_file(
+    "impedance_preset.yaml",
+    R"(impedance_preset:
+  min:
+    stiffness: [0.0, 0.0]
+    damping: [0.0, 0.0]
+  max:
+    stiffness: [2.0, 4.0]
+    damping: [0.2, 0.4]
+)");
+
+  joint_impedance_controller::ImpedanceHandler handler(
+    2, temp_dir.file_path("impedance_preset.yaml"));
+
+  EXPECT_DOUBLE_EQ(handler.default_level(), 6.0);
+  EXPECT_DOUBLE_EQ(handler.filter_alpha(), 0.1);
 }
 
 TEST(ImpedanceHandlerTest, RejectsLegacyNumericAnchorFormat)

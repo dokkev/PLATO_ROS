@@ -34,8 +34,8 @@ private:
   using LifecyclePlan = can_hardware_common::core::LifecyclePlan;
   using WritePlan = can_hardware_common::core::WritePlan;
 
-  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{100};
-  static constexpr std::chrono::microseconds kDirectTxFrameTimeout{2000};
+  static constexpr std::chrono::microseconds kDirectTxInterFrameGap{250};
+  static constexpr std::chrono::microseconds kDirectTxFrameTimeout{10000};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
 
   bool update_measurements_() override;

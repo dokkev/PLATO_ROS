@@ -1,9 +1,11 @@
-#include "plato_hardware_interface/plato_model.hpp"
+#include "plato_hardware_interface/plato_state_helper.hpp"
 
 #include <cmath>
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
+
+#include "plato_hardware_interface/plato_layout.hpp"
 
 namespace plato_hand
 {
@@ -16,13 +18,9 @@ rclcpp::Clock & throttle_clock()
   static rclcpp::Clock clock(RCL_STEADY_TIME);
   return clock;
 }
-
-constexpr std::size_t kThumbRollIndex = 0;
-constexpr std::size_t kThumbYawIndex = 1;
-constexpr std::size_t kFirstGimActuatorIndex = 2;
 }  // namespace
 
-void PlatoModel::update_joint_states(
+void PlatoStateHelper::update_joint_states(
   const std::vector<plato_actuator::Actuator> & actuators,
   const can_hardware_common::RobotIO::JointCommand & joint_commands,
   can_hardware_common::RobotIO::ActuatorState & actuator_states,
@@ -32,7 +30,7 @@ void PlatoModel::update_joint_states(
   std::string fallback_feedback_ids;
   for (std::size_t i = 0; i < actuators.size(); ++i) {
     if (!actuators[i].is_initialized()) {
-      if (i == kThumbRollIndex || i == kThumbYawIndex) {
+      if (layout::is_thumb_servo(i)) {
         actuator_states.position_at(i) = static_cast<float>(joint_commands.position_at(i));
         actuator_states.velocity_at(i) = 0.0;
         actuator_states.effort_at(i) = 0.0;
@@ -89,7 +87,7 @@ void PlatoModel::update_joint_states(
   joint_states.copy_from(joint_state_candidate);
 }
 
-void PlatoModel::joint_to_actuator_commands(
+void PlatoStateHelper::joint_to_actuator_commands(
   const can_hardware_common::RobotIO::JointCommand & joint_commands,
   const can_hardware_common::RobotIO::ActuatorState & actuator_states,
   const can_hardware_common::RobotIO::JointState & joint_states,
@@ -102,29 +100,22 @@ void PlatoModel::joint_to_actuator_commands(
     actuator_commands);
 }
 
-bool PlatoModel::actuators_ready(const std::vector<plato_actuator::Actuator> & actuators) const
+bool PlatoStateHelper::actuators_ready(const std::vector<plato_actuator::Actuator> & actuators) const
 {
-  if (actuators.size() <= kFirstGimActuatorIndex) {
-    return false;
-  }
-
-  return std::all_of(
-    actuators.begin() + kFirstGimActuatorIndex,
-    actuators.end(),
+  return can_hardware_common::RobotIO::all_actuators_ready_from(
+    actuators,
+    layout::kFirstGimActuator,
     [](const auto & actuator) { return actuator.is_initialized(); });
 }
 
-void PlatoModel::copy_feedback_snapshot(
+void PlatoStateHelper::copy_feedback_snapshot(
   const std::vector<plato_actuator::Actuator> & actuators,
   can_hardware_common::core::StateSnapshot & snapshot) const
 {
-  if (snapshot.actuator_states.size() != actuators.size()) {
-    snapshot.actuator_states.assign(actuators.size(), can_hardware_common::ActuatorState{});
-  }
-
-  for (std::size_t i = 0; i < actuators.size(); ++i) {
-    snapshot.actuator_states[i] = actuators[i].get_state();
-  }
+  can_hardware_common::RobotIO::copy_actuator_feedback_to_snapshot(
+    actuators,
+    snapshot,
+    [](const auto & actuator) { return actuator.get_state(); });
 }
 
 }  // namespace plato_hand

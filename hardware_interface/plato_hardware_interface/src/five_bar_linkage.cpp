@@ -4,6 +4,8 @@
 #include <cmath>
 #include <limits>
 
+#include "plato_hardware_interface/plato_layout.hpp"
+
 namespace FiveBarLinkage
 {
 
@@ -14,14 +16,6 @@ constexpr float kDefaultAmplification = 1.0f;
 constexpr float kEpsilon = 1e-6f;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kSteadywinTorqueScale = 8.0f;
-constexpr size_t kThumbRollIndex = 0;
-constexpr size_t kThumbYawIndex = 1;
-constexpr size_t kThumbMcpIndex = 2;
-constexpr size_t kThumbPipIndex = 3;
-constexpr size_t kIndexMcpIndex = 4;
-constexpr size_t kIndexPipIndex = 5;
-constexpr size_t kMiddleMcpIndex = 6;
-constexpr size_t kMiddlePipIndex = 7;
 constexpr float kInfinity = std::numeric_limits<float>::infinity();
 
 float clamp_joint_effort_command(float joint_effort, float joint_effort_limit)
@@ -89,9 +83,9 @@ void Transmission::compute_ratios_(
       torque_ratios[pip_index] = kinematics.torque_amplification;
     };
 
-  apply_kinematics(kThumbMcpIndex, kThumbPipIndex, 1.0f);
-  apply_kinematics(kIndexMcpIndex, kIndexPipIndex, -1.0f);
-  apply_kinematics(kMiddleMcpIndex, kMiddlePipIndex, -1.0f);
+  apply_kinematics(plato_hand::layout::kThumbMcp, plato_hand::layout::kThumbPip, 1.0f);
+  apply_kinematics(plato_hand::layout::kIndexMcp, plato_hand::layout::kIndexPip, -1.0f);
+  apply_kinematics(plato_hand::layout::kMiddleMcp, plato_hand::layout::kMiddlePip, -1.0f);
 }
 
 void Transmission::actuator_to_joint(
@@ -111,8 +105,7 @@ void Transmission::actuator_to_joint(
     joint_state.position_at(i) = actuator_state.position_at(i) * position_ratios[i];
     joint_state.velocity_at(i) = actuator_state.velocity_at(i) * velocity_ratios[i];
 
-    const bool is_thumb_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
-    joint_state.effort_at(i) = is_thumb_servo ?
+    joint_state.effort_at(i) = plato_hand::layout::is_thumb_servo(i) ?
       0.0 :
       (actuator_state.effort_at(i) / kSteadywinTorqueScale) * torque_ratios[i];
   }

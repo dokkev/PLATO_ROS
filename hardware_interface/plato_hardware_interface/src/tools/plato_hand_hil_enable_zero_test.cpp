@@ -279,7 +279,7 @@ int main(int argc, char ** argv)
     transport.add_rx_observer([&actuators](const TPCANMsg & frame) {
       for (auto & actuator : actuators) {
         if (actuator.get_rx_id() == frame.ID) {
-          actuator.process_message(frame);
+          actuator.process_rx_frame(frame);
           return;
         }
       }

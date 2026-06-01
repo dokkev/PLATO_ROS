@@ -5,7 +5,6 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <utility>
 
 #include <rclcpp/rclcpp.hpp>
@@ -21,12 +20,6 @@ constexpr float kInvalidStateValue = std::numeric_limits<float>::quiet_NaN();
 constexpr double kDefaultJointStateValue = 0.0;
 auto logger() { return rclcpp::get_logger("plato_hardware_interface"); }
 
-rclcpp::Clock & throttle_clock()
-{
-  static rclcpp::Clock clock(RCL_STEADY_TIME);
-  return clock;
-}
-
 rclcpp::Clock & snapshot_clock()
 {
   static rclcpp::Clock clock(RCL_STEADY_TIME);
@@ -34,11 +27,6 @@ rclcpp::Clock & snapshot_clock()
 }
 
 using WritePlan = can_hardware_common::core::WritePlan;
-
-bool is_nonfatal_read_status(TPCANStatus status)
-{
-  return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
-}
 
 static_assert(
   Hand::kNumJoints == FiveBarLinkage::Transmission::kNumJoints,
@@ -95,9 +83,9 @@ std::vector<float> extract_position_offsets(
 // ════════════════════════════════════════════════════════════════════════════
 
 Hand::Hand(PlatoHandConfig config)
-: transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
-  protocol_(),
-  model_(transmission_),
+: frame_executor_(transport_, logger()),
+  transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
+  state_helper_(transmission_),
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),
   actuator_static_configs_(extract_static_configs(config.actuator_configs)),
   actuator_position_offsets_(extract_position_offsets(config.actuator_configs)),
@@ -123,8 +111,8 @@ Hand::Hand(PlatoHandConfig config)
 
   transport_.add_rx_observer([this](const TPCANMsg & frame) {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    if (protocol_.process_rx_frame(frame, actuators_)) {
-      mark_rx_frame_();
+    if (can_hardware_common::core::dispatch_rx_frame(frame, actuators_)) {
+      frame_executor_.mark_rx_frame();
     }
   });
 
@@ -169,28 +157,20 @@ Hand::~Hand()
 
 bool Hand::update_measurements_()
 {
-  const auto rx = transport_.poll_rx();
-  last_rx_healthy_ = is_nonfatal_read_status(rx.status);
-  if (!last_rx_healthy_) {
-    RCLCPP_WARN_THROTTLE(
-      logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
-    return false;
-  }
-
-  return true;
+  return frame_executor_.poll_rx();
 }
 
 void Hand::refresh_state_snapshot_()
 {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  model_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
+  state_helper_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
 
   state_snapshot_.stamp = snapshot_clock().now();
-  state_snapshot_.has_fresh_rx = has_fresh_rx_(SteadyClock::now());
+  state_snapshot_.has_fresh_rx = frame_executor_.has_fresh_rx(kRxStaleTimeout);
   state_snapshot_.calibrated = actuator_position_offsets_.size() == kNumActuators;
   state_snapshot_.sensors_ok = true;
-  state_snapshot_.actuators_ready = model_.actuators_ready(actuators_);
-  state_snapshot_.transport_healthy = last_rx_healthy_;
+  state_snapshot_.actuators_ready = state_helper_.actuators_ready(actuators_);
+  state_snapshot_.transport_healthy = frame_executor_.transport_healthy();
   state_snapshot_.lifecycle_busy = false;
   state_snapshot_.model_ready =
     actuators_.size() == kNumActuators &&
@@ -198,10 +178,8 @@ void Hand::refresh_state_snapshot_()
   if (state_snapshot_.actuator_states.size() != kNumActuators) {
     state_snapshot_.resize(kNumJoints, kNumActuators);
   }
-  std::copy_n(joint_states_.position_data(), kNumJoints, state_snapshot_.joint_position.begin());
-  std::copy_n(joint_states_.velocity_data(), kNumJoints, state_snapshot_.joint_velocity.begin());
-  std::copy_n(joint_states_.effort_data(), kNumJoints, state_snapshot_.joint_effort.begin());
-  model_.copy_feedback_snapshot(actuators_, state_snapshot_);
+  can_hardware_common::RobotIO::copy_joint_state_to_snapshot(joint_states_, state_snapshot_);
+  state_helper_.copy_feedback_snapshot(actuators_, state_snapshot_);
 }
 
 can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
@@ -219,10 +197,10 @@ can_hardware_common::core::LifecyclePlan Hand::build_lifecycle_plan_(
   plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
   switch (operation) {
     case can_hardware_common::core::LifecycleOperation::kEnable:
-      protocol_.append_enable_frames(actuators_, plan.direct_frames);
+      can_hardware_common::core::append_enable_frames(actuators_, plan.direct_frames);
       break;
     case can_hardware_common::core::LifecycleOperation::kDisable:
-      protocol_.append_disable_frames(actuators_, plan.direct_frames);
+      can_hardware_common::core::append_disable_frames(actuators_, plan.direct_frames);
       break;
     case can_hardware_common::core::LifecycleOperation::kZero:
       break;
@@ -250,13 +228,7 @@ bool Hand::execute_standard_lifecycle_(const LifecyclePlan & plan)
     disable_requested_ = true;
   }
 
-  for (const auto & frame : plan.direct_frames) {
-    if (!send_frame_blocking_(frame, kResponseTimeout)) {
-      return false;
-    }
-  }
-
-  return true;
+  return frame_executor_.execute_direct_frames(plan.direct_frames, kResponseTimeout);
 }
 
 bool Hand::execute_zero_lifecycle_()
@@ -268,15 +240,13 @@ void Hand::build_ready_write_plan_(WritePlan & plan)
 {
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    model_.joint_to_actuator_commands(
+    state_helper_.joint_to_actuator_commands(
       joint_commands_, actuator_states_, joint_states_, actuator_commands_);
-    protocol_.append_write_frames(
+    can_hardware_common::core::append_actuator_command_frames(
       actuators_,
       actuator_commands_,
-      write_cycle_count_,
       servo_stiffness_scale_,
       plan.direct_frames);
-    ++write_cycle_count_;
   }
 
   plan.dispatch_policy = can_hardware_common::core::DispatchPolicy::kDirectFrames;
@@ -284,79 +254,7 @@ void Hand::build_ready_write_plan_(WritePlan & plan)
 
 bool Hand::execute_write_plan_(const WritePlan & plan)
 {
-  for (const auto & frame : plan.direct_frames) {
-    if (!send_frame_blocking_(frame, direct_tx_frame_timeout_)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool Hand::send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout)
-{
-  const auto now = SteadyClock::now();
-  const auto next_send_time = transport_.next_tx_time();
-  if (next_send_time > now) {
-    const auto wait = std::chrono::duration_cast<std::chrono::microseconds>(next_send_time - now);
-    if (wait > timeout) {
-      RCLCPP_WARN_THROTTLE(
-        logger(),
-        throttle_clock(),
-        1000,
-        "CAN direct TX pacing timeout on ID 0x%X (wait=%ldus)",
-        frame.ID,
-        static_cast<long>(wait.count()));
-      return false;
-    }
-    std::this_thread::sleep_until(next_send_time);
-  }
-
-  const TPCANStatus tx_status = transport_.send_tx_frame(frame);
-  if (tx_status == PCAN_ERROR_OK) {
-    return true;
-  }
-  if (tx_status == PCAN_ERROR_QXMTFULL) {
-    RCLCPP_WARN_THROTTLE(
-      logger(),
-      throttle_clock(),
-      1000,
-      "CAN direct TX dropped by pacing on ID 0x%X",
-      frame.ID);
-    return false;
-  }
-
-  RCLCPP_WARN_THROTTLE(
-    logger(),
-    throttle_clock(),
-    1000,
-    "CAN direct TX error on ID 0x%X: status 0x%X",
-    frame.ID,
-    tx_status);
-  return false;
-}
-
-bool Hand::poll_rx_for_(std::chrono::microseconds budget)
-{
-  const auto deadline = SteadyClock::now() + budget;
-  bool healthy = true;
-
-  while (SteadyClock::now() < deadline) {
-    const auto rx = transport_.poll_rx();
-    last_rx_healthy_ = is_nonfatal_read_status(rx.status);
-    healthy = healthy && last_rx_healthy_;
-    if (!last_rx_healthy_) {
-      RCLCPP_WARN_THROTTLE(
-        logger(), throttle_clock(), 1000, "CAN receive error: status 0x%X", rx.status);
-      return false;
-    }
-
-    if (rx.processed_frames == 0U) {
-      std::this_thread::sleep_for(std::chrono::microseconds(500));
-    }
-  }
-
-  return healthy;
+  return frame_executor_.execute_direct_frames(plan.direct_frames, direct_tx_frame_timeout_);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -377,8 +275,11 @@ bool Hand::run_zeroing_probe_rounds_()
 {
   bool success = true;
   for (size_t round = 0; round < kZeroingProbeRounds; ++round) {
-    for (size_t i = kThumbMcpIndex; i < kNumActuators; ++i) {
-      if (!send_frame_blocking_(actuators_[i].set_joint_torque(0.0f).frame, kResponseTimeout)) {
+    for (size_t i = layout::kFirstGimActuator; i < kNumActuators; ++i) {
+      if (!frame_executor_.send_frame_blocking(
+          actuators_[i].set_joint_torque(0.0f).frame,
+          kResponseTimeout))
+      {
         RCLCPP_WARN(
           logger(),
           "Zeroing probe direct TX failed for actuator %zu",
@@ -386,10 +287,10 @@ bool Hand::run_zeroing_probe_rounds_()
         success = false;
       }
     }
-    success = poll_rx_for_(kResponseTimeout) && success;
+    success = frame_executor_.poll_rx_for(kResponseTimeout) && success;
   }
 
-  success = poll_rx_for_(kResponseTimeout) && success;
+  success = frame_executor_.poll_rx_for(kResponseTimeout) && success;
   return success;
 }
 
@@ -401,9 +302,7 @@ bool Hand::capture_zero_offsets_(std::vector<float> & offsets)
 
   std::lock_guard<std::mutex> lock(state_mutex_);
   for (size_t i = 0; i < kNumActuators; ++i) {
-    const bool is_servo = (i == kThumbRollIndex || i == kThumbYawIndex);
-
-    if (is_servo) {
+    if (layout::is_thumb_servo(i)) {
       // Preserve the existing offsets for joint1/joint2 thumb servo channels during zeroing.
       offsets.push_back(actuator_position_offsets_[i]);
       continue;
@@ -433,7 +332,7 @@ bool Hand::capture_zero_offsets_(std::vector<float> & offsets)
     offsets.push_back(actuator_position_offsets_[i]);
   }
 
-  model_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
+  state_helper_.update_joint_states(actuators_, joint_commands_, actuator_states_, joint_states_);
   return success;
 }
 
@@ -451,21 +350,6 @@ bool Hand::persist_zero_offsets_(const std::vector<float> & offsets, bool zeroin
     RCLCPP_ERROR(logger(), "Zeroing completed with warnings and failed to save offsets: %s", e.what());
     return false;
   }
-}
-
-void Hand::mark_rx_frame_()
-{
-  last_rx_time_ = SteadyClock::now();
-  has_observed_rx_ = true;
-  ++rx_frame_count_;
-}
-
-bool Hand::has_fresh_rx_(SteadyClock::time_point now) const
-{
-  if (!has_observed_rx_) {
-    return false;
-  }
-  return (now - last_rx_time_) <= kRxStaleTimeout;
 }
 
 void Hand::print_motor_positions()

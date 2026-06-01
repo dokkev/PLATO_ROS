@@ -1,13 +1,12 @@
-#include "plato_hardware_interface/can_protocol.hpp"
+#include "plato_hardware_interface/gim3505_protocol.hpp"
 
-#include <chrono>
-#include <cstring>
 #include <cmath>
+#include <cstring>
 #include <stdexcept>
 
 #include <rclcpp/rclcpp.hpp>
 
-namespace can_protocol
+namespace plato_hardware_interface::gim3505_protocol
 {
 
 using can_hardware_common::can_protocol_helpers::encode_float_le;
@@ -18,7 +17,7 @@ namespace
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSecondsPerMinute = 60.0f;
 
-auto logger() { return rclcpp::get_logger("can_protocol"); }
+auto logger() { return rclcpp::get_logger("gim3505_protocol"); }
 
 rclcpp::Clock & throttle_clock()
 {
@@ -130,12 +129,14 @@ void MsgDecoder::get_states(
   torque = torque_int * torque_scale_ - torque_offset_;
 }
 
-}  // namespace can_protocol
+}  // namespace plato_hardware_interface::gim3505_protocol
 
 namespace plato_actuator
 {
 
-CANProtocol::CANProtocol(const can_hardware_common::ActuatorCoreConfig & config)
+namespace gim3505_protocol = plato_hardware_interface::gim3505_protocol;
+
+Gim3505Protocol::Gim3505Protocol(const can_hardware_common::ActuatorCoreConfig & config)
 : config_(config),
   tx_id_(config.can_tx_id),
   decoder_(config.gear_ratio, config.torque_constant),
@@ -145,88 +146,97 @@ CANProtocol::CANProtocol(const can_hardware_common::ActuatorCoreConfig & config)
   validate_direction_(config_);
 }
 
-std::optional<actuator::TxCommand> CANProtocol::make_impedance_command(
+std::optional<actuator::TxCommand> Gim3505Protocol::make_impedance_command(
   const can_hardware_common::ActuatorTarget &)
 {
   return std::nullopt;
 }
 
-actuator::TxCommand CANProtocol::make_enable_motor_command()
+actuator::TxCommand Gim3505Protocol::make_enable_motor_command()
 {
-  can_protocol::MsgEncoder::start_motor(onoff_msg_);
+  gim3505_protocol::MsgEncoder::start_motor(onoff_msg_);
   return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand CANProtocol::make_disable_motor_command()
+actuator::TxCommand Gim3505Protocol::make_disable_motor_command()
 {
-  can_protocol::MsgEncoder::stop_motor(onoff_msg_);
+  gim3505_protocol::MsgEncoder::stop_motor(onoff_msg_);
   return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand CANProtocol::make_stop_control_command()
+actuator::TxCommand Gim3505Protocol::make_stop_control_command()
 {
-  can_protocol::MsgEncoder::stop_control(onoff_msg_);
+  gim3505_protocol::MsgEncoder::stop_control(onoff_msg_);
   return actuator::TxCommand{onoff_msg_};
 }
 
-actuator::TxCommand CANProtocol::make_torque_command(float motor_torque)
+actuator::TxCommand Gim3505Protocol::make_torque_command(float motor_torque)
 {
-  can_protocol::MsgEncoder::set_torque(cmd_msg_, motor_torque, 0);
+  gim3505_protocol::MsgEncoder::set_torque(cmd_msg_, motor_torque, 0);
   return actuator::TxCommand{cmd_msg_};
 }
 
-actuator::TxCommand CANProtocol::make_position_command(
+actuator::TxCommand Gim3505Protocol::make_position_command(
   float joint_position,
   uint32_t duration)
 {
-  can_protocol::MsgEncoder::set_position(
+  gim3505_protocol::MsgEncoder::set_position(
     cmd_msg_, map_joint_to_motor_frame_(joint_position, true), duration);
   return actuator::TxCommand{cmd_msg_};
 }
 
-actuator::TxCommand CANProtocol::make_servo_position_command(
+actuator::TxCommand Gim3505Protocol::make_servo_position_command(
   float joint_position,
   uint32_t current_milliamps)
 {
-  can_protocol::MsgEncoder::set_position(
+  gim3505_protocol::MsgEncoder::set_position(
     cmd_msg_, map_joint_to_motor_frame_(joint_position, true), current_milliamps);
   return actuator::TxCommand{cmd_msg_};
 }
 
-std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
-  const can_hardware_common::RxFrame & msg)
+std::optional<can_hardware_common::DecodedFeedback> Gim3505Protocol::decode(
+  const TPCANMsg & msg)
 {
-  if (!can_protocol::is_supported_rx_frame(msg)) {
+  if (!gim3505_protocol::is_supported_rx_frame(msg)) {
     RCLCPP_WARN_THROTTLE(
-      can_protocol::logger(), can_protocol::throttle_clock(), 1000,
-      "Ignoring unsupported Plato CAN frame type 0x%02X for actuator ID 0x%02X",
-      msg.MSGTYPE, tx_id_);
+      gim3505_protocol::logger(),
+      gim3505_protocol::throttle_clock(),
+      1000,
+      "Ignoring unsupported GIM3505 CAN frame type 0x%02X for actuator ID 0x%02X",
+      msg.MSGTYPE,
+      tx_id_);
     return std::nullopt;
   }
 
-  if (msg.LEN < can_protocol::kAckFrameLength) {
+  if (msg.LEN < gim3505_protocol::kAckFrameLength) {
     RCLCPP_WARN_THROTTLE(
-      can_protocol::logger(), can_protocol::throttle_clock(), 1000,
-      "Ignoring short Plato CAN frame for actuator ID 0x%02X: LEN=%u",
-      tx_id_, msg.LEN);
+      gim3505_protocol::logger(),
+      gim3505_protocol::throttle_clock(),
+      1000,
+      "Ignoring short GIM3505 CAN frame for actuator ID 0x%02X: LEN=%u",
+      tx_id_,
+      msg.LEN);
     return std::nullopt;
   }
 
   can_hardware_common::DecodedFeedback decoded;
 
   switch (msg.DATA[0]) {
-    case CommandByte::POSITION_CONTROL:
-    case CommandByte::SPEED_CONTROL:
-    case CommandByte::TORQUE_CONTROL: {
-        if (msg.LEN < can_protocol::kStateFrameLength) {
+    case gim3505_protocol::CommandByte::POSITION_CONTROL:
+    case gim3505_protocol::CommandByte::SPEED_CONTROL:
+    case gim3505_protocol::CommandByte::TORQUE_CONTROL: {
+        if (msg.LEN < gim3505_protocol::kStateFrameLength) {
           RCLCPP_WARN_THROTTLE(
-            can_protocol::logger(), can_protocol::throttle_clock(), 1000,
-            "Ignoring short Plato state reply for actuator ID 0x%02X: LEN=%u",
-            tx_id_, msg.LEN);
+            gim3505_protocol::logger(),
+            gim3505_protocol::throttle_clock(),
+            1000,
+            "Ignoring short GIM3505 state reply for actuator ID 0x%02X: LEN=%u",
+            tx_id_,
+            msg.LEN);
           return std::nullopt;
         }
-        if (!can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
-          RCLCPP_ERROR(can_protocol::logger(), "Actuator ID 0x%02X control failed", tx_id_);
+        if (!gim3505_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+          RCLCPP_ERROR(gim3505_protocol::logger(), "Actuator ID 0x%02X control failed", tx_id_);
           return std::nullopt;
         }
 
@@ -240,46 +250,51 @@ std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
         decoded.motor_position = motor_position;
         decoded.temperature = temperature;
         decoded.state.position = map_motor_to_joint_frame_(motor_position, true);
-        decoded.state.velocity =
-          map_motor_to_joint_frame_(motor_velocity * can_protocol::kTwoPi / can_protocol::kSecondsPerMinute);
+        decoded.state.velocity = map_motor_to_joint_frame_(
+          motor_velocity * gim3505_protocol::kTwoPi /
+          gim3505_protocol::kSecondsPerMinute);
         decoded.state.torque = map_motor_to_joint_frame_(motor_torque);
         return decoded;
       }
-    case CommandByte::START_MOTOR:
-      if (can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+    case gim3505_protocol::CommandByte::START_MOTOR:
+      if (gim3505_protocol::MsgDecoder::get_result(msg.DATA[1])) {
         decoded.motor_enabled = true;
         RCLCPP_INFO(
-          can_protocol::logger(),
+          gim3505_protocol::logger(),
           "Actuator RX 0x%02X acknowledged %s",
-          msg.ID, can_protocol::command_name(msg.DATA[0]));
+          msg.ID,
+          gim3505_protocol::command_name(msg.DATA[0]));
         return decoded;
       }
       RCLCPP_ERROR(
-        can_protocol::logger(),
+        gim3505_protocol::logger(),
         "Actuator RX 0x%02X returned failure for %s",
-        msg.ID, can_protocol::command_name(msg.DATA[0]));
+        msg.ID,
+        gim3505_protocol::command_name(msg.DATA[0]));
       return std::nullopt;
-    case CommandByte::STOP_MOTOR:
-    case CommandByte::STOP_CONTROL:
-      if (can_protocol::MsgDecoder::get_result(msg.DATA[1])) {
+    case gim3505_protocol::CommandByte::STOP_MOTOR:
+    case gim3505_protocol::CommandByte::STOP_CONTROL:
+      if (gim3505_protocol::MsgDecoder::get_result(msg.DATA[1])) {
         decoded.motor_enabled = false;
         RCLCPP_INFO(
-          can_protocol::logger(),
+          gim3505_protocol::logger(),
           "Actuator RX 0x%02X acknowledged %s",
-          msg.ID, can_protocol::command_name(msg.DATA[0]));
+          msg.ID,
+          gim3505_protocol::command_name(msg.DATA[0]));
         return decoded;
       }
       RCLCPP_ERROR(
-        can_protocol::logger(),
+        gim3505_protocol::logger(),
         "Actuator RX 0x%02X returned failure for %s",
-        msg.ID, can_protocol::command_name(msg.DATA[0]));
+        msg.ID,
+        gim3505_protocol::command_name(msg.DATA[0]));
       return std::nullopt;
     default:
       return std::nullopt;
   }
 }
 
-TPCANMsg CANProtocol::make_message_(uint32_t can_id, uint8_t len)
+TPCANMsg Gim3505Protocol::make_message_(uint32_t can_id, uint8_t len)
 {
   TPCANMsg msg;
   std::memset(&msg, 0, sizeof(msg));
@@ -289,14 +304,15 @@ TPCANMsg CANProtocol::make_message_(uint32_t can_id, uint8_t len)
   return msg;
 }
 
-void CANProtocol::validate_direction_(const can_hardware_common::ActuatorCoreConfig & config)
+void Gim3505Protocol::validate_direction_(
+  const can_hardware_common::ActuatorCoreConfig & config)
 {
   if (config.direction != 1 && config.direction != -1) {
-    throw std::invalid_argument("Plato actuator direction must be +1 or -1");
+    throw std::invalid_argument("GIM3505 actuator direction must be +1 or -1");
   }
 }
 
-float CANProtocol::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
+float Gim3505Protocol::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
 {
   const float direction = static_cast<float>(config_.direction);
   return apply_offset ?
@@ -304,7 +320,7 @@ float CANProtocol::map_joint_to_motor_frame_(float joint_value, bool apply_offse
          joint_value * direction;
 }
 
-float CANProtocol::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
+float Gim3505Protocol::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
 {
   const float direction = static_cast<float>(config_.direction);
   return apply_offset ?

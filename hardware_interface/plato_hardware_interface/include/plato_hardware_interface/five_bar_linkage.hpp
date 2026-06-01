@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "can_hardware_common/transmission.hpp"
+#include "plato_hardware_interface/plato_layout.hpp"
 
 namespace FiveBarLinkage
 {
@@ -29,8 +30,8 @@ struct Kinematics
 class Transmission : public can_hardware_common::Transmission
 {
 public:
-  static constexpr size_t kNumJoints = 8;
-  static constexpr size_t kNumActuators = 8;
+  static constexpr size_t kNumJoints = plato_hand::layout::kNumJoints;
+  static constexpr size_t kNumActuators = plato_hand::layout::kNumActuators;
   using JointArray = std::array<float, kNumJoints>;
 
   explicit Transmission(FiveBarLinkageConfig config);

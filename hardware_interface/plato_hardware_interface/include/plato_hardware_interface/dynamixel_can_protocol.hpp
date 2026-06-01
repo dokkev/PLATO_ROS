@@ -6,22 +6,22 @@
 
 #include <PCANBasic.h>
 
-#include "plato_hardware_interface/utils/can_ids.hpp"
+#include "plato_hardware_interface/gim3505_protocol.hpp"
 
 namespace plato_hardware_interface::dynamixel_can_protocol
 {
 
 enum class Command : uint8_t
 {
-  kEnable = CommandByte::START_MOTOR,
-  kDisable = CommandByte::STOP_MOTOR,
-  kSetPosition = CommandByte::POSITION_CONTROL,
+  kEnable = plato_hardware_interface::gim3505_protocol::CommandByte::START_MOTOR,
+  kDisable = plato_hardware_interface::gim3505_protocol::CommandByte::STOP_MOTOR,
+  kSetPosition = plato_hardware_interface::gim3505_protocol::CommandByte::POSITION_CONTROL,
 };
 
 enum class Result : uint8_t
 {
-  kSuccess = ResultByte::SUCCESS,
-  kFailure = ResultByte::FAILURE,
+  kSuccess = plato_hardware_interface::gim3505_protocol::ResultByte::SUCCESS,
+  kFailure = plato_hardware_interface::gim3505_protocol::ResultByte::FAILURE,
   kMotorDisabled = 0x02,
 };
 

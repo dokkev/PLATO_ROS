@@ -4,64 +4,15 @@
 
 #include <rclcpp/logging.hpp>
 #include <chrono>
-#include <cmath>
 #include <exception>
 #include <limits>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <pluginlib/class_list_macros.hpp>
 
 namespace plato_hardware_interface
 {
-
-namespace
-{
-
-std::chrono::microseconds parse_nonnegative_microseconds_parameter(
-  const std::string & value, const char * parameter_name)
-{
-  long long parsed = 0;
-  try {
-    parsed = std::stoll(value);
-  } catch (const std::exception &) {
-    throw std::invalid_argument(
-            std::string("Hardware parameter '") + parameter_name +
-            "' must be a non-negative integer (microseconds)");
-  }
-
-  if (parsed < 0) {
-    throw std::invalid_argument(
-            std::string("Hardware parameter '") + parameter_name +
-            "' must be >= 0 (microseconds)");
-  }
-
-  return std::chrono::microseconds(parsed);
-}
-
-double parse_nonnegative_double_parameter(
-  const std::string & value, const char * parameter_name)
-{
-  double parsed = 0.0;
-  try {
-    parsed = std::stod(value);
-  } catch (const std::exception &) {
-    throw std::invalid_argument(
-            std::string("Hardware parameter '") + parameter_name +
-            "' must be a non-negative number");
-  }
-
-  if (!std::isfinite(parsed) || parsed < 0.0) {
-    throw std::invalid_argument(
-            std::string("Hardware parameter '") + parameter_name +
-            "' must be a finite value >= 0");
-  }
-
-  return parsed;
-}
-
-}  // namespace
 
 hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interface::HardwareInfo & info)
 {
@@ -104,7 +55,8 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
   const auto direct_tx_gap_it = info_.hardware_parameters.find("direct_tx_inter_frame_gap_us");
   if (direct_tx_gap_it != info_.hardware_parameters.end()) {
     try {
-      direct_tx_inter_frame_gap_override = parse_nonnegative_microseconds_parameter(
+      direct_tx_inter_frame_gap_override =
+        plato_hardware_interface::utils::parse_nonnegative_microseconds_parameter(
         direct_tx_gap_it->second, "direct_tx_inter_frame_gap_us");
     } catch (const std::exception & e) {
       RCLCPP_ERROR(
@@ -119,7 +71,8 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
   const auto servo_stiffness_scale_it = info_.hardware_parameters.find("servo_stiffness_scale");
   if (servo_stiffness_scale_it != info_.hardware_parameters.end()) {
     try {
-      servo_stiffness_scale_override = parse_nonnegative_double_parameter(
+      servo_stiffness_scale_override =
+        plato_hardware_interface::utils::parse_nonnegative_double_parameter(
         servo_stiffness_scale_it->second, "servo_stiffness_scale");
     } catch (const std::exception & e) {
       RCLCPP_ERROR(

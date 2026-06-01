@@ -176,6 +176,71 @@ using JointCommand = detail::CommandBuffer<double>;
 using ActuatorState = detail::StateBuffer<float>;
 using ActuatorCommand = detail::CommandBuffer<float>;
 
+template<typename Snapshot>
+inline void copy_joint_state_to_snapshot(const JointState & joint_state, Snapshot & snapshot)
+{
+  snapshot.joint_position.resize(joint_state.size());
+  snapshot.joint_velocity.resize(joint_state.size());
+  snapshot.joint_effort.resize(joint_state.size());
+  std::copy_n(joint_state.position_data(), joint_state.size(), snapshot.joint_position.begin());
+  std::copy_n(joint_state.velocity_data(), joint_state.size(), snapshot.joint_velocity.begin());
+  std::copy_n(joint_state.effort_data(), joint_state.size(), snapshot.joint_effort.begin());
+}
+
+template<typename ActuatorRange, typename StateGetter>
+inline bool copy_actuator_feedback_to_buffer(
+  const ActuatorRange & actuators,
+  ActuatorState & actuator_state,
+  StateGetter get_state)
+{
+  if (actuator_state.size() != actuators.size()) {
+    return false;
+  }
+
+  for (std::size_t i = 0; i < actuators.size(); ++i) {
+    const auto state = get_state(actuators[i]);
+    actuator_state.position_at(i) = state.position;
+    actuator_state.velocity_at(i) = state.velocity;
+    actuator_state.effort_at(i) = state.torque;
+  }
+
+  return true;
+}
+
+template<typename ActuatorRange, typename Snapshot, typename StateGetter>
+inline void copy_actuator_feedback_to_snapshot(
+  const ActuatorRange & actuators,
+  Snapshot & snapshot,
+  StateGetter get_state)
+{
+  if (snapshot.actuator_states.size() != actuators.size()) {
+    snapshot.actuator_states.assign(actuators.size(), {});
+  }
+
+  for (std::size_t i = 0; i < actuators.size(); ++i) {
+    snapshot.actuator_states[i] = get_state(actuators[i]);
+  }
+}
+
+template<typename ActuatorRange, typename ReadyPredicate>
+inline bool any_actuator_ready(const ActuatorRange & actuators, ReadyPredicate is_ready)
+{
+  return std::any_of(actuators.begin(), actuators.end(), is_ready);
+}
+
+template<typename ActuatorRange, typename ReadyPredicate>
+inline bool all_actuators_ready_from(
+  const ActuatorRange & actuators,
+  std::size_t first_index,
+  ReadyPredicate is_ready)
+{
+  if (actuators.size() <= first_index) {
+    return false;
+  }
+
+  return std::all_of(actuators.begin() + first_index, actuators.end(), is_ready);
+}
+
 }  // namespace RobotIO
 
 }  // namespace can_hardware_common

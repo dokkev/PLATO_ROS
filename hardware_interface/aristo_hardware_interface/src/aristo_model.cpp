@@ -32,12 +32,17 @@ void AristoModel::update_joint_states(
   JointArrayf joint_velocities = JointArrayf::Zero();
   JointArrayf joint_efforts = JointArrayf::Zero();
 
+  if (!can_hardware_common::RobotIO::copy_actuator_feedback_to_buffer(
+      actuators,
+      actuator_states,
+      [](const auto & actuator) { return actuator.get_feedback(); }))
+  {
+    return;
+  }
+
   for (std::size_t i = 0; i < actuators.size(); ++i) {
     const auto & states = actuators[i].get_feedback();
     const Eigen::Index joint_index = static_cast<Eigen::Index>(i);
-    actuator_states.position_at(i) = states.position;
-    actuator_states.velocity_at(i) = states.velocity;
-    actuator_states.effort_at(i) = states.torque;
     joint_positions(joint_index) = states.position;
     joint_velocities(joint_index) = states.velocity;
     joint_efforts(joint_index) = states.torque;
@@ -105,9 +110,8 @@ void AristoModel::build_impedance_targets(
 
 bool AristoModel::actuators_ready(const std::vector<aristo_actuator::Actuator> & actuators) const
 {
-  return std::any_of(
-    actuators.begin(),
-    actuators.end(),
+  return can_hardware_common::RobotIO::any_actuator_ready(
+    actuators,
     [](const auto & actuator) { return actuator.has_feedback(); });
 }
 
@@ -115,13 +119,10 @@ void AristoModel::copy_feedback_snapshot(
   const std::vector<aristo_actuator::Actuator> & actuators,
   can_hardware_common::core::StateSnapshot & snapshot) const
 {
-  if (snapshot.actuator_states.size() != actuators.size()) {
-    snapshot.actuator_states.assign(actuators.size(), can_hardware_common::ActuatorState{});
-  }
-
-  for (std::size_t i = 0; i < actuators.size(); ++i) {
-    snapshot.actuator_states[i] = actuators[i].get_feedback();
-  }
+  can_hardware_common::RobotIO::copy_actuator_feedback_to_snapshot(
+    actuators,
+    snapshot,
+    [](const auto & actuator) { return actuator.get_feedback(); });
 }
 
 }  // namespace aristo_hand

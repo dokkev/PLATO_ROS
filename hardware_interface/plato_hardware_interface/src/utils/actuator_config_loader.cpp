@@ -10,22 +10,13 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include "plato_hardware_interface/plato_layout.hpp"
+
 namespace plato_actuator
 {
 
 namespace
 {
-
-constexpr std::array<const char *, 8> kExpectedActuatorNames = {
-  "thumb_roll",
-  "thumb_yaw",
-  "thumb_mcp",
-  "thumb_pip",
-  "index_mcp",
-  "index_pip",
-  "middle_mcp",
-  "middle_pip",
-};
 
 std::string require_scalar(const YAML::Node & node, const char * key)
 {
@@ -135,7 +126,8 @@ void validate_can_ids(const std::vector<Config> & configs)
 {
   for (std::size_t i = 0; i < configs.size(); ++i) {
     for (std::size_t j = i + 1; j < configs.size(); ++j) {
-      const bool allowed_shared_dynamixel_mcu = i < 2U && j < 2U;
+      const bool allowed_shared_dynamixel_mcu =
+        plato_hand::layout::is_thumb_servo(i) && plato_hand::layout::is_thumb_servo(j);
       if (!allowed_shared_dynamixel_mcu &&
         configs[i].static_config.can_tx_id == configs[j].static_config.can_tx_id)
       {
@@ -152,9 +144,10 @@ void validate_can_ids(const std::vector<Config> & configs)
 
 }  // namespace
 
-const std::array<const char *, 8> & expected_plato_actuator_names()
+const std::array<const char *, plato_hand::layout::kNumActuators> &
+expected_plato_actuator_names()
 {
-  return kExpectedActuatorNames;
+  return plato_hand::layout::kActuatorNames;
 }
 
 std::vector<Config> load_plato_actuator_configs()
@@ -184,21 +177,27 @@ std::vector<Config> load_plato_actuator_configs(const std::string & yaml_path)
     }
   }
 
-  if (configs_by_name.size() != kExpectedActuatorNames.size()) {
+  if (configs_by_name.size() != plato_hand::layout::kActuatorNames.size()) {
     throw std::runtime_error(
-      "Expected exactly " + std::to_string(kExpectedActuatorNames.size()) +
+      "Expected exactly " + std::to_string(plato_hand::layout::kActuatorNames.size()) +
       " actuators in YAML");
   }
 
   std::vector<Config> configs;
-  configs.reserve(kExpectedActuatorNames.size());
+  configs.reserve(plato_hand::layout::kActuatorNames.size());
 
-  for (const auto * expected_name : kExpectedActuatorNames) {
+  for (std::size_t i = 0; i < plato_hand::layout::kActuatorNames.size(); ++i) {
+    const auto * expected_name = plato_hand::layout::kActuatorNames[i];
     const auto it = configs_by_name.find(expected_name);
     if (it == configs_by_name.end()) {
       throw std::runtime_error(std::string("Missing actuator entry in YAML: ") + expected_name);
     }
-    configs.push_back(it->second);
+    auto config = it->second;
+    if (plato_hand::layout::is_thumb_servo(i)) {
+      config.static_config.protocol_kind = ProtocolKind::kDynamixelBridge;
+      config.static_config.dynamixel_servo_id = plato_hand::layout::dynamixel_id_for_index(i);
+    }
+    configs.push_back(config);
   }
 
   validate_can_ids(configs);

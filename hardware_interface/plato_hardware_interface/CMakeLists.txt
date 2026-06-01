@@ -22,13 +22,12 @@ endforeach()
 
 add_library(${PROJECT_NAME} SHARED
   src/actuator.cpp
-  src/can_protocol.cpp
   src/dynamixel_can_protocol.cpp
   src/five_bar_linkage.cpp
+  src/gim3505_protocol.cpp
   src/plato.cpp
   src/plato_hand.cpp
-  src/plato_model.cpp
-  src/plato_protocol.cpp
+  src/plato_state_helper.cpp
   src/utils/actuator_config_loader.cpp
   src/utils/actuator_offset_loader.cpp
   src/utils/linkage_config_loader.cpp

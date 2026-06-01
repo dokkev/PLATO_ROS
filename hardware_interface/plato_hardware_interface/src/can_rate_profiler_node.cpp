@@ -10,6 +10,7 @@
 
 #include "can_hardware_common/can_bus_manager.hpp"
 #include "plato_hardware_interface/actuator.hpp"
+#include "plato_hardware_interface/plato_layout.hpp"
 #include "plato_hardware_interface/utils/actuator_config_loader.hpp"
 #include "plato_utils/watchdog.hpp"
 
@@ -17,10 +18,6 @@ namespace
 {
 using namespace std::chrono_literals;
 
-constexpr size_t kNumActuators = 8;
-constexpr size_t kThumbRollIndex = 0;
-constexpr size_t kThumbYawIndex = 1;
-constexpr size_t kThumbMcpIndex = 2;
 constexpr auto kWatchdogTimeout = 50ms;
 constexpr auto kWarmupDuration = 2s;
 constexpr auto kTestDuration = 7s;
@@ -151,7 +148,7 @@ private:
     // Send harmless commands, skip on pacing busy.
     for (size_t i = 0; i < actuators_.size(); ++i) {
       TPCANMsg frame{};
-      if (i == kThumbRollIndex || i == kThumbYawIndex) {
+      if (plato_hand::layout::is_thumb_servo(i)) {
         frame = actuators_[i].set_servo_position(0.0f, 0U).frame;
       } else {
         frame = actuators_[i].set_joint_torque(0.0f).frame;
@@ -265,7 +262,7 @@ private:
   can_hardware_common::CanBusManager can_bus_manager_;
   std::vector<plato_actuator::Actuator> actuators_;
   std::vector<std::pair<uint32_t, size_t>> rx_id_to_index_;
-  std::array<plato_utils::Watchdog, kNumActuators> rx_watchdogs_{
+  std::array<plato_utils::Watchdog, plato_hand::layout::kNumActuators> rx_watchdogs_{
     plato_utils::Watchdog(kWatchdogTimeout), plato_utils::Watchdog(kWatchdogTimeout),
     plato_utils::Watchdog(kWatchdogTimeout), plato_utils::Watchdog(kWatchdogTimeout),
     plato_utils::Watchdog(kWatchdogTimeout), plato_utils::Watchdog(kWatchdogTimeout),

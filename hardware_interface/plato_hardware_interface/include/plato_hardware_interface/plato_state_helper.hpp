@@ -1,5 +1,5 @@
-#ifndef PLATO_HARDWARE_INTERFACE__PLATO_MODEL_HPP_
-#define PLATO_HARDWARE_INTERFACE__PLATO_MODEL_HPP_
+#ifndef PLATO_HARDWARE_INTERFACE__PLATO_STATE_HELPER_HPP_
+#define PLATO_HARDWARE_INTERFACE__PLATO_STATE_HELPER_HPP_
 
 #include <vector>
 
@@ -11,10 +11,10 @@
 namespace plato_hand
 {
 
-class PlatoModel
+class PlatoStateHelper
 {
 public:
-  explicit PlatoModel(FiveBarLinkage::Transmission & transmission)
+  explicit PlatoStateHelper(FiveBarLinkage::Transmission & transmission)
   : transmission_(transmission)
   {
   }
@@ -43,4 +43,4 @@ private:
 
 }  // namespace plato_hand
 
-#endif  // PLATO_HARDWARE_INTERFACE__PLATO_MODEL_HPP_
+#endif  // PLATO_HARDWARE_INTERFACE__PLATO_STATE_HELPER_HPP_

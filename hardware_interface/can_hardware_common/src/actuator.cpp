@@ -37,7 +37,7 @@ actuator::TxCommand Actuator::set_torque_command(float joint_torque)
   return protocol_->make_torque_command(clamp_joint_torque(joint_torque));
 }
 
-bool Actuator::process_rx_frame(const RxFrame & frame)
+bool Actuator::process_rx_frame(const TPCANMsg & frame)
 {
   if (frame.ID != config_.core.can_rx_id) {
     return false;

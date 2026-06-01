@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 
-#include "plato_hardware_interface/can_protocol.hpp"
+#include "plato_hardware_interface/dynamixel_can_protocol.hpp"
 
 namespace plato_actuator
 {
@@ -30,12 +32,17 @@ void validate_direction(const StaticConfig & config)
     throw std::invalid_argument("Plato actuator direction must be +1 or -1");
   }
 }
+
+uint16_t clamp_u16(uint32_t value)
+{
+  return static_cast<uint16_t>(std::min<uint32_t>(value, std::numeric_limits<uint16_t>::max()));
+}
 }  // namespace
 
 Actuator::Actuator(const Config & config)
 : static_config_(config.static_config),
   position_offset_(config.position_offset),
-  protocol_(std::make_unique<CANProtocol>(make_core_config(config)))
+  protocol_(std::make_unique<Gim3505Protocol>(make_core_config(config)))
 {
   validate_direction(static_config_);
 }
@@ -46,11 +53,17 @@ Actuator::~Actuator() = default;
 
 actuator::TxCommand Actuator::enable_motor()
 {
+  if (uses_dynamixel_bridge()) {
+    return make_dynamixel_lifecycle_command_(true);
+  }
   return protocol_->make_enable_motor_command();
 }
 
 actuator::TxCommand Actuator::disable_motor()
 {
+  if (uses_dynamixel_bridge()) {
+    return make_dynamixel_lifecycle_command_(false);
+  }
   return protocol_->make_disable_motor_command();
 }
 
@@ -98,6 +111,15 @@ actuator::TxCommand Actuator::set_servo_position(float joint_position, uint32_t 
       static_config_.limits.position_limit_max);
   }
 
+  if (uses_dynamixel_bridge()) {
+    return actuator::TxCommand{
+      plato_hardware_interface::dynamixel_can_protocol::make_position_command(
+        get_tx_id(),
+        static_config_.dynamixel_servo_id,
+        joint_position,
+        clamp_u16(current_milliamps))};
+  }
+
   return protocol_->make_servo_position_command(joint_position, current_milliamps);
 }
 
@@ -109,6 +131,21 @@ actuator::TxCommand Actuator::set_servo_hold(float joint_position)
 actuator::TxCommand Actuator::set_servo_idle(float joint_position)
 {
   return set_servo_position(joint_position, 0);
+}
+
+actuator::TxCommand Actuator::set_actuator_command(
+  float position,
+  float effort,
+  float stiffness,
+  double servo_stiffness_scale)
+{
+  if (uses_dynamixel_bridge()) {
+    return set_servo_position(
+      position,
+      resolve_servo_current_command_(stiffness, servo_stiffness_scale));
+  }
+
+  return set_joint_torque(effort);
 }
 
 bool Actuator::set_current_position_as_zero()
@@ -123,18 +160,77 @@ bool Actuator::set_current_position_as_zero()
   return true;
 }
 
-void Actuator::process_message(const TPCANMsg & msg)
+bool Actuator::process_rx_frame(const TPCANMsg & msg)
 {
   if (msg.ID != get_rx_id()) {
-    return;
+    return false;
+  }
+
+  if (uses_dynamixel_bridge()) {
+    return process_dynamixel_bridge_message_(msg);
   }
 
   const auto decoded = protocol_->decode(msg);
   if (!decoded) {
-    return;
+    return false;
   }
 
   apply_decoded_feedback_(*decoded);
+  return true;
+}
+
+actuator::TxCommand Actuator::make_dynamixel_lifecycle_command_(bool enable) const
+{
+  const auto command = enable ?
+    plato_hardware_interface::dynamixel_can_protocol::make_enable_command(
+    get_tx_id(), static_config_.dynamixel_servo_id) :
+    plato_hardware_interface::dynamixel_can_protocol::make_disable_command(
+    get_tx_id(), static_config_.dynamixel_servo_id);
+  return actuator::TxCommand{command};
+}
+
+bool Actuator::process_dynamixel_bridge_message_(const TPCANMsg & msg)
+{
+  const auto response = plato_hardware_interface::dynamixel_can_protocol::decode_response(msg);
+  if (!response || response->servo_id != static_config_.dynamixel_servo_id) {
+    return false;
+  }
+
+  const bool success =
+    plato_hardware_interface::dynamixel_can_protocol::is_success(response->result);
+  if (response->command == plato_hardware_interface::dynamixel_can_protocol::Command::kEnable) {
+    motor_enabled_ = success;
+  } else if (
+    response->command == plato_hardware_interface::dynamixel_can_protocol::Command::kDisable &&
+    success)
+  {
+    motor_enabled_ = false;
+  }
+
+  return true;
+}
+
+uint32_t Actuator::resolve_servo_current_command_(
+  float stiffness,
+  double servo_stiffness_scale) const
+{
+  double current_milliamps = std::numeric_limits<double>::quiet_NaN();
+  if (std::isfinite(stiffness) && servo_stiffness_scale > 0.0) {
+    current_milliamps = std::clamp(
+      std::abs(static_cast<double>(stiffness)) * servo_stiffness_scale,
+      0.0,
+      kMaxDerivedServoCurrentMilliamps);
+  }
+
+  if (!std::isfinite(current_milliamps)) {
+    current_milliamps = static_cast<double>(static_config_.servo_current_milliamps);
+  }
+
+  current_milliamps = std::clamp(
+    current_milliamps,
+    0.0,
+    static_cast<double>(std::numeric_limits<uint32_t>::max()));
+  return static_cast<uint32_t>(std::llround(current_milliamps));
 }
 
 float Actuator::clamp_torque_near_bounds_(float joint_torque) const

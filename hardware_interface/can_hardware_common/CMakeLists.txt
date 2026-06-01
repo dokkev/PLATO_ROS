@@ -14,6 +14,7 @@ find_path(PCAN_INCLUDE_DIR NAMES PCANBasic.h PATHS /usr/local/include /usr/inclu
 add_library(${PROJECT_NAME} SHARED
   src/actuator.cpp
   src/can_bus.cpp
+  src/can_frame_executor.cpp
   src/pcan_interface.cpp
 )
 

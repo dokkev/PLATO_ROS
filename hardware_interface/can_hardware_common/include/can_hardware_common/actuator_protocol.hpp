@@ -3,6 +3,8 @@
 
 #include <optional>
 
+#include <PCANBasic.h>
+
 #include "can_hardware_common/actuator_types.hpp"
 
 namespace can_hardware_common
@@ -27,7 +29,7 @@ public:
   virtual std::optional<actuator::TxCommand> make_impedance_command(
     const ActuatorTarget & joint_target) = 0;
   virtual actuator::TxCommand make_torque_command(float joint_torque) = 0;
-  virtual std::optional<DecodedFeedback> decode(const RxFrame & frame) = 0;
+  virtual std::optional<DecodedFeedback> decode(const TPCANMsg & frame) = 0;
 };
 
 }  // namespace can_hardware_common

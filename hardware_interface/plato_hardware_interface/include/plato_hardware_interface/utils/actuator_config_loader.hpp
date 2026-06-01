@@ -6,11 +6,13 @@
 #include <vector>
 
 #include "plato_hardware_interface/actuator.hpp"
+#include "plato_hardware_interface/plato_layout.hpp"
 
 namespace plato_actuator
 {
 
-const std::array<const char *, 8> & expected_plato_actuator_names();
+const std::array<const char *, plato_hand::layout::kNumActuators> &
+expected_plato_actuator_names();
 
 std::vector<Config> load_plato_actuator_configs();
 std::vector<Config> load_plato_actuator_configs(const std::string & yaml_path);

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "can_hardware_common/can_frame_types.hpp"
+#include <PCANBasic.h>
 
 namespace can_hardware_common
 {
@@ -65,7 +65,7 @@ struct Config
 
 struct TxCommand
 {
-  can_hardware_common::TxFrame frame{};
+  TPCANMsg frame{};
 };
 
 }  // namespace actuator

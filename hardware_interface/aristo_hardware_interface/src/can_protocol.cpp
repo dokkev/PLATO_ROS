@@ -10,7 +10,7 @@ namespace
 {
 constexpr uint8_t kCmdReadStates = 0xF1;
 
-bool is_state_frame(const can_hardware_common::RxFrame & frame)
+bool is_state_frame(const TPCANMsg & frame)
 {
   return frame.LEN == 8 || (frame.LEN >= 7 && frame.DATA[0] == kCmdReadStates);
 }
@@ -54,7 +54,7 @@ actuator::TxCommand CANProtocol::make_torque_command(float joint_torque)
 }
 
 std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
-  const can_hardware_common::RxFrame & frame)
+  const TPCANMsg & frame)
 {
   if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || !is_state_frame(frame)) {
     return std::nullopt;

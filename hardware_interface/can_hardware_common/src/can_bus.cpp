@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <exception>
+#include <thread>
 
 namespace can_hardware_common
 {
@@ -29,8 +30,8 @@ void CanBus::set_tx_gap(std::chrono::microseconds tx_gap)
 CanBus::RxPollResult CanBus::poll_rx()
 {
   RxPollResult result;
-  RxFrame rx_frame{};
-  const auto dispatch_rx = [this](const RxFrame & frame) {
+  TPCANMsg rx_frame{};
+  const auto dispatch_rx = [this](const TPCANMsg & frame) {
       for (auto & observer : rx_observers_) {
         try {
           observer(frame);
@@ -58,8 +59,32 @@ CanBus::RxPollResult CanBus::poll_rx()
   return result;
 }
 
+CanBus::RxPollResult CanBus::poll_rx_for(
+  std::chrono::microseconds budget,
+  std::chrono::microseconds idle_sleep)
+{
+  const auto deadline = std::chrono::steady_clock::now() + budget;
+
+  RxPollResult result;
+  while (std::chrono::steady_clock::now() < deadline) {
+    const auto rx = poll_rx();
+    result.processed_frames += rx.processed_frames;
+    result.status = rx.status;
+
+    if (!is_nonfatal_read_status(rx.status)) {
+      return result;
+    }
+
+    if (rx.processed_frames == 0U && idle_sleep.count() > 0) {
+      std::this_thread::sleep_for(idle_sleep);
+    }
+  }
+
+  return result;
+}
+
 CanBus::RxPollResult CanBus::read_frames_for(
-  std::vector<RxFrame> & rx_frames,
+  std::vector<TPCANMsg> & rx_frames,
   std::size_t max_frames,
   std::chrono::microseconds budget)
 {
@@ -67,7 +92,7 @@ CanBus::RxPollResult CanBus::read_frames_for(
 }
 
 CanBus::RxPollResult CanBus::read_frames_until(
-  std::vector<RxFrame> & rx_frames,
+  std::vector<TPCANMsg> & rx_frames,
   std::size_t max_frames,
   std::chrono::steady_clock::time_point deadline)
 {
@@ -86,7 +111,7 @@ CanBus::RxPollResult CanBus::read_frames_until(
       return result;
     }
 
-    RxFrame rx_frame{};
+    TPCANMsg rx_frame{};
     const auto timeout = std::chrono::duration_cast<std::chrono::microseconds>(deadline - now);
     const TPCANStatus status = channel_.read_with_timeout(rx_frame, timeout);
     if (status != PCAN_ERROR_OK) {
@@ -112,7 +137,7 @@ void CanBus::clear_rx_observers()
   rx_observers_.clear();
 }
 
-TPCANStatus CanBus::send_tx_frame(const TxFrame & tx_frame)
+TPCANStatus CanBus::send_tx_frame(const TPCANMsg & tx_frame)
 {
   std::lock_guard<std::mutex> lock(tx_mutex_);
 
@@ -132,6 +157,29 @@ TPCANStatus CanBus::send_tx_frame(const TxFrame & tx_frame)
   return status;
 }
 
+CanBus::BlockingTxResult CanBus::send_tx_frame_blocking(
+  const TPCANMsg & tx_frame,
+  std::chrono::microseconds timeout)
+{
+  BlockingTxResult result;
+
+  const auto now = std::chrono::steady_clock::now();
+  const auto next_send = next_tx_time();
+  if (next_send > now) {
+    result.required_wait =
+      std::chrono::duration_cast<std::chrono::microseconds>(next_send - now);
+    if (result.required_wait > timeout) {
+      result.status = PCAN_ERROR_QXMTFULL;
+      result.timed_out = true;
+      return result;
+    }
+    std::this_thread::sleep_until(next_send);
+  }
+
+  result.status = send_tx_frame(tx_frame);
+  return result;
+}
+
 std::chrono::steady_clock::time_point CanBus::next_tx_time() const
 {
   std::lock_guard<std::mutex> lock(tx_mutex_);
@@ -139,6 +187,11 @@ std::chrono::steady_clock::time_point CanBus::next_tx_time() const
     return {};
   }
   return last_tx_time_ + tx_gap_;
+}
+
+bool CanBus::is_nonfatal_read_status(TPCANStatus status)
+{
+  return status == PCAN_ERROR_OK || status == PCAN_ERROR_QRCVEMPTY;
 }
 
 CanBus::BusDiagnostics CanBus::get_diagnostics()

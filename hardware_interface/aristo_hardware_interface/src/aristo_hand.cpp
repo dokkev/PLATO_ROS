@@ -229,9 +229,7 @@ void Hand::refresh_state_snapshot_()
   if (state_snapshot_.actuator_states.size() != kNumActuators) {
     state_snapshot_.resize(kNumActuators, kNumActuators);
   }
-  std::copy_n(joint_states_.position_data(), kNumActuators, state_snapshot_.joint_position.begin());
-  std::copy_n(joint_states_.velocity_data(), kNumActuators, state_snapshot_.joint_velocity.begin());
-  std::copy_n(joint_states_.effort_data(), kNumActuators, state_snapshot_.joint_effort.begin());
+  can_hardware_common::RobotIO::copy_joint_state_to_snapshot(joint_states_, state_snapshot_);
   model_.copy_feedback_snapshot(actuators_, state_snapshot_);
 }
 

@@ -3,6 +3,8 @@
 
 #include <optional>
 
+#include <PCANBasic.h>
+
 #include "aristo_hardware_interface/mit_can_protocol.hpp"
 #include "can_hardware_common/actuator_protocol.hpp"
 
@@ -18,7 +20,7 @@ public:
     const can_hardware_common::ActuatorTarget & joint_target) override;
   actuator::TxCommand make_torque_command(float joint_torque) override;
   std::optional<can_hardware_common::DecodedFeedback> decode(
-    const can_hardware_common::RxFrame & frame) override;
+    const TPCANMsg & frame) override;
 
   actuator::TxCommand make_enable_motor_command();
   actuator::TxCommand make_disable_motor_command();

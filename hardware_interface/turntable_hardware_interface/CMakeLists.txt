@@ -10,6 +10,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   dynamixel_sdk
   rclcpp
   std_msgs
+  std_srvs
 )
 
 find_package(ament_cmake REQUIRED)
@@ -46,6 +47,7 @@ ament_target_dependencies(turntable_dynamixel_node
   ament_index_cpp
   rclcpp
   std_msgs
+  std_srvs
 )
 target_link_libraries(turntable_dynamixel_node
   ${PROJECT_NAME}

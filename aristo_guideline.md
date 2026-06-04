@@ -80,12 +80,10 @@ Input topic:
 /plato2/joint_impedance_controller/commands_float8array_HY
 ```
 
-
-
 ## Notes
 
-- Do not launch Naritouch separately for these stacks; the trajectory/grasp
-  launch brings the tactile launch in where needed.
+- Parallel grasp launches Naritouch and the object state estimator. Joint teleop
+  and the joint trajectory launch do not launch tactile sensing.
 - Do not use the old `grasp_node` or `/naritouch_grasp_demo/start_grasp`
   commands from the old branch.
 - To verify hardware:

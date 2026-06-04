@@ -2,10 +2,11 @@ dynamixel:
   device_name: /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT9BTGF3-if00-port0
   servo_id: 101
   baudrate: 1000000
-  set_position_control_mode_on_start: true
+  set_operating_mode_on_start: true
+  operating_mode: 4
   enable_torque_on_start: true
 
 min_jerk:
-  duration_sec: 1.0
+  duration_sec: 10.0
   command_rate_hz: 100.0
   completion_tolerance_rad: 0.01

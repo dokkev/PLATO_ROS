@@ -7,6 +7,7 @@
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "yaml-cpp/yaml.h"
 
 #include "turntable_hardware_interface/dynamixel.hpp"
@@ -18,7 +19,9 @@ namespace
 {
 
 constexpr double kTwoPi = 6.28318530717958647692;
-constexpr uint8_t kPositionControlMode = 3;
+constexpr uint8_t kExtendedPositionControlMode = 4;
+constexpr double kQuarterTurnRad = 1.57079632679489661923;
+constexpr double kHalfTurnRad = 3.14159265358979323846;
 
 template<typename T>
 T yaml_value(const YAML::Node & node, const std::string & key, const T & default_value)
@@ -50,19 +53,21 @@ public:
       declare_parameter<std::string>("desired_position_topic", "~/desired_position");
 
     load_config_(config_file);
+    RCLCPP_INFO(get_logger(), "Loaded turntable config: %s", config_file.c_str());
 
     dynamixel_ = std::make_unique<Dynamixel>(dynamixel_config_);
     if (!dynamixel_->open()) {
       throw std::runtime_error(dynamixel_->last_error());
     }
-    if (set_position_control_mode_on_start_) {
+    if (set_operating_mode_on_start_) {
       try {
         dynamixel_->set_torque_enabled(false);
-        dynamixel_->set_operating_mode(kPositionControlMode);
+        dynamixel_->set_operating_mode(startup_operating_mode_);
       } catch (const std::exception & ex) {
         RCLCPP_ERROR(
           get_logger(),
-          "Failed to set turntable Dynamixel position-control mode: %s",
+          "Failed to set turntable Dynamixel operating mode %u: %s",
+          startup_operating_mode_,
           ex.what());
       }
     }
@@ -83,6 +88,42 @@ public:
       desired_position_topic_,
       10,
       std::bind(&TurntableDynamixelNode::desired_position_callback_, this, std::placeholders::_1));
+    turn_90_cw_service_ = create_service<std_srvs::srv::Trigger>(
+      "~/turn_90_cw",
+      std::bind(
+        &TurntableDynamixelNode::relative_turn_callback_,
+        this,
+        -kQuarterTurnRad,
+        "90 deg CW",
+        std::placeholders::_1,
+        std::placeholders::_2));
+    turn_90_ccw_service_ = create_service<std_srvs::srv::Trigger>(
+      "~/turn_90_ccw",
+      std::bind(
+        &TurntableDynamixelNode::relative_turn_callback_,
+        this,
+        kQuarterTurnRad,
+        "90 deg CCW",
+        std::placeholders::_1,
+        std::placeholders::_2));
+    turn_180_cw_service_ = create_service<std_srvs::srv::Trigger>(
+      "~/turn_180_cw",
+      std::bind(
+        &TurntableDynamixelNode::relative_turn_callback_,
+        this,
+        -kHalfTurnRad,
+        "180 deg CW",
+        std::placeholders::_1,
+        std::placeholders::_2));
+    turn_180_ccw_service_ = create_service<std_srvs::srv::Trigger>(
+      "~/turn_180_ccw",
+      std::bind(
+        &TurntableDynamixelNode::relative_turn_callback_,
+        this,
+        kHalfTurnRad,
+        "180 deg CCW",
+        std::placeholders::_1,
+        std::placeholders::_2));
 
     const auto period = std::chrono::duration<double>(1.0 / command_rate_hz_);
     control_timer_ = create_wall_timer(
@@ -140,11 +181,19 @@ private:
       velocity_unit_rad_per_sec_);
     enable_torque_on_start_ =
       yaml_value<bool>(dynamixel, "enable_torque_on_start", enable_torque_on_start_);
-    set_position_control_mode_on_start_ =
+    set_operating_mode_on_start_ =
       yaml_value<bool>(
       dynamixel,
-      "set_position_control_mode_on_start",
-      set_position_control_mode_on_start_);
+      "set_operating_mode_on_start",
+      yaml_value<bool>(
+        dynamixel,
+        "set_position_control_mode_on_start",
+        set_operating_mode_on_start_));
+    startup_operating_mode_ =
+      static_cast<uint8_t>(yaml_value<int>(
+        dynamixel,
+        "operating_mode",
+        startup_operating_mode_));
 
     min_jerk_duration_sec_ =
       yaml_value<double>(min_jerk, "duration_sec", min_jerk_duration_sec_);
@@ -181,30 +230,33 @@ private:
 
   void desired_position_callback_(const std_msgs::msg::Float64::SharedPtr msg)
   {
-    if (traj_active_) {
-      RCLCPP_WARN_THROTTLE(
+    std::string error;
+    if (!start_absolute_trajectory_(msg->data, &error)) {
+      RCLCPP_ERROR_THROTTLE(
         get_logger(),
         *get_clock(),
         1000,
-        "Ignoring desired position %.3f rad while turntable trajectory is active.",
-        msg->data);
-      return;
+        "%s",
+        error.c_str());
+    }
+  }
+
+  bool start_absolute_trajectory_(double target_position_rad, std::string * error)
+  {
+    if (traj_active_) {
+      set_error_(error, "Ignoring turntable command while trajectory is active.");
+      return false;
     }
 
     double start_position_rad = 0.0;
     try {
       start_position_rad = read_position_rad_();
     } catch (const std::exception & ex) {
-      RCLCPP_ERROR_THROTTLE(
-        get_logger(),
-        *get_clock(),
-        1000,
-        "Cannot start turntable trajectory: %s",
-        ex.what());
-      return;
+      set_error_(error, std::string("Cannot start turntable trajectory: ") + ex.what());
+      return false;
     }
 
-    target_position_rad_ = msg->data;
+    target_position_rad_ = target_position_rad;
     trajectory_.reset(start_position_rad, target_position_rad_, min_jerk_duration_sec_);
     traj_start_time_ = now();
     traj_active_ = true;
@@ -215,6 +267,42 @@ private:
       start_position_rad,
       target_position_rad_,
       min_jerk_duration_sec_);
+    return true;
+  }
+
+  bool start_relative_trajectory_(double delta_rad, std::string * error)
+  {
+    if (traj_active_) {
+      set_error_(error, "Ignoring turntable service command while trajectory is active.");
+      return false;
+    }
+
+    double start_position_rad = 0.0;
+    try {
+      start_position_rad = read_position_rad_();
+    } catch (const std::exception & ex) {
+      set_error_(error, std::string("Cannot start turntable relative trajectory: ") + ex.what());
+      return false;
+    }
+
+    return start_absolute_trajectory_(start_position_rad + delta_rad, error);
+  }
+
+  void relative_turn_callback_(
+    double delta_rad,
+    const char * label,
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    (void)request;
+
+    std::string error;
+    response->success = start_relative_trajectory_(delta_rad, &error);
+    if (response->success) {
+      response->message = std::string("Started turntable ") + label + " trajectory.";
+    } else {
+      response->message = error;
+    }
   }
 
   void control_loop_()
@@ -318,6 +406,13 @@ private:
     return raw_velocity * velocity_unit_rad_per_sec_;
   }
 
+  static void set_error_(std::string * error, const std::string & message)
+  {
+    if (error != nullptr) {
+      *error = message;
+    }
+  }
+
   Dynamixel::Config dynamixel_config_;
   std::unique_ptr<Dynamixel> dynamixel_;
   MinJerkTraj trajectory_;
@@ -325,6 +420,10 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr position_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr velocity_pub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr desired_position_sub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr turn_90_cw_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr turn_90_ccw_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr turn_180_cw_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr turn_180_ccw_service_;
   rclcpp::TimerBase::SharedPtr control_timer_;
 
   std::string position_topic_;
@@ -339,7 +438,8 @@ private:
   double target_position_rad_ = 0.0;
   rclcpp::Time traj_start_time_;
   bool traj_active_ = false;
-  bool set_position_control_mode_on_start_ = true;
+  bool set_operating_mode_on_start_ = true;
+  uint8_t startup_operating_mode_ = kExtendedPositionControlMode;
   bool enable_torque_on_start_ = true;
 };
 

@@ -4,6 +4,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -12,6 +13,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     jpc_pkg_dir = get_package_share_directory('joint_impedance_controller')
     estimator_pkg_dir = get_package_share_directory('plato_state_estimator')
+    tactile_pkg_dir = get_package_share_directory('tactile_sensing')
 
     controller_params_default = os.path.join(jpc_pkg_dir, 'config', 'impedance_preset.yaml')
     estimator_params_default = os.path.join(estimator_pkg_dir, 'config', 'object_state_estimator.yaml')
@@ -34,8 +36,21 @@ def generate_launch_description():
         ),
         launch_arguments={
             'controller_params_file': LaunchConfiguration('controller_params_file'),
-            'estimator_params_file': LaunchConfiguration('estimator_params_file'),
         }.items(),
+    )
+
+    tactile_launch = IncludeLaunchDescription(
+        FrontendLaunchDescriptionSource(
+            os.path.join(tactile_pkg_dir, 'launch', 'two_naritouchs.xml')
+        )
+    )
+
+    object_state_estimator_node = Node(
+        package='plato_state_estimator',
+        executable='object_state_estimator_node',
+        name='object_state_estimator',
+        output='screen',
+        parameters=[LaunchConfiguration('estimator_params_file')],
     )
 
     parallel_grasp_node = Node(
@@ -48,6 +63,8 @@ def generate_launch_description():
     return LaunchDescription([
         controller_params_arg,
         estimator_params_arg,
+        tactile_launch,
+        object_state_estimator_node,
         joint_impedance_trajectory_controller_launch,
         parallel_grasp_node,
     ])

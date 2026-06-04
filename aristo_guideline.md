@@ -31,27 +31,8 @@ ros2 launch aristo_bringup aristo_hardware.launch.py zeroing:=true gui:=false
 Use `zeroing:=true` only when the fingers are physically in the zero pose. No
 recompile is needed for zeroing.
 
+
 ## 2. Choose One Control Stack
-
-### Joint Teleop / HY Float8 Input
-
-Terminal 2:
-
-```bash
-ros2 launch joint_impedance_controller joint_impedance_trajectory_controller.launch.py
-```
-
-Terminal 3:
-
-```bash
-ros2 launch maestro_teleop joint_teleop.launch.py
-```
-
-Input topic:
-
-```text
-/plato2/joint_impedance_controller/commands_float8array_HY
-```
 
 ### Parallel Grasp
 
@@ -78,6 +59,28 @@ Direct grasp command topic:
 ```text
 /plato2/parallel_grasp_controller/commands
 ```
+
+### Joint Teleop / HY Float8 Input
+
+Terminal 2:
+
+```bash
+ros2 launch joint_impedance_controller joint_impedance_trajectory_controller.launch.py
+```
+
+Terminal 3:
+
+```bash
+ros2 launch maestro_teleop joint_teleop.launch.py
+```
+
+Input topic:
+
+```text
+/plato2/joint_impedance_controller/commands_float8array_HY
+```
+
+
 
 ## Notes
 

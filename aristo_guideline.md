@@ -31,27 +31,8 @@ ros2 launch aristo_bringup aristo_hardware.launch.py zeroing:=true gui:=false
 Use `zeroing:=true` only when the fingers are physically in the zero pose. No
 recompile is needed for zeroing.
 
+
 ## 2. Choose One Control Stack
-
-### Joint Teleop / HY Float8 Input
-
-Terminal 2:
-
-```bash
-ros2 launch joint_impedance_controller joint_impedance_trajectory_controller.launch.py
-```
-
-Terminal 3:
-
-```bash
-ros2 launch maestro_teleop joint_teleop.launch.py
-```
-
-Input topic:
-
-```text
-/plato2/joint_impedance_controller/commands_float8array_HY
-```
 
 ### Parallel Grasp
 
@@ -79,10 +60,30 @@ Direct grasp command topic:
 /plato2/parallel_grasp_controller/commands
 ```
 
+### Joint Teleop / HY Float8 Input
+
+Terminal 2:
+
+```bash
+ros2 launch joint_impedance_controller joint_impedance_trajectory_controller.launch.py
+```
+
+Terminal 3:
+
+```bash
+ros2 launch maestro_teleop joint_teleop.launch.py
+```
+
+Input topic:
+
+```text
+/plato2/joint_impedance_controller/commands_float8array_HY
+```
+
 ## Notes
 
-- Do not launch Naritouch separately for these stacks; the trajectory/grasp
-  launch brings the tactile launch in where needed.
+- Parallel grasp launches Naritouch and the object state estimator. Joint teleop
+  and the joint trajectory launch do not launch tactile sensing.
 - Do not use the old `grasp_node` or `/naritouch_grasp_demo/start_grasp`
   commands from the old branch.
 - To verify hardware:

@@ -17,6 +17,9 @@
   <depend>sensor_msgs</depend>
   <depend>plato_interfaces</depend>
   <depend>plato_utils</depend>
+  <exec_depend>joint_impedance_controller</exec_depend>
+  <exec_depend>plato_state_estimator</exec_depend>
+  <exec_depend>tactile_sensing</exec_depend>
   <build_depend>eigen3_cmake_module</build_depend>
   <build_export_depend>eigen3_cmake_module</build_export_depend>
   <exec_depend>eigen3_cmake_module</exec_depend>

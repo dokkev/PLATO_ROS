@@ -32,9 +32,7 @@
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
-  <exec_depend>plato_state_estimator</exec_depend>
   <exec_depend>plato_teleop</exec_depend>
-  <exec_depend>tactile_sensing</exec_depend>
 
   <!-- Test dependencies (if BUILD_TESTING is enabled) -->
   <test_depend>ament_cmake_gmock</test_depend>

@@ -16,12 +16,6 @@ broadcaster, joint impedance controller, TF helpers, and RViz:
 ros2 launch aristo_bringup aristo_hardware.launch.py
 ```
 
-Headless:
-
-```bash
-ros2 launch aristo_bringup aristo_hardware.launch.py gui:=false
-```
-
 Zero fingers during hardware activation:
 
 ```bash

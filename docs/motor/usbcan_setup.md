@@ -1,167 +1,155 @@
-# Setting up your USB-CAN Interface
+# USB-CAN Setup
 
-Reference Video: [Getting started with SocketCAN (can-utils)](https://www.youtube.com/watch?v=my-mBFQCIZ0&ab_channel=TheEVEngineer) 
+This runbook configures a USB-CAN adapter for SocketCAN on Linux. Use it before
+launching hardware interfaces that expect `can0`.
 
-Install  `can-utils`
+Reference video: [Getting started with SocketCAN (can-utils)](https://www.youtube.com/watch?v=my-mBFQCIZ0&ab_channel=TheEVEngineer)
 
-```sudo apt install can-utils```
+## Install Tools
 
-Setting up your USB-CAN connection will vary depending on what firmware you have on your USB-CAN converter.  You can update your firmware from https://canable.io/updater/. I used slcan firmware for my USB-CAN converter.
-
-
-## Option 1: Slcan (Recommended)
-connect USB-CAN adaptor to PC
-
-Run the following command:
+```bash
+sudo apt install can-utils
 ```
+
+## Option 1: SLCAN Firmware
+
+SLCAN is the common setup for CANable-style adapters that appear as
+`/dev/ttyACM*`.
+
+Connect the USB-CAN adapter and find the device:
+
+```bash
 ls /dev/ttyACM*
 ```
 
-==> The MKS CANable adapter appears as /dev/ttyACMx (an arbitrary number x depending on the number of USB devices connected to the PC)
+### Optional Static Device Name
 
----
-#### **NOTE**: Assign a static name by assigning a symlink (Optional, but recommended)
-ttyACM tends to be dynamically allocated whenever it creates CAN driver is ran by slacand command. If you unplug and re-plug in the USB-CAN module, the /dev/ttyACMx value will be changed while x is an arbitrary number
+`ttyACM*` numbers can change after unplug/replug. A udev symlink makes launch
+and shell commands repeatable.
 
-To avoid this inconvenience, create a symlink in /dev using /etc/udev/rules.  Firstly, check USB devices connected to your system:
+Find the vendor and product IDs:
 
-Run `lsusb` to list all USB devices connected to your system. You will see a list of USB devices connected to your system. Find the USB-CAN device and note the Vendor ID and Product ID. It will return somethi    ng like this:
-    
+```bash
+lsusb
 ```
-==> Bus 001 Device 042: ID 16d0:117e MCS CANable2 b158aa7 GitHub - normaldotcom/canable2-fw
 
-```
-`16d0` is your ATTRS{idVendor}, and `117e` is your ATTRS{idProduct}
+Example output:
 
-Run the following command to create a new rule file (use 99 ~ 90 to prevent override):
+```text
+Bus 001 Device 042: ID 16d0:117e MCS CANable2 b158aa7 GitHub - normaldotcom/canable2-fw
 ```
+
+Create a udev rule:
+
+```bash
 sudo nano /etc/udev/rules.d/99-usb-serial.rules
 ```
-Within the file, add the following line (replace `16d0` and `117e` with your own Vendor ID and Product ID):
 
-```
+Replace the IDs with the values from `lsusb`:
+
+```text
 ACTION=="add", SUBSYSTEM=="tty", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="117e", SYMLINK+="ttycan"
 ```
-and ctrl + x  and y to save and exit (for me, SYMLINK name had to be all lowercase in order to work).
 
- 
+Reload rules, then unplug and reconnect the adapter:
 
-reload the udev/rules.d  by: 
-```
+```bash
 sudo udevadm control --reload-rules
-```
-Unplug and plug back in the USB-CAN module just in case, and run:
-
-```
 ls -l /dev/ttycan
 ```
 
-it should return something like this:
+The symlink should point to the current `/dev/ttyACM*` device.
+
+### Bring Up can0
+
+For a udev symlink:
+
+```bash
+sudo slcand -o -c -s8 /dev/ttycan can0
 ```
-==> lrwxrwxrwx 1 root root 7 Sep 12 14:01 /dev/ttycan -> ttyACM5
+
+Without a symlink:
+
+```bash
+sudo slcand -o -c -s8 /dev/ttyACM0 can0
 ```
-You can see that `ttycan` is linked to `ttyACMx`
 
-Lastly, compare `udevadm info -a /dev/ttyACMx` and `udevadm info -a /dev/ttycan` to make sure they output the same device info.
+`-s8` selects 1 Mbps. On some real-time kernels the bitrate must be set in
+`slcand`; setting bitrate later with `ip link` may fail with
+`RTNETLINK answers: Operation not supported`.
 
----
-#### Connect CAN driver and Setup CAN chaneel `can-utils`
+Bring the interface up:
 
-Run:
-
-```
-sudo slcand -o -c -s8 /dev/ttycan can0 (If you had set-up symlink in udev.rules)
-```
-or if you skipped setting up the symlink, run:
-```
-sudo slcand -o -c -s8 /dev/ttyACMx can0
-``` 
-
--s8 sets the bitrate 1 Mbps. On a normal kernel, bitrate can be set later, however on the RT kernel this must be set here, as you will get a `RTNETLINK answers: Operation not supported` error. See [Getting Started - CANable](https://canable.io/getting-started.html#socketcan-linux) to see the various bitrates.
-
-then
-
-```
+```bash
 ip link ls
+sudo ip link set up can0 type can
+sudo ip link set can0 txqueuelen 1000
+ip -details link show can0
 ```
 
-You should see: 
-```
-==> can0: <NOARP> mtu 16 qdisc noop state DOWN mode DEFAULT group default qlen 10
-```
-Note that can0 is down. To set it to `UP` state, run:
+`state UNKNOWN` can be normal for CAN interfaces.
 
-```
-sudo ip link set up can0 type can 
-```
+## Option 2: Candlelight Firmware
 
-Confirm by:
+With Candlelight firmware, `can0` should appear directly in `ip link`.
 
-```
-ip link ls
-```
-You should see:
-```
-==> <NOARP,UP,LOWER_UP> mtu 16 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
-    link/can
-```
-Somethimes, it's shown as `state UNKNOWN` instead of `state UP`. This is normal.
-
-To set buffer:
-
-```
-ip link set can0 txqueuelen 1000
+```bash
+sudo ip link set can0 type can bitrate 1000000
+sudo ip link set can0 txqueuelen 1000
+sudo ip link set can0 up
+ip -details link show can0
 ```
 
-#### Testing SocketCAN in Terminal
-After you set the CAN state to `UP`, run:
+For isolated adapter debugging, enable loopback while the interface is down:
 
+```bash
+sudo ip link set can0 down
+sudo ip link set can0 type can loopback on
+sudo ip link set can0 up
 ```
+
+Disable loopback the same way:
+
+```bash
+sudo ip link set can0 down
+sudo ip link set can0 type can loopback off
+sudo ip link set can0 up
+```
+
+## Test The Bus
+
+Terminal 1:
+
+```bash
 candump can0
 ```
-And open another terminal and run:
 
-```
+Terminal 2:
+
+```bash
 cansend can0 123#1122334455667788
 ```
-You will see somethime like this in the terminal where `candump can0` is running:
-![alt text](/docs/img/candump.png)
 
+The frame should appear in `candump` if the interface and bus are working.
 
-To stop the CAN interface, run:
+## Shut Down
 
-```
+```bash
 sudo ip link set can0 down
 ```
-## Option 2: Candlelight
 
-`can0` should appear as down state when you run `ip link ls`
+If using `slcand`, stop the corresponding process when done:
 
-To set CAN state to up to 1Mbps:
-
-```sudo ip link set can0 type can bitrate 1000000```
-
-
-To set buffer to 1000:
-
-```sudo ip link set canX txqueuelen 1000```
-
-
-<!-- Note -->
-> If the USB-CAN device with candlelight firmware is not connected to any other CAN devices (such as ESP32 + CAN Transceiver), it will not process CAN messages and will not show any data in `candump` or `cansniffer` after processing 2~3 messages. In order to debug the isolated USB-CAN device, you have to enable to loopback on
-
-```
-sudo ip link set can0 type can loopback on 
+```bash
+pgrep -a slcand
+sudo pkill slcand
 ```
 
-Note that CAN bus state has be to `DOWN` in order to enable the loopback
+## Safety Notes
 
-To set the loopback off, run:
-```
-sudo ip link set can0 type can loopback off 
-```
-
-
- To stop the CAN interface, run:
-
-```sudo ip link set can0 down```
+- Confirm wiring, bus termination, bitrate, and motor power state before
+  launching hardware nodes.
+- Do not send arbitrary frames on a live robot bus.
+- Prefer `candump` observation before enabling actuators.
+- Keep hardware launch commands in `docs/COMMANDS.md` and operator command
+  examples in `cli_commands.md`.

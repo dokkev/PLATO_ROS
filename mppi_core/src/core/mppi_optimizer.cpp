@@ -189,7 +189,6 @@ RolloutContext MakeRolloutContext(const GraspObservation& observation,
   rollout_context.tactile_contexts = observation.tactile_contexts;
   rollout_context.tactile_transition_config =
       observation.tactile_transition_config;
-  rollout_context.grasp_rollout_config = observation.grasp_rollout_config;
   rollout_context.contact_force_projection_config =
       observation.contact_force_projection_config;
   rollout_context.contact_force_rollout_config =

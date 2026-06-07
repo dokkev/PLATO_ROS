@@ -16,13 +16,13 @@ find_package(pinocchio REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 set(${PROJECT_NAME}_SOURCES
-  src/config/mppi_config.cpp
-  src/config/rollout_config.cpp
   src/core/action_sequence.cpp
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
   src/rollout/grasp_state_rollout_model.cpp
   src/robot/robot_system.cpp
+  src/util/mppi_config.cpp
+  src/util/rollout_config.cpp
   src/util/task_config.cpp
   src/util/yaml_utils.cpp
 )

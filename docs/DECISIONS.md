@@ -35,8 +35,8 @@ Do not expose residual/contact-force rollout knobs in task YAML files.
 
 The first integration should tune physically interpretable task values without
 making normal force or residual projection look like the primary horizon
-dynamics. `src/config` should stay controller/model config code, while
-YAML parser helper logic and task YAML loading live under `util`.
+dynamics. Public config headers stay under `include/mppi_core/config`, while
+YAML parser implementations and parser helper logic live under `src/util`.
 
 ### Consequences
 

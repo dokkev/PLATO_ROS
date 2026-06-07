@@ -124,9 +124,6 @@ ContactForceRolloutConfig ParseContactForceRolloutConfig(
   defaults.min_active_hemisphere_count =
       yaml_utils::ReadSize(rollout, "min_active_hemisphere_count",
                            defaults.min_active_hemisphere_count);
-  defaults.min_active_hemisphere_count =
-      yaml_utils::ReadSize(rollout, "min_stable_support_count",
-                           defaults.min_active_hemisphere_count);
   defaults.min_contact_confidence =
       yaml_utils::ReadDouble(rollout, "min_contact_confidence",
                              defaults.min_contact_confidence);

@@ -15,7 +15,6 @@
 
 namespace mppi_core {
 
-struct GraspRolloutConfig;
 struct TactileTransitionConfig;
 struct ContactForceCorrectionState;
 struct ContactForceProjectionConfig;
@@ -28,7 +27,6 @@ struct RolloutContext {
   RobotSystem* robot_system{nullptr};
   std::vector<TactileSensorContext> tactile_contexts{};
   const TactileTransitionConfig* tactile_transition_config{nullptr};
-  const GraspRolloutConfig* grasp_rollout_config{nullptr};
 
   // Reserved for residual/contact-force correction experiments. The current
   // GraspStateRolloutModel does not use these pointers in horizon dynamics.

@@ -26,6 +26,10 @@ struct GraspObservation {
 
   Eigen::VectorXd q_meas;
   Eigen::VectorXd qdot_meas;
+
+  // tau_meas is required as robot feedback. The current MVP rollout does not
+  // use tau_meas for residual projection. Residual-based GraspState correction
+  // will be added later as an observation-time preprocessing step.
   Eigen::VectorXd tau_meas;
 
   Eigen::VectorXd q_ref_current;

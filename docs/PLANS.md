@@ -41,9 +41,9 @@ Steps:
    sensor-level aggregate fields.
 3. Define the adapter boundary outside `mppi_core`: ROS joint/tactile messages
    become `GraspObservation`; `RobotCommand` becomes `ImpedanceCommands`.
-4. Check whether contact kinematics, torque-residual transition config,
-   and NARI tactile conversion are available at the intended runtime call site.
-5. Add or tighten deterministic tests for no-contact gating, invalid residual
+4. Check whether contact kinematics, split rollout/task config loading, and
+   NARI tactile conversion are available at the intended runtime call site.
+5. Add or tighten deterministic tests for no-contact gating, invalid tactile
    transition, acceleration integration, RNEA/zero fallback, config parsing,
    and command dimensions before wiring into ROS.
 6. Only after tests pass, choose the package/node that owns the ROS adapter and

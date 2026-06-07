@@ -16,13 +16,15 @@ find_package(pinocchio REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 set(${PROJECT_NAME}_SOURCES
-  src/config/grasp_config.cpp
   src/config/mppi_config.cpp
+  src/config/rollout_config.cpp
   src/core/action_sequence.cpp
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
   src/rollout/grasp_state_rollout_model.cpp
   src/robot/robot_system.cpp
+  src/util/task_config.cpp
+  src/util/yaml_utils.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SOURCES})
@@ -49,8 +51,8 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY config/
-  DESTINATION share/${PROJECT_NAME}/config
+install(DIRECTORY config task
+  DESTINATION share/${PROJECT_NAME}
 )
 
 install(EXPORT ${PROJECT_NAME}Targets

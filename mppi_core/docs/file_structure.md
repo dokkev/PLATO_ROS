@@ -12,6 +12,8 @@ include/mppi_core/
   contact/
   costs/
   config/
+  task/
+  util/
 ```
 
 ## core/
@@ -54,8 +56,34 @@ Cost terms that evaluate predicted `GraspState` rollouts.
 
 ## config/
 
-YAML parsers for MPPI, grasp cost, tactile transition, rollout, and optional
-contact-force rollout configuration.
+Controller/model config parsers:
+
+- `mppi_config.hpp/cpp` for sampling, horizon, action bounds, and command gains.
+- `rollout_config.hpp/cpp` for rollout/tactile model constants and disturbance
+  defaults.
+Default files live under `config/`:
+
+- `mppi.yaml`
+- `rollout.yaml`
+- `experimental_residual.yaml`
+
+## task/
+
+Task-spec types and task YAML files. This layer owns start conditions, contact
+support objectives, shear/rotation tolerances, task cost weights, and later
+task-specific disturbance or object priors.
+
+Default files live under `task/`:
+
+- `jenga.yaml`
+- `peg_in_hole.yaml`
+- `grasp_hold.yaml`
+
+## util/
+
+Implementation helpers that do not own controller, rollout, or task semantics.
+YAML parser helper code and task YAML loading live here so `mppi_core/task/`
+can stay a data directory.
 
 ## Include Policy
 

@@ -1,0 +1,11 @@
+rollout:
+  tactile_model:
+    birth_approach_velocity_mps: 0.002
+    loss_unloading_velocity_mps: 0.002
+
+    born_normal_force_n: 0.05
+    born_confidence: 0.5
+    contact_confidence_decay: 1.0
+
+  disturbance:
+    enabled: false

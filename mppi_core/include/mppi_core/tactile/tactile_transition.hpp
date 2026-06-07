@@ -17,31 +17,14 @@
 namespace mppi_core {
 
 struct TactileTransitionConfig {
-  bool enable_birth{true};
-  bool enable_loss{true};
+  double birth_approach_velocity_mps{0.002};
+  double loss_unloading_velocity_mps{0.002};
 
-  double birth_score_threshold{0.5};
-  double loss_score_threshold{0.5};
-
-  double birth_neighbor_weight{0.25};
-  double birth_tangent_approach_weight{1.0};
-  double birth_normal_approach_weight{0.5};
-  double birth_shear_penalty_weight{0.5};
-
-  double loss_unloading_weight{1.0};
-  double loss_shear_weight{0.5};
-  double loss_low_force_weight{0.5};
-
+  double max_shear_m{0.003};
+  double max_rotation_rad{0.05};
   double born_normal_force_n{0.05};
   double born_confidence{0.5};
-
-  double inactive_confidence{0.0};
   double contact_confidence_decay{1.0};
-
-  double aggregate_shear_decay{1.0};
-  double aggregate_rotation_decay{1.0};
-
-  std::size_t enough_contact_hemisphere_count{2};
 };
 
 struct GraspRolloutConfig {
@@ -86,6 +69,9 @@ inline double Clamp01(double x) {
   return std::clamp(x, 0.0, 1.0);
 }
 
+inline constexpr double kInactiveConfidence = 0.0;
+inline constexpr std::size_t kEnoughContactHemisphereCount = 2;
+
 inline bool HasNeighborInActiveSet(const HemisphereGeometry& geometry,
                                    const std::vector<bool>& active_by_index) {
   for (const std::size_t neighbor : geometry.neighbors) {
@@ -96,8 +82,8 @@ inline bool HasNeighborInActiveSet(const HemisphereGeometry& geometry,
   return false;
 }
 
-inline void RefreshTactileAggregate(TactileState* tactile,
-                                    const TactileTransitionConfig& config) {
+inline void RefreshTactileAggregate(
+    TactileState* tactile, const TactileTransitionConfig& /*config*/) {
   if (tactile == nullptr) {
     return;
   }
@@ -106,7 +92,7 @@ inline void RefreshTactileAggregate(TactileState* tactile,
   const std::size_t active_count = tactile->activeHemisphereCount();
   if (active_count == 0) {
     tactile->contact_state = TactileState::kNoContact;
-  } else if (active_count < config.enough_contact_hemisphere_count) {
+  } else if (active_count < kEnoughContactHemisphereCount) {
     tactile->contact_state = TactileState::kFewContacts;
   } else {
     tactile->contact_state = TactileState::kEnoughContacts;
@@ -116,7 +102,7 @@ inline void RefreshTactileAggregate(TactileState* tactile,
       Eigen::Vector3d{0.0, 0.0, tactile->activeHemisphereNormalForceN()};
 
   if (active_count == 0) {
-    tactile->confidence = Clamp01(config.inactive_confidence);
+    tactile->confidence = kInactiveConfidence;
   } else {
     tactile->confidence = Clamp01(tactile->confidence);
   }
@@ -124,18 +110,9 @@ inline void RefreshTactileAggregate(TactileState* tactile,
   if (!tactile->shear_displacement_m.allFinite()) {
     tactile->shear_displacement_m = Eigen::Vector2d::Zero();
   }
-  tactile->shear_displacement_m *=
-      std::isfinite(config.aggregate_shear_decay)
-          ? config.aggregate_shear_decay
-          : 0.0;
-
   if (!std::isfinite(tactile->rotational_shear_rad)) {
     tactile->rotational_shear_rad = 0.0;
   }
-  tactile->rotational_shear_rad *=
-      std::isfinite(config.aggregate_rotation_decay)
-          ? config.aggregate_rotation_decay
-          : 0.0;
 
   tactile->slip_score = tactile->shear_displacement_m.norm() +
                         std::abs(tactile->rotational_shear_rad);
@@ -259,7 +236,10 @@ inline TactileState StepTactileState(
   const double shear_norm = out.shear_displacement_m.allFinite()
                                 ? out.shear_displacement_m.norm()
                                 : 0.0;
-  constexpr double kForceEpsilon = 1.0e-6;
+  const bool shear_bad =
+      shear_norm > config.max_shear_m ||
+      std::abs(out.rotational_shear_rad) > config.max_rotation_rad;
+  const bool shear_ok = !shear_bad;
 
   for (std::size_t i = 0; i < out.hemispheres.size(); ++i) {
     auto& hemi = out.hemispheres[i];
@@ -271,21 +251,17 @@ inline TactileState StepTactileState(
       if (hemi.cop_sensor_m.allFinite()) {
         hemi.cop_sensor_m += motion.velocity_sensor_xy_mps * dt;
       }
-      const double unloading = std::max(0.0, -motion.normal_velocity_mps);
       const double normal_force =
           std::max(0.0, std::isfinite(hemi.normal_force_n)
                             ? hemi.normal_force_n
                             : 0.0);
-      const double low_force =
-          std::clamp(1.0 - normal_force, 0.0, 1.0) + kForceEpsilon;
-      const double loss_score = config.loss_unloading_weight * unloading +
-                                config.loss_shear_weight * shear_norm +
-                                config.loss_low_force_weight * low_force;
+      const bool unloading =
+          -motion.normal_velocity_mps > config.loss_unloading_velocity_mps;
 
-      if (config.enable_loss && loss_score > config.loss_score_threshold) {
+      if (unloading || shear_bad) {
         hemi.contact = false;
         hemi.normal_force_n = 0.0;
-        hemi.confidence = config.inactive_confidence;
+        hemi.confidence = kInactiveConfidence;
       } else {
         hemi.normal_force_n = normal_force;
         hemi.confidence =
@@ -296,10 +272,10 @@ inline TactileState StepTactileState(
 
     const bool adjacent =
         HasNeighborInActiveSet(geometry, active_by_index);
-    if (!config.enable_birth || !adjacent) {
+    if (!adjacent) {
       hemi.contact = false;
       hemi.normal_force_n = 0.0;
-      hemi.confidence = config.inactive_confidence;
+      hemi.confidence = kInactiveConfidence;
       continue;
     }
 
@@ -316,22 +292,18 @@ inline TactileState StepTactileState(
     const double neighbor_term = adjacent ? 1.0 : 0.0;
     const double tangent_approach =
         std::max(0.0, motion.velocity_sensor_xy_mps.dot(toward_candidate));
-    const double normal_approach =
-        std::max(0.0, motion.normal_velocity_mps);
-    const double birth_score =
-        config.birth_neighbor_weight * neighbor_term +
-        config.birth_tangent_approach_weight * tangent_approach +
-        config.birth_normal_approach_weight * normal_approach -
-        config.birth_shear_penalty_weight * shear_norm;
+    const bool approaching =
+        motion.normal_velocity_mps > config.birth_approach_velocity_mps ||
+        tangent_approach > config.birth_approach_velocity_mps;
 
-    if (birth_score >= config.birth_score_threshold) {
+    if (neighbor_term > 0.0 && approaching && shear_ok) {
       hemi.contact = true;
       hemi.normal_force_n = config.born_normal_force_n;
-      hemi.confidence = config.born_confidence;
+      hemi.confidence = Clamp01(config.born_confidence);
     } else {
       hemi.contact = false;
       hemi.normal_force_n = 0.0;
-      hemi.confidence = config.inactive_confidence;
+      hemi.confidence = kInactiveConfidence;
     }
   }
 

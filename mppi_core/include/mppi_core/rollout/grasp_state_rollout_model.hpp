@@ -14,8 +14,9 @@ namespace mppi_core {
 struct GraspStateRolloutConfig {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  // Reserved for rollout-model parameters. Residual force projection is not a
-  // GraspState rollout policy.
+  // Reserved for the future disturbance sampler. Residual force projection is
+  // not a GraspState horizon rollout policy.
+  bool disturbance_enabled{false};
 };
 
 RobotState StepRobotState(const RobotState& robot,

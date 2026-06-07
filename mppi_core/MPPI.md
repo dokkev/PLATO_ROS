@@ -560,31 +560,23 @@ Do not project the same residual independently into each tactile sensor.
 
 The cost should evaluate GraspState robustness and quality.
 
-Useful cost terms include:
+The MVP cost intentionally uses a small set of tactile and robot features:
 
 ```txt
-robot/action costs:
-  qddot magnitude
-  qdot limit
-  tau effort / torque limit
-  action smoothness
-
-tactile costs:
-  contact loss
-  insufficient active hemispheres
-  insufficient active tactile sensors
-  excessive shear displacement
-  excessive rotational shear
-  low tactile confidence
-  unstable contact transition
-
-multi-sensor costs:
-  too few active tactile sensors
-  unbalanced contact support
-  asymmetric contact loss
+1. active tactile sensor loss
+2. active hemisphere support below a lower-bound target
+3. shear displacement
+4. rotational shear
+5. robot action and RNEA torque effort
 ```
 
-The cost should not depend on exact future force prediction.
+`target_active_hemisphere_total` is a lower-bound target. More active
+hemispheres than the target do not keep reducing cost, because that would push
+the rollout toward predicting every hemisphere as active.
+
+Normal force, sensor total force, slip scores, and confidence remain useful
+proxies for debugging and future extensions, but they are not dominant MVP cost
+terms. The cost should not depend on exact future force prediction.
 
 For disturbance-sampled rollout, the final cost for an action sequence should reflect not only average performance, but also robustness under worse disturbance outcomes.
 
@@ -648,38 +640,92 @@ Sampling budget, acceleration action bounds, and command gains live in:
 mppi_core/config/mppi.yaml
 ```
 
-Contact-local cost and tactile transition parameters live in:
+Rollout-model tactile constants live in:
 
 ```txt
-mppi_core/config/grasp.yaml
+mppi_core/config/rollout.yaml
 ```
 
-The current tactile transition section is:
+Task objectives, start gates, tolerances, and task cost weights live in:
+
+```txt
+mppi_core/task/*.yaml
+```
+
+The default MVP split is:
+
+```txt
+config:
+  mppi.yaml    = controller sampling, action bounds, command gains
+  rollout.yaml = rollout/tactile model constants and disturbance defaults
+
+task:
+  jenga.yaml       = task start/objective/tolerance/cost
+  peg_in_hole.yaml = task start/objective/tolerance/cost
+  grasp_hold.yaml  = task start/objective/tolerance/cost
+```
+
+Example rollout config:
 
 ```yaml
-grasp:
-  tactile_transition:
-    enable_birth: true
-    enable_loss: true
-    birth_score_threshold: 0.5
-    loss_score_threshold: 0.5
-    birth_neighbor_weight: 0.25
-    birth_tangent_approach_weight: 1.0
-    birth_normal_approach_weight: 0.5
-    birth_shear_penalty_weight: 0.5
-    loss_unloading_weight: 1.0
-    loss_shear_weight: 0.5
-    loss_low_force_weight: 0.5
+rollout:
+  tactile_model:
+    birth_approach_velocity_mps: 0.002
+    loss_unloading_velocity_mps: 0.002
     born_normal_force_n: 0.05
     born_confidence: 0.5
-    inactive_confidence: 0.0
     contact_confidence_decay: 1.0
-    aggregate_shear_decay: 1.0
-    aggregate_rotation_decay: 1.0
-    enough_contact_hemisphere_count: 2
+
+  disturbance:
+    enabled: false
 ```
 
-These values are parsed into `TactileTransitionConfig`.
+Example task config:
+
+```yaml
+task:
+  name: jenga
+
+  start:
+    min_enough_contact_sensors: 1
+    min_active_hemisphere_total: 1
+
+  objective:
+    min_active_tactile_sensors: 1
+    target_active_hemisphere_total: 4
+
+  tolerance:
+    max_shear_m: 0.003
+    max_rotation_rad: 0.05
+
+  cost:
+    contact_loss_weight: 50.0
+    support_weight: 10.0
+    shear_weight: 5.0
+    rotation_weight: 5.0
+    qddot_weight: 1.0
+    tau_weight: 0.01
+```
+
+The MVP does not tune a large weighted tactile transition model. Birth and loss
+are threshold-based:
+
+```txt
+birth:
+  inactive neighbor + approach velocity above threshold + shear/rotation OK
+
+loss:
+  unloading velocity above threshold OR shear/rotation too large
+```
+
+Torque feedback is always part of `GraspObservation` as `tau_meas`, but
+residual projection is not part of the current rollout. Residual/contact-force
+rollout knobs are not exposed in task YAML files; experimental values belong in
+`mppi_core/config/experimental_residual.yaml`.
+
+Measured `TactileState::total_force_n` is the sensor aggregate force. Predicted
+rollout `total_force_n` is only a proxy reconstructed from active hemisphere
+normal forces, not exact future force prediction.
 
 ---
 

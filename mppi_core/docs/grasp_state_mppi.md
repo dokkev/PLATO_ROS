@@ -121,12 +121,21 @@ entry in `RolloutContext::tactile_contexts`. The MPPI horizon rollout does not
 perform measured-torque residual projection or exact future contact-force
 prediction.
 
-Transition gains and thresholds are loaded from `grasp.tactile_transition` in
-`config/grasp.yaml`.
+Rollout tactile model constants are loaded from `config/rollout.yaml`, while
+task-specific start gates, support objectives, shear/rotation tolerances, and
+cost weights are loaded from `task/*.yaml`. Birth/loss is rule-based for now:
+inactive neighboring hemispheres can be born when approach velocity is high
+enough and shear/rotation remain within task thresholds; active hemispheres can
+be lost when unloading or excessive shear/rotation is detected. Low normal force
+alone is not a default loss trigger.
 
 The contact-force projection utilities remain separate from
 `GraspStateRolloutModel` and are reserved for later observation-time correction
 experiments.
+
+`tau_meas` remains required in `GraspObservation` as robot feedback, but the
+current rollout does not use it for residual projection. Rollout
+`RobotState::tau` is the RNEA model torque proxy.
 
 ## Contact kinematics
 

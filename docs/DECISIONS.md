@@ -5,6 +5,63 @@ preserve or intentionally replace.
 
 ---
 
+## 2026-06-07 - MPPI Splits Controller, Rollout, And Task Config
+
+Status: Accepted
+
+### Context
+
+The previous grasp YAML mixed controller/model rollout settings, task
+objectives, tactile tolerances, cost weights, and experimental residual knobs.
+That made tuning hard and made it unclear which values belonged to the
+controller versus a task spec.
+
+### Decision
+
+Use:
+
+- `mppi_core/config/mppi.yaml` for MPPI sampling, action bounds, and command
+  gains.
+- `mppi_core/config/rollout.yaml` for rollout/tactile model constants and
+  disturbance defaults.
+- `mppi_core/task/*.yaml` for task start gates, contact support objectives,
+  shear/rotation tolerances, and task cost weights.
+
+Keep task YAML files focused on the MVP costs: active tactile sensor loss, active
+hemisphere support, shear, rotation, `qddot`, and rollout `RobotState::tau`.
+Do not expose residual/contact-force rollout knobs in task YAML files.
+
+### Reason
+
+The first integration should tune physically interpretable task values without
+making normal force or residual projection look like the primary horizon
+dynamics. `src/config` should stay controller/model config code, while
+YAML parser helper logic and task YAML loading live under `util`.
+
+### Consequences
+
+- Tactile birth/loss is rule-based, not a large weighted scoring model.
+- Normal force remains a proxy/debug value and is not a default loss trigger.
+- Contact support cost penalizes insufficient support but does not reward
+  unlimited active hemispheres.
+- Residual/contact-force rollout settings stay in experimental config or C++
+  defaults until observation-time correction work is promoted.
+- `grasp_config.hpp/cpp` and `config/grasp.yaml` are removed instead of
+  remaining as a mixed-responsibility surface.
+
+### Related files
+
+- `mppi_core/config/rollout.yaml`
+- `mppi_core/config/experimental_residual.yaml`
+- `mppi_core/task/jenga.yaml`
+- `mppi_core/MPPI.md`
+- `mppi_core/include/mppi_core/config/rollout_config.hpp`
+- `mppi_core/include/mppi_core/task/task_config.hpp`
+- `mppi_core/include/mppi_core/tactile/tactile_transition.hpp`
+- `mppi_core/include/mppi_core/costs/grasp_stability_cost.hpp`
+
+---
+
 ## 2026-06-05 - MPPI Predicts Modular Tactile GraspState
 
 Status: Accepted

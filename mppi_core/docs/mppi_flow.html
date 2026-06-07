@@ -786,7 +786,7 @@
                 <div class="edge"><span>points to</span></div>
                 <button class="node diagram-node compact" data-id="contactContextObject" data-kind="policy" data-step="0">
                   <span class="node-title">Contact Context</span>
-                  <span class="node-path">kinematics + force configs</span>
+                  <span class="node-path">kinematics + transition config</span>
                 </button>
               </div>
             </div>
@@ -817,7 +817,7 @@
             <div class="flow-row long">
               <button class="node diagram-node compact" data-id="observation" data-kind="state" data-step="0">
                 <span class="node-title">obs</span>
-                <span class="node-path">q_ref, q_meas, qdot_meas, tau_meas, tactile0_meas/tactile1_meas</span>
+                <span class="node-path">q_ref, q_meas, qdot_meas, tau_meas, tactile_meas[]</span>
               </button>
               <div class="edge"><span>calls</span></div>
               <button class="node diagram-node compact" data-id="update" data-kind="module" data-step="1">
@@ -844,7 +844,7 @@
               <div class="edge"><span>initializes</span></div>
               <button class="node diagram-node compact" data-id="state" data-kind="state" data-step="2">
                 <span class="node-title">state[0]</span>
-                <span class="node-path">MakeGraspState(RobotState, tactile0, tactile1)</span>
+                <span class="node-path">MakeGraspState(RobotState, tactile_meas[])</span>
               </button>
               <div class="edge"><span>steps</span></div>
               <button class="node diagram-node compact" data-id="step" data-kind="module" data-step="3">
@@ -909,8 +909,8 @@
                 <span class="tags"><span class="tag">measured</span><span class="tag">reference</span></span>
               </button>
               <button class="node" data-id="config" data-kind="policy" data-step="0">
-                <span class="node-title">MPPI + rollout config</span>
-                <span class="node-path">mppi.yaml + grasp.yaml</span>
+                <span class="node-title">MPPI + task config</span>
+                <span class="node-path">mppi.yaml + rollout.yaml + task/*.yaml</span>
                 <span class="tags"><span class="tag">bounds</span><span class="tag">transition</span></span>
               </button>
             </div>
@@ -962,7 +962,7 @@
               <h2>Cost + Output</h2>
               <button class="node" data-id="cost" data-kind="cost" data-step="4">
                 <span class="node-title">GraspStabilityCost</span>
-                <span class="node-path">force, slip, centroid, hemisphere support, tracking</span>
+                <span class="node-path">sensor support, shear, rotation, qddot/tau</span>
                 <span class="tags"><span class="tag">contact-local</span></span>
               </button>
               <button class="node" data-id="weights" data-kind="module" data-step="4">
@@ -1066,7 +1066,7 @@
       },
       stabilityCostObject: {
         title: "GraspStabilityCost",
-        summary: "Concrete CostTermBase implementation that scores contact-local force, slip, centroid, hemisphere support, tracking, smoothness, and joint-limit terms.",
+        summary: "Concrete CostTermBase implementation that scores active tactile sensor loss, active hemisphere support, shear, rotation, qddot, and RNEA torque effort.",
         view: ["objects"],
         kv: [
           ["Inherits", "CostTermBase"],
@@ -1140,7 +1140,7 @@
       },
       tactileStateObject: {
         title: "TactileState",
-        summary: "Hardware-agnostic tactile representation used by observations, rollout states, force projection priors, and costs.",
+        summary: "Hardware-agnostic tactile representation used by observations, rollout states, transition rules, and costs.",
         view: ["objects"],
         kv: [
           ["Contact", "contact_state, total_force_n, dense hemispheres"],
@@ -1156,19 +1156,18 @@
       },
       contactContextObject: {
         title: "Contact Context",
-        summary: "Observation pointers that make tactile transition possible: transition config, per-sensor kinematics, and optional residual/correction hooks.",
+        summary: "Observation pointers that make tactile transition possible: transition config, per-sensor kinematics, and experimental residual/correction hooks.",
         view: ["objects"],
         kv: [
           ["Kinematics", "PinocchioContactKinematicsContext"],
           ["Transition", "TactileTransitionConfig"],
           ["Kinematics", "PinocchioContactKinematicsContext"],
-          ["Optional hooks", "ContactForceProjectionConfig, ContactForceRolloutConfig, ContactForceCorrectionState"]
+          ["Experimental hooks", "ContactForceProjectionConfig, ContactForceRolloutConfig, ContactForceCorrectionState"]
         ],
         sources: [
           ["include/mppi_core/state/grasp_observation.hpp", "../include/mppi_core/state/grasp_observation.hpp"],
           ["include/mppi_core/contact/contact_kinematics.hpp", "../include/mppi_core/contact/contact_kinematics.hpp"],
-          ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
-          ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
+          ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"]
         ],
         related: ["rolloutContextObject", "tactileTransition", "observation"]
       },
@@ -1179,8 +1178,8 @@
         kv: [
           ["Built in", "PredictRollout and EvaluateRollout"],
           ["State refs", "measured_state, initial_reference_state"],
-          ["Contact refs", "tactile0/tactile1, per-sensor kinematics, force configs, correction state"],
-          ["Usage", "Step uses per-sensor contact context; cost uses measured/reference tracking context"]
+          ["Contact refs", "tactile_meas[], per-sensor kinematics, transition config, experimental correction hooks"],
+          ["Usage", "Step uses per-sensor contact context; cost uses rollout state and action"]
         ],
         sources: [
           ["include/mppi_core/rollout/rollout_model.hpp", "../include/mppi_core/rollout/rollout_model.hpp"],
@@ -1233,7 +1232,7 @@
         summary: "Runtime input bundle consumed by MPPIOptimizer. It combines measured robot state, current commanded reference, tactile state, torque, and optional contact-model context.",
         view: ["objects", "runtime", "rollout", "config"],
         kv: [
-          ["Fields", "q_meas, qdot_meas, tau_meas, tactile0_meas/tactile1_meas, q_ref_current, qdot_ref_current"],
+          ["Fields", "q_meas, qdot_meas, tau_meas, tactile_meas[], q_ref_current, qdot_ref_current"],
           ["Contact context", "TactileTransitionConfig, PinocchioContactKinematicsContext, optional residual/correction hooks"],
           ["Tau", "Measured joint torque for the current observation"],
           ["Failure risk", "Missing contact kinematics prevents tactile transition"]
@@ -1246,18 +1245,20 @@
       },
       config: {
         title: "Config Surface",
-        summary: "YAML-loaded parameters define sampling, action bounds, tactile transition gains, optional force rollout gains, and contact-local cost weights.",
+        summary: "YAML-loaded parameters are split between controller/model config and task specs.",
         view: ["runtime", "config"],
         kv: [
           ["mppi.yaml", "horizon_steps, dt, num_rollouts, temperature, action bounds, noise"],
-          ["grasp.yaml", "tactile_transition, contact_force_rollout, normal force, slip, centroid, hemisphere costs"],
-          ["Transition", "Birth/loss thresholds and confidence/shear decay live under grasp.tactile_transition"],
-          ["Residual hooks", "Contact-force rollout config is retained for observation-time correction experiments"]
+          ["rollout.yaml", "tactile model constants and disturbance defaults"],
+          ["task/*.yaml", "start gates, support objective, tolerances, and task cost weights"],
+          ["Residual hooks", "Residual/contact-force rollout knobs stay out of task YAML files"]
         ],
         sources: [
           ["config/mppi.yaml", "../config/mppi.yaml"],
-          ["config/grasp.yaml", "../config/grasp.yaml"],
-          ["src/config/grasp_config.cpp", "../src/config/grasp_config.cpp"]
+          ["config/rollout.yaml", "../config/rollout.yaml"],
+          ["task/jenga.yaml", "../task/jenga.yaml"],
+          ["src/config/rollout_config.cpp", "../src/config/rollout_config.cpp"],
+          ["src/util/task_config.cpp", "../src/util/task_config.cpp"]
         ],
         related: ["update", "tactileTransition", "cost"]
       },
@@ -1344,13 +1345,11 @@
           ["Preconditions", "Valid GraspState, matching tactile context, finite robot vectors"],
           ["Kinematics", "ComputeHemisphereMotions produces one HemisphereMotion per hemisphere"],
           ["Topology", "StepTactileState applies deterministic birth/loss/survival rules"],
-          ["Residual hooks", "Projection helpers remain separate from current horizon dynamics"]
+          ["Residual policy", "Projection helpers remain separate from current horizon dynamics"]
         ],
         sources: [
           ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"],
-          ["include/mppi_core/tactile/tactile_transition.hpp", "../include/mppi_core/tactile/tactile_transition.hpp"],
-          ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
-          ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
+          ["include/mppi_core/tactile/tactile_transition.hpp", "../include/mppi_core/tactile/tactile_transition.hpp"]
         ],
         related: ["invalid", "cost", "config"]
       },
@@ -1373,13 +1372,13 @@
       },
       cost: {
         title: "GraspStabilityCost",
-        summary: "Contact-local cost for normal force, slip risk, centroid bounds, hemisphere support, tracking guard, action smoothness, and joint limits.",
+        summary: "Contact-local MVP cost for active tactile sensor count, active hemisphere support, shear, rotation, qddot, and RNEA torque effort.",
         view: ["cost", "runtime"],
         kv: [
-          ["Force", "Penalty below force_min_n and above force_max_n"],
-          ["Slip", "Tactile slip score plus optional velocity-weighted slip score"],
-          ["Centroid", "Boundary penalty or contact loss penalty if centroid is missing"],
-          ["Hemisphere contact", "Penalty for active_hemisphere_count below target_active_hemisphere_count"]
+          ["Contact loss", "Penalty when active tactile sensor count is below min_active_tactile_sensors"],
+          ["Support", "Penalty when active hemisphere total is below target_active_hemisphere_total"],
+          ["Shear", "Sensor shear displacement and rotational shear penalties"],
+          ["Effort", "qddot action magnitude and rollout RobotState::tau magnitude"]
         ],
         sources: [
           ["include/mppi_core/costs/grasp_stability_cost.hpp", "../include/mppi_core/costs/grasp_stability_cost.hpp"],

@@ -27,8 +27,8 @@
 #include <utility>
 #include <vector>
 
-#include "mppi_core/config/grasp_config.hpp"
 #include "mppi_core/config/mppi_config.hpp"
+#include "mppi_core/config/rollout_config.hpp"
 #include "mppi_core/contact/contact_force_correction.hpp"
 #include "mppi_core/contact/contact_force_projection.hpp"
 #include "mppi_core/contact/contact_kinematics.hpp"
@@ -39,6 +39,7 @@
 #include "mppi_core/rollout/grasp_state_rollout_model.hpp"
 #include "mppi_core/state/grasp_observation.hpp"
 #include "mppi_core/state/grasp_state.hpp"
+#include "mppi_core/task/task_config.hpp"
 #include "mppi_core/tactile/nari_touch_adapter.hpp"
 #include "mppi_core/tactile/tactile_transition.hpp"
 
@@ -1310,13 +1311,8 @@ TEST(TactileTransitionTest,
   motions[1].normal_velocity_mps = 0.2;
 
   mppi_core::TactileTransitionConfig config;
-  config.enable_loss = false;
-  config.birth_score_threshold = 0.1;
-  config.birth_neighbor_weight = 0.0;
-  config.birth_tangent_approach_weight = 0.0;
-  config.birth_normal_approach_weight = 1.0;
+  config.birth_approach_velocity_mps = 0.1;
   config.born_normal_force_n = 0.2;
-  config.born_confidence = 0.5;
 
   const auto next = mppi_core::StepTactileState(
       tactile, robot, robot, motions, sensor_context, config, 0.1);
@@ -1350,11 +1346,7 @@ TEST(TactileTransitionTest,
   motions[0].normal_velocity_mps = -0.2;
 
   mppi_core::TactileTransitionConfig config;
-  config.enable_birth = false;
-  config.loss_score_threshold = 0.1;
-  config.loss_unloading_weight = 1.0;
-  config.loss_shear_weight = 0.0;
-  config.loss_low_force_weight = 0.0;
+  config.loss_unloading_velocity_mps = 0.1;
 
   const auto next = mppi_core::StepTactileState(
       tactile, robot, robot, motions, sensor_context, config, 0.1);
@@ -1366,6 +1358,115 @@ TEST(TactileTransitionTest,
   EXPECT_EQ(next.activeHemisphereCount(), 0U);
   EXPECT_EQ(next.contact_state, mppi_core::TactileState::kNoContact);
   EXPECT_NEAR(next.total_force_n.z(), 0.0, kTolerance);
+}
+
+TEST(TactileTransitionTest,
+     InactiveNeighborBelowApproachThresholdRemainsInactive) {
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kFewContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.hemispheres.push_back(
+      MakeHemisphere(1, Eigen::Vector2d{1.0e-4, 0.0}, 0.0, false));
+  tactile.hemispheres[1].confidence = 0.0;
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  const auto robot = MakeTestRobotState();
+  const auto sensor_context = MakeTactileContextForState(tactile);
+  auto motions = MakeMotionsForTactileState(tactile);
+  motions[1].normal_velocity_mps = 0.001;
+
+  mppi_core::TactileTransitionConfig config;
+  config.birth_approach_velocity_mps = 0.002;
+
+  const auto next = mppi_core::StepTactileState(
+      tactile, robot, robot, motions, sensor_context, config, 0.1);
+
+  ASSERT_TRUE(next.valid);
+  EXPECT_FALSE(next.hemispheres[1].contact);
+  EXPECT_EQ(next.activeHemisphereCount(), 1U);
+}
+
+TEST(TactileTransitionTest,
+     InactiveNonNeighborAboveApproachThresholdRemainsInactive) {
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kFewContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.hemispheres.push_back(
+      MakeHemisphere(1, Eigen::Vector2d{1.0e-4, 0.0}, 0.0, false));
+  tactile.hemispheres.push_back(
+      MakeHemisphere(2, Eigen::Vector2d{2.0e-4, 0.0}, 0.0, false));
+
+  const auto robot = MakeTestRobotState();
+  const auto sensor_context = MakeTactileContextForState(tactile);
+  auto motions = MakeMotionsForTactileState(tactile);
+  motions[2].normal_velocity_mps = 0.2;
+
+  mppi_core::TactileTransitionConfig config;
+  config.birth_approach_velocity_mps = 0.1;
+
+  const auto next = mppi_core::StepTactileState(
+      tactile, robot, robot, motions, sensor_context, config, 0.1);
+
+  ASSERT_TRUE(next.valid);
+  EXPECT_FALSE(next.hemispheres[2].contact);
+  EXPECT_EQ(next.activeHemisphereCount(), 1U);
+}
+
+TEST(TactileTransitionTest,
+     LowNormalForceAloneDoesNotLoseActiveHemisphere) {
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kFewContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 0.0, true));
+  tactile.total_force_n.z() = 0.0;
+
+  const auto robot = MakeTestRobotState();
+  const auto sensor_context = MakeTactileContextForState(tactile);
+  const auto motions = MakeMotionsForTactileState(tactile);
+
+  mppi_core::TactileTransitionConfig config;
+  config.loss_unloading_velocity_mps = 0.1;
+
+  const auto next = mppi_core::StepTactileState(
+      tactile, robot, robot, motions, sensor_context, config, 0.1);
+
+  ASSERT_TRUE(next.valid);
+  EXPECT_TRUE(next.hemispheres[0].contact);
+  EXPECT_NEAR(next.hemispheres[0].normal_force_n, 0.0, kTolerance);
+  EXPECT_EQ(next.activeHemisphereCount(), 1U);
+}
+
+TEST(TactileTransitionTest, HighShearCanLoseContactAndPreventBirth) {
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kFewContacts;
+  tactile.shear_displacement_m = Eigen::Vector2d{0.01, 0.0};
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.hemispheres.push_back(
+      MakeHemisphere(1, Eigen::Vector2d{1.0e-4, 0.0}, 0.0, false));
+
+  const auto robot = MakeTestRobotState();
+  const auto sensor_context = MakeTactileContextForState(tactile);
+  auto motions = MakeMotionsForTactileState(tactile);
+  motions[1].normal_velocity_mps = 0.2;
+
+  mppi_core::TactileTransitionConfig config;
+  config.birth_approach_velocity_mps = 0.1;
+  config.max_shear_m = 0.003;
+
+  const auto next = mppi_core::StepTactileState(
+      tactile, robot, robot, motions, sensor_context, config, 0.1);
+
+  ASSERT_TRUE(next.valid);
+  EXPECT_FALSE(next.hemispheres[0].contact);
+  EXPECT_FALSE(next.hemispheres[1].contact);
+  EXPECT_EQ(next.activeHemisphereCount(), 0U);
 }
 
 TEST(GraspRolloutTest, TangentialMotionUpdatesCentroidAndShear) {
@@ -1978,8 +2079,7 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.min_active_hemisphere_count = 1;
   rollout_config.normal_force_gain_n_per_m = 100.0;
   mppi_core::TactileTransitionConfig transition_config;
-  transition_config.loss_score_threshold = 0.001;
-  transition_config.loss_low_force_weight = 0.0;
+  transition_config.loss_unloading_velocity_mps = 0.001;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
@@ -2152,7 +2252,6 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.min_active_hemisphere_count = 1;
   rollout_config.normal_force_gain_n_per_m = 100.0;
   mppi_core::TactileTransitionConfig transition_config;
-  transition_config.loss_low_force_weight = 0.0;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
@@ -2208,7 +2307,6 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.min_active_hemisphere_count = 1;
   rollout_config.normal_force_gain_n_per_m = 100.0;
   mppi_core::TactileTransitionConfig transition_config;
-  transition_config.loss_low_force_weight = 0.0;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
@@ -2311,12 +2409,15 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.tangential_confidence_loss_per_m = 0.0;
   rollout_config.edge_confidence_loss_gain = 0.0;
   rollout_config.shear_ref_m = 1.0;
+  mppi_core::TactileTransitionConfig transition_config;
+  transition_config.max_shear_m = 0.1;
   mppi_core::ContactForceProjectionConfig projection_config;
   projection_config.enabled = false;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
       &kinematics, tactile, &kinematics, tactile);
+  context.tactile_transition_config = &transition_config;
   context.grasp_rollout_config = &rollout_config;
   context.contact_force_projection_config = &projection_config;
 
@@ -2367,12 +2468,15 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.tangential_confidence_loss_per_m = 0.0;
   rollout_config.edge_confidence_loss_gain = 0.0;
   rollout_config.shear_ref_m = 1.0;
+  mppi_core::TactileTransitionConfig transition_config;
+  transition_config.max_shear_m = 0.1;
   mppi_core::ContactForceProjectionConfig projection_config;
   projection_config.enabled = false;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
       &kinematics, tactile, &kinematics, tactile);
+  context.tactile_transition_config = &transition_config;
   context.grasp_rollout_config = &rollout_config;
   context.contact_force_projection_config = &projection_config;
 
@@ -2420,12 +2524,15 @@ TEST(GraspStateRolloutModelTest,
   rollout_config.tangential_confidence_loss_per_m = 0.0;
   rollout_config.edge_confidence_loss_gain = 0.0;
   rollout_config.shear_ref_m = 1.0;
+  mppi_core::TactileTransitionConfig transition_config;
+  transition_config.max_shear_m = 0.1;
   mppi_core::ContactForceProjectionConfig projection_config;
   projection_config.enabled = false;
 
   mppi_core::RolloutContext context;
   context.tactile_contexts = MakeTactileContextsForStates(
       &kinematics, tactile, &kinematics, tactile);
+  context.tactile_transition_config = &transition_config;
   context.grasp_rollout_config = &rollout_config;
   context.contact_force_projection_config = &projection_config;
 
@@ -2487,194 +2594,239 @@ TEST(GraspStateRolloutModelTest,
   EXPECT_EQ(next_state.tactile_sensors[0].activeHemisphereCount(), 0U);
 }
 
-TEST(GraspStabilityCostTest, PenalizesSmallPredictedContactPatch) {
+TEST(GraspStabilityCostTest, TooFewActiveTactileSensorsIncreaseCost) {
   mppi_core::GraspStabilityCostConfig config;
-  config.force_min_n = 0.0;
-  config.force_max_n = 10.0;
-  config.force_under_weight = 0.0;
-  config.force_over_weight = 0.0;
-  config.slip_risk_weight = 0.0;
-  config.contact_centroid_enabled = true;
-  config.centroid_boundary_weight = 0.0;
-  config.contact_loss_weight = 0.0;
-  config.tracking_weight = 0.0;
-  config.tracking_action_scale_weight = 0.0;
-  config.action_smoothness_weight = 0.0;
-  config.joint_limit_weight = 0.0;
-  config.hemisphere_contact_enabled = true;
-  config.target_active_hemisphere_count = 6.0;
-  config.hemisphere_contact_weight = 1.0;
+  config.min_active_tactile_sensors = 2;
+  config.target_active_hemisphere_total = 0;
+  config.contact_loss_weight = 10.0;
+  config.support_weight = 0.0;
+  config.shear_weight = 0.0;
+  config.rotation_weight = 0.0;
+  config.qddot_weight = 0.0;
+  config.tau_weight = 0.0;
 
   mppi_core::GraspStabilityCost cost(config);
 
-  mppi_core::TactileState tactile;
-  tactile.valid = true;
-  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
-  tactile.total_force_n.z() = 1.0;
-  mppi_core::RolloutContext rollout;
   mppi_core::CostContext context;
-  context.rollout = &rollout;
   const Eigen::VectorXd action = Eigen::VectorXd::Zero(1);
 
-  auto low_patch_state = MakeState(1, tactile);
-  SetHemispherePatch(&low_patch_state.tactile_sensors[0], 2,
-                     TestTactileCentroidM(low_patch_state.tactile_sensors[0]),
-                     low_patch_state.tactile_sensors[0].total_force_n.z());
-  SetHemispherePatch(&low_patch_state.tactile_sensors[1], 2,
-                     TestTactileCentroidM(low_patch_state.tactile_sensors[1]),
-                     low_patch_state.tactile_sensors[1].total_force_n.z());
+  mppi_core::TactileState active_tactile;
+  active_tactile.valid = true;
+  active_tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  SetHemispherePatch(&active_tactile, 1, Eigen::Vector2d::Zero(), 1.0);
+  const mppi_core::TactileState inactive_tactile =
+      MakeInactiveTactileState(active_tactile);
 
-  auto wide_patch_state = low_patch_state;
-  SetHemispherePatch(&wide_patch_state.tactile_sensors[0], 6,
-                     TestTactileCentroidM(wide_patch_state.tactile_sensors[0]),
-                     wide_patch_state.tactile_sensors[0].total_force_n.z());
-  SetHemispherePatch(&wide_patch_state.tactile_sensors[1], 6,
-                     TestTactileCentroidM(wide_patch_state.tactile_sensors[1]),
-                     wide_patch_state.tactile_sensors[1].total_force_n.z());
+  const auto one_sensor_state = mppi_core::MakeGraspState(
+      Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1), active_tactile, inactive_tactile);
+  const auto two_sensor_state = mppi_core::MakeGraspState(
+      Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1), active_tactile, active_tactile);
 
-  const double low_patch_cost = cost.Evaluate(low_patch_state, action, context);
-  const double wide_patch_cost =
-      cost.Evaluate(wide_patch_state, action, context);
-
-  EXPECT_GT(low_patch_cost, wide_patch_cost);
-  EXPECT_NEAR(wide_patch_cost, 0.0, kTolerance);
+  EXPECT_GT(cost.Evaluate(one_sensor_state, action, context),
+            cost.Evaluate(two_sensor_state, action, context));
 }
 
-TEST(GraspStabilityCostTest, DisablingCentroidCostDoesNotAddContactLossCost) {
+TEST(GraspStabilityCostTest,
+     TooFewActiveHemispheresIncreaseCostButExtraContactsDoNotReward) {
   mppi_core::GraspStabilityCostConfig config;
-  config.force_min_n = 0.0;
-  config.force_max_n = 10.0;
-  config.force_under_weight = 0.0;
-  config.force_over_weight = 0.0;
-  config.slip_risk_weight = 0.0;
-  config.contact_centroid_enabled = false;
-  config.centroid_boundary_weight = 0.0;
-  config.contact_loss_weight = 10.0;
-  config.hemisphere_contact_enabled = false;
-  config.tracking_weight = 0.0;
-  config.tracking_action_scale_weight = 0.0;
-  config.action_smoothness_weight = 0.0;
-  config.joint_limit_weight = 0.0;
+  config.min_active_tactile_sensors = 0;
+  config.target_active_hemisphere_total = 4;
+  config.contact_loss_weight = 0.0;
+  config.support_weight = 1.0;
+  config.shear_weight = 0.0;
+  config.rotation_weight = 0.0;
+  config.qddot_weight = 0.0;
+  config.tau_weight = 0.0;
 
   mppi_core::GraspStabilityCost cost(config);
+  mppi_core::CostContext context;
+  const Eigen::VectorXd action = Eigen::VectorXd::Zero(1);
 
   mppi_core::TactileState tactile;
   tactile.valid = true;
   tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
-  tactile.total_force_n.z() = 1.0;
-  SetHemispherePatch(&tactile, 1, TestTactileCentroidM(tactile),
-                     tactile.total_force_n.z());
+
+  auto low_support_state = MakeState(1, tactile);
+  SetHemispherePatch(&low_support_state.tactile_sensors[0], 1,
+                     Eigen::Vector2d::Zero(), 1.0);
+  SetHemispherePatch(&low_support_state.tactile_sensors[1], 1,
+                     Eigen::Vector2d::Zero(), 1.0);
+
+  auto target_support_state = MakeState(1, tactile);
+  SetHemispherePatch(&target_support_state.tactile_sensors[0], 2,
+                     Eigen::Vector2d::Zero(), 1.0);
+  SetHemispherePatch(&target_support_state.tactile_sensors[1], 2,
+                     Eigen::Vector2d::Zero(), 1.0);
+
+  auto extra_support_state = MakeState(1, tactile);
+  SetHemispherePatch(&extra_support_state.tactile_sensors[0], 3,
+                     Eigen::Vector2d::Zero(), 1.0);
+  SetHemispherePatch(&extra_support_state.tactile_sensors[1], 3,
+                     Eigen::Vector2d::Zero(), 1.0);
+
+  const double low_support_cost =
+      cost.Evaluate(low_support_state, action, context);
+  const double target_support_cost =
+      cost.Evaluate(target_support_state, action, context);
+  const double extra_support_cost =
+      cost.Evaluate(extra_support_state, action, context);
+
+  EXPECT_GT(low_support_cost, target_support_cost);
+  EXPECT_NEAR(target_support_cost, 0.0, kTolerance);
+  EXPECT_NEAR(extra_support_cost, target_support_cost, kTolerance);
+}
+
+TEST(GraspStabilityCostTest, ShearRotationActionAndTauIncreaseCost) {
+  mppi_core::GraspStabilityCostConfig config;
+  config.min_active_tactile_sensors = 0;
+  config.target_active_hemisphere_total = 0;
+  config.contact_loss_weight = 0.0;
+  config.support_weight = 0.0;
+  config.shear_weight = 2.0;
+  config.rotation_weight = 3.0;
+  config.qddot_weight = 4.0;
+  config.tau_weight = 5.0;
+
+  mppi_core::GraspStabilityCost cost(config);
+  mppi_core::CostContext context;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.shear_displacement_m = Eigen::Vector2d{0.1, 0.2};
+  tactile.rotational_shear_rad = 0.3;
 
   auto state = MakeState(1, tactile);
-  mppi_core::RolloutContext rollout;
-  mppi_core::CostContext context;
-  context.rollout = &rollout;
-  const Eigen::VectorXd action = Eigen::VectorXd::Zero(1);
+  state.robot.tau = Eigen::VectorXd::Constant(1, 0.4);
+  const Eigen::VectorXd action = Eigen::VectorXd::Constant(1, 0.5);
 
-  EXPECT_NEAR(cost.Evaluate(state, action, context), 0.0, kTolerance);
+  const double expected = 2.0 * (0.1 * 0.1 + 0.2 * 0.2) * 2.0 +
+                          3.0 * 0.3 * 0.3 * 2.0 + 4.0 * 0.5 * 0.5 +
+                          5.0 * 0.4 * 0.4;
+  EXPECT_NEAR(cost.Evaluate(state, action, context), expected, kTolerance);
 }
 
-TEST(GraspConfigTest,
-     ParsesContactLocalCostForceRolloutAndTactileTransitionConfig) {
+TEST(TaskConfigTest, ParsesTaskObjectiveToleranceStartAndCost) {
   const YAML::Node root = YAML::Load(R"(
-grasp:
-  tactile_transition:
-    enable_birth: false
-    enable_loss: false
-    birth_score_threshold: 0.7
-    loss_score_threshold: 0.8
-    birth_neighbor_weight: 0.3
-    birth_tangent_approach_weight: 1.2
-    birth_normal_approach_weight: 0.9
-    birth_shear_penalty_weight: 0.4
-    loss_unloading_weight: 1.3
-    loss_shear_weight: 0.6
-    loss_low_force_weight: 0.2
-    born_normal_force_n: 0.07
-    born_confidence: 0.45
-    inactive_confidence: 0.1
-    contact_confidence_decay: 0.95
-    aggregate_shear_decay: 0.9
-    aggregate_rotation_decay: 0.85
-    enough_contact_hemisphere_count: 3
-  contact_force_rollout:
-    enable_force_projection_update: true
-    force_lowpass_alpha: 0.7
-    max_predicted_normal_force_n: 12.0
-    shear_force_gain_m_per_n_s: 0.0002
-    rotational_shear_gain_rad_per_nm_s: 0.03
-    friction_violation_confidence_decay: 0.4
-    negative_normal_confidence_decay: 0.6
-    min_active_hemisphere_count: 2
-    min_contact_confidence: 0.02
-    shear_ref_m: 0.004
-    rotational_shear_ref_rad: 0.05
-  slip_risk:
-    velocity_weight: 0.05
-  hemisphere_contact:
-    enabled: true
-    target_active_hemisphere_count: 7
-    weight: 3.5
+task:
+  name: jenga
+  start:
+    min_enough_contact_sensors: 2
+    min_active_hemisphere_total: 3
+  objective:
+    min_active_tactile_sensors: 2
+    target_active_hemisphere_total: 5
+  tolerance:
+    max_shear_m: 0.005
+    max_rotation_rad: 0.06
+  cost:
+    contact_loss_weight: 51.0
+    support_weight: 11.0
+    shear_weight: 6.0
+    rotation_weight: 7.0
+    qddot_weight: 8.0
+    tau_weight: 0.09
 )");
 
-  const auto cost_config = mppi_core::ParseGraspConfig(
-      root["grasp"], 2, mppi_core::GraspStabilityCostConfig{});
-  const auto force_rollout_config = mppi_core::ParseContactForceRolloutConfig(
-      root["grasp"], mppi_core::ContactForceRolloutConfig{});
+  const auto task_config =
+      mppi_core::ParseTaskConfig(root["task"], mppi_core::TaskConfig{});
+
+  EXPECT_EQ(task_config.name, "jenga");
+  EXPECT_EQ(task_config.start.min_enough_contact_sensors, 2U);
+  EXPECT_EQ(task_config.start.min_active_hemispheres_total, 3U);
+  EXPECT_EQ(task_config.cost.min_active_tactile_sensors, 2U);
+  EXPECT_EQ(task_config.cost.target_active_hemisphere_total, 5U);
+  EXPECT_NEAR(task_config.tolerance.max_shear_m, 0.005, kTolerance);
+  EXPECT_NEAR(task_config.tolerance.max_rotation_rad, 0.06, kTolerance);
+  EXPECT_NEAR(task_config.cost.contact_loss_weight, 51.0, kTolerance);
+  EXPECT_NEAR(task_config.cost.support_weight, 11.0, kTolerance);
+  EXPECT_NEAR(task_config.cost.shear_weight, 6.0, kTolerance);
+  EXPECT_NEAR(task_config.cost.rotation_weight, 7.0, kTolerance);
+  EXPECT_NEAR(task_config.cost.qddot_weight, 8.0, kTolerance);
+  EXPECT_NEAR(task_config.cost.tau_weight, 0.09, kTolerance);
+}
+
+TEST(TaskConfigTest, AppliesTaskToleranceToTransitionConfig) {
+  const YAML::Node root = YAML::Load(R"(
+task:
+  tolerance:
+    max_shear_m: 0.01
+    max_rotation_rad: 0.2
+)");
+
+  const auto task_config =
+      mppi_core::ParseTaskConfig(root["task"], mppi_core::TaskConfig{});
+  mppi_core::TactileTransitionConfig transition;
+  transition.birth_approach_velocity_mps = 0.123;
+  transition.loss_unloading_velocity_mps = 0.456;
+  transition.born_normal_force_n = 0.789;
+
+  const auto merged =
+      mppi_core::ApplyTaskToleranceToTransitionConfig(task_config, transition);
+
+  EXPECT_NEAR(merged.birth_approach_velocity_mps, 0.123, kTolerance);
+  EXPECT_NEAR(merged.loss_unloading_velocity_mps, 0.456, kTolerance);
+  EXPECT_NEAR(merged.born_normal_force_n, 0.789, kTolerance);
+  EXPECT_NEAR(merged.max_shear_m, 0.01, kTolerance);
+  EXPECT_NEAR(merged.max_rotation_rad, 0.2, kTolerance);
+}
+
+TEST(RolloutConfigTest, ParsesTactileModelAndDisturbanceConfig) {
+  const YAML::Node root = YAML::Load(R"(
+rollout:
+  tactile_model:
+    birth_approach_velocity_mps: 0.003
+    loss_unloading_velocity_mps: 0.004
+    born_normal_force_n: 0.07
+    born_confidence: 0.6
+    contact_confidence_decay: 0.9
+  disturbance:
+    enabled: true
+)");
+
+  const auto rollout_config = mppi_core::ParseGraspStateRolloutConfig(
+      root["rollout"], mppi_core::GraspStateRolloutConfig{});
   const auto tactile_transition_config =
       mppi_core::ParseTactileTransitionConfig(
-          root["grasp"], mppi_core::TactileTransitionConfig{});
+          root["rollout"], mppi_core::TactileTransitionConfig{});
 
-  EXPECT_NEAR(cost_config.slip_velocity_weight, 0.05, kTolerance);
-  EXPECT_TRUE(cost_config.hemisphere_contact_enabled);
-  EXPECT_NEAR(cost_config.target_active_hemisphere_count, 7.0, kTolerance);
-  EXPECT_NEAR(cost_config.hemisphere_contact_weight, 3.5, kTolerance);
-  EXPECT_TRUE(force_rollout_config.enable_force_projection_update);
-  EXPECT_NEAR(force_rollout_config.force_lowpass_alpha, 0.7, kTolerance);
-  EXPECT_NEAR(force_rollout_config.max_predicted_normal_force_n, 12.0,
+  EXPECT_TRUE(rollout_config.disturbance_enabled);
+  EXPECT_NEAR(tactile_transition_config.birth_approach_velocity_mps, 0.003,
               kTolerance);
-  EXPECT_NEAR(force_rollout_config.shear_force_gain_m_per_n_s, 0.0002,
-              kTolerance);
-  EXPECT_NEAR(force_rollout_config.rotational_shear_gain_rad_per_nm_s, 0.03,
-              kTolerance);
-  EXPECT_NEAR(force_rollout_config.friction_violation_confidence_decay, 0.4,
-              kTolerance);
-  EXPECT_NEAR(force_rollout_config.negative_normal_confidence_decay, 0.6,
-              kTolerance);
-  EXPECT_EQ(force_rollout_config.min_active_hemisphere_count, 2U);
-  EXPECT_NEAR(force_rollout_config.min_contact_confidence, 0.02, kTolerance);
-  EXPECT_NEAR(force_rollout_config.shear_ref_m, 0.004, kTolerance);
-  EXPECT_NEAR(force_rollout_config.rotational_shear_ref_rad, 0.05, kTolerance);
-  EXPECT_FALSE(tactile_transition_config.enable_birth);
-  EXPECT_FALSE(tactile_transition_config.enable_loss);
-  EXPECT_NEAR(tactile_transition_config.birth_score_threshold, 0.7,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.loss_score_threshold, 0.8,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.birth_neighbor_weight, 0.3,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.birth_tangent_approach_weight, 1.2,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.birth_normal_approach_weight, 0.9,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.birth_shear_penalty_weight, 0.4,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.loss_unloading_weight, 1.3,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.loss_shear_weight, 0.6, kTolerance);
-  EXPECT_NEAR(tactile_transition_config.loss_low_force_weight, 0.2,
+  EXPECT_NEAR(tactile_transition_config.loss_unloading_velocity_mps, 0.004,
               kTolerance);
   EXPECT_NEAR(tactile_transition_config.born_normal_force_n, 0.07,
               kTolerance);
-  EXPECT_NEAR(tactile_transition_config.born_confidence, 0.45, kTolerance);
-  EXPECT_NEAR(tactile_transition_config.inactive_confidence, 0.1, kTolerance);
-  EXPECT_NEAR(tactile_transition_config.contact_confidence_decay, 0.95,
+  EXPECT_NEAR(tactile_transition_config.born_confidence, 0.6, kTolerance);
+  EXPECT_NEAR(tactile_transition_config.contact_confidence_decay, 0.9,
               kTolerance);
-  EXPECT_NEAR(tactile_transition_config.aggregate_shear_decay, 0.9,
-              kTolerance);
-  EXPECT_NEAR(tactile_transition_config.aggregate_rotation_decay, 0.85,
-              kTolerance);
-  EXPECT_EQ(tactile_transition_config.enough_contact_hemisphere_count, 3U);
+}
+
+TEST(ConfigFileLayoutTest, DefaultFilesUseSplitTaskAndRolloutSurface) {
+  EXPECT_FALSE(std::filesystem::exists(
+      MppiCorePackageRoot() / "config" / "grasp.yaml"));
+
+  const std::filesystem::path rollout_path =
+      MppiCorePackageRoot() / "config" / "rollout.yaml";
+  const std::filesystem::path task_path =
+      MppiCorePackageRoot() / "task" / "jenga.yaml";
+  const std::string rollout_contents = ReadTextFile(rollout_path);
+  const std::string task_contents = ReadTextFile(task_path);
+
+  EXPECT_EQ(rollout_contents.find("contact_loss_weight"),
+            std::string::npos);
+  EXPECT_EQ(task_contents.find("contact_force_rollout"), std::string::npos);
+  EXPECT_EQ(task_contents.find("birth_neighbor_weight"), std::string::npos);
+
+  const YAML::Node rollout_root = YAML::Load(rollout_contents);
+  const YAML::Node task_root = YAML::Load(task_contents);
+  (void)mppi_core::ParseGraspStateRolloutConfig(
+      rollout_root["rollout"], mppi_core::GraspStateRolloutConfig{});
+  (void)mppi_core::ParseTactileTransitionConfig(
+      rollout_root["rollout"], mppi_core::TactileTransitionConfig{});
+  (void)mppi_core::ParseTaskConfig(task_root["task"],
+                                   mppi_core::TaskConfig{});
 }
 
 TEST(IncludeStructureTest, ProductionCodeDoesNotIncludeDeprecatedPaths) {
@@ -2910,6 +3062,39 @@ TEST(MPPIOptimizerTest, InvalidRolloutStepGetsLargeCostAndStopsTrace) {
   EXPECT_FALSE(trace.states[1].valid);
   EXPECT_NEAR(trace.step_costs[0], 1.0e30, 0.0);
   EXPECT_NEAR(trace.total_cost, 1.0e30, 0.0);
+}
+
+TEST(MPPIOptimizerTest, PredictRolloutRequiresMeasuredTorqueFeedback) {
+  mppi_core::MPPIConfig config;
+  config.horizon_steps = 1;
+  config.num_rollouts = 1;
+  config.action_dim = 1;
+  config.dt = 0.1;
+  config.temperature = 1.0;
+  config.action_lower_bound = Eigen::VectorXd::Constant(1, -1.0);
+  config.action_upper_bound = Eigen::VectorXd::Constant(1, 1.0);
+  config.action_noise_std = Eigen::VectorXd::Zero(1);
+
+  auto model = std::make_shared<mppi_core::GraspStateRolloutModel>(1);
+  mppi_core::MPPIOptimizer optimizer;
+  optimizer.Initialize(config, model, nullptr);
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kNoContact;
+
+  mppi_core::GraspObservation observation;
+  observation.q_ref_current = Eigen::VectorXd::Zero(1);
+  observation.qdot_ref_current = Eigen::VectorXd::Zero(1);
+  observation.q_meas = observation.q_ref_current;
+  observation.qdot_meas = observation.qdot_ref_current;
+  observation.tactile_meas = MakeTactileSensors(tactile, tactile);
+
+  mppi_core::ActionSequence actions(1, 1);
+  actions.setAction(0, Eigen::VectorXd::Zero(1));
+
+  EXPECT_THROW((void)optimizer.PredictRollout(observation, actions),
+               std::invalid_argument);
 }
 
 TEST(MPPIOptimizerTest, AllInvalidRolloutsReturnHoldCommand) {

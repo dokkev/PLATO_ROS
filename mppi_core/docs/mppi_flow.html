@@ -674,7 +674,7 @@
       <div class="header-inner">
         <div>
           <h1>MPPI Core Data Flow</h1>
-          <p class="subtitle">Interactive map for the contact-gated force-aware tactile MPPI runtime.</p>
+          <p class="subtitle">Interactive map for the contact-gated residual-aware tactile MPPI runtime.</p>
         </div>
         <div class="toolbar" aria-label="Views">
           <button class="view-button active" data-view="runtime">Runtime</button>
@@ -708,12 +708,11 @@
         <section class="diagram-section" data-section-views="objects" aria-label="Object relationship diagram">
           <div class="diagram-heading">
             <h2>Object Relationship Diagram</h2>
-            <p>Inheritance, ownership, aliases, and composition used by the MPPI runtime.</p>
+            <p>Inheritance, ownership, and composition used by the MPPI runtime.</p>
           </div>
           <div class="legend">
             <span>solid arrow: inheritance / implementation</span>
             <span>has: member or pointer reference</span>
-            <span>alias: type alias</span>
           </div>
           <div class="relation-grid">
             <div class="relation-card">
@@ -725,8 +724,8 @@
                 </button>
                 <div class="edge"><span>implemented by</span></div>
                 <button class="node diagram-node compact" data-id="deltaModelObject" data-kind="module" data-step="0">
-                  <span class="node-title">DeltaQReferenceRolloutModel</span>
-                  <span class="node-path">force-aware rollout model</span>
+                  <span class="node-title">GraspStateRolloutModel</span>
+                  <span class="node-path">acceleration rollout model</span>
                 </button>
               </div>
             </div>
@@ -749,12 +748,7 @@
               <div class="relation-chain">
                 <button class="node diagram-node compact" data-id="graspStateObject" data-kind="state" data-step="0">
                   <span class="node-title">GraspState</span>
-                  <span class="node-path">q, dq, tau, tactile, valid</span>
-                </button>
-                <div class="edge"><span>alias</span></div>
-                <button class="node diagram-node compact" data-id="state" data-kind="state" data-step="0">
-                  <span class="node-title">RobotRolloutState</span>
-                  <span class="node-path">using RobotRolloutState = GraspState</span>
+                  <span class="node-path">RobotState + TactileState + valid</span>
                 </button>
               </div>
             </div>
@@ -823,7 +817,7 @@
             <div class="flow-row long">
               <button class="node diagram-node compact" data-id="observation" data-kind="state" data-step="0">
                 <span class="node-title">obs</span>
-                <span class="node-path">q_ref, q_measured, tau, tactile</span>
+                <span class="node-path">q_ref, q_meas, qdot_meas, tau_meas, tactile0_meas/tactile1_meas</span>
               </button>
               <div class="edge"><span>calls</span></div>
               <button class="node diagram-node compact" data-id="update" data-kind="module" data-step="1">
@@ -833,7 +827,7 @@
               <div class="edge"><span>samples</span></div>
               <button class="node diagram-node compact" data-id="sample" data-kind="module" data-step="1">
                 <span class="node-title">ActionSequence[]</span>
-                <span class="node-path">candidate delta_q_ref sequences</span>
+                <span class="node-path">candidate qddot_des sequences</span>
               </button>
             </div>
             <p class="flow-lane-label">Per-rollout evaluation</p>
@@ -850,7 +844,7 @@
               <div class="edge"><span>initializes</span></div>
               <button class="node diagram-node compact" data-id="state" data-kind="state" data-step="2">
                 <span class="node-title">state[0]</span>
-                <span class="node-path">MakeGraspState(q_ref, tau, tactile)</span>
+                <span class="node-path">MakeGraspState(RobotState, tactile0, tactile1)</span>
               </button>
               <div class="edge"><span>steps</span></div>
               <button class="node diagram-node compact" data-id="step" data-kind="module" data-step="3">
@@ -860,8 +854,8 @@
             </div>
             <p class="flow-lane-label">Tactile prediction and scoring</p>
             <div class="flow-row command">
-              <button class="node diagram-node compact" data-id="forceAware" data-kind="module" data-step="3">
-                <span class="node-title">force-aware tactile</span>
+              <button class="node diagram-node compact" data-id="residualAware" data-kind="module" data-step="3">
+                <span class="node-title">residual-aware tactile</span>
                 <span class="node-path">tau residual -> projected force</span>
               </button>
               <div class="edge"><span>valid state</span></div>
@@ -883,7 +877,7 @@
             <p class="flow-lane-label">Failure and output</p>
             <div class="flow-row command">
               <button class="node diagram-node compact failure-node" data-id="invalid" data-kind="failure" data-step="3">
-                <span class="node-title">force-aware failure</span>
+                <span class="node-title">residual-aware failure</span>
                 <span class="node-path">state.valid = false</span>
               </button>
               <div class="edge"><span>cost</span></div>
@@ -894,7 +888,7 @@
               <div class="edge"><span>or command</span></div>
               <button class="node diagram-node compact" data-id="makeCommandObject" data-kind="module" data-step="5">
                 <span class="node-title">MakeCommand</span>
-                <span class="node-path">integrate first delta_q_ref</span>
+                <span class="node-path">first qddot_des to hybrid command</span>
               </button>
               <div class="edge"><span>returns</span></div>
               <button class="node diagram-node compact" data-id="command" data-kind="state" data-step="5">
@@ -911,7 +905,7 @@
               <h2>Inputs</h2>
               <button class="node" data-id="observation" data-kind="state" data-step="0">
                 <span class="node-title">GraspObservation</span>
-                <span class="node-path">q, dq, tau, tactile, contact context</span>
+                <span class="node-path">measured robot + tactile, reference, contact context</span>
                 <span class="tags"><span class="tag">measured</span><span class="tag">reference</span></span>
               </button>
               <button class="node" data-id="config" data-kind="policy" data-step="0">
@@ -931,7 +925,7 @@
               <button class="node" data-id="sample" data-kind="module" data-step="1">
                 <span class="node-title">SampleActionSequences</span>
                 <span class="node-path">nominal + Gaussian noise + clamp</span>
-                <span class="tags"><span class="tag">delta_q_ref</span></span>
+                <span class="tags"><span class="tag">qddot_des</span></span>
               </button>
               <button class="node" data-id="evaluate" data-kind="module" data-step="2">
                 <span class="node-title">EvaluateRollout</span>
@@ -943,23 +937,23 @@
             <div class="lane" data-lane="model">
               <h2>Rollout Model</h2>
               <button class="node" data-id="state" data-kind="state" data-step="2">
-                <span class="node-title">RobotRolloutState</span>
-                <span class="node-path">GraspState alias</span>
-                <span class="tags"><span class="tag">q</span><span class="tag">dq</span><span class="tag">tau</span><span class="tag">tactile</span></span>
+                <span class="node-title">GraspState</span>
+                <span class="node-path">RobotState + TactileState</span>
+                <span class="tags"><span class="tag">q_des</span><span class="tag">qdot_des</span><span class="tag">tau_ff</span><span class="tag">tactile</span></span>
               </button>
               <button class="node" data-id="step" data-kind="module" data-step="3">
-                <span class="node-title">DeltaQReferenceRolloutModel::Step</span>
-                <span class="node-path">integrate q, predict tau, update tactile</span>
-                <span class="tags"><span class="tag">force-aware first</span></span>
+                <span class="node-title">GraspStateRolloutModel::Step</span>
+                <span class="node-path">integrate qddot_des, compute tau_ff, update tactile0/tactile1</span>
+                <span class="tags"><span class="tag">residual-aware first</span></span>
               </button>
-              <button class="node" data-id="forceAware" data-kind="module" data-step="3">
-                <span class="node-title">TryForceAwareTactileRollout</span>
+              <button class="node" data-id="residualAware" data-kind="module" data-step="3">
+                <span class="node-title">TryResidualAwareTactileTransition</span>
                 <span class="node-path">tau residual -> contact force -> tactile</span>
                 <span class="tags"><span class="tag">required by default</span></span>
               </button>
               <button class="node failure-node" data-id="invalid" data-kind="failure" data-step="3">
                 <span class="node-title">Invalid rollout state</span>
-                <span class="node-path">force-aware missing or failed</span>
+                <span class="node-path">residual-aware missing or failed</span>
                 <span class="tags"><span class="tag">kLargeCost</span><span class="tag">hold if all invalid</span></span>
               </button>
             </div>
@@ -1001,11 +995,11 @@
             </div>
             <div class="note">
               <h3>Tau semantics</h3>
-              <p>Current-state tau is measured joint torque. Future rollout tau is a predicted commanded-torque proxy.</p>
+              <p>Current-state tau is measured joint torque. Future rollout tau is `tau_ff`, the feed-forward torque carried by RobotState.</p>
             </div>
             <div class="note">
               <h3>No heuristic proxy</h3>
-              <p>The simple tactile proxy fallback is removed. Only force-aware rollout and explicit kinematic ablation remain.</p>
+              <p>The simple tactile proxy fallback is removed. Only residual-aware rollout and explicit kinematic ablation remain.</p>
             </div>
           </div>
         </section>
@@ -1036,26 +1030,26 @@
           ["Kind", "abstract base class"],
           ["Virtual API", "actionDim(), Step(state, action, context, dt, next_state)"],
           ["Owner", "MPPIOptimizer stores shared_ptr<const RolloutModelBase>"],
-          ["Current concrete", "DeltaQReferenceRolloutModel"]
+          ["Current concrete", "GraspStateRolloutModel"]
         ],
-        sources: [["include/mppi_core/model/rollout.hpp", "../include/mppi_core/model/rollout.hpp"]],
+        sources: [["include/mppi_core/rollout/rollout_model.hpp", "../include/mppi_core/rollout/rollout_model.hpp"]],
         related: ["deltaModelObject", "optimizerObject", "step"]
       },
       deltaModelObject: {
-        title: "DeltaQReferenceRolloutModel",
-        summary: "Concrete RolloutModelBase implementation for delta-q reference rollout and force-aware tactile prediction.",
+        title: "GraspStateRolloutModel",
+        summary: "Concrete RolloutModelBase implementation for qddot_des rollout and residual-aware tactile prediction.",
         view: ["objects"],
         kv: [
           ["Inherits", "RolloutModelBase"],
-          ["Config", "DeltaQReferenceRolloutConfig"],
-          ["Default policy", "TactileRolloutPolicy::kForceAwareRequired"],
-          ["Step output", "q_next, dq_next, predicted tau, predicted tactile, valid flag"]
+          ["Config", "GraspStateRolloutConfig"],
+          ["Default policy", "TactileRolloutPolicy::kResidualRequired"],
+          ["Step output", "GraspState = RobotState + predicted TactileState"]
         ],
         sources: [
-          ["include/mppi_core/model/delta_q_reference_rollout_model.hpp", "../include/mppi_core/model/delta_q_reference_rollout_model.hpp"],
-          ["src/model/delta_q_reference_rollout_model.cpp", "../src/model/delta_q_reference_rollout_model.cpp"]
+          ["include/mppi_core/rollout/grasp_state_rollout_model.hpp", "../include/mppi_core/rollout/grasp_state_rollout_model.hpp"],
+          ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"]
         ],
-        related: ["rolloutBase", "step", "forceAware"]
+        related: ["rolloutBase", "step", "residualAware"]
       },
       costBase: {
         title: "CostTermBase",
@@ -1076,7 +1070,7 @@
         view: ["objects"],
         kv: [
           ["Inherits", "CostTermBase"],
-          ["Reads", "RobotRolloutState + RolloutContext"],
+          ["Reads", "GraspState + RolloutContext"],
           ["Primary input", "predicted TactileState from the rollout state"],
           ["Output", "one scalar step cost"]
         ],
@@ -1088,15 +1082,15 @@
       },
       graspStateObject: {
         title: "GraspState",
-        summary: "State object that carries rollout joint reference, velocity proxy, torque value, tactile prediction, and validity.",
+        summary: "MPPI prediction target: ideal/reference RobotState plus predicted TactileState and validity.",
         view: ["objects"],
         kv: [
-          ["Fields", "q, dq, tau, tactile, valid"],
+          ["RobotState", "q_des, qdot_des, qddot_des, tau_ff"],
+          ["TactileState", "predicted contact nodes, patch, slip, shear, angle, confidence"],
           ["Construction", "MakeGraspState(...) validates dimensions and finite values"],
-          ["Alias", "RobotRolloutState is currently an alias for GraspState"],
-          ["Tau", "measured in initial/current state; predicted proxy in future rollout states"]
+          ["Measured data", "Use GraspObservation/explicit measured fields, not GraspState"]
         ],
-        sources: [["include/mppi_core/grasp/grasp_state.hpp", "../include/mppi_core/grasp/grasp_state.hpp"]],
+        sources: [["include/mppi_core/state/grasp_state.hpp", "../include/mppi_core/state/grasp_state.hpp"]],
         related: ["state", "step", "cost"]
       },
       optimizerObject: {
@@ -1117,13 +1111,13 @@
       },
       actionSequenceObject: {
         title: "ActionSequence",
-        summary: "Matrix-backed horizon of delta_q_ref actions. MPPI keeps one nominal sequence and many sampled candidate sequences.",
+        summary: "Matrix-backed horizon of qddot_des actions. MPPI keeps one nominal sequence and many sampled candidate sequences.",
         view: ["objects"],
         kv: [
           ["Shape", "action_dim x horizon_steps"],
           ["Nominal", "shifted and repeated after each command"],
           ["Sampled", "nominal plus clipped Gaussian noise"],
-          ["Element", "actions[k] is delta_q_ref for rollout step k"]
+          ["Element", "actions[k] is qddot_des for rollout step k"]
         ],
         sources: [
           ["include/mppi_core/core/action_sequence.hpp", "../include/mppi_core/core/action_sequence.hpp"],
@@ -1138,8 +1132,8 @@
         kv: [
           ["model_", "shared_ptr<const RolloutModelBase>"],
           ["cost_term_", "shared_ptr<const CostTermBase>"],
-          ["Benefit", "optimizer logic does not depend on force-aware tactile details"],
-          ["Runtime concrete types", "DeltaQReferenceRolloutModel and GraspStabilityCost"]
+          ["Benefit", "optimizer logic does not depend on residual-aware tactile details"],
+          ["Runtime concrete types", "GraspStateRolloutModel and GraspStabilityCost"]
         ],
         sources: [["include/mppi_core/core/mppi_optimizer.hpp", "../include/mppi_core/core/mppi_optimizer.hpp"]],
         related: ["rolloutBase", "costBase", "optimizerObject"]
@@ -1149,8 +1143,8 @@
         summary: "Hardware-agnostic tactile representation used by observations, rollout states, force projection priors, and costs.",
         view: ["objects"],
         kv: [
-          ["Contact", "contact_presence, normal_force_n, contact_points, support counts"],
-          ["Geometry", "centroid_m, shear_displacement_m, rotational_shear_rad"],
+          ["Contact", "contact_state, total_force_n, dense hemispheres"],
+          ["Geometry", "cop_sensor_m, shear_displacement_m, rotational_shear_rad"],
           ["Risk", "slip_score, slip_velocity_score, incipient_slip_score"],
           ["Adapter", "NARI data is converted before MPPI sees it"]
         ],
@@ -1158,11 +1152,11 @@
           ["include/mppi_core/tactile/tactile_state.hpp", "../include/mppi_core/tactile/tactile_state.hpp"],
           ["include/mppi_core/tactile/nari_touch_adapter.hpp", "../include/mppi_core/tactile/nari_touch_adapter.hpp"]
         ],
-        related: ["observation", "state", "forceAware"]
+        related: ["observation", "state", "residualAware"]
       },
       contactContextObject: {
         title: "Contact Context",
-        summary: "Observation pointers that make force-aware tactile rollout possible: kinematics, projection config, rollout config, and correction state.",
+        summary: "Observation pointers that make residual-aware tactile rollout possible: kinematics, projection config, rollout config, and correction state.",
         view: ["objects"],
         kv: [
           ["Kinematics", "PinocchioContactKinematicsContext"],
@@ -1171,12 +1165,12 @@
           ["Correction", "ContactForceCorrectionState"]
         ],
         sources: [
-          ["include/mppi_core/grasp_types.hpp", "../include/mppi_core/grasp_types.hpp"],
-          ["include/mppi_core/grasp/grasp_contact_kinematics.hpp", "../include/mppi_core/grasp/grasp_contact_kinematics.hpp"],
-          ["include/mppi_core/grasp/contact_force_projection.hpp", "../include/mppi_core/grasp/contact_force_projection.hpp"],
-          ["include/mppi_core/grasp/contact_force_rollout.hpp", "../include/mppi_core/grasp/contact_force_rollout.hpp"]
+          ["include/mppi_core/state/grasp_observation.hpp", "../include/mppi_core/state/grasp_observation.hpp"],
+          ["include/mppi_core/contact/contact_kinematics.hpp", "../include/mppi_core/contact/contact_kinematics.hpp"],
+          ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
+          ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
         ],
-        related: ["rolloutContextObject", "forceAware", "observation"]
+        related: ["rolloutContextObject", "residualAware", "observation"]
       },
       rolloutContextObject: {
         title: "RolloutContext",
@@ -1185,11 +1179,11 @@
         kv: [
           ["Built in", "PredictRollout and EvaluateRollout"],
           ["State refs", "measured_state, initial_reference_state"],
-          ["Contact refs", "tactile, contact_kinematics, force configs, correction state"],
-          ["Usage", "Step uses contact context; cost uses measured/reference tracking context"]
+          ["Contact refs", "tactile0/tactile1, per-sensor kinematics, force configs, correction state"],
+          ["Usage", "Step uses per-sensor contact context; cost uses measured/reference tracking context"]
         ],
         sources: [
-          ["include/mppi_core/model/rollout.hpp", "../include/mppi_core/model/rollout.hpp"],
+          ["include/mppi_core/rollout/rollout_model.hpp", "../include/mppi_core/rollout/rollout_model.hpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
         related: ["evaluate", "step", "cost", "observation"]
@@ -1222,14 +1216,14 @@
       },
       makeCommandObject: {
         title: "MakeCommand",
-        summary: "Turns the selected first delta_q_ref into a generic RobotCommand hybrid impedance packet.",
+        summary: "Turns the selected first qddot_des into a generic RobotCommand hybrid impedance packet.",
         view: ["runtime"],
         kv: [
           ["Input", "observation + first nominal action"],
-          ["q_des", "Pinocchio integrate when nq/nv differ, otherwise q_ref_current + delta_q_ref"],
-          ["qdot_des", "delta_q_ref / dt"],
-          ["Feedforward/gains", "tau_ff, qddot_des, kp, and kd are populated as zero unless another layer fills them"],
-          ["Hold path", "zero delta_q_ref keeps q_des at current reference"]
+          ["q_des", "Pinocchio integrate from q_ref_current using qdot_des * dt"],
+          ["qdot_des", "qdot_ref_current + qddot_des * dt"],
+          ["Feedforward/gains", "tau_ff, qddot_des, kp, and kd are populated for the embedded PD law"],
+          ["Hold path", "zero qddot_des holds current reference velocity"]
         ],
         sources: [["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]],
         related: ["weights", "command", "invalid"]
@@ -1239,16 +1233,16 @@
         summary: "Runtime input bundle consumed by MPPIOptimizer. It combines measured robot state, current commanded reference, tactile state, torque, and optional contact-model context.",
         view: ["objects", "runtime", "rollout", "config"],
         kv: [
-          ["Fields", "q_measured, v_measured, q_ref_current, v_ref_current, tau, tactile"],
+          ["Fields", "q_meas, qdot_meas, tau_meas, tactile0_meas/tactile1_meas, q_ref_current, qdot_ref_current"],
           ["Contact context", "PinocchioContactKinematicsContext, ContactForceProjectionConfig, ContactForceRolloutConfig, ContactForceCorrectionState"],
           ["Tau", "Measured joint torque for the current observation"],
-          ["Failure risk", "Missing tactile contact or contact kinematics prevents force-aware rollout"]
+          ["Failure risk", "Missing tactile contact or contact kinematics prevents residual-aware rollout"]
         ],
         sources: [
-          ["include/mppi_core/grasp_types.hpp", "../include/mppi_core/grasp_types.hpp"],
+          ["include/mppi_core/state/grasp_observation.hpp", "../include/mppi_core/state/grasp_observation.hpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
-        related: ["update", "state", "forceAware"]
+        related: ["update", "state", "residualAware"]
       },
       config: {
         title: "Config Surface",
@@ -1256,16 +1250,16 @@
         view: ["runtime", "config"],
         kv: [
           ["mppi.yaml", "horizon_steps, dt, num_rollouts, temperature, action bounds, noise"],
-          ["grasp.yaml", "tactile_prediction.rollout_policy, contact_force_rollout, normal force, slip, centroid, patch costs"],
-          ["Default policy", "TactileRolloutPolicy::kForceAwareRequired"],
-          ["Ablation", "kForceThenKinematicFallback enables kinematic patch fallback only"]
+          ["grasp.yaml", "grasp_state_transition.rollout_policy, contact_force_rollout, normal force, slip, centroid, hemisphere costs"],
+          ["Default policy", "TactileRolloutPolicy::kResidualRequired"],
+          ["Ablation", "kResidualThenKinematicFallback enables kinematic patch fallback only"]
         ],
         sources: [
           ["config/mppi.yaml", "../config/mppi.yaml"],
           ["config/grasp.yaml", "../config/grasp.yaml"],
           ["src/config/grasp_config.cpp", "../src/config/grasp_config.cpp"]
         ],
-        related: ["update", "forceAware", "cost"]
+        related: ["update", "residualAware", "cost"]
       },
       update: {
         title: "MPPIOptimizer::Update",
@@ -1274,8 +1268,8 @@
         kv: [
           ["Input", "GraspObservation"],
           ["Sampling", "Starts from nominal action sequence"],
-          ["Contact gate", "Not owned here; caller must gate no-contact observations for force-aware-required controllers"],
-          ["Invalid handling", "All invalid rollouts reset nominal actions and return zero delta_q_ref"],
+          ["Contact gate", "Not owned here; caller must gate no-contact observations for residual-required controllers"],
+          ["Invalid handling", "All invalid rollouts reset nominal actions and return zero qddot_des"],
           ["Output", "RobotCommand"]
         ],
         sources: [
@@ -1289,7 +1283,7 @@
         summary: "Builds candidate action sequences by copying the nominal sequence, adding Gaussian noise, and clipping to configured bounds.",
         view: ["runtime"],
         kv: [
-          ["Action", "delta_q_ref"],
+          ["Action", "qddot_des"],
           ["Rollout 0", "Current nominal sequence without added noise"],
           ["Other rollouts", "Nominal + normal noise * action_noise_std"],
           ["Bounds", "action_lower_bound and action_upper_bound"]
@@ -1302,7 +1296,7 @@
         summary: "Runs each candidate action sequence across the horizon. Every step calls the rollout model, then scores the next state.",
         view: ["runtime", "rollout"],
         kv: [
-          ["Initial state", "MakeGraspState(q_ref_current, v_ref_current or zero, tau, tactile)"],
+          ["Initial state", "MakeGraspState(RobotState{q_ref_current, qdot_ref_current, zero qddot_des, zero tau_ff}, tactile0_meas, tactile1_meas)"],
           ["Context", "Measured state, initial reference, tactile, contact configs"],
           ["Invalid state", "Returns kLargeCost immediately"],
           ["Trace mode", "PredictRollout records states, actions, step_costs, and stops at invalid"]
@@ -1311,67 +1305,68 @@
         related: ["state", "step", "cost", "invalid"]
       },
       state: {
-        title: "RobotRolloutState",
-        summary: "Alias for GraspState. This is the per-step state passed through the rollout and cost functions.",
+        title: "GraspState",
+        summary: "Per-step MPPI state passed through rollout and cost functions.",
         view: ["objects", "runtime", "rollout", "cost"],
         kv: [
-          ["q", "Reference configuration. May be nq when Pinocchio integration is used"],
-          ["dq", "Reference velocity proxy, usually action / dt"],
-          ["tau", "Measured at current state, predicted proxy in future states"],
-          ["tactile", "Predicted TactileState after contact-force rollout"]
+          ["robot.q_des", "Reference configuration. May be nq when Pinocchio integration is used"],
+          ["robot.qdot_des", "Reference velocity"],
+          ["robot.qddot_des", "Sampled desired acceleration"],
+          ["robot.tau_ff", "Feed-forward torque from RNEA or deterministic zero fallback"],
+          ["tactile", "Predicted TactileState after residual/contact rollout"]
         ],
         sources: [
-          ["include/mppi_core/model/rollout.hpp", "../include/mppi_core/model/rollout.hpp"],
-          ["include/mppi_core/grasp/grasp_state.hpp", "../include/mppi_core/grasp/grasp_state.hpp"]
+          ["include/mppi_core/rollout/rollout_model.hpp", "../include/mppi_core/rollout/rollout_model.hpp"],
+          ["include/mppi_core/state/grasp_state.hpp", "../include/mppi_core/state/grasp_state.hpp"]
         ],
-        related: ["step", "forceAware", "cost"]
+        related: ["step", "residualAware", "cost"]
       },
       step: {
-        title: "DeltaQReferenceRolloutModel::Step",
-        summary: "Integrates q, computes dq and predicted rollout tau, then updates tactile state through force-aware prediction or explicit kinematic fallback.",
+        title: "GraspStateRolloutModel::Step",
+        summary: "Integrates qddot_des into qdot_des/q_des, computes tau_ff, then updates tactile0 and tactile1 state through residual-aware prediction or explicit kinematic fallback.",
         view: ["objects", "rollout", "runtime"],
         kv: [
-          ["q_next", "pinocchio::integrate(model, q, action), or q + action"],
-          ["dq_next", "action / dt"],
-          ["tau_next", "stiffness * action - damping * current dq"],
-          ["Tactile order", "Try force-aware first; if required policy fails, mark invalid"]
+          ["qdot_des_next", "qdot_des + qddot_des * dt"],
+          ["q_des_next", "pinocchio::integrate(model, q_des, qdot_des_next * dt), or q_des + step"],
+          ["tau_ff_next", "pinocchio::rnea(q_des_next, qdot_des_next, qddot_des), or zero fallback"],
+          ["Tactile order", "Try residual-aware first; if required policy fails, mark invalid"]
         ],
         sources: [
-          ["include/mppi_core/model/delta_q_reference_rollout_model.hpp", "../include/mppi_core/model/delta_q_reference_rollout_model.hpp"],
-          ["src/model/delta_q_reference_rollout_model.cpp", "../src/model/delta_q_reference_rollout_model.cpp"]
+          ["include/mppi_core/rollout/grasp_state_rollout_model.hpp", "../include/mppi_core/rollout/grasp_state_rollout_model.hpp"],
+          ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"]
         ],
-        related: ["forceAware", "invalid", "state"]
+        related: ["residualAware", "invalid", "state"]
       },
-      forceAware: {
-        title: "Force-Aware Tactile Rollout",
+      residualAware: {
+        title: "Residual-Aware Tactile Transition",
         summary: "Projects contact forces from torque residuals, optionally corrects normal force bias, and updates predicted tactile force, shear, confidence, support, and slip.",
         view: ["rollout", "runtime"],
         kv: [
-          ["Preconditions", "Valid state, valid tactile contact point, valid Pinocchio contact kinematics, finite q/dq/tau"],
-          ["Residual", "tau_residual = state.tau - pinocchio::rnea(q, dq, zero_acceleration)"],
+          ["Preconditions", "Valid GraspState, valid tactile contact point, valid Pinocchio contact kinematics, finite robot vectors"],
+          ["Residual", "tau_residual = tau_meas - pinocchio::rnea(q_meas, qdot_meas, zero_acceleration)"],
           ["Projection", "ProjectContactForcesFromTorqueResidual solves contact forces with tactile prior and regularization"],
           ["Tactile update", "StepTactileStateFromProjectedForce"]
         ],
         sources: [
-          ["src/model/delta_q_reference_rollout_model.cpp", "../src/model/delta_q_reference_rollout_model.cpp"],
-          ["include/mppi_core/grasp/contact_force_projection.hpp", "../include/mppi_core/grasp/contact_force_projection.hpp"],
-          ["include/mppi_core/grasp/contact_force_rollout.hpp", "../include/mppi_core/grasp/contact_force_rollout.hpp"]
+          ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"],
+          ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
+          ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
         ],
         related: ["invalid", "cost", "config"]
       },
       invalid: {
         title: "Invalid Rollout State",
-        summary: "In force-aware-required mode, force-aware failure means the sample/model step is invalid. It does not fall back to heuristic tactile prediction.",
+        summary: "In residual-required mode, residual-aware failure means the sample/model step is invalid. It does not fall back to heuristic tactile prediction.",
         view: ["runtime", "rollout"],
         kv: [
           ["Step behavior", "next_state.valid = false"],
           ["Rollout cost", "EvaluateRollout returns kLargeCost"],
           ["Trace behavior", "PredictRollout records the invalid step and stops"],
-          ["Update behavior", "If every rollout is invalid, ResetNominalActions and return zero delta_q_ref"],
-          ["Gate owner", "Caller/controller must avoid entering force-aware MPPI before tactile contact"]
+          ["Update behavior", "If every rollout is invalid, ResetNominalActions and return zero qddot_des"],
+          ["Gate owner", "Caller/controller must avoid entering residual-aware MPPI before tactile contact"]
         ],
         sources: [
-          ["src/model/delta_q_reference_rollout_model.cpp", "../src/model/delta_q_reference_rollout_model.cpp"],
+          ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
         related: ["evaluate", "update", "command"]
@@ -1384,7 +1379,7 @@
           ["Force", "Penalty below force_min_n and above force_max_n"],
           ["Slip", "Tactile slip score plus optional velocity-weighted slip score"],
           ["Centroid", "Boundary penalty or contact loss penalty if centroid is missing"],
-          ["Patch", "Penalty for contact_support_count below target_node_count"]
+          ["Hemisphere contact", "Penalty for active_hemisphere_count below target_active_hemisphere_count"]
         ],
         sources: [
           ["include/mppi_core/costs/grasp_stability_cost.hpp", "../include/mppi_core/costs/grasp_stability_cost.hpp"],
@@ -1411,12 +1406,12 @@
         view: ["runtime"],
         kv: [
           ["Core packet", "q_des, qdot_des, qddot_des, tau_ff, kp, kd"],
-          ["q_des", "pinocchio::integrate(q_ref_current, delta_q_ref), or q_ref_current + delta_q_ref"],
-          ["qdot_des", "delta_q_ref / dt"],
-          ["Debug fields", "delta_q_ref, delta_tau_ref, tau_raw, tau_limited"]
+          ["q_des", "pinocchio::integrate(q_ref_current, qdot_des * dt), or q_ref_current + step"],
+          ["qdot_des", "qdot_ref_current + qddot_des * dt"],
+          ["Debug fields", "qddot_des, tau_ff, kp, kd"]
         ],
         sources: [
-          ["include/mppi_core/robot_command.hpp", "../include/mppi_core/robot_command.hpp"],
+          ["include/mppi_core/robot/robot_command.hpp", "../include/mppi_core/robot/robot_command.hpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
         related: ["update", "weights", "invalid"]

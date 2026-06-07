@@ -4,16 +4,13 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include <Eigen/Core>
+#include <cstddef>
 
 namespace mppi_core {
 
 class ActionSequence {
  public:
-  using Matrix = Eigen::MatrixXd;
-
   ActionSequence() = default;
   ActionSequence(std::size_t action_dim, std::size_t horizon_steps) {
     Resize(action_dim, horizon_steps);
@@ -30,15 +27,15 @@ class ActionSequence {
     return static_cast<std::size_t>(values_.cols());
   }
 
-  const Matrix& values() const { return values_; }
-  Matrix& values() { return values_; }
+  const Eigen::MatrixXd& values() const { return values_; }
+  Eigen::MatrixXd& values() { return values_; }
 
   Eigen::VectorXd action(std::size_t step) const;
   Eigen::VectorXd firstAction() const;
   void setAction(std::size_t step, const Eigen::Ref<const Eigen::VectorXd>& u);
 
  private:
-  Matrix values_;
+  Eigen::MatrixXd values_;
 };
 
 }  // namespace mppi_core

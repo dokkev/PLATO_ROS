@@ -5,6 +5,107 @@ preserve or intentionally replace.
 
 ---
 
+## 2026-06-05 - MPPI Predicts Modular Tactile GraspState
+
+Status: Accepted
+
+### Context
+
+`mppi_core` needs a rollout target that keeps robot reference state and all
+tactile sensors visible. A single tactile field made it too easy to ignore one
+sensor, while fixed first/second tactile fields made the rollout unnecessarily
+specific to one hand configuration.
+
+### Decision
+
+Use `GraspState = RobotState + vector<TactileState>` as the top-level rollout
+state. Keep `TactileState` sensor-specific and compact: sensor-level aggregates
+plus a dense full hemisphere list. Carry one `TactileSensorContext` per tactile
+state and a separate `RobotDynamicsContext` for Pinocchio integrate/RNEA.
+
+### Reason
+
+The current hand setup may have two tactile sensors, but rollout, cost, adapter,
+and tests should not bake that count into production state fields. A vector
+keeps the current paired-sensor setup representable while leaving room for
+additional tactile sensors.
+
+### Consequences
+
+Positive:
+
+- Validity checks must consider every tactile sensor.
+- Inactive hemispheres remain representable, so contact birth can be modeled
+  later without changing `TactileState` shape.
+- Measured torque residual force projection is only safe when exactly one
+  tactile sensor has active hemisphere contact; zero or multi-active-sensor
+  rollout skips residual projection and uses kinematic tactile transition until
+  a coupled residual solver exists.
+- The `/grasp` include directory no longer acts as a catch-all for robot,
+  tactile, contact, and rollout code.
+
+Trade-offs:
+
+- Runtime integration must construct and cache one contact kinematics context
+  per tactile sensor frame, plus one robot dynamics context for the robot model.
+- Old include compatibility headers and aliases are removed; callers must use
+  the current responsibility directories directly.
+
+### Related files
+
+- `mppi_core/include/mppi_core/state/grasp_state.hpp`
+- `mppi_core/include/mppi_core/rollout/grasp_state_rollout_model.hpp`
+- `mppi_core/include/mppi_core/tactile/tactile_state.hpp`
+- `mppi_core/docs/grasp_state_mppi.md`
+
+---
+
+## 2026-06-05 - MPPI Action Is Desired Joint Acceleration
+
+Status: Accepted
+
+### Context
+
+The contact-local MPPI core previously sampled joint reference increments and
+used a simple torque proxy during rollout. The intended runtime now sends hybrid
+impedance commands to an embedded 1 kHz controller.
+
+### Decision
+
+Sample `qddot_des` in `mppi_core`, integrate ideal `qdot_des` and `q_des` during
+rollout, compute `tau_ff` with Pinocchio RNEA when model/data are available,
+and fall back to deterministic zero feed-forward torque otherwise. Keep embedded
+PD feedback out of the rollout model.
+
+### Reason
+
+This matches the command actually consumed by the low-level controller while
+keeping MPPI prediction deterministic, ROS-free, and testable.
+
+### Consequences
+
+Positive:
+
+- Clear separation between measured state, rollout reference state, and final
+  command packet.
+- Explicit acceleration units for action bounds and noise.
+- No fake rollout torque stiffness/damping proxy in production behavior.
+
+Trade-offs:
+
+- ROS adapters must populate measured fields and command gains explicitly.
+- Older delta-q callers need to migrate to `GraspStateRolloutModel` and
+  `qddot_des` actions directly.
+
+### Related files
+
+- `mppi_core/include/mppi_core/rollout/grasp_state_rollout_model.hpp`
+- `mppi_core/include/mppi_core/robot/robot_command.hpp`
+- `mppi_core/config/mppi.yaml`
+- `mppi_core/README.md`
+
+---
+
 ## 2026-06-05 - Keep AGENTS.md As A Map
 
 Status: Accepted

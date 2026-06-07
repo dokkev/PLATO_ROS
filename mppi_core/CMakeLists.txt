@@ -21,7 +21,8 @@ set(${PROJECT_NAME}_SOURCES
   src/core/action_sequence.cpp
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
-  src/model/delta_q_reference_rollout_model.cpp
+  src/rollout/grasp_state_rollout_model.cpp
+  src/robot/robot_system.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SOURCES})

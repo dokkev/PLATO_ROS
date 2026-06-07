@@ -68,15 +68,15 @@ TactileRolloutPolicy ReadTactileRolloutPolicy(
     return default_value;
   }
   const std::string policy = value.as<std::string>();
-  if (policy == "force_aware_required") {
-    return TactileRolloutPolicy::kForceAwareRequired;
+  if (policy == "residual_required") {
+    return TactileRolloutPolicy::kResidualRequired;
   }
-  if (policy == "force_then_kinematic_fallback") {
-    return TactileRolloutPolicy::kForceThenKinematicFallback;
+  if (policy == "residual_then_kinematic_fallback") {
+    return TactileRolloutPolicy::kResidualThenKinematicFallback;
   }
   throw std::invalid_argument(
-      "Field 'rollout_policy' must be one of: force_aware_required, "
-      "force_then_kinematic_fallback");
+      "Field 'rollout_policy' must be one of: residual_required, "
+      "residual_then_kinematic_fallback");
 }
 
 YAML::Node ReadSection(const YAML::Node& node, const char* key) {
@@ -199,14 +199,21 @@ GraspStabilityCostConfig ParseGraspConfig(const YAML::Node& params,
   defaults.centroid_y_max =
       ReadDouble(contact_centroid, "y_max", defaults.centroid_y_max);
 
-  const YAML::Node contact_patch = ReadSection(safe_params, "contact_patch");
-  defaults.contact_patch_enabled =
-      ReadBool(contact_patch, "enabled", defaults.contact_patch_enabled);
-  defaults.contact_patch_target_node_count =
-      ReadDouble(contact_patch, "target_node_count",
-                 defaults.contact_patch_target_node_count);
-  defaults.contact_patch_weight =
-      ReadDouble(contact_patch, "weight", defaults.contact_patch_weight);
+  YAML::Node hemisphere_contact =
+      ReadSection(safe_params, "hemisphere_contact");
+  if (!HasValue(hemisphere_contact)) {
+    hemisphere_contact = ReadSection(safe_params, "contact_patch");
+  }
+  defaults.hemisphere_contact_enabled = ReadBool(
+      hemisphere_contact, "enabled", defaults.hemisphere_contact_enabled);
+  defaults.target_active_hemisphere_count =
+      ReadDouble(hemisphere_contact, "target_active_hemisphere_count",
+                 defaults.target_active_hemisphere_count);
+  defaults.target_active_hemisphere_count =
+      ReadDouble(hemisphere_contact, "target_node_count",
+                 defaults.target_active_hemisphere_count);
+  defaults.hemisphere_contact_weight = ReadDouble(
+      hemisphere_contact, "weight", defaults.hemisphere_contact_weight);
 
   const YAML::Node tracking_guard = ReadSection(safe_params, "tracking_guard");
   defaults.tracking_weight =
@@ -277,30 +284,36 @@ GraspStabilityCostConfig LoadGraspConfigFromYamlFile(
   }
 }
 
-DeltaQReferenceRolloutConfig ParseDeltaQReferenceRolloutConfig(
-    const YAML::Node& params, DeltaQReferenceRolloutConfig defaults) {
+GraspStateRolloutConfig ParseGraspStateRolloutConfig(
+    const YAML::Node& params, GraspStateRolloutConfig defaults) {
   const YAML::Node safe_params = HasValue(params) ? params : YAML::Node();
   if (HasValue(safe_params) && !safe_params.IsMap()) {
     throw std::invalid_argument(
-        "ParseDeltaQReferenceRolloutConfig: params must be a map");
+        "ParseGraspStateRolloutConfig: params must be a map");
   }
 
-  const YAML::Node tactile_prediction =
-      ReadSection(safe_params, "tactile_prediction");
+  YAML::Node tactile_prediction =
+      ReadSection(safe_params, "grasp_state_transition");
+  if (!HasValue(tactile_prediction)) {
+    tactile_prediction = ReadSection(safe_params, "tactile_transition");
+  }
+  if (!HasValue(tactile_prediction)) {
+    tactile_prediction = ReadSection(safe_params, "tactile_prediction");
+  }
   defaults.tactile_rollout_policy = ReadTactileRolloutPolicy(
       tactile_prediction, "rollout_policy", defaults.tactile_rollout_policy);
   return defaults;
 }
 
-DeltaQReferenceRolloutConfig LoadDeltaQReferenceRolloutConfigFromYamlFile(
-    const std::string& yaml_path, DeltaQReferenceRolloutConfig defaults) {
+GraspStateRolloutConfig LoadGraspStateRolloutConfigFromYamlFile(
+    const std::string& yaml_path, GraspStateRolloutConfig defaults) {
   try {
     const YAML::Node root = YAML::LoadFile(yaml_path);
-    return ParseDeltaQReferenceRolloutConfig(GraspConfigNode(root),
-                                             std::move(defaults));
+    return ParseGraspStateRolloutConfig(GraspConfigNode(root),
+                                        std::move(defaults));
   } catch (const YAML::Exception& ex) {
     throw std::runtime_error(
-        "LoadDeltaQReferenceRolloutConfigFromYamlFile: failed to load '" +
+        "LoadGraspStateRolloutConfigFromYamlFile: failed to load '" +
         yaml_path + "': " + ex.what());
   }
 }
@@ -314,41 +327,38 @@ ContactForceRolloutConfig ParseContactForceRolloutConfig(
   }
 
   const YAML::Node rollout = ReadSection(safe_params, "contact_force_rollout");
-  defaults.enable_force_projection_update = ReadBool(
-      rollout, "enable_force_projection_update",
-      defaults.enable_force_projection_update);
+  defaults.enable_force_projection_update =
+      ReadBool(rollout, "enable_force_projection_update",
+               defaults.enable_force_projection_update);
   defaults.force_lowpass_alpha =
       ReadDouble(rollout, "force_lowpass_alpha", defaults.force_lowpass_alpha);
-  defaults.max_predicted_normal_force_n = ReadDouble(
-      rollout, "max_predicted_normal_force_n",
-      defaults.max_predicted_normal_force_n);
-  defaults.shear_force_gain_m_per_n_s = ReadDouble(
-      rollout, "shear_force_gain_m_per_n_s",
-      defaults.shear_force_gain_m_per_n_s);
-  defaults.rotational_shear_gain_rad_per_nm_s = ReadDouble(
-      rollout, "rotational_shear_gain_rad_per_nm_s",
-      defaults.rotational_shear_gain_rad_per_nm_s);
-  defaults.friction_violation_confidence_decay = ReadDouble(
-      rollout, "friction_violation_confidence_decay",
-      defaults.friction_violation_confidence_decay);
-  defaults.negative_normal_confidence_decay = ReadDouble(
-      rollout, "negative_normal_confidence_decay",
-      defaults.negative_normal_confidence_decay);
-  defaults.min_stable_support_count = ReadSize(
-      rollout, "min_stable_support_count", defaults.min_stable_support_count);
+  defaults.max_predicted_normal_force_n =
+      ReadDouble(rollout, "max_predicted_normal_force_n",
+                 defaults.max_predicted_normal_force_n);
+  defaults.shear_force_gain_m_per_n_s =
+      ReadDouble(rollout, "shear_force_gain_m_per_n_s",
+                 defaults.shear_force_gain_m_per_n_s);
+  defaults.rotational_shear_gain_rad_per_nm_s =
+      ReadDouble(rollout, "rotational_shear_gain_rad_per_nm_s",
+                 defaults.rotational_shear_gain_rad_per_nm_s);
+  defaults.friction_violation_confidence_decay =
+      ReadDouble(rollout, "friction_violation_confidence_decay",
+                 defaults.friction_violation_confidence_decay);
+  defaults.negative_normal_confidence_decay =
+      ReadDouble(rollout, "negative_normal_confidence_decay",
+                 defaults.negative_normal_confidence_decay);
+  defaults.min_active_hemisphere_count =
+      ReadSize(rollout, "min_active_hemisphere_count",
+               defaults.min_active_hemisphere_count);
+  defaults.min_active_hemisphere_count =
+      ReadSize(rollout, "min_stable_support_count",
+               defaults.min_active_hemisphere_count);
   defaults.min_contact_confidence = ReadDouble(
       rollout, "min_contact_confidence", defaults.min_contact_confidence);
   defaults.shear_ref_m =
       ReadDouble(rollout, "shear_ref_m", defaults.shear_ref_m);
   defaults.rotational_shear_ref_rad = ReadDouble(
-      rollout, "rotational_shear_ref_rad",
-      defaults.rotational_shear_ref_rad);
-  defaults.rollout_torque_stiffness_nm_per_rad = ReadDouble(
-      rollout, "rollout_torque_stiffness_nm_per_rad",
-      defaults.rollout_torque_stiffness_nm_per_rad);
-  defaults.rollout_torque_damping_nms_per_rad = ReadDouble(
-      rollout, "rollout_torque_damping_nms_per_rad",
-      defaults.rollout_torque_damping_nms_per_rad);
+      rollout, "rotational_shear_ref_rad", defaults.rotational_shear_ref_rad);
   return defaults;
 }
 

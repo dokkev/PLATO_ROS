@@ -10,8 +10,8 @@
 #include <yaml-cpp/yaml.h>
 
 #include "mppi_core/costs/grasp_stability_cost.hpp"
-#include "mppi_core/grasp/contact_force_rollout.hpp"
-#include "mppi_core/model/delta_q_reference_rollout_model.hpp"
+#include "mppi_core/rollout/grasp_state_rollout_model.hpp"
+#include "mppi_core/rollout/contact_force_rollout.hpp"
 
 namespace mppi_core {
 
@@ -23,12 +23,12 @@ GraspStabilityCostConfig LoadGraspConfigFromYamlFile(
     const std::string& yaml_path, std::size_t action_dim,
     GraspStabilityCostConfig defaults = {});
 
-DeltaQReferenceRolloutConfig ParseDeltaQReferenceRolloutConfig(
-    const YAML::Node& params, DeltaQReferenceRolloutConfig defaults = {});
+GraspStateRolloutConfig ParseGraspStateRolloutConfig(
+    const YAML::Node& params, GraspStateRolloutConfig defaults = {});
 
-DeltaQReferenceRolloutConfig LoadDeltaQReferenceRolloutConfigFromYamlFile(
+GraspStateRolloutConfig LoadGraspStateRolloutConfigFromYamlFile(
     const std::string& yaml_path,
-    DeltaQReferenceRolloutConfig defaults = {});
+    GraspStateRolloutConfig defaults = {});
 
 ContactForceRolloutConfig ParseContactForceRolloutConfig(
     const YAML::Node& params, ContactForceRolloutConfig defaults = {});

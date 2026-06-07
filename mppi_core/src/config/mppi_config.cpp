@@ -148,6 +148,12 @@ MPPIConfig ParseMPPIConfig(const YAML::Node& params, std::size_t action_dim,
   defaults.action_noise_std = ReadVectorXdOrScalar(
       action, "noise_std", action_dim, defaults.action_noise_std);
 
+  const YAML::Node command = ReadSection(safe_params, "command");
+  defaults.command_kp = ReadVectorXdOrScalar(command, "kp", action_dim,
+                                             defaults.command_kp);
+  defaults.command_kd = ReadVectorXdOrScalar(command, "kd", action_dim,
+                                             defaults.command_kd);
+
   // Backward-compatible flat fields for older experimental configs.
   defaults.action_lower_bound =
       ReadVectorXdOrScalar(safe_params, "action_lower_bound", action_dim,
@@ -157,6 +163,12 @@ MPPIConfig ParseMPPIConfig(const YAML::Node& params, std::size_t action_dim,
                            defaults.action_upper_bound);
   defaults.action_noise_std = ReadVectorXdOrScalar(
       safe_params, "action_noise_std", action_dim, defaults.action_noise_std);
+  defaults.command_kp =
+      ReadVectorXdOrScalar(safe_params, "command_kp", action_dim,
+                           defaults.command_kp);
+  defaults.command_kd =
+      ReadVectorXdOrScalar(safe_params, "command_kd", action_dim,
+                           defaults.command_kd);
 
   return defaults;
 }

@@ -15,6 +15,8 @@ Useful deeper runbooks:
 
 - `docs/motor/usbcan_setup.md`
 - `docs/frimware/plato2/README.md`
+- `mppi_core/docs/grasp_state_mppi.md`
+- `mppi_core/docs/file_structure.md`
 - `installation.md`
 - `cli_commands.md`
 
@@ -28,5 +30,7 @@ Guidelines:
   launch dry runs, or limited-scope checks before real hardware when practical.
 - Preserve the ros2_control boundary: controllers speak joint-space interfaces;
   hardware packages absorb robot-specific actuator, CAN, and transmission detail.
-- Run the narrowest relevant validation command from `docs/COMMANDS.md` when
-  practical. If validation is not run, say exactly what was not verified.
+- Read relevant tests, docs, and nearby code when they help understand the
+  change. Run test/build commands only when the user explicitly asks for
+  testing/validation or agrees to it; otherwise, name the narrow command from
+  `docs/COMMANDS.md` that was not run.

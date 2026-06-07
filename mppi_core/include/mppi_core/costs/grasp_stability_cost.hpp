@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include <Eigen/Core>
+#include <cstddef>
 
 #include "mppi_core/costs/cost_term_base.hpp"
 #include "mppi_core/tactile/tactile_state.hpp"
@@ -32,9 +31,9 @@ struct GraspStabilityCostConfig {
   double centroid_y_min{-0.008};
   double centroid_y_max{0.008};
   double contact_loss_weight{15.0};
-  bool contact_patch_enabled{true};
-  double contact_patch_target_node_count{6.0};
-  double contact_patch_weight{2.0};
+  bool hemisphere_contact_enabled{true};
+  double target_active_hemisphere_count{6.0};
+  double hemisphere_contact_weight{2.0};
 
   double tracking_weight{5.0};
   double tracking_action_scale_weight{20.0};
@@ -48,19 +47,22 @@ class GraspStabilityCost final : public CostTermBase {
  public:
   explicit GraspStabilityCost(GraspStabilityCostConfig config);
 
-  double Evaluate(const RobotRolloutState& state,
+  double Evaluate(const GraspState& state,
                   const Eigen::Ref<const Eigen::VectorXd>& action,
                   const CostContext& context) const override;
 
  private:
   double TrackingGuardCost(const Eigen::Ref<const Eigen::VectorXd>& action,
                            const RolloutContext& rollout) const;
-  double JointLimitCost(const RobotRolloutState& state,
+  double JointLimitCost(const GraspState& state,
                         const Eigen::Ref<const Eigen::VectorXd>& action) const;
+  double TactileSensorsCost(const GraspState& state,
+                            const RolloutContext* rollout) const;
+  double TactileSensorCost(const TactileState& tactile) const;
   double ContactLocalCost(double normal_force_n, double slip_risk,
                           const Eigen::Vector2d& predicted_centroid_m,
                           bool centroid_valid,
-                          std::size_t contact_support_count) const;
+                          std::size_t active_hemisphere_count) const;
 
   GraspStabilityCostConfig config_;
 };

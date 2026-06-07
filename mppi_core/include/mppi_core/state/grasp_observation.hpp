@@ -1,0 +1,45 @@
+// Copyright 2026
+//
+// Licensed under the Apache License, Version 2.0.
+
+#pragma once
+
+#include <Eigen/Core>
+#include <Eigen/StdVector>
+#include <vector>
+
+#include "mppi_core/robot/robot_dynamics_context.hpp"
+#include "mppi_core/tactile/tactile_sensor_context.hpp"
+#include "mppi_core/tactile/tactile_state.hpp"
+
+namespace mppi_core {
+
+struct GraspRolloutConfig;
+struct ContactForceCorrectionState;
+struct ContactForceProjectionConfig;
+struct ContactForceRolloutConfig;
+struct PinocchioContactKinematicsContext;
+
+struct GraspObservation {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  Eigen::VectorXd q_meas;
+  Eigen::VectorXd qdot_meas;
+  Eigen::VectorXd tau_meas;
+
+  Eigen::VectorXd q_ref_current;
+  Eigen::VectorXd qdot_ref_current;
+
+  std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
+      tactile_meas;
+
+  const RobotDynamicsContext* robot_dynamics{nullptr};
+  std::vector<TactileSensorContext> tactile_contexts{};
+  const GraspRolloutConfig* grasp_rollout_config{nullptr};
+  const ContactForceProjectionConfig* contact_force_projection_config{nullptr};
+  const ContactForceRolloutConfig* contact_force_rollout_config{nullptr};
+  const ContactForceCorrectionState* contact_force_correction_state{nullptr};
+  double time_s{0.0};
+};
+
+}  // namespace mppi_core

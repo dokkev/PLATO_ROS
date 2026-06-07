@@ -674,7 +674,7 @@
       <div class="header-inner">
         <div>
           <h1>MPPI Core Data Flow</h1>
-          <p class="subtitle">Interactive map for the contact-gated residual-aware tactile MPPI runtime.</p>
+          <p class="subtitle">Interactive map for the contact-gated tactile MPPI runtime.</p>
         </div>
         <div class="toolbar" aria-label="Views">
           <button class="view-button active" data-view="runtime">Runtime</button>
@@ -827,7 +827,7 @@
               <div class="edge"><span>samples</span></div>
               <button class="node diagram-node compact" data-id="sample" data-kind="module" data-step="1">
                 <span class="node-title">ActionSequence[]</span>
-                <span class="node-path">candidate qddot_des sequences</span>
+                <span class="node-path">candidate qddot_sol sequences</span>
               </button>
             </div>
             <p class="flow-lane-label">Per-rollout evaluation</p>
@@ -854,9 +854,9 @@
             </div>
             <p class="flow-lane-label">Tactile prediction and scoring</p>
             <div class="flow-row command">
-              <button class="node diagram-node compact" data-id="residualAware" data-kind="module" data-step="3">
-                <span class="node-title">residual-aware tactile</span>
-                <span class="node-path">tau residual -> projected force</span>
+              <button class="node diagram-node compact" data-id="tactileTransition" data-kind="module" data-step="3">
+                <span class="node-title">tactile transition</span>
+                <span class="node-path">contact kinematics -> topology/shear</span>
               </button>
               <div class="edge"><span>valid state</span></div>
               <button class="node diagram-node compact" data-id="cost" data-kind="cost" data-step="4">
@@ -877,7 +877,7 @@
             <p class="flow-lane-label">Failure and output</p>
             <div class="flow-row command">
               <button class="node diagram-node compact failure-node" data-id="invalid" data-kind="failure" data-step="3">
-                <span class="node-title">residual-aware failure</span>
+                <span class="node-title">transition failure</span>
                 <span class="node-path">state.valid = false</span>
               </button>
               <div class="edge"><span>cost</span></div>
@@ -888,7 +888,7 @@
               <div class="edge"><span>or command</span></div>
               <button class="node diagram-node compact" data-id="makeCommandObject" data-kind="module" data-step="5">
                 <span class="node-title">MakeCommand</span>
-                <span class="node-path">first qddot_des to hybrid command</span>
+                <span class="node-path">first qddot_sol to hybrid command</span>
               </button>
               <div class="edge"><span>returns</span></div>
               <button class="node diagram-node compact" data-id="command" data-kind="state" data-step="5">
@@ -911,7 +911,7 @@
               <button class="node" data-id="config" data-kind="policy" data-step="0">
                 <span class="node-title">MPPI + rollout config</span>
                 <span class="node-path">mppi.yaml + grasp.yaml</span>
-                <span class="tags"><span class="tag">bounds</span><span class="tag">policy</span></span>
+                <span class="tags"><span class="tag">bounds</span><span class="tag">transition</span></span>
               </button>
             </div>
 
@@ -925,7 +925,7 @@
               <button class="node" data-id="sample" data-kind="module" data-step="1">
                 <span class="node-title">SampleActionSequences</span>
                 <span class="node-path">nominal + Gaussian noise + clamp</span>
-                <span class="tags"><span class="tag">qddot_des</span></span>
+                <span class="tags"><span class="tag">qddot_sol</span></span>
               </button>
               <button class="node" data-id="evaluate" data-kind="module" data-step="2">
                 <span class="node-title">EvaluateRollout</span>
@@ -939,21 +939,21 @@
               <button class="node" data-id="state" data-kind="state" data-step="2">
                 <span class="node-title">GraspState</span>
                 <span class="node-path">RobotState + TactileState</span>
-                <span class="tags"><span class="tag">q_des</span><span class="tag">qdot_des</span><span class="tag">tau_ff</span><span class="tag">tactile</span></span>
+                <span class="tags"><span class="tag">q</span><span class="tag">qdot</span><span class="tag">tau</span><span class="tag">tactile</span></span>
               </button>
               <button class="node" data-id="step" data-kind="module" data-step="3">
                 <span class="node-title">GraspStateRolloutModel::Step</span>
-                <span class="node-path">integrate qddot_des, compute tau_ff, update tactile0/tactile1</span>
-                <span class="tags"><span class="tag">residual-aware first</span></span>
+                <span class="node-path">integrate qddot_sol, compute tau, update tactile sensors</span>
+                <span class="tags"><span class="tag">contact kinematics</span></span>
               </button>
-              <button class="node" data-id="residualAware" data-kind="module" data-step="3">
-                <span class="node-title">TryResidualAwareTactileTransition</span>
-                <span class="node-path">tau residual -> contact force -> tactile</span>
-                <span class="tags"><span class="tag">required by default</span></span>
+              <button class="node" data-id="tactileTransition" data-kind="module" data-step="3">
+                <span class="node-title">StepTactileState</span>
+                <span class="node-path">hemisphere motion -> tactile state</span>
+                <span class="tags"><span class="tag">birth/loss/survival</span></span>
               </button>
               <button class="node failure-node" data-id="invalid" data-kind="failure" data-step="3">
                 <span class="node-title">Invalid rollout state</span>
-                <span class="node-path">residual-aware missing or failed</span>
+                <span class="node-path">kinematics/context missing or failed</span>
                 <span class="tags"><span class="tag">kLargeCost</span><span class="tag">hold if all invalid</span></span>
               </button>
             </div>
@@ -962,7 +962,7 @@
               <h2>Cost + Output</h2>
               <button class="node" data-id="cost" data-kind="cost" data-step="4">
                 <span class="node-title">GraspStabilityCost</span>
-                <span class="node-path">force, slip, centroid, patch, tracking</span>
+                <span class="node-path">force, slip, centroid, hemisphere support, tracking</span>
                 <span class="tags"><span class="tag">contact-local</span></span>
               </button>
               <button class="node" data-id="weights" data-kind="module" data-step="4">
@@ -972,7 +972,7 @@
               </button>
               <button class="node" data-id="command" data-kind="state" data-step="5">
                 <span class="node-title">RobotCommand</span>
-                <span class="node-path">q_des, qdot_des, tau_ff, kp, kd</span>
+                <span class="node-path">q_cmd, qdot_cmd, tau_cmd, kp, kd</span>
                 <span class="tags"><span class="tag">first action</span></span>
               </button>
             </div>
@@ -995,11 +995,11 @@
             </div>
             <div class="note">
               <h3>Tau semantics</h3>
-              <p>Current-state tau is measured joint torque. Future rollout tau is `tau_ff`, the feed-forward torque carried by RobotState.</p>
+              <p>Current-state tau is accepted joint torque. Command tau_cmd is the host-to-driver torque, currently populated from RNEA feedforward.</p>
             </div>
             <div class="note">
               <h3>No heuristic proxy</h3>
-              <p>The simple tactile proxy fallback is removed. Only residual-aware rollout and explicit kinematic ablation remain.</p>
+            <p>The current horizon rollout uses contact kinematics. Residual projection helpers remain separate utilities for later correction experiments.</p>
             </div>
           </div>
         </section>
@@ -1037,19 +1037,19 @@
       },
       deltaModelObject: {
         title: "GraspStateRolloutModel",
-        summary: "Concrete RolloutModelBase implementation for qddot_des rollout and residual-aware tactile prediction.",
+        summary: "Concrete RolloutModelBase implementation for qddot_sol rollout and contact-kinematic tactile prediction.",
         view: ["objects"],
         kv: [
           ["Inherits", "RolloutModelBase"],
           ["Config", "GraspStateRolloutConfig"],
-          ["Default policy", "TactileRolloutPolicy::kResidualRequired"],
+          ["Transition", "StepTactileState with TactileTransitionConfig"],
           ["Step output", "GraspState = RobotState + predicted TactileState"]
         ],
         sources: [
           ["include/mppi_core/rollout/grasp_state_rollout_model.hpp", "../include/mppi_core/rollout/grasp_state_rollout_model.hpp"],
           ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"]
         ],
-        related: ["rolloutBase", "step", "residualAware"]
+        related: ["rolloutBase", "step", "tactileTransition"]
       },
       costBase: {
         title: "CostTermBase",
@@ -1066,7 +1066,7 @@
       },
       stabilityCostObject: {
         title: "GraspStabilityCost",
-        summary: "Concrete CostTermBase implementation that scores contact-local force, slip, centroid, patch, tracking, smoothness, and joint-limit terms.",
+        summary: "Concrete CostTermBase implementation that scores contact-local force, slip, centroid, hemisphere support, tracking, smoothness, and joint-limit terms.",
         view: ["objects"],
         kv: [
           ["Inherits", "CostTermBase"],
@@ -1085,8 +1085,8 @@
         summary: "MPPI prediction target: ideal/reference RobotState plus predicted TactileState and validity.",
         view: ["objects"],
         kv: [
-          ["RobotState", "q_des, qdot_des, qddot_des, tau_ff"],
-          ["TactileState", "predicted contact nodes, patch, slip, shear, angle, confidence"],
+          ["RobotState", "q, qdot, tau"],
+          ["TactileState", "predicted hemispheres, contact topology, slip, shear, angle, confidence"],
           ["Construction", "MakeGraspState(...) validates dimensions and finite values"],
           ["Measured data", "Use GraspObservation/explicit measured fields, not GraspState"]
         ],
@@ -1111,13 +1111,13 @@
       },
       actionSequenceObject: {
         title: "ActionSequence",
-        summary: "Matrix-backed horizon of qddot_des actions. MPPI keeps one nominal sequence and many sampled candidate sequences.",
+        summary: "Matrix-backed horizon of qddot_sol actions. MPPI keeps one nominal sequence and many sampled candidate sequences.",
         view: ["objects"],
         kv: [
           ["Shape", "action_dim x horizon_steps"],
           ["Nominal", "shifted and repeated after each command"],
           ["Sampled", "nominal plus clipped Gaussian noise"],
-          ["Element", "actions[k] is qddot_des for rollout step k"]
+          ["Element", "actions[k] is qddot_sol for rollout step k"]
         ],
         sources: [
           ["include/mppi_core/core/action_sequence.hpp", "../include/mppi_core/core/action_sequence.hpp"],
@@ -1132,7 +1132,7 @@
         kv: [
           ["model_", "shared_ptr<const RolloutModelBase>"],
           ["cost_term_", "shared_ptr<const CostTermBase>"],
-          ["Benefit", "optimizer logic does not depend on residual-aware tactile details"],
+          ["Benefit", "optimizer logic does not depend on tactile transition details"],
           ["Runtime concrete types", "GraspStateRolloutModel and GraspStabilityCost"]
         ],
         sources: [["include/mppi_core/core/mppi_optimizer.hpp", "../include/mppi_core/core/mppi_optimizer.hpp"]],
@@ -1152,17 +1152,17 @@
           ["include/mppi_core/tactile/tactile_state.hpp", "../include/mppi_core/tactile/tactile_state.hpp"],
           ["include/mppi_core/tactile/nari_touch_adapter.hpp", "../include/mppi_core/tactile/nari_touch_adapter.hpp"]
         ],
-        related: ["observation", "state", "residualAware"]
+        related: ["observation", "state", "tactileTransition"]
       },
       contactContextObject: {
         title: "Contact Context",
-        summary: "Observation pointers that make residual-aware tactile rollout possible: kinematics, projection config, rollout config, and correction state.",
+        summary: "Observation pointers that make tactile transition possible: transition config, per-sensor kinematics, and optional residual/correction hooks.",
         view: ["objects"],
         kv: [
           ["Kinematics", "PinocchioContactKinematicsContext"],
-          ["Projection", "ContactForceProjectionConfig"],
-          ["Rollout", "ContactForceRolloutConfig"],
-          ["Correction", "ContactForceCorrectionState"]
+          ["Transition", "TactileTransitionConfig"],
+          ["Kinematics", "PinocchioContactKinematicsContext"],
+          ["Optional hooks", "ContactForceProjectionConfig, ContactForceRolloutConfig, ContactForceCorrectionState"]
         ],
         sources: [
           ["include/mppi_core/state/grasp_observation.hpp", "../include/mppi_core/state/grasp_observation.hpp"],
@@ -1170,7 +1170,7 @@
           ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
           ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
         ],
-        related: ["rolloutContextObject", "residualAware", "observation"]
+        related: ["rolloutContextObject", "tactileTransition", "observation"]
       },
       rolloutContextObject: {
         title: "RolloutContext",
@@ -1216,14 +1216,14 @@
       },
       makeCommandObject: {
         title: "MakeCommand",
-        summary: "Turns the selected first qddot_des into a generic RobotCommand hybrid impedance packet.",
+        summary: "Turns the selected first qddot_sol into a generic RobotCommand hybrid impedance packet.",
         view: ["runtime"],
         kv: [
           ["Input", "observation + first nominal action"],
-          ["q_des", "Pinocchio integrate from q_ref_current using qdot_des * dt"],
-          ["qdot_des", "qdot_ref_current + qddot_des * dt"],
-          ["Feedforward/gains", "tau_ff, qddot_des, kp, and kd are populated for the embedded PD law"],
-          ["Hold path", "zero qddot_des holds current reference velocity"]
+          ["q_cmd", "Pinocchio integrate from q_ref_current using qdot_cmd * dt"],
+          ["qdot_cmd", "qdot_ref_current + qddot_sol * dt"],
+          ["Feedforward/gains", "tau_ff_cmd is computed with RNEA, then tau_cmd, kp, and kd are populated"],
+          ["Hold path", "zero qddot_sol holds current reference velocity"]
         ],
         sources: [["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]],
         related: ["weights", "command", "invalid"]
@@ -1234,32 +1234,32 @@
         view: ["objects", "runtime", "rollout", "config"],
         kv: [
           ["Fields", "q_meas, qdot_meas, tau_meas, tactile0_meas/tactile1_meas, q_ref_current, qdot_ref_current"],
-          ["Contact context", "PinocchioContactKinematicsContext, ContactForceProjectionConfig, ContactForceRolloutConfig, ContactForceCorrectionState"],
+          ["Contact context", "TactileTransitionConfig, PinocchioContactKinematicsContext, optional residual/correction hooks"],
           ["Tau", "Measured joint torque for the current observation"],
-          ["Failure risk", "Missing tactile contact or contact kinematics prevents residual-aware rollout"]
+          ["Failure risk", "Missing contact kinematics prevents tactile transition"]
         ],
         sources: [
           ["include/mppi_core/state/grasp_observation.hpp", "../include/mppi_core/state/grasp_observation.hpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
-        related: ["update", "state", "residualAware"]
+        related: ["update", "state", "tactileTransition"]
       },
       config: {
         title: "Config Surface",
-        summary: "YAML-loaded parameters define sampling, action bounds, rollout policy, force rollout gains, and contact-local cost weights.",
+        summary: "YAML-loaded parameters define sampling, action bounds, tactile transition gains, optional force rollout gains, and contact-local cost weights.",
         view: ["runtime", "config"],
         kv: [
           ["mppi.yaml", "horizon_steps, dt, num_rollouts, temperature, action bounds, noise"],
-          ["grasp.yaml", "grasp_state_transition.rollout_policy, contact_force_rollout, normal force, slip, centroid, hemisphere costs"],
-          ["Default policy", "TactileRolloutPolicy::kResidualRequired"],
-          ["Ablation", "kResidualThenKinematicFallback enables kinematic patch fallback only"]
+          ["grasp.yaml", "tactile_transition, contact_force_rollout, normal force, slip, centroid, hemisphere costs"],
+          ["Transition", "Birth/loss thresholds and confidence/shear decay live under grasp.tactile_transition"],
+          ["Residual hooks", "Contact-force rollout config is retained for observation-time correction experiments"]
         ],
         sources: [
           ["config/mppi.yaml", "../config/mppi.yaml"],
           ["config/grasp.yaml", "../config/grasp.yaml"],
           ["src/config/grasp_config.cpp", "../src/config/grasp_config.cpp"]
         ],
-        related: ["update", "residualAware", "cost"]
+        related: ["update", "tactileTransition", "cost"]
       },
       update: {
         title: "MPPIOptimizer::Update",
@@ -1268,8 +1268,8 @@
         kv: [
           ["Input", "GraspObservation"],
           ["Sampling", "Starts from nominal action sequence"],
-          ["Contact gate", "Not owned here; caller must gate no-contact observations for residual-required controllers"],
-          ["Invalid handling", "All invalid rollouts reset nominal actions and return zero qddot_des"],
+          ["Contact gate", "Not owned here; caller must gate no-contact observations before entering contact-local MPPI"],
+          ["Invalid handling", "All invalid rollouts reset nominal actions and return zero qddot_sol"],
           ["Output", "RobotCommand"]
         ],
         sources: [
@@ -1283,7 +1283,7 @@
         summary: "Builds candidate action sequences by copying the nominal sequence, adding Gaussian noise, and clipping to configured bounds.",
         view: ["runtime"],
         kv: [
-          ["Action", "qddot_des"],
+          ["Action", "qddot_sol"],
           ["Rollout 0", "Current nominal sequence without added noise"],
           ["Other rollouts", "Nominal + normal noise * action_noise_std"],
           ["Bounds", "action_lower_bound and action_upper_bound"]
@@ -1296,7 +1296,7 @@
         summary: "Runs each candidate action sequence across the horizon. Every step calls the rollout model, then scores the next state.",
         view: ["runtime", "rollout"],
         kv: [
-          ["Initial state", "MakeGraspState(RobotState{q_ref_current, qdot_ref_current, zero qddot_des, zero tau_ff}, tactile0_meas, tactile1_meas)"],
+          ["Initial state", "MakeGraspState(q_ref_current, qdot_ref_current, zero tau, tactile_meas)"],
           ["Context", "Measured state, initial reference, tactile, contact configs"],
           ["Invalid state", "Returns kLargeCost immediately"],
           ["Trace mode", "PredictRollout records states, actions, step_costs, and stops at invalid"]
@@ -1309,46 +1309,46 @@
         summary: "Per-step MPPI state passed through rollout and cost functions.",
         view: ["objects", "runtime", "rollout", "cost"],
         kv: [
-          ["robot.q_des", "Reference configuration. May be nq when Pinocchio integration is used"],
-          ["robot.qdot_des", "Reference velocity"],
-          ["robot.qddot_des", "Sampled desired acceleration"],
-          ["robot.tau_ff", "Feed-forward torque from RNEA or deterministic zero fallback"],
-          ["tactile", "Predicted TactileState after residual/contact rollout"]
+          ["robot.q", "Reference configuration. May be nq when Pinocchio integration is used"],
+          ["robot.qdot", "Reference velocity"],
+          ["robot.tau", "Feed-forward torque from RNEA or deterministic zero fallback"],
+          ["tactile", "Predicted TactileState after contact-kinematic transition"]
         ],
         sources: [
           ["include/mppi_core/rollout/rollout_model.hpp", "../include/mppi_core/rollout/rollout_model.hpp"],
           ["include/mppi_core/state/grasp_state.hpp", "../include/mppi_core/state/grasp_state.hpp"]
         ],
-        related: ["step", "residualAware", "cost"]
+        related: ["step", "tactileTransition", "cost"]
       },
       step: {
         title: "GraspStateRolloutModel::Step",
-        summary: "Integrates qddot_des into qdot_des/q_des, computes tau_ff, then updates tactile0 and tactile1 state through residual-aware prediction or explicit kinematic fallback.",
+        summary: "Integrates qddot_sol into qdot/q, computes tau, then updates tactile sensor state through contact kinematics.",
         view: ["objects", "rollout", "runtime"],
         kv: [
-          ["qdot_des_next", "qdot_des + qddot_des * dt"],
-          ["q_des_next", "pinocchio::integrate(model, q_des, qdot_des_next * dt), or q_des + step"],
-          ["tau_ff_next", "pinocchio::rnea(q_des_next, qdot_des_next, qddot_des), or zero fallback"],
-          ["Tactile order", "Try residual-aware first; if required policy fails, mark invalid"]
+          ["qdot_next", "qdot + qddot_sol * dt"],
+          ["q_next", "pinocchio::integrate(model, q, qdot_next * dt), or q + step"],
+          ["tau_next", "pinocchio::rnea(q_next, qdot_next, qddot_sol), or zero fallback"],
+          ["Tactile order", "Compute per-hemisphere motion, then apply deterministic birth/loss/survival transition"]
         ],
         sources: [
           ["include/mppi_core/rollout/grasp_state_rollout_model.hpp", "../include/mppi_core/rollout/grasp_state_rollout_model.hpp"],
           ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"]
         ],
-        related: ["residualAware", "invalid", "state"]
+        related: ["tactileTransition", "invalid", "state"]
       },
-      residualAware: {
-        title: "Residual-Aware Tactile Transition",
-        summary: "Projects contact forces from torque residuals, optionally corrects normal force bias, and updates predicted tactile force, shear, confidence, support, and slip.",
+      tactileTransition: {
+        title: "Tactile Transition",
+        summary: "Uses contact kinematics to update hemisphere topology, contact point motion, shear, confidence, and aggregate tactile fields.",
         view: ["rollout", "runtime"],
         kv: [
-          ["Preconditions", "Valid GraspState, valid tactile contact point, valid Pinocchio contact kinematics, finite robot vectors"],
-          ["Residual", "tau_residual = tau_meas - pinocchio::rnea(q_meas, qdot_meas, zero_acceleration)"],
-          ["Projection", "ProjectContactForcesFromTorqueResidual solves contact forces with tactile prior and regularization"],
-          ["Tactile update", "StepTactileStateFromProjectedForce"]
+          ["Preconditions", "Valid GraspState, matching tactile context, finite robot vectors"],
+          ["Kinematics", "ComputeHemisphereMotions produces one HemisphereMotion per hemisphere"],
+          ["Topology", "StepTactileState applies deterministic birth/loss/survival rules"],
+          ["Residual hooks", "Projection helpers remain separate from current horizon dynamics"]
         ],
         sources: [
           ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"],
+          ["include/mppi_core/tactile/tactile_transition.hpp", "../include/mppi_core/tactile/tactile_transition.hpp"],
           ["include/mppi_core/contact/contact_force_projection.hpp", "../include/mppi_core/contact/contact_force_projection.hpp"],
           ["include/mppi_core/rollout/contact_force_rollout.hpp", "../include/mppi_core/rollout/contact_force_rollout.hpp"]
         ],
@@ -1356,14 +1356,14 @@
       },
       invalid: {
         title: "Invalid Rollout State",
-        summary: "In residual-required mode, residual-aware failure means the sample/model step is invalid. It does not fall back to heuristic tactile prediction.",
+        summary: "A sample/model step is invalid when robot integration or tactile transition inputs are incompatible.",
         view: ["runtime", "rollout"],
         kv: [
           ["Step behavior", "next_state.valid = false"],
           ["Rollout cost", "EvaluateRollout returns kLargeCost"],
           ["Trace behavior", "PredictRollout records the invalid step and stops"],
-          ["Update behavior", "If every rollout is invalid, ResetNominalActions and return zero qddot_des"],
-          ["Gate owner", "Caller/controller must avoid entering residual-aware MPPI before tactile contact"]
+          ["Update behavior", "If every rollout is invalid, ResetNominalActions and return zero qddot_sol"],
+          ["Gate owner", "Caller/controller must avoid entering contact-local MPPI before tactile contact"]
         ],
         sources: [
           ["src/rollout/grasp_state_rollout_model.cpp", "../src/rollout/grasp_state_rollout_model.cpp"],
@@ -1373,7 +1373,7 @@
       },
       cost: {
         title: "GraspStabilityCost",
-        summary: "Contact-local cost for normal force, slip risk, centroid bounds, contact patch support, tracking guard, action smoothness, and joint limits.",
+        summary: "Contact-local cost for normal force, slip risk, centroid bounds, hemisphere support, tracking guard, action smoothness, and joint limits.",
         view: ["cost", "runtime"],
         kv: [
           ["Force", "Penalty below force_min_n and above force_max_n"],
@@ -1402,16 +1402,16 @@
       },
       command: {
         title: "RobotCommand",
-        summary: "Final command emitted by MPPIOptimizer. It always represents a hybrid impedance packet interpreted as tau_ff + kp position error + kd velocity error.",
+        summary: "Final command emitted by MPPIOptimizer. It represents the host-to-driver packet interpreted by the embedded driver as tau_cmd + local impedance feedback.",
         view: ["runtime"],
         kv: [
-          ["Core packet", "q_des, qdot_des, qddot_des, tau_ff, kp, kd"],
-          ["q_des", "pinocchio::integrate(q_ref_current, qdot_des * dt), or q_ref_current + step"],
-          ["qdot_des", "qdot_ref_current + qddot_des * dt"],
-          ["Debug fields", "qddot_des, tau_ff, kp, kd"]
+          ["Core packet", "q_cmd, qdot_cmd, tau_cmd, kp, kd"],
+          ["q_cmd", "pinocchio::integrate(q_ref_current, qdot_cmd * dt), or q_ref_current + step"],
+          ["qdot_cmd", "qdot_ref_current + qddot_sol * dt"],
+          ["Debug fields", "solver acceleration belongs outside RobotCommand"]
         ],
         sources: [
-          ["include/mppi_core/robot/robot_command.hpp", "../include/mppi_core/robot/robot_command.hpp"],
+          ["include/mppi_core/robot/robot_system.hpp", "../include/mppi_core/robot/robot_system.hpp"],
           ["src/core/mppi_optimizer.cpp", "../src/core/mppi_optimizer.cpp"]
         ],
         related: ["update", "weights", "invalid"]

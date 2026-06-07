@@ -11,7 +11,7 @@
 #include "mppi_core/core/action_sequence.hpp"
 #include "mppi_core/core/mppi_config.hpp"
 #include "mppi_core/costs/cost_term_base.hpp"
-#include "mppi_core/robot/robot_command.hpp"
+#include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/rollout/rollout_model.hpp"
 #include "mppi_core/state/grasp_observation.hpp"
 
@@ -52,7 +52,7 @@ class MPPIOptimizer {
   double EvaluateRollout(const GraspObservation& observation,
                          const ActionSequence& actions) const;
   RobotCommand MakeCommand(const GraspObservation& observation,
-                           const Eigen::VectorXd& qddot_des) const;
+                           const Eigen::VectorXd& qddot_sol) const;
   void UpdateNominalActionSequence();
 
   bool initialized_{false};

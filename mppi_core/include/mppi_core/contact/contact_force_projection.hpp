@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "mppi_core/contact/contact_kinematics.hpp"
-#include "mppi_core/robot/robot_state.hpp"
+#include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 
 namespace mppi_core {
@@ -145,11 +145,11 @@ inline ContactForceProjectionResult ProjectContactForcesFromTorqueResidual(
     const ContactForceProjectionConfig& config = {}) {
   ContactForceProjectionResult result;
 
-  if (!config.enabled || !IsValidRobotState(robot) || !tactile.valid ||
+  if (!config.enabled || !IsValid(robot) || !tactile.valid ||
       !IsValidContactKinematicsContext(context) ||
-      robot.q_des.size() != static_cast<Eigen::Index>(context.model->nq) ||
+      robot.q.size() != static_cast<Eigen::Index>(context.model->nq) ||
       tau_residual.size() != static_cast<Eigen::Index>(context.model->nv) ||
-      !robot.q_des.allFinite() || !tau_residual.allFinite() ||
+      !robot.q.allFinite() || !tau_residual.allFinite() ||
       tactile.hemispheres.empty()) {
     return result;
   }
@@ -168,7 +168,7 @@ inline ContactForceProjectionResult ProjectContactForcesFromTorqueResidual(
   auto& data = *context.data;
   const auto& model = *context.model;
 
-  pinocchio::computeJointJacobians(model, data, robot.q_des);
+  pinocchio::computeJointJacobians(model, data, robot.q);
   pinocchio::updateFramePlacements(model, data);
 
   Eigen::Matrix<double, 6, Eigen::Dynamic> frame_jacobian(6, model.nv);

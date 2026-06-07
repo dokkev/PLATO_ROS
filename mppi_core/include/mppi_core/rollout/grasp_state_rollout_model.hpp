@@ -8,16 +8,19 @@
 #include <cstddef>
 
 #include "mppi_core/rollout/rollout_model.hpp"
-#include "mppi_core/tactile/tactile_rollout_policy.hpp"
 
 namespace mppi_core {
 
 struct GraspStateRolloutConfig {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  TactileRolloutPolicy tactile_rollout_policy{
-      TactileRolloutPolicy::kResidualRequired};
+  // Reserved for rollout-model parameters. Residual force projection is not a
+  // GraspState rollout policy.
 };
+
+RobotState StepRobotState(const RobotState& robot,
+                          const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
+                          RobotSystem* robot_system, double dt);
 
 class GraspStateRolloutModel final : public RolloutModelBase {
  public:
@@ -33,7 +36,6 @@ class GraspStateRolloutModel final : public RolloutModelBase {
 
  private:
   std::size_t joint_dim_{0};
-  GraspStateRolloutConfig config_;
 };
 
 }  // namespace mppi_core

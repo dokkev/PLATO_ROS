@@ -72,8 +72,8 @@ MPPI flow:
 
 ```text
 q_meas/qdot_meas/tau_meas + tactile_meas sensor vector
--> mppi_core qddot_des sampling, GraspState rollout, and stability cost
--> RobotCommand hybrid impedance packet with q_des/qdot_des/tau_ff/kp/kd
+-> mppi_core qddot_sol sampling, GraspState rollout, and stability cost
+-> RobotCommand hybrid impedance packet with q_cmd/qdot_cmd/tau_cmd/kp/kd
 -> downstream controller or integration layer
 ```
 
@@ -154,7 +154,7 @@ Safe validation path for risky changes:
 - `docs/frimware/plato2/README.md`
 - `installation.md`
 - `cli_commands.md`
-- `mppi_core/README.md`
+- `mppi_core/MPPI.md`
 - `mppi_core/docs/grasp_state_mppi.md`
 - `mppi_core/docs/file_structure.md`
 - `controllers/parallel_grasp_controller/COMMAND_EXAMPLES.md`

@@ -12,8 +12,6 @@
 #include <stdexcept>
 #include <vector>
 
-#include "mppi_core/robot/robot_dynamics_context.hpp"
-
 namespace mppi_core {
 namespace {
 
@@ -72,14 +70,52 @@ bool IsFiniteAndNonnegative(const Eigen::VectorXd& value) {
   return true;
 }
 
+bool HasPinocchioModelData(const RobotSystem* robot_system) {
+  return robot_system != nullptr && robot_system->hasModel() &&
+         robot_system->data().oMi.size() == robot_system->model().joints.size();
+}
+
 bool HasPinocchioConfigurationSpace(const GraspObservation& observation,
                                     std::size_t action_dim) {
-  const RobotDynamicsContext* dynamics = observation.robot_dynamics;
-  return dynamics != nullptr && IsValidRobotDynamicsContext(*dynamics) &&
+  const RobotSystem* robot_system = observation.robot_system;
+  return HasPinocchioModelData(robot_system) &&
          observation.q_ref_current.size() ==
-             static_cast<Eigen::Index>(dynamics->model->nq) &&
+             static_cast<Eigen::Index>(robot_system->nq()) &&
          static_cast<Eigen::Index>(action_dim) ==
-             static_cast<Eigen::Index>(dynamics->model->nv);
+             static_cast<Eigen::Index>(robot_system->nv());
+}
+
+struct RobotStateView {
+  const Eigen::VectorXd* q{nullptr};
+  const Eigen::VectorXd* qdot{nullptr};
+};
+
+RobotStateView SelectCurrentStateForRnea(const GraspObservation& observation,
+                                         std::size_t action_dim) {
+  RobotSystem* robot_system = observation.robot_system;
+  if (!HasPinocchioModelData(robot_system) ||
+      static_cast<Eigen::Index>(action_dim) != robot_system->nv()) {
+    return {};
+  }
+
+  if (robot_system->hasState()) {
+    const RobotState& state = robot_system->state();
+    if (IsValid(state) &&
+        state.q.size() == static_cast<Eigen::Index>(robot_system->nq()) &&
+        state.qdot.size() == static_cast<Eigen::Index>(robot_system->nv())) {
+      return RobotStateView{&state.q, &state.qdot};
+    }
+  }
+
+  if (observation.q_meas.size() ==
+          static_cast<Eigen::Index>(robot_system->nq()) &&
+      observation.qdot_meas.size() ==
+          static_cast<Eigen::Index>(robot_system->nv()) &&
+      observation.q_meas.allFinite() && observation.qdot_meas.allFinite()) {
+    return RobotStateView{&observation.q_meas, &observation.qdot_meas};
+  }
+
+  return {};
 }
 
 bool HasCompatibleReferenceConfiguration(const GraspObservation& observation,
@@ -113,9 +149,9 @@ Eigen::VectorXd IntegrateReferenceStep(
     const Eigen::Ref<const Eigen::VectorXd>& tangent_step) {
   if (HasPinocchioConfigurationSpace(
           observation, static_cast<std::size_t>(tangent_step.size()))) {
-    const RobotDynamicsContext* dynamics = observation.robot_dynamics;
-    return pinocchio::integrate(*dynamics->model, observation.q_ref_current,
-                                tangent_step);
+    const RobotSystem* robot_system = observation.robot_system;
+    return pinocchio::integrate(robot_system->model(),
+                                observation.q_ref_current, tangent_step);
   }
   if (observation.q_ref_current.size() == tangent_step.size()) {
     return observation.q_ref_current + tangent_step;
@@ -125,24 +161,23 @@ Eigen::VectorXd IntegrateReferenceStep(
 }
 
 Eigen::VectorXd CommandFeedForwardTorqueOrZero(
-    const GraspObservation& observation, const Eigen::VectorXd& q_des,
-    const Eigen::VectorXd& qdot_des, const Eigen::VectorXd& qddot_des) {
-  Eigen::VectorXd tau_ff = Eigen::VectorXd::Zero(qddot_des.size());
-  const RobotDynamicsContext* dynamics = observation.robot_dynamics;
-  if (!HasPinocchioConfigurationSpace(
-          observation, static_cast<std::size_t>(qddot_des.size())) ||
-      dynamics == nullptr ||
-      q_des.size() != static_cast<Eigen::Index>(dynamics->model->nq) ||
-      qdot_des.size() != static_cast<Eigen::Index>(dynamics->model->nv)) {
-    return tau_ff;
+    const GraspObservation& observation, const Eigen::VectorXd& qddot_sol) {
+  Eigen::VectorXd tau_ff_cmd = Eigen::VectorXd::Zero(qddot_sol.size());
+  RobotSystem* robot_system = observation.robot_system;
+  const RobotStateView current_state = SelectCurrentStateForRnea(
+      observation, static_cast<std::size_t>(qddot_sol.size()));
+  if (robot_system == nullptr || current_state.q == nullptr ||
+      current_state.qdot == nullptr) {
+    return tau_ff_cmd;
   }
 
-  const Eigen::VectorXd rnea = pinocchio::rnea(
-      *dynamics->model, *dynamics->data, q_des, qdot_des, qddot_des);
-  if (rnea.size() == tau_ff.size() && rnea.allFinite()) {
-    tau_ff = rnea;
+  const Eigen::VectorXd rnea =
+      pinocchio::rnea(robot_system->model(), robot_system->data(),
+                      *current_state.q, *current_state.qdot, qddot_sol);
+  if (rnea.size() == tau_ff_cmd.size() && rnea.allFinite()) {
+    tau_ff_cmd = rnea;
   }
-  return tau_ff;
+  return tau_ff_cmd;
 }
 
 RolloutContext MakeRolloutContext(const GraspObservation& observation,
@@ -150,8 +185,10 @@ RolloutContext MakeRolloutContext(const GraspObservation& observation,
   RolloutContext rollout_context;
   rollout_context.observation = &observation;
   rollout_context.initial_reference_state = &initial_reference_state;
-  rollout_context.robot_dynamics = observation.robot_dynamics;
+  rollout_context.robot_system = observation.robot_system;
   rollout_context.tactile_contexts = observation.tactile_contexts;
+  rollout_context.tactile_transition_config =
+      observation.tactile_transition_config;
   rollout_context.grasp_rollout_config = observation.grasp_rollout_config;
   rollout_context.contact_force_projection_config =
       observation.contact_force_projection_config;
@@ -314,7 +351,6 @@ RolloutTrace MPPIOptimizer::PredictRollout(
   GraspState state = MakeGraspState(
       observation.q_ref_current, dq_ref_current,
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
-      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
       observation.tactile_meas);
 
   const GraspState initial_reference_state = state;
@@ -416,7 +452,6 @@ double MPPIOptimizer::EvaluateRollout(const GraspObservation& observation,
   GraspState state = MakeGraspState(
       observation.q_ref_current, dq_ref_current,
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
-      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
       observation.tactile_meas);
 
   const GraspState initial_reference_state = state;
@@ -448,12 +483,12 @@ double MPPIOptimizer::EvaluateRollout(const GraspObservation& observation,
 
 RobotCommand MPPIOptimizer::MakeCommand(
     const GraspObservation& observation,
-    const Eigen::VectorXd& qddot_des) const {
+    const Eigen::VectorXd& qddot_sol) const {
   RobotCommand command;
-  if (qddot_des.size() != static_cast<Eigen::Index>(config_.action_dim) ||
-      !qddot_des.allFinite()) {
+  if (qddot_sol.size() != static_cast<Eigen::Index>(config_.action_dim) ||
+      !qddot_sol.allFinite()) {
     throw std::invalid_argument(
-        "MPPIOptimizer::MakeCommand: qddot_des dimension mismatch or "
+        "MPPIOptimizer::MakeCommand: qddot_sol dimension mismatch or "
         "nonfinite");
   }
   if (!HasCompatibleReferenceConfiguration(observation, config_.action_dim) ||
@@ -472,17 +507,17 @@ RobotCommand MPPIOptimizer::MakeCommand(
   command.Resize(static_cast<int>(observation.q_ref_current.size()),
                  static_cast<int>(config_.action_dim));
   command.stamp_sec = observation.time_s;
-  command.qddot_des = qddot_des;
   const Eigen::VectorXd qdot_ref_current =
       ReferenceVelocityOrZero(observation, config_.action_dim);
-  command.qdot_des = qdot_ref_current + qddot_des * config_.dt;
-  command.q_des =
-      IntegrateReferenceStep(observation, command.qdot_des * config_.dt);
-  if (!command.q_des.allFinite()) {
-    throw std::invalid_argument("MPPIOptimizer::MakeCommand: q_des nonfinite");
+  command.qdot_cmd = qdot_ref_current + qddot_sol * config_.dt;
+  command.q_cmd =
+      IntegrateReferenceStep(observation, command.qdot_cmd * config_.dt);
+  if (!command.q_cmd.allFinite()) {
+    throw std::invalid_argument("MPPIOptimizer::MakeCommand: q_cmd nonfinite");
   }
-  command.tau_ff = CommandFeedForwardTorqueOrZero(
-      observation, command.q_des, command.qdot_des, command.qddot_des);
+  const Eigen::VectorXd tau_ff_cmd =
+      CommandFeedForwardTorqueOrZero(observation, qddot_sol);
+  command.tau_cmd = tau_ff_cmd;
   command.kp = config_.command_kp;
   command.kd = config_.command_kd;
   command.valid = command.HasValidDimensions() && command.AllFinite();

@@ -21,8 +21,8 @@ MPPI optimizer mechanics, action sequences, and sampling configuration.
 ## rollout/
 
 Top-level rollout interfaces and `GraspStateRolloutModel`. This layer owns
-`GraspState -> GraspState` stepping, residual-aware tactile/contact rollout,
-contact-force rollout, and the `qddot_des` action contract.
+`GraspState -> GraspState` stepping, contact-kinematic tactile transition, and
+the `qddot_sol` action contract.
 
 ## state/
 
@@ -44,9 +44,9 @@ sensor.
 
 ## contact/
 
-Contact kinematics, force projection, and force correction helpers. Contact
-kinematics uses one Pinocchio frame per tactile sensor and derives hemisphere
-point Jacobians from local offsets.
+Contact kinematics, hemisphere motion, force projection, and force correction
+helpers. Contact kinematics uses one Pinocchio frame per tactile sensor and
+derives hemisphere point Jacobians from local offsets.
 
 ## costs/
 
@@ -54,8 +54,8 @@ Cost terms that evaluate predicted `GraspState` rollouts.
 
 ## config/
 
-YAML parsers for MPPI, grasp cost, rollout, and contact-force rollout
-configuration.
+YAML parsers for MPPI, grasp cost, tactile transition, rollout, and optional
+contact-force rollout configuration.
 
 ## Include Policy
 

@@ -12,6 +12,7 @@
 #include "mppi_core/costs/grasp_stability_cost.hpp"
 #include "mppi_core/rollout/grasp_state_rollout_model.hpp"
 #include "mppi_core/rollout/contact_force_rollout.hpp"
+#include "mppi_core/tactile/tactile_transition.hpp"
 
 namespace mppi_core {
 
@@ -29,6 +30,12 @@ GraspStateRolloutConfig ParseGraspStateRolloutConfig(
 GraspStateRolloutConfig LoadGraspStateRolloutConfigFromYamlFile(
     const std::string& yaml_path,
     GraspStateRolloutConfig defaults = {});
+
+TactileTransitionConfig ParseTactileTransitionConfig(
+    const YAML::Node& params, TactileTransitionConfig defaults = {});
+
+TactileTransitionConfig LoadTactileTransitionConfigFromYamlFile(
+    const std::string& yaml_path, TactileTransitionConfig defaults = {});
 
 ContactForceRolloutConfig ParseContactForceRolloutConfig(
     const YAML::Node& params, ContactForceRolloutConfig defaults = {});

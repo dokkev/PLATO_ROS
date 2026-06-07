@@ -12,7 +12,7 @@ The rollout equation is:
 
 ```text
 G_{k+1} = f_G(G_k, u_k)
-u_k = qddot_des,k
+u_k = qddot_sol,k
 ```
 
 The rollout predicts an ideal/reference robot state and compact tactile/contact
@@ -20,18 +20,19 @@ state. It does not predict exact future contact force.
 
 ## RobotState
 
-`RobotState` is the ideal/reference robot rollout state:
+`RobotState` is the robot state container used inside `GraspState` and
+`RobotSystem`. The owner decides whether the values are measured or rollout
+values:
 
 ```cpp
 struct RobotState {
-  Eigen::VectorXd q_des;
-  Eigen::VectorXd qdot_des;
-  Eigen::VectorXd qddot_des;
-  Eigen::VectorXd tau_ff;
+  Eigen::VectorXd q;
+  Eigen::VectorXd qdot;
+  Eigen::VectorXd tau;
 };
 ```
 
-Measured robot values belong in `GraspObservation`, not in `RobotState`.
+`qddot_sol` is the MPPI action and is not stored in `RobotState`.
 
 ## TactileState
 
@@ -77,13 +78,13 @@ adapter-facing code should treat them as an ordered per-sensor vector.
 
 ## Action definition
 
-The MPPI action is desired joint acceleration:
+The MPPI action is the solver joint acceleration:
 
 ```text
-u = qddot_des
+u = qddot_sol
 ```
 
-Do not treat `delta_q_ref` as the primary action. Use `qddot_des`,
+Do not treat `delta_q_ref` as the primary action. Use `qddot_sol`,
 `GraspStateRolloutConfig`, and `GraspStateRolloutModel` directly.
 
 ## Ideal robot rollout
@@ -91,34 +92,41 @@ Do not treat `delta_q_ref` as the primary action. Use `qddot_des`,
 For each rollout step:
 
 ```text
-qdot_des[k + 1] = qdot_des[k] + qddot_des[k] * dt
-q_des[k + 1]    = integrate(q_des[k], qdot_des[k + 1] * dt)
-tau_ff[k + 1]   = RNEA(q_des[k + 1], qdot_des[k + 1], qddot_des[k])
+qdot[k + 1] = qdot[k] + qddot_sol[k] * dt
+q[k + 1]    = integrate(q[k], qdot[k + 1] * dt)
+tau[k + 1]  = RNEA(q[k], qdot[k], qddot_sol[k])
 ```
 
-If Pinocchio model/data are unavailable or incompatible, `tau_ff` falls back to
+`EvaluateRollout()` and `PredictRollout()` initialize the rollout root from
+`GraspObservation::q_ref_current` and `qdot_ref_current`, with zero initial
+rollout torque. The horizon therefore extends the accepted host reference
+state, while measured `q_meas`/`qdot_meas` stay in the observation layer.
+
+If Pinocchio model/data are unavailable or incompatible, `tau` falls back to
 zero. The rollout does not add embedded PD feedback torque.
 
 ## Tactile transition
 
-The current transition preserves the compact `TactileState` shape and updates
-existing contact/sensor aggregate fields through either:
+The current transition preserves `TactileState` shape and updates each sensor
+through contact kinematics:
 
-- measured-torque residual force projection, or
-- an explicit kinematic fallback used for debug and ablation.
+1. Compute one `HemisphereMotion` per hemisphere from robot state, next robot
+   state, `TactileState`, and `TactileSensorContext`.
+2. Apply deterministic contact survival/loss/birth rules.
+3. Refresh contact topology, contact-point motion, shear/rotation features,
+   confidence, and aggregate fields.
 
 The transition is applied to each entry in `tactile_sensors` with a matching
-entry in `RolloutContext::tactile_contexts`. To avoid projecting the same
-measured torque residual into multiple contacts, residual force projection is
-only used when exactly one tactile sensor has active hemisphere contact. If zero
-or more than one sensor is active, the rollout skips residual projection and
-uses the kinematic tactile transition until a coupled multi-sensor residual
-solver exists.
+entry in `RolloutContext::tactile_contexts`. The MPPI horizon rollout does not
+perform measured-torque residual projection or exact future contact-force
+prediction.
 
-The force projection output is clamped into a simple friction cone before it is
-fed back into tactile force rollout: no positive normal force means zero
-tangential force, otherwise tangential force is limited by `mu * normal_force`.
-Full contact birth prediction is a non-goal for this refactor.
+Transition gains and thresholds are loaded from `grasp.tactile_transition` in
+`config/grasp.yaml`.
+
+The contact-force projection utilities remain separate from
+`GraspStateRolloutModel` and are reserved for later observation-time correction
+experiments.
 
 ## Contact kinematics
 
@@ -131,37 +139,44 @@ types store where tactile units are and which Pinocchio frame represents the
 sensor.
 
 `GraspObservation` carries measured tactile states in `tactile_meas`,
-Pinocchio robot dynamics in `robot_dynamics`, and per-sensor contact kinematics
-in `tactile_contexts`. `RolloutContext` mirrors those context pointers during
-prediction.
+Pinocchio robot model/data through `robot_system`, and per-sensor contact
+kinematics in `tactile_contexts`. `RolloutContext` mirrors those context
+pointers during prediction.
 
 ## Command packet
 
 `RobotCommand` is the final low-level packet:
 
 ```text
-q_des
-qdot_des
-qddot_des
-tau_ff
+q_cmd
+qdot_cmd
+tau_cmd
 kp
 kd
 stamp_sec
 ```
 
-The embedded driver applies:
+`qddot_sol` is integrated into `q_cmd` and `qdot_cmd`; it is not sent as part of
+`RobotCommand`. The command builder computes:
 
 ```text
-tau_cmd = tau_ff
-        + kp * (q_des - q_meas)
-        + kd * (qdot_des - qdot_meas)
+tau_ff_cmd = RNEA(q, qdot, qddot_sol)
+tau_cmd    = tau_ff_cmd
+```
+
+The embedded driver may then apply:
+
+```text
+tau_driver = tau_cmd
+           + kp * (q_cmd - q_meas)
+           + kd * (qdot_cmd - qdot_meas)
 ```
 
 Debug fields belong in a separate debug type, not in `RobotCommand`.
 
 ## Non-goals
 
-- Full contact birth prediction.
+- Full physics-based or probabilistic contact birth prediction.
 - Object pose tracking.
 - Rigid-body contact simulation.
 - Controller modes or a new state machine.
@@ -180,4 +195,5 @@ colcon test-result --verbose --test-result-base build/mppi_core
 
 The deterministic tests cover tactile dense hemisphere state, NARI adapter
 conversion, modular `GraspState` validity, clean command packet dimensions,
-qddot rollout integration, tactile propagation, and include-structure drift.
+solver-acceleration rollout integration, tactile propagation, and
+include-structure drift.

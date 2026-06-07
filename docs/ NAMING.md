@@ -1,96 +1,83 @@
 # Controller Variable Naming Convention
 
-This document defines controller variable naming conventions for robot control
-code. The goal is to keep the control pipeline explicit: what a task wants,
-what a solver computed, what the host passed to hardware, what the robot
-reported back, and what the host accepted as the current state.
+This document defines naming conventions for robot controller variables.
 
-In ideal tracking, several values may be numerically equal. In real robot
-software, they still belong to different layers and should not be collapsed.
+The goal is to keep the control pipeline explicit:
 
-## 1. Core Rule
+```txt
+task objective -> solver result -> host command -> driver/local control -> robot feedback -> accepted state
+```
+
+In an ideal system, several values may be numerically equal. In real robot software, they still belong to different layers and should not be collapsed.
+
+---
+
+## 1. Core Suffix Rule
 
 Use suffixes to describe the control layer of a value.
 
 ```txt
-_des     = what a task, planner, or controller objective wants
-_sol     = what a solver computed
-_cmd     = what the host passed to the embedded driver
-_applied = what the embedded controller or lower-level driver actually used
-_meas    = what the robot, sensor, or driver reported back
-_est     = estimated or filtered intermediate value
-q        = what the host controller accepts as the current robot state
+_des      = desired by a task, planner, or controller objective
+_sol      = computed by a solver
+_cmd      = passed from the host to the driver interface
+_meas     = reported by hardware, sensor, or driver
+_est      = estimated or filtered value
+_applied  = physically applied ground-truth-like value, rarely observable
 ```
 
-Use unsuffixed `q`, `qdot`, `qddot`, and `tau` only for the canonical current
-robot state used by kinematics, dynamics, estimation, and feedback control.
+Use unsuffixed `q`, `qdot`, `qddot`, and `tau` only for the canonical current robot state accepted by the host controller.
 
-## 2. Why These Layers Are Separate
-
-These values may be equal in an ideal system, but they do not represent the same
-concept.
-
-For example, in whole-body control, the controller may receive multiple task
-objectives:
-
-```cpp
-right_hand_task.x_des;
-com_task.x_des;
-posture_task.q_des;
+```txt
+q     = current configuration used by model/control
+qdot  = current velocity used by model/control
+qddot = current acceleration used by model/control, if available
+tau   = current effort/torque used by model/control
 ```
 
-Even if one objective is a joint-space desired value, such as
-`posture_task.q_des`, the final solver output may not equal that value. The
-solver may need to satisfy task conflicts, contact constraints, torque limits,
-balance constraints, joint limits, or higher-priority objectives.
+The unsuffixed state may come from measured, calibrated, filtered, or estimated values. The suffix-free name means the host controller has accepted it as the current state for this control tick.
 
-Therefore:
+---
+
+## 2. Why Layers Are Separate
+
+A task may desire one value, but a solver may compute another because of conflicts, priorities, constraints, or limits.
 
 ```txt
 q_des != q_sol
 ```
 
-The solver result is then converted into a host-to-driver command. This
-conversion may include actuator limits, hardware limits, safety clamps, command
-smoothing, interpolation, or mode-dependent behavior.
-
-Therefore:
+A solver result may then be processed by the host before being sent to the driver.
 
 ```txt
 q_sol != q_cmd
 ```
 
-After the command is sent, the embedded controller or driver may still apply
-additional processing. The measured robot state may differ from the command due
-to tracking error, delay, compliance, backlash, saturation, or contact
-interaction.
-
-Therefore:
+The robot may not exactly track the command because of delay, compliance, saturation, backlash, contact, or actuator limits.
 
 ```txt
 q_cmd != q_meas
 ```
 
-The ideal chain is:
+The intended control pipeline is:
 
 ```txt
-x_des -> q_sol -> q_cmd -> q_applied -> robot -> q_meas -> q
+x_des / q_des
+  -> solver
+  -> q_sol / qdot_sol / qddot_sol / tau_sol
+  -> host command builder and limits
+  -> q_cmd / qdot_cmd / tau_cmd
+  -> embedded driver
+  -> robot
+  -> q_meas / qdot_meas / tau_meas
+  -> host state preprocessing
+  -> q / qdot / tau
 ```
 
-In an ideal system with no conflict, no delay, no saturation, perfect actuation,
-and perfect sensing:
+---
 
-```txt
-q_sol = q_cmd = q_applied = q_meas = q
-```
+## 3. Current State and Feedback Values
 
-Real robot software should still keep these names separate because each value
-belongs to a different control layer.
-
-## 3. Current State Values
-
-Use unsuffixed `q`, `qdot`, `qddot`, and `tau` only for the canonical current
-robot state accepted by the host controller for the current control tick.
+Use unsuffixed values for the canonical state used by the controller during the current control tick.
 
 ```cpp
 struct RobotState
@@ -101,66 +88,60 @@ struct RobotState
 };
 ```
 
-Meaning:
+Use `*_meas` for values reported by hardware, sensors, or drivers.
 
 ```txt
-q     = current robot configuration used by model/control
-qdot  = current generalized velocity used by model/control
-qddot = current generalized acceleration used by model/control, if available
-tau   = current joint torque or effort used by model/control
+q_meas
+qdot_meas
+tau_meas
+current_meas
 ```
-
-These values may come from raw encoder feedback, calibrated measurements,
-filtered velocity, sensor fusion, or estimator output. The unsuffixed name does
-not describe how the value was obtained. It means the value has been accepted as
-the current robot state.
 
 Example:
 
 ```cpp
-const JointFeedback feedback = read_joint_feedback_();
+const JointFeedback feedback = driver.read();
 
 RobotState state;
-state.q = apply_joint_calibration_(feedback.q_meas);
-state.qdot = velocity_filter_.update(feedback.qdot_meas);
-state.tau = feedback.tau_meas;
-
-pinocchio::forwardKinematics(model, data, state.q, state.qdot);
+state.q = apply_joint_calibration(feedback.q_meas);
+state.qdot = velocity_filter.update(feedback.qdot_meas);
+state.tau = torque_filter.update(feedback.tau_meas);
 ```
 
-Use `*_meas` for values reported by hardware or a lower-level driver:
+For many motors, reported torque is estimated from measured current:
 
-```cpp
-q_meas
-qdot_meas
-tau_meas
+```txt
+tau_meas ≈ current_meas * Kt
 ```
 
-`*_meas` means the value came from the hardware or driver interface. It does not
-necessarily mean the value is raw. For example, `qdot_meas` may already be
-filtered by the embedded driver.
+For geared joints, depending on the driver convention:
 
-Use `*_est` or more specific names for explicit host-side preprocessing:
+```txt
+tau_meas ≈ current_meas * Kt * gear_ratio
+```
 
-```cpp
-q_calibrated
-qdot_filtered
+Use `*_est` for explicit estimates or filtered intermediate values.
+
+```txt
+qdot_est
 tau_est
+contact_force_est
 ```
+
+---
 
 ## 4. Desired Values
 
 Use `*_des` for values desired by a task, planner, or controller objective.
 
-```cpp
+```txt
 x_des
 xdot_des
 q_des
 qdot_des
 ```
 
-These values describe what a task wants before arbitration or conflict
-resolution.
+These values represent what the objective wants before arbitration or conflict resolution.
 
 Good:
 
@@ -172,18 +153,16 @@ hand_task.x_des = target_hand_pose;
 Bad:
 
 ```cpp
-q_des = solve_wbc(problem);  // Bad: this is a solver result.
+q_des = solve_wbc(problem);  // Bad: solver output is not a desired value.
 ```
 
-Do not use `*_des` for solver outputs, host-to-driver commands, or measured
-state.
+---
 
 ## 5. Solver Results
 
-Use `*_sol` for raw results from solvers such as IK, QP, WBC, MPC, inverse
-dynamics, or trajectory optimization.
+Use `*_sol` for raw results from solvers such as IK, QP, WBC, MPC, inverse dynamics, or trajectory optimization.
 
-```cpp
+```txt
 q_sol
 qdot_sol
 qddot_sol
@@ -191,163 +170,384 @@ tau_sol
 contact_force_sol
 ```
 
-These values mean:
+Meaning:
 
 ```txt
 The solver computed this value.
 ```
 
-They do not necessarily mean:
-
-- the host sent it to the driver
-- the embedded controller accepted it
-- the robot physically applied it
-- the measured robot state reached it
+It does not mean the value was sent to hardware, accepted by the driver, physically applied, or measured back.
 
 Example:
 
 ```cpp
-const WbcSolution solution = solve_wbc_(problem, state);
+const WbcSolution solution = solve_wbc(problem, state);
 
-solution.qddot_sol;
-solution.tau_sol;
-solution.contact_force_sol;
+const Eigen::VectorXd qddot_sol = solution.qddot_sol;
+const Eigen::VectorXd contact_force_sol = solution.contact_force_sol;
 ```
 
-## 6. Host-to-Driver Commands
+---
 
-Use `*_cmd` for values that the host-side controller passes to a lower-level
-driver or embedded controller.
+## 6. From WBC Acceleration to Driver Command
+
+In acceleration-based WBC, the solver commonly outputs:
+
+```txt
+qddot_sol
+```
+
+The host controller converts this solver result into torque, velocity, and position commands.
+
+Typical flow:
+
+```txt
+qddot_sol
+  -> inverse dynamics
+  -> tau_ff_cmd
+
+qddot_sol
+  -> host-side integration and limits
+  -> qdot_cmd, q_cmd
+
+q_cmd, qdot_cmd, q, qdot
+  -> optional host-side feedback
+  -> tau_fb_cmd
+
+tau_ff_cmd + tau_fb_cmd
+  -> tau_cmd
+
+tau_cmd, qdot_cmd, q_cmd, kp, kd
+  -> motor driver
+```
+
+---
+
+## 7. Feedforward Torque Command
+
+Compute model-based feedforward torque from `qddot_sol` using inverse dynamics:
+
+```txt
+tau_ff_cmd = M(q) qddot_sol + h(q, qdot)
+```
+
+where:
+
+```txt
+h(q, qdot) = C(q, qdot) qdot + g(q)
+```
+
+In Pinocchio:
 
 ```cpp
-q_cmd
-qdot_cmd
-tau_ff_cmd
-kp_cmd
-kd_cmd
+tau_ff_cmd = pinocchio::rnea(model, data, q, qdot, qddot_sol);
 ```
 
 Meaning:
 
 ```txt
-*_cmd = value passed from the host to the driver interface
+tau_ff_cmd = pure model-based feedforward torque command
 ```
 
-`*_cmd` does not mean the actuator physically applied the value. It only means
-the host provided that value to the driver interface.
+Do not include feedback inside `tau_ff_cmd`.
 
-Use explicit suffixes inside command structs:
-
-```cpp
-struct JointCommand
-{
-  Eigen::VectorXd q_cmd;
-  Eigen::VectorXd qdot_cmd;
-  Eigen::VectorXd tau_ff_cmd;
-  Eigen::VectorXd kp_cmd;
-  Eigen::VectorXd kd_cmd;
-};
-```
-
-Typical host-side flow:
-
-```cpp
-const WbcSolution solution = solve_wbc_(problem, state);
-
-JointCommand command = build_joint_command_(solution, state);
-JointCommand limited_command = apply_host_limits_(command);
-
-if (driver_.write(limited_command)) {
-  last_sent_command_ = limited_command;
-}
-```
-
-Use `last_sent_command_` for the last command successfully written to the
-transport or driver interface.
-
-## 7. Applied Values Are Rarely Observable
-
-Use `*_applied` only for the value that the embedded controller or lower-level
-driver actually used as its internal command after embedded-side processing.
-
-For example:
+If contact force compensation is explicitly modeled, the controller may include a contact term depending on sign convention:
 
 ```txt
-q_cmd -> embedded processing -> q_applied
+tau_ff_cmd = M(q) qddot_sol + h(q, qdot) - J_c(q)^T f_c
 ```
 
-`q_cmd` is the value passed from the host to the embedded controller.
-`q_applied` is the value actually used inside the embedded controller after
-internal processing.
+Only include this term when contact force compensation is intentionally part of the controller.
 
-Embedded-side processing may include:
+---
 
-- joint limit clamping
-- velocity or acceleration limits
-- current or torque limits
-- watchdog cutoffs
-- mode gates
-- command filtering
-- interpolation
-- thermal protection
-- fault handling
+## 8. Host-Side Integration to Position and Velocity Commands
 
-Therefore, host-side code should not assume:
+The host may integrate `qddot_sol` to produce driver position and velocity commands.
 
-```txt
-q_applied = q_cmd
-```
-
-Bad:
+The integrated values should be clamped before being stored as `_cmd` values:
 
 ```cpp
-if (driver.write(command)) {
-  last_applied_command_ = command;  // Incorrect unless embedded confirms it.
-}
+qdot_cmd = clamp_velocity(qdot_cmd_prev + dt * qddot_sol);
+q_cmd = clamp_position(q_cmd_prev + dt * qdot_cmd);
+```
+
+or, if integrating from the current accepted robot state:
+
+```cpp
+qdot_cmd = clamp_velocity(state.qdot + dt * qddot_sol);
+q_cmd = clamp_position(state.q + dt * qdot_cmd);
+```
+
+Meaning:
+
+```txt
+q_cmd    = position command passed to the driver after host-side limits
+qdot_cmd = velocity command passed to the driver after host-side limits
+```
+
+Do not keep separate names such as `q_cmd_raw` unless the unclamped value is explicitly needed for debugging or analysis.
+
+The `_cmd` values should be the actual values passed to the driver interface.
+
+---
+
+## 9. Optional Host-Side Feedback Torque
+
+The host may optionally compute a tracking feedback torque:
+
+```txt
+tau_fb_cmd = kp_fb * (q_cmd - q)
+           + kd_fb * (qdot_cmd - qdot)
+```
+
+where:
+
+```txt
+kp_fb = host-side feedback proportional gain
+kd_fb = host-side feedback derivative gain
+```
+
+Then:
+
+```txt
+tau_cmd = tau_ff_cmd + tau_fb_cmd
+```
+
+In some modes:
+
+```txt
+tau_fb_cmd = 0
+```
+
+This is appropriate when:
+
+* the model-based torque is intended to be used alone
+* the embedded driver handles all impedance tracking
+* the user does not want host-side tracking feedback
+* the model is assumed to be accurate enough for the task
+
+Naming rule:
+
+```txt
+tau_ff_cmd = model-based feedforward torque command
+tau_fb_cmd = optional host-side feedback torque command
+tau_cmd    = final torque command passed to the driver
 ```
 
 Good:
 
 ```cpp
+tau_ff_cmd = compute_inverse_dynamics(q, qdot, qddot_sol);
+tau_fb_cmd = compute_host_feedback(q_cmd, qdot_cmd, q, qdot);
+tau_cmd = tau_ff_cmd + tau_fb_cmd;
+```
+
+Bad:
+
+```cpp
+tau_ff_cmd = tau_ff_cmd + tau_fb_cmd;  // Bad: no longer pure feedforward.
+```
+
+---
+
+## 10. Driver-Local Impedance Gains
+
+The motor driver command should contain only values passed to the embedded driver.
+
+```cpp
+struct JointCommand
+{
+  Eigen::VectorXd tau_cmd;
+  Eigen::VectorXd qdot_cmd;
+  Eigen::VectorXd q_cmd;
+  Eigen::VectorXd kp;
+  Eigen::VectorXd kd;
+};
+```
+
+Meaning:
+
+```txt
+tau_cmd  = final torque command passed to the driver
+qdot_cmd = velocity command passed to the driver
+q_cmd    = position command passed to the driver
+kp       = driver-local proportional gain
+kd       = driver-local derivative gain
+```
+
+The gains `kp` and `kd` are used by the embedded driver. They are not host-side feedback gains.
+
+Host-side feedback gains must be named separately:
+
+```txt
+kp_fb
+kd_fb
+```
+
+These are used only to compute `tau_fb_cmd` on the host.
+
+Good:
+
+```cpp
+JointCommand command;
+command.tau_cmd = tau_cmd;
+command.qdot_cmd = qdot_cmd;
+command.q_cmd = q_cmd;
+command.kp = driver_kp;
+command.kd = driver_kd;
+```
+
+Bad:
+
+```cpp
+command.kp = kp_fb;  // Bad: host-side feedback gain sent as driver-local gain.
+command.kd = kd_fb;  // Bad.
+```
+
+The embedded driver may internally combine the command as an impedance controller:
+
+```txt
+tau_driver_internal =
+    tau_cmd
+  + kp * (q_cmd - q_meas)
+  + kd * (qdot_cmd - qdot_meas)
+```
+
+This internal value should not be called `tau_applied` unless it is explicitly reported and validated as a physical applied torque.
+
+---
+
+## 11. Measured vs Applied Values
+
+Use `*_meas` for values reported by hardware, sensors, or drivers.
+
+Use `*_applied` only for values that represent physically applied ground-truth-like quantities.
+
+For torque:
+
+```txt
+tau_cmd     = torque command sent from host to driver
+tau_meas    = torque reported or estimated by driver/robot
+tau_applied = actual physical joint torque, rarely directly observable
+```
+
+In most systems:
+
+```txt
+tau_applied is not available
+```
+
+Do not assume:
+
+```txt
+tau_applied = tau_cmd
+```
+
+Do not assume:
+
+```txt
+tau_applied = tau_meas
+```
+
+unless the measurement source is explicitly calibrated and documented as a physical ground-truth-like torque measurement.
+
+Good:
+
+```cpp
+feedback.tau_meas = driver_feedback.tau_meas;
+state.tau = torque_filter.update(feedback.tau_meas);
+```
+
+Bad:
+
+```cpp
+state.tau_applied = driver_feedback.tau_meas;  // Bad: reported estimate is not ground truth.
+```
+
+Use `*_applied` only for values from calibrated physical measurement systems, external ground-truth sensors, or explicitly validated applied-value reports.
+
+---
+
+## 12. Complete WBC Command Example
+
+```cpp
+const WbcSolution solution = solve_wbc(problem, state);
+
+// Solver result.
+const Eigen::VectorXd qddot_sol = solution.qddot_sol;
+
+// Pure model-based feedforward torque.
+const Eigen::VectorXd tau_ff_cmd =
+    pinocchio::rnea(model, data, state.q, state.qdot, qddot_sol);
+
+// Integrate acceleration into host-side command references.
+// Clamp before storing as _cmd values.
+Eigen::VectorXd qdot_cmd =
+    clamp_velocity(qdot_cmd_prev + dt * qddot_sol);
+
+Eigen::VectorXd q_cmd =
+    clamp_position(q_cmd_prev + dt * qdot_cmd);
+
+// Optional host-side feedback torque.
+Eigen::VectorXd tau_fb_cmd = Eigen::VectorXd::Zero(model.nv);
+
+if (use_host_feedback) {
+  tau_fb_cmd =
+      kp_fb.cwiseProduct(q_cmd - state.q)
+    + kd_fb.cwiseProduct(qdot_cmd - state.qdot);
+}
+
+// Final torque command passed to the driver.
+Eigen::VectorXd tau_cmd = tau_ff_cmd + tau_fb_cmd;
+tau_cmd = clamp_torque(tau_cmd);
+
+// Build driver command.
+JointCommand command;
+command.tau_cmd = tau_cmd;
+command.qdot_cmd = qdot_cmd;
+command.q_cmd = q_cmd;
+command.kp = driver_kp;
+command.kd = driver_kd;
+
+// Send to embedded driver.
 if (driver.write(command)) {
-  last_sent_command_ = command;
+  last_sent_command = command;
+  qdot_cmd_prev = qdot_cmd;
+  q_cmd_prev = q_cmd;
 }
 ```
 
-Use `applied_command` or `q_applied` only if the embedded controller explicitly
-reports or echoes the value it actually used internally.
+---
 
-If the host cannot observe the embedded-side applied value, use:
+## 13. Rule of Thumb
 
-```cpp
-last_sent_command_
-```
-
-not:
-
-```cpp
-last_applied_command_
-```
-
-In short:
+General suffixes:
 
 ```txt
-cmd     = host passed it to the driver
-applied = embedded actually used it internally
-meas    = robot or sensor reported it back
-q       = host accepted it as current state
+_des       = wanted
+_sol       = solved
+_cmd       = passed to driver
+_meas      = reported back by robot, sensor, or driver
+_est       = estimated or filtered
+_applied   = physically applied ground-truth-like value
+q/qdot/tau = accepted current state
 ```
 
-## 8. Rule of Thumb
+Torque-specific names:
 
 ```txt
-des     = wanted
-sol     = solved
-cmd     = passed to driver
-applied = embedded actually used
-meas    = reported back
-est     = estimated or filtered
-q       = accepted current state
+tau_ff_cmd = model-based feedforward torque command
+tau_fb_cmd = host-side feedback torque command
+tau_cmd    = final torque command passed to driver
+tau_meas   = measured/reported torque, often current_meas * Kt
+```
+
+Gain-specific names:
+
+```txt
+kp, kd        = driver-local impedance gains
+kp_fb, kd_fb  = host-side feedback gains
 ```
 
 Anti-patterns:
@@ -356,18 +556,33 @@ Anti-patterns:
 q_cmd = solve_ik(x_des);  // Bad: solver output skipped the _sol layer.
 ```
 
+Good:
+
 ```cpp
 q_sol = solve_ik(x_des);
-q_cmd = build_command_from_solution_(q_sol, state);
+q_cmd = build_command_from_solution(q_sol, state);
 ```
+
+Bad:
 
 ```cpp
-last_applied_command_ = command;  // Bad unless embedded confirms it.
+tau_ff_cmd = tau_ff_cmd + tau_fb_cmd;  // Bad: feedforward name reused for final torque.
 ```
+
+Good:
 
 ```cpp
-last_sent_command_ = command;
+tau_cmd = tau_ff_cmd + tau_fb_cmd;
 ```
 
-Ideal systems may make these values numerically equal. Real robot software
-should still name them as different layers.
+Bad:
+
+```cpp
+state.tau_applied = driver_feedback.tau_meas;  // Bad: measured estimate is not applied ground truth.
+```
+
+Good:
+
+```cpp
+state.tau = torque_filter.update(driver_feedback.tau_meas);
+```

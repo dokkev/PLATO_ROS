@@ -21,7 +21,8 @@ specific to one hand configuration.
 Use `GraspState = RobotState + vector<TactileState>` as the top-level rollout
 state. Keep `TactileState` sensor-specific and compact: sensor-level aggregates
 plus a dense full hemisphere list. Carry one `TactileSensorContext` per tactile
-state and a separate `RobotDynamicsContext` for Pinocchio integrate/RNEA.
+state. Use `RobotSystem` as the robot model/data holder for Pinocchio
+integrate/RNEA.
 
 ### Reason
 
@@ -37,17 +38,16 @@ Positive:
 - Validity checks must consider every tactile sensor.
 - Inactive hemispheres remain representable, so contact birth can be modeled
   later without changing `TactileState` shape.
-- Measured torque residual force projection is only safe when exactly one
-  tactile sensor has active hemisphere contact; zero or multi-active-sensor
-  rollout skips residual projection and uses kinematic tactile transition until
-  a coupled residual solver exists.
+- MPPI horizon rollout does not use measured-torque residual force projection.
+  Residual/contact-force projection helpers remain separate utilities for later
+  observation-time correction experiments.
 - The `/grasp` include directory no longer acts as a catch-all for robot,
   tactile, contact, and rollout code.
 
 Trade-offs:
 
-- Runtime integration must construct and cache one contact kinematics context
-  per tactile sensor frame, plus one robot dynamics context for the robot model.
+- Runtime integration must construct and cache one `RobotSystem` for the robot
+  model plus one contact kinematics context per tactile sensor frame.
 - Old include compatibility headers and aliases are removed; callers must use
   the current responsibility directories directly.
 
@@ -60,7 +60,7 @@ Trade-offs:
 
 ---
 
-## 2026-06-05 - MPPI Action Is Desired Joint Acceleration
+## 2026-06-05 - MPPI Action Is Solver Joint Acceleration
 
 Status: Accepted
 
@@ -72,10 +72,11 @@ impedance commands to an embedded 1 kHz controller.
 
 ### Decision
 
-Sample `qddot_des` in `mppi_core`, integrate ideal `qdot_des` and `q_des` during
-rollout, compute `tau_ff` with Pinocchio RNEA when model/data are available,
-and fall back to deterministic zero feed-forward torque otherwise. Keep embedded
-PD feedback out of the rollout model.
+Solve/sample `qddot_sol` in `mppi_core`, integrate ideal `qdot` and `q` during
+rollout, compute `tau` with Pinocchio RNEA when model/data are available, and
+fall back to deterministic zero torque otherwise. Keep embedded PD feedback out
+of the rollout model. `qddot_sol` remains the action and is not stored in
+`RobotState` or `RobotCommand`.
 
 ### Reason
 
@@ -95,14 +96,14 @@ Trade-offs:
 
 - ROS adapters must populate measured fields and command gains explicitly.
 - Older delta-q callers need to migrate to `GraspStateRolloutModel` and
-  `qddot_des` actions directly.
+  `qddot_sol` actions directly.
 
 ### Related files
 
 - `mppi_core/include/mppi_core/rollout/grasp_state_rollout_model.hpp`
-- `mppi_core/include/mppi_core/robot/robot_command.hpp`
+- `mppi_core/include/mppi_core/robot/robot_system.hpp`
 - `mppi_core/config/mppi.yaml`
-- `mppi_core/README.md`
+- `mppi_core/MPPI.md`
 
 ---
 
@@ -311,7 +312,7 @@ Trade-offs:
 ### Related files
 
 - `mppi_core/`
-- `mppi_core/README.md`
+- `mppi_core/MPPI.md`
 
 ---
 

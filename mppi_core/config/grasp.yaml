@@ -1,9 +1,27 @@
 grasp:
-  grasp_state_transition:
-    # Contact MPPI is entered after tactile contact is already active. Runtime
-    # rollout therefore requires measured-torque-residual transition by default.
-    rollout_policy: residual_required
+  tactile_transition:
+    enable_birth: true
+    enable_loss: true
+    birth_score_threshold: 0.5
+    loss_score_threshold: 0.5
+    birth_neighbor_weight: 0.25
+    birth_tangent_approach_weight: 1.0
+    birth_normal_approach_weight: 0.5
+    birth_shear_penalty_weight: 0.5
+    loss_unloading_weight: 1.0
+    loss_shear_weight: 0.5
+    loss_low_force_weight: 0.5
+    born_normal_force_n: 0.05
+    born_confidence: 0.5
+    inactive_confidence: 0.0
+    contact_confidence_decay: 1.0
+    aggregate_shear_decay: 1.0
+    aggregate_rotation_decay: 1.0
+    enough_contact_hemisphere_count: 2
 
+  # Contact-force rollout settings are retained for residual/correction
+  # experiments. The current GraspStateRolloutModel does not use residual force
+  # projection inside MPPI horizon dynamics.
   contact_force_rollout:
     enable_force_projection_update: true
     force_lowpass_alpha: 0.5

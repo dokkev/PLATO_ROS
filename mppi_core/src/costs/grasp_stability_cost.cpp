@@ -16,6 +16,13 @@ double Relu(double value) { return std::max(0.0, value); }
 
 double Square(double value) { return value * value; }
 
+double Clamp01(double value) {
+  if (!std::isfinite(value)) {
+    return 0.0;
+  }
+  return std::clamp(value, 0.0, 1.0);
+}
+
 bool IsFiniteAndNonnegative(double value) {
   return std::isfinite(value) && value >= 0.0;
 }
@@ -131,6 +138,16 @@ GraspStabilityCost::GraspStabilityCost(GraspStabilityCostConfig config)
       !IsFiniteAndNonnegative(config_.contact_loss_weight) ||
       !IsFiniteAndNonnegative(config_.target_active_hemisphere_count) ||
       !IsFiniteAndNonnegative(config_.hemisphere_contact_weight) ||
+      !IsFiniteAndNonnegative(config_.qddot_weight) ||
+      !IsFiniteAndNonnegative(config_.tau_weight) ||
+      !IsFiniteAndNonnegative(config_.qdot_limit) ||
+      !IsFiniteAndNonnegative(config_.qdot_limit_weight) ||
+      !IsFiniteAndNonnegative(config_.active_tactile_sensor_weight) ||
+      !IsFiniteAndNonnegative(config_.target_active_hemisphere_total) ||
+      !IsFiniteAndNonnegative(config_.active_hemisphere_total_weight) ||
+      !IsFiniteAndNonnegative(config_.shear_displacement_weight) ||
+      !IsFiniteAndNonnegative(config_.rotational_shear_weight) ||
+      !IsFiniteAndNonnegative(config_.low_confidence_weight) ||
       !IsFiniteAndNonnegative(config_.tracking_weight) ||
       !IsFiniteAndNonnegative(config_.tracking_action_scale_weight) ||
       !IsFiniteAndNonnegative(config_.action_smoothness_weight) ||
@@ -163,8 +180,9 @@ double GraspStabilityCost::Evaluate(
                                  : 0.0;
 
   return TactileSensorsCost(state, context.rollout) + tracking_guard_cost +
-         JointLimitCost(state, action) +
-         config_.action_smoothness_weight * action.squaredNorm();
+         JointLimitCost(state, action) + RobotEffortCost(state, action) +
+         config_.action_smoothness_weight * action.squaredNorm() +
+         config_.qddot_weight * action.squaredNorm();
 }
 
 double GraspStabilityCost::TrackingGuardCost(
@@ -176,7 +194,7 @@ double GraspStabilityCost::TrackingGuardCost(
   }
 
   const auto& measured_q = rollout.observation->q_meas;
-  const auto& reference_q = rollout.initial_reference_state->robot.q_des;
+  const auto& reference_q = rollout.initial_reference_state->robot.q;
   if (measured_q.size() != reference_q.size() ||
       measured_q.size() != action.size()) {
     return 0.0;
@@ -193,12 +211,12 @@ double GraspStabilityCost::JointLimitCost(
     const Eigen::Ref<const Eigen::VectorXd>& action) const {
   if (config_.joint_lower_bound.size() == 0 ||
       config_.joint_upper_bound.size() == 0 ||
-      state.robot.q_des.size() != action.size() ||
-      config_.joint_lower_bound.size() != state.robot.q_des.size()) {
+      state.robot.q.size() != action.size() ||
+      config_.joint_lower_bound.size() != state.robot.q.size()) {
     return 0.0;
   }
 
-  const Eigen::VectorXd q_next = state.robot.q_des;
+  const Eigen::VectorXd q_next = state.robot.q;
   const Eigen::VectorXd lower_violation =
       (config_.joint_lower_bound - q_next)
           .cwiseMax(Eigen::VectorXd::Zero(q_next.size()));
@@ -209,9 +227,29 @@ double GraspStabilityCost::JointLimitCost(
          (lower_violation.squaredNorm() + upper_violation.squaredNorm());
 }
 
+double GraspStabilityCost::RobotEffortCost(
+    const GraspState& state,
+    const Eigen::Ref<const Eigen::VectorXd>& /*action*/) const {
+  double cost = 0.0;
+  if (state.robot.tau.size() > 0 && state.robot.tau.allFinite()) {
+    cost += config_.tau_weight * state.robot.tau.squaredNorm();
+  }
+  if (config_.qdot_limit > 0.0 && state.robot.qdot.size() > 0 &&
+      state.robot.qdot.allFinite()) {
+    for (Eigen::Index i = 0; i < state.robot.qdot.size(); ++i) {
+      cost += config_.qdot_limit_weight *
+              Square(Relu(std::abs(state.robot.qdot[i]) -
+                          config_.qdot_limit));
+    }
+  }
+  return cost;
+}
+
 double GraspStabilityCost::TactileSensorsCost(
     const GraspState& state, const RolloutContext* rollout) const {
   double cost = 0.0;
+  std::size_t active_sensor_count = 0;
+  std::size_t active_hemisphere_total = 0;
   for (std::size_t i = 0; i < state.tactile_sensors.size(); ++i) {
     const TactileState* tactile = &state.tactile_sensors[i];
     if (!tactile->valid && rollout != nullptr &&
@@ -219,8 +257,19 @@ double GraspStabilityCost::TactileSensorsCost(
         i < rollout->observation->tactile_meas.size()) {
       tactile = &rollout->observation->tactile_meas[i];
     }
+    const std::size_t active_count = tactile->activeHemisphereCount();
+    active_hemisphere_total += active_count;
+    if (active_count > 0) {
+      ++active_sensor_count;
+    }
     cost += TactileSensorCost(*tactile);
   }
+  cost += config_.active_tactile_sensor_weight *
+          Square(Relu(static_cast<double>(config_.min_active_tactile_sensors) -
+                      static_cast<double>(active_sensor_count)));
+  cost += config_.active_hemisphere_total_weight *
+          Square(Relu(config_.target_active_hemisphere_total -
+                      static_cast<double>(active_hemisphere_total)));
   return cost;
 }
 
@@ -233,8 +282,20 @@ double GraspStabilityCost::TactileSensorCost(
   const bool centroid_valid = TactileContactCentroidM(tactile, &centroid_m);
   const std::size_t active_hemisphere_count = tactile.activeHemisphereCount();
 
-  return ContactLocalCost(TactileNormalForceN(tactile), slip_risk, centroid_m,
-                          centroid_valid, active_hemisphere_count);
+  double cost = ContactLocalCost(TactileNormalForceN(tactile), slip_risk,
+                                 centroid_m, centroid_valid,
+                                 active_hemisphere_count);
+  if (tactile.shear_displacement_m.allFinite()) {
+    cost += config_.shear_displacement_weight *
+            tactile.shear_displacement_m.squaredNorm();
+  }
+  if (std::isfinite(tactile.rotational_shear_rad)) {
+    cost += config_.rotational_shear_weight *
+            Square(tactile.rotational_shear_rad);
+  }
+  cost += config_.low_confidence_weight *
+          Square(Relu(1.0 - Clamp01(tactile.confidence)));
+  return cost;
 }
 
 double GraspStabilityCost::ContactLocalCost(

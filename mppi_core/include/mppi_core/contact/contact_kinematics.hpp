@@ -13,11 +13,13 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/spatial/skew.hpp>
+#include <utility>
 #include <vector>
 
-#include "mppi_core/robot/robot_state.hpp"
+#include "mppi_core/contact/hemisphere_motion.hpp"
+#include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/state/grasp_state.hpp"
-#include "mppi_core/tactile/tactile_transition.hpp"
+#include "mppi_core/tactile/tactile_sensor_context.hpp"
 
 namespace mppi_core {
 
@@ -44,15 +46,15 @@ inline bool IsValidContactKinematicsInput(
     const RobotState& robot, const TactileState& tactile,
     const Eigen::Ref<const Eigen::VectorXd>& tangent_step,
     const PinocchioContactKinematicsContext& context) {
-  if (!IsValidRobotState(robot) || !tactile.valid ||
+  if (!IsValid(robot) || !tactile.valid ||
       !IsValidContactKinematicsContext(context)) {
     return false;
   }
-  if (robot.q_des.size() != static_cast<Eigen::Index>(context.model->nq) ||
+  if (robot.q.size() != static_cast<Eigen::Index>(context.model->nq) ||
       tangent_step.size() != static_cast<Eigen::Index>(context.model->nv)) {
     return false;
   }
-  return robot.q_des.allFinite() && tangent_step.allFinite();
+  return robot.q.allFinite() && tangent_step.allFinite();
 }
 
 inline Eigen::Vector3d ApplyTactileNormalAxisConvention(
@@ -115,7 +117,7 @@ inline std::vector<HemisphereMotion> ComputeHemisphereMotions(
   auto& data = *context.data;
   const auto& model = *context.model;
 
-  pinocchio::computeJointJacobians(model, data, robot.q_des);
+  pinocchio::computeJointJacobians(model, data, robot.q);
   pinocchio::updateFramePlacements(model, data);
 
   Eigen::Matrix<double, 6, Eigen::Dynamic> frame_jacobian(6, model.nv);
@@ -146,6 +148,125 @@ inline std::vector<HemisphereMotion> ComputeHemisphereMotions(
     if (motion.delta_position_sensor_m.allFinite()) {
       motions.push_back(motion);
     }
+  }
+
+  return motions;
+}
+
+inline bool HasMatchingTactileSensorContext(
+    const TactileState& tactile, const TactileSensorContext& sensor_context) {
+  if (tactile.sensor_index >= 0 && sensor_context.sensor_index >= 0 &&
+      tactile.sensor_index != sensor_context.sensor_index) {
+    return false;
+  }
+  return tactile.hemispheres.size() == sensor_context.hemispheres.size();
+}
+
+inline Eigen::Vector3d HemisphereLocalPointSensorM(
+    const HemisphereState& hemisphere, const HemisphereGeometry& geometry) {
+  if (hemisphere.cop_sensor_m.allFinite()) {
+    return Eigen::Vector3d{hemisphere.cop_sensor_m.x(),
+                           hemisphere.cop_sensor_m.y(), 0.0};
+  }
+  return geometry.center_sensor_m;
+}
+
+inline std::vector<HemisphereMotion> ComputeHemisphereMotions(
+    const RobotState& robot, const RobotState& next_robot,
+    const TactileState& tactile, const TactileSensorContext& sensor_context,
+    double dt) {
+  std::vector<HemisphereMotion> motions;
+  const PinocchioContactKinematicsContext* context =
+      sensor_context.kinematics;
+  if (!IsValid(robot) || !IsValid(next_robot) || !tactile.valid ||
+      context == nullptr || !IsValidContactKinematicsContext(*context) ||
+      !HasMatchingTactileSensorContext(tactile, sensor_context) ||
+      !std::isfinite(dt) || dt <= 0.0 ||
+      robot.q.size() != static_cast<Eigen::Index>(context->model->nq) ||
+      next_robot.q.size() != static_cast<Eigen::Index>(context->model->nq) ||
+      robot.qdot.size() != static_cast<Eigen::Index>(context->model->nv)) {
+    return motions;
+  }
+
+  const auto& model = *context->model;
+  pinocchio::Data data_now(model);
+  pinocchio::Data data_next(model);
+
+  pinocchio::forwardKinematics(model, data_now, robot.q);
+  pinocchio::updateFramePlacements(model, data_now);
+  pinocchio::forwardKinematics(model, data_next, next_robot.q);
+  pinocchio::updateFramePlacements(model, data_next);
+
+  auto& jacobian_data = *context->data;
+  pinocchio::computeJointJacobians(model, jacobian_data, robot.q);
+  pinocchio::updateFramePlacements(model, jacobian_data);
+
+  Eigen::Matrix<double, 6, Eigen::Dynamic> frame_jacobian_sensor(6, model.nv);
+  frame_jacobian_sensor.setZero();
+  pinocchio::getFrameJacobian(model, jacobian_data, context->sensor_frame_id,
+                              pinocchio::LOCAL, frame_jacobian_sensor);
+
+  const Eigen::Matrix3d rotation_world_sensor =
+      data_now.oMf[context->sensor_frame_id].rotation();
+  Eigen::Matrix<double, 3, Eigen::Dynamic> point_jacobian_sensor(3, model.nv);
+
+  motions.reserve(tactile.hemispheres.size());
+  for (std::size_t i = 0; i < tactile.hemispheres.size(); ++i) {
+    const auto& hemisphere = tactile.hemispheres[i];
+    const auto& geometry = sensor_context.hemispheres[i];
+    if (hemisphere.hemisphere_index != geometry.hemisphere_index) {
+      return {};
+    }
+
+    const Eigen::Vector3d point_sensor_m =
+        HemisphereLocalPointSensorM(hemisphere, geometry);
+    if (!point_sensor_m.allFinite() || !geometry.normal_sensor.allFinite() ||
+        geometry.normal_sensor.norm() <= 1.0e-12) {
+      return {};
+    }
+
+    const Eigen::Vector3d point_world_now =
+        data_now.oMf[context->sensor_frame_id].act(point_sensor_m);
+    const Eigen::Vector3d point_world_next =
+        data_next.oMf[context->sensor_frame_id].act(point_sensor_m);
+    Eigen::Vector3d normal_world =
+        rotation_world_sensor * geometry.normal_sensor.normalized();
+    if (std::isfinite(context->normal_axis_sign) &&
+        context->normal_axis_sign < 0.0) {
+      normal_world = -normal_world;
+    }
+
+    HemisphereMotion motion;
+    motion.hemisphere_index = hemisphere.hemisphere_index;
+    motion.point_world_m = point_world_now;
+    motion.normal_world = normal_world;
+    motion.velocity_world_mps = (point_world_next - point_world_now) / dt;
+
+    const Eigen::Vector3d velocity_sensor_mps =
+        rotation_world_sensor.transpose() * motion.velocity_world_mps;
+    const Eigen::Vector3d tactile_velocity_sensor_mps =
+        ApplyTactileNormalAxisConvention(velocity_sensor_mps, *context);
+    motion.velocity_sensor_xy_mps = tactile_velocity_sensor_mps.head<2>();
+    motion.normal_velocity_mps =
+        motion.normal_world.dot(motion.velocity_world_mps);
+
+    motion.position_sensor_m = point_sensor_m;
+    motion.delta_position_sensor_m = tactile_velocity_sensor_mps * dt;
+
+    if (ComputeContactPointJacobianSensor(frame_jacobian_sensor,
+                                          point_sensor_m,
+                                          &point_jacobian_sensor)) {
+      motion.J_contact_world = rotation_world_sensor * point_jacobian_sensor;
+      motion.J_normal = motion.normal_world.transpose() * motion.J_contact_world;
+    } else {
+      motion.J_contact_world.resize(0, 0);
+      motion.J_normal.resize(0);
+    }
+
+    if (!IsFiniteHemisphereMotion(motion)) {
+      return {};
+    }
+    motions.push_back(std::move(motion));
   }
 
   return motions;

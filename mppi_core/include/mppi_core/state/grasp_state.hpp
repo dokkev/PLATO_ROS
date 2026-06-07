@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "mppi_core/robot/robot_state.hpp"
+#include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/tactile/tactile_state.hpp"
 
 namespace mppi_core {
@@ -69,7 +69,7 @@ inline GraspState MakeGraspState(
   GraspState state;
   state.robot = robot;
   state.tactile_sensors = tactile_sensors;
-  state.valid = IsValidRobotState(robot) && HasValidTactileSensors(state);
+  state.valid = IsValid(robot) && HasValidTactileSensors(state);
   return state;
 }
 
@@ -85,22 +85,20 @@ inline GraspState MakeGraspState(const RobotState& robot,
 }
 
 inline GraspState MakeGraspState(
-    const Eigen::VectorXd& q_des, const Eigen::VectorXd& qdot_des,
-    const Eigen::VectorXd& qddot_des, const Eigen::VectorXd& tau_ff,
+    const Eigen::VectorXd& q, const Eigen::VectorXd& qdot,
+    const Eigen::VectorXd& tau,
     const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
         tactile_sensors) {
-  return MakeGraspState(MakeRobotState(q_des, qdot_des, qddot_des, tau_ff),
-                        tactile_sensors);
+  return MakeGraspState(MakeRobotState(q, qdot, tau), tactile_sensors);
 }
 
-inline GraspState MakeGraspState(const Eigen::VectorXd& q_des,
-                                 const Eigen::VectorXd& qdot_des,
-                                 const Eigen::VectorXd& qddot_des,
-                                 const Eigen::VectorXd& tau_ff,
+inline GraspState MakeGraspState(const Eigen::VectorXd& q,
+                                 const Eigen::VectorXd& qdot,
+                                 const Eigen::VectorXd& tau,
                                  const TactileState& first_tactile,
                                  const TactileState& second_tactile) {
-  return MakeGraspState(MakeRobotState(q_des, qdot_des, qddot_des, tau_ff),
-                        first_tactile, second_tactile);
+  return MakeGraspState(MakeRobotState(q, qdot, tau), first_tactile,
+                        second_tactile);
 }
 
 struct GraspStartConfig {

@@ -35,6 +35,20 @@ struct GraspStabilityCostConfig {
   double target_active_hemisphere_count{6.0};
   double hemisphere_contact_weight{2.0};
 
+  double qddot_weight{0.0};
+  double tau_weight{0.0};
+  double qdot_limit{0.0};
+  double qdot_limit_weight{0.0};
+
+  std::size_t min_active_tactile_sensors{0};
+  double active_tactile_sensor_weight{0.0};
+  double target_active_hemisphere_total{0.0};
+  double active_hemisphere_total_weight{0.0};
+
+  double shear_displacement_weight{0.0};
+  double rotational_shear_weight{0.0};
+  double low_confidence_weight{0.0};
+
   double tracking_weight{5.0};
   double tracking_action_scale_weight{20.0};
   double action_smoothness_weight{1.0};
@@ -56,6 +70,9 @@ class GraspStabilityCost final : public CostTermBase {
                            const RolloutContext& rollout) const;
   double JointLimitCost(const GraspState& state,
                         const Eigen::Ref<const Eigen::VectorXd>& action) const;
+  double RobotEffortCost(
+      const GraspState& state,
+      const Eigen::Ref<const Eigen::VectorXd>& action) const;
   double TactileSensorsCost(const GraspState& state,
                             const RolloutContext* rollout) const;
   double TactileSensorCost(const TactileState& tactile) const;

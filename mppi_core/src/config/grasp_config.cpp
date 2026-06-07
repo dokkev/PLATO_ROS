@@ -57,28 +57,6 @@ std::size_t ReadSize(const YAML::Node& node, const char* key,
   return static_cast<std::size_t>(parsed);
 }
 
-TactileRolloutPolicy ReadTactileRolloutPolicy(
-    const YAML::Node& node, const char* key,
-    TactileRolloutPolicy default_value) {
-  if (!HasValue(node)) {
-    return default_value;
-  }
-  const YAML::Node value = node[key];
-  if (!HasValue(value)) {
-    return default_value;
-  }
-  const std::string policy = value.as<std::string>();
-  if (policy == "residual_required") {
-    return TactileRolloutPolicy::kResidualRequired;
-  }
-  if (policy == "residual_then_kinematic_fallback") {
-    return TactileRolloutPolicy::kResidualThenKinematicFallback;
-  }
-  throw std::invalid_argument(
-      "Field 'rollout_policy' must be one of: residual_required, "
-      "residual_then_kinematic_fallback");
-}
-
 YAML::Node ReadSection(const YAML::Node& node, const char* key) {
   if (!HasValue(node)) {
     return YAML::Node();
@@ -292,16 +270,6 @@ GraspStateRolloutConfig ParseGraspStateRolloutConfig(
         "ParseGraspStateRolloutConfig: params must be a map");
   }
 
-  YAML::Node tactile_prediction =
-      ReadSection(safe_params, "grasp_state_transition");
-  if (!HasValue(tactile_prediction)) {
-    tactile_prediction = ReadSection(safe_params, "tactile_transition");
-  }
-  if (!HasValue(tactile_prediction)) {
-    tactile_prediction = ReadSection(safe_params, "tactile_prediction");
-  }
-  defaults.tactile_rollout_policy = ReadTactileRolloutPolicy(
-      tactile_prediction, "rollout_policy", defaults.tactile_rollout_policy);
   return defaults;
 }
 
@@ -314,6 +282,88 @@ GraspStateRolloutConfig LoadGraspStateRolloutConfigFromYamlFile(
   } catch (const YAML::Exception& ex) {
     throw std::runtime_error(
         "LoadGraspStateRolloutConfigFromYamlFile: failed to load '" +
+        yaml_path + "': " + ex.what());
+  }
+}
+
+TactileTransitionConfig ParseTactileTransitionConfig(
+    const YAML::Node& params, TactileTransitionConfig defaults) {
+  const YAML::Node safe_params = HasValue(params) ? params : YAML::Node();
+  if (HasValue(safe_params) && !safe_params.IsMap()) {
+    throw std::invalid_argument(
+        "ParseTactileTransitionConfig: params must be a map");
+  }
+
+  const YAML::Node transition = ReadSection(safe_params, "tactile_transition");
+  defaults.enable_birth =
+      ReadBool(transition, "enable_birth", defaults.enable_birth);
+  defaults.enable_loss =
+      ReadBool(transition, "enable_loss", defaults.enable_loss);
+
+  defaults.birth_score_threshold =
+      ReadDouble(transition, "birth_score_threshold",
+                 defaults.birth_score_threshold);
+  defaults.loss_score_threshold =
+      ReadDouble(transition, "loss_score_threshold",
+                 defaults.loss_score_threshold);
+
+  defaults.birth_neighbor_weight =
+      ReadDouble(transition, "birth_neighbor_weight",
+                 defaults.birth_neighbor_weight);
+  defaults.birth_tangent_approach_weight =
+      ReadDouble(transition, "birth_tangent_approach_weight",
+                 defaults.birth_tangent_approach_weight);
+  defaults.birth_normal_approach_weight =
+      ReadDouble(transition, "birth_normal_approach_weight",
+                 defaults.birth_normal_approach_weight);
+  defaults.birth_shear_penalty_weight =
+      ReadDouble(transition, "birth_shear_penalty_weight",
+                 defaults.birth_shear_penalty_weight);
+
+  defaults.loss_unloading_weight =
+      ReadDouble(transition, "loss_unloading_weight",
+                 defaults.loss_unloading_weight);
+  defaults.loss_shear_weight =
+      ReadDouble(transition, "loss_shear_weight", defaults.loss_shear_weight);
+  defaults.loss_low_force_weight =
+      ReadDouble(transition, "loss_low_force_weight",
+                 defaults.loss_low_force_weight);
+
+  defaults.born_normal_force_n =
+      ReadDouble(transition, "born_normal_force_n",
+                 defaults.born_normal_force_n);
+  defaults.born_confidence =
+      ReadDouble(transition, "born_confidence", defaults.born_confidence);
+
+  defaults.inactive_confidence =
+      ReadDouble(transition, "inactive_confidence",
+                 defaults.inactive_confidence);
+  defaults.contact_confidence_decay =
+      ReadDouble(transition, "contact_confidence_decay",
+                 defaults.contact_confidence_decay);
+
+  defaults.aggregate_shear_decay =
+      ReadDouble(transition, "aggregate_shear_decay",
+                 defaults.aggregate_shear_decay);
+  defaults.aggregate_rotation_decay =
+      ReadDouble(transition, "aggregate_rotation_decay",
+                 defaults.aggregate_rotation_decay);
+
+  defaults.enough_contact_hemisphere_count =
+      ReadSize(transition, "enough_contact_hemisphere_count",
+               defaults.enough_contact_hemisphere_count);
+  return defaults;
+}
+
+TactileTransitionConfig LoadTactileTransitionConfigFromYamlFile(
+    const std::string& yaml_path, TactileTransitionConfig defaults) {
+  try {
+    const YAML::Node root = YAML::LoadFile(yaml_path);
+    return ParseTactileTransitionConfig(GraspConfigNode(root),
+                                        std::move(defaults));
+  } catch (const YAML::Exception& ex) {
+    throw std::runtime_error(
+        "LoadTactileTransitionConfigFromYamlFile: failed to load '" +
         yaml_path + "': " + ex.what());
   }
 }

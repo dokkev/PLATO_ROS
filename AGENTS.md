@@ -15,6 +15,7 @@ Useful deeper runbooks:
 
 - `docs/motor/usbcan_setup.md`
 - `docs/frimware/plato2/README.md`
+- `mppi_core/MPPI.md`
 - `mppi_core/docs/grasp_state_mppi.md`
 - `mppi_core/docs/file_structure.md`
 - `installation.md`

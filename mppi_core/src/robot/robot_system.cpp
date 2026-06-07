@@ -4,17 +4,14 @@
 
 #include "mppi_core/robot/robot_system.hpp"
 
-#include <stdexcept>
-
 #include <pinocchio/algorithm/compute-all-terms.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp>
 #include <pinocchio/parsers/urdf.hpp>
+#include <stdexcept>
 
 namespace mppi_core {
 
-RobotSystem::RobotSystem(const pinocchio::Model& model) {
-  LoadModel(model);
-}
+RobotSystem::RobotSystem(const pinocchio::Model& model) { LoadModel(model); }
 
 RobotSystem::RobotSystem(const std::string& urdf_path, bool verbose) {
   LoadUrdf(urdf_path, verbose);
@@ -49,35 +46,50 @@ void RobotSystem::LoadUrdf(const std::string& urdf_path,
   ResetStateToNeutral();
 }
 
-void RobotSystem::UpdateState(
-    const Eigen::Ref<const Eigen::VectorXd>& q_des,
-    const Eigen::Ref<const Eigen::VectorXd>& qdot_des, double time_s) {
-  CheckHasModel("RobotSystem::UpdateState");
-  const Eigen::VectorXd qddot_des = Eigen::VectorXd::Zero(model_.nv);
-  const Eigen::VectorXd tau_ff = Eigen::VectorXd::Zero(model_.nv);
-  UpdateState(q_des, qdot_des, qddot_des, tau_ff, time_s);
-}
-
-void RobotSystem::UpdateState(
-    const Eigen::Ref<const Eigen::VectorXd>& q_des,
-    const Eigen::Ref<const Eigen::VectorXd>& qdot_des,
-    const Eigen::Ref<const Eigen::VectorXd>& qddot_des,
-    const Eigen::Ref<const Eigen::VectorXd>& tau_ff, double time_s) {
-  CheckHasModel("RobotSystem::UpdateState");
-  RobotState next = MakeRobotState(q_des, qdot_des, qddot_des, tau_ff, time_s);
-  CheckStateDimensions(next, "RobotSystem::UpdateState");
-  if (!IsValidRobotState(next)) {
+void RobotSystem::UpdateState(const Eigen::Ref<const Eigen::VectorXd>& q,
+                              const Eigen::Ref<const Eigen::VectorXd>& qdot,
+                              double time_s) {
+  if (q.size() != model_.nq || qdot.size() != model_.nv) {
+    throw std::invalid_argument(
+        "RobotSystem::UpdateState: state dimension mismatch");
+  }
+  if (!q.allFinite() || !qdot.allFinite() || !std::isfinite(time_s)) {
     throw std::invalid_argument(
         "RobotSystem::UpdateState: state contains non-finite values");
   }
-  state_ = next;
+  state_.q = q;
+  state_.qdot = qdot;
+  state_.tau.setZero();
+  state_.time_s = time_s;
+  state_.valid = true;
+  has_state_ = true;
+}
+
+void RobotSystem::UpdateState(const Eigen::Ref<const Eigen::VectorXd>& q,
+                              const Eigen::Ref<const Eigen::VectorXd>& qdot,
+                              const Eigen::Ref<const Eigen::VectorXd>& tau,
+                              double time_s) {
+  if (q.size() != model_.nq || qdot.size() != model_.nv ||
+      tau.size() != model_.nv) {
+    throw std::invalid_argument(
+        "RobotSystem::UpdateState: state dimension mismatch");
+  }
+  if (!q.allFinite() || !qdot.allFinite() || !tau.allFinite() ||
+      !std::isfinite(time_s)) {
+    throw std::invalid_argument(
+        "RobotSystem::UpdateState: state contains non-finite values");
+  }
+  state_.q = q;
+  state_.qdot = qdot;
+  state_.tau = tau;
+  state_.time_s = time_s;
+  state_.valid = true;
   has_state_ = true;
 }
 
 void RobotSystem::UpdateState(const RobotState& state) {
-  CheckHasModel("RobotSystem::UpdateState");
   CheckStateDimensions(state, "RobotSystem::UpdateState");
-  if (!IsValidRobotState(state)) {
+  if (!IsValid(state)) {
     throw std::invalid_argument(
         "RobotSystem::UpdateState: state contains non-finite values");
   }
@@ -90,12 +102,11 @@ void RobotSystem::ComputeAllTerms() {
   if (!has_state_) {
     throw std::logic_error("RobotSystem::ComputeAllTerms: state is not set");
   }
-  pinocchio::computeAllTerms(model_, data_, state_.q_des, state_.qdot_des);
+  pinocchio::computeAllTerms(model_, data_, state_.q, state_.qdot);
 }
 
 void RobotSystem::ResetStateToNeutral() {
   state_ = MakeRobotState(pinocchio::neutral(model_),
-                          Eigen::VectorXd::Zero(model_.nv),
                           Eigen::VectorXd::Zero(model_.nv),
                           Eigen::VectorXd::Zero(model_.nv), 0.0);
   has_state_ = false;
@@ -109,10 +120,8 @@ void RobotSystem::CheckHasModel(const char* caller) const {
 
 void RobotSystem::CheckStateDimensions(const RobotState& state,
                                        const char* caller) const {
-  if (state.q_des.size() != model_.nq ||
-      state.qdot_des.size() != model_.nv ||
-      state.qddot_des.size() != model_.nv ||
-      state.tau_ff.size() != model_.nv) {
+  if (state.q.size() != model_.nq || state.qdot.size() != model_.nv ||
+      state.tau.size() != model_.nv) {
     throw std::invalid_argument(std::string(caller) +
                                 ": state dimension mismatch");
   }

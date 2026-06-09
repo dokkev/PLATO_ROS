@@ -207,6 +207,10 @@ void Actuator::clamp_impedance_target_(can_hardware_common::ActuatorTarget & joi
 
 float Actuator::smooth_impedance_torque_(float torque)
 {
+  if (!std::isfinite(torque)) {
+    return torque;
+  }
+
   const float smoothing = config_.torque_smoothing;
   if (smoothing <= 0.0f || !has_smoothed_impedance_torque_) {
     reset_torque_smoothing_(torque);

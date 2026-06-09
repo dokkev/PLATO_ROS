@@ -62,6 +62,11 @@ static constexpr float unmap_signed_12(uint16_t u, float x_max)
   return (static_cast<float>(u) * INV_4095 - 0.5f) * (x_max + x_max);
 }
 
+static float finite_or_zero(float value)
+{
+  return std::isfinite(value) ? value : 0.0f;
+}
+
 static void pack_oc_frame(
   TPCANMsg & msg,
   float pos_rad,
@@ -81,11 +86,11 @@ static void pack_oc_frame(
 {
   reset_message(msg, tx_id | STDID_OC_BIT, 8);
 
-  const float pos_val = pos_set ? std::clamp(pos_rad, -pos_max, pos_max) : 0.0f;
-  const float vel_val = vel_set ? std::clamp(vel_rps, -vel_max, vel_max) : 0.0f;
-  const float tq_val = tq_set ? std::clamp(tq_nm, -t_max, t_max) : 0.0f;
-  const float kp_val = kp_set ? std::clamp(kp, 0.0f, KP_MAX) : 0.0f;
-  const float kd_val = kd_set ? std::clamp(kd, 0.0f, KD_MAX) : 0.0f;
+  const float pos_val = pos_set ? std::clamp(finite_or_zero(pos_rad), -pos_max, pos_max) : 0.0f;
+  const float vel_val = vel_set ? std::clamp(finite_or_zero(vel_rps), -vel_max, vel_max) : 0.0f;
+  const float tq_val = tq_set ? std::clamp(finite_or_zero(tq_nm), -t_max, t_max) : 0.0f;
+  const float kp_val = kp_set ? std::clamp(finite_or_zero(kp), 0.0f, KP_MAX) : 0.0f;
+  const float kd_val = kd_set ? std::clamp(finite_or_zero(kd), 0.0f, KD_MAX) : 0.0f;
 
   const uint16_t p16 = map_signed_16(pos_val, pos_max);
   const uint16_t v12 = map_signed_12(vel_val, vel_max);
@@ -232,18 +237,7 @@ void MsgDecoder::get_states(
   uint16_t p16 = 0;
   uint16_t v12 = 0;
   uint16_t t12 = 0;
-  uint16_t kp12 = 0;
-  uint16_t kd12 = 0;
-
-  if (msg.LEN == 8) {
-    p16 = (static_cast<uint16_t>(msg.DATA[0]) << 8) | static_cast<uint16_t>(msg.DATA[1]);
-    v12 = (static_cast<uint16_t>(msg.DATA[2]) << 4) | ((msg.DATA[3] & 0xF0) >> 4);
-    kp12 = ((msg.DATA[3] & 0x0F) << 8) | msg.DATA[4];
-    kd12 = (static_cast<uint16_t>(msg.DATA[5]) << 4) | ((msg.DATA[6] & 0xF0) >> 4);
-    t12 = ((msg.DATA[6] & 0x0F) << 8) | msg.DATA[7];
-    in_oc_mode = true;
-    has_fault = false;
-  } else if (msg.LEN >= 7 && msg.DATA[0] == CMD_READ_STATES) {
+  if (msg.LEN == 7 && msg.DATA[0] == CMD_READ_STATES) {
     p16 = (static_cast<uint16_t>(msg.DATA[1]) << 8) | static_cast<uint16_t>(msg.DATA[2]);
     v12 = (static_cast<uint16_t>(msg.DATA[3]) << 4) | ((msg.DATA[4] & 0xF0) >> 4);
     t12 = ((msg.DATA[4] & 0x0F) << 8) | msg.DATA[5];
@@ -261,14 +255,8 @@ void MsgDecoder::get_states(
   position = unmap_signed_16(p16, POS_MAX);
   velocity = unmap_signed_12(v12, VEL_MAX);
   torque = unmap_signed_12(t12, T_MAX);
-
-  if (msg.LEN == 8) {
-    kp = static_cast<float>(kp12) * (KP_MAX / MAX_12BIT);
-    kd = static_cast<float>(kd12) * (KD_MAX / MAX_12BIT);
-  } else {
-    kp = 0.0f;
-    kd = 0.0f;
-  }
+  kp = 0.0f;
+  kd = 0.0f;
 }
 
 void MsgDecoder::get_limits(

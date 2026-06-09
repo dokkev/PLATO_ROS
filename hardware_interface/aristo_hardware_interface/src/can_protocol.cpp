@@ -1,5 +1,6 @@
 #include "aristo_hardware_interface/can_protocol.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 
@@ -12,7 +13,16 @@ constexpr uint8_t kCmdReadStates = 0xF1;
 
 bool is_state_frame(const TPCANMsg & frame)
 {
-  return frame.LEN == 8 || (frame.LEN >= 7 && frame.DATA[0] == kCmdReadStates);
+  return frame.LEN == 7 && frame.DATA[0] == kCmdReadStates;
+}
+
+bool is_finite_target(const can_hardware_common::ActuatorTarget & target)
+{
+  return std::isfinite(target.position) &&
+         std::isfinite(target.velocity) &&
+         std::isfinite(target.stiffness) &&
+         std::isfinite(target.damping) &&
+         std::isfinite(target.torque);
 }
 }  // namespace
 
@@ -31,6 +41,10 @@ CANProtocol::CANProtocol(
 std::optional<actuator::TxCommand> CANProtocol::make_impedance_command(
   const can_hardware_common::ActuatorTarget & joint_target)
 {
+  if (!is_finite_target(joint_target)) {
+    return std::nullopt;
+  }
+
   encoder_.set_impedance(
     cmd_msg_,
     map_joint_to_motor_frame_(joint_target.position),

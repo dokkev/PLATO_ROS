@@ -110,8 +110,9 @@ void AristoModel::build_impedance_targets(
 
 bool AristoModel::actuators_ready(const std::vector<aristo_actuator::Actuator> & actuators) const
 {
-  return can_hardware_common::RobotIO::any_actuator_ready(
+  return can_hardware_common::RobotIO::all_actuators_ready_from(
     actuators,
+    0,
     [](const auto & actuator) { return actuator.has_feedback(); });
 }
 

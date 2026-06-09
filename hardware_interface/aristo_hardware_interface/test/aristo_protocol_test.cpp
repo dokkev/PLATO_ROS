@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "aristo_hardware_interface/actuator.hpp"
@@ -43,16 +45,11 @@ std::vector<aristo_actuator::Actuator> make_aristo_actuators(std::size_t count)
 
 float decode_command_torque(const TPCANMsg & msg)
 {
-  mit_can_protocol::MsgDecoder decoder;
-  float position = 0.0f;
-  float velocity = 0.0f;
-  float kp = 0.0f;
-  float kd = 0.0f;
-  float torque = 0.0f;
-  bool in_oc_mode = false;
-  bool has_fault = false;
-  decoder.get_states(msg, position, velocity, kp, kd, torque, in_oc_mode, has_fault);
-  return torque;
+  constexpr float kTorqueMaxNm = 18.0f;
+  constexpr float kInvMax12Bit = 1.0f / 4095.0f;
+  const uint16_t t12 = ((static_cast<uint16_t>(msg.DATA[6]) & 0x0F) << 8) |
+                       static_cast<uint16_t>(msg.DATA[7]);
+  return (static_cast<float>(t12) * kInvMax12Bit - 0.5f) * (kTorqueMaxNm + kTorqueMaxNm);
 }
 
 TEST(AristoProtocolTest, EnableBuildsDirectFrames)
@@ -146,6 +143,49 @@ TEST(MitCanProtocolTest, ZeroImpedanceCommandHasStableMidpointEncoding)
   }
 }
 
+TEST(MitCanProtocolTest, NonFiniteImpedanceCommandFallsBackToZeroEncoding)
+{
+  mit_can_protocol::MsgEncoder encoder(1.0f, 0x0A);
+  TPCANMsg msg{};
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+
+  encoder.set_impedance(msg, nan, nan, nan, nan, nan);
+
+  constexpr std::array<uint8_t, 8> kExpectedZeroPayload = {
+    0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x08, 0x00};
+  EXPECT_EQ(msg.ID, 0x40A);
+  EXPECT_EQ(msg.MSGTYPE, PCAN_MESSAGE_STANDARD);
+  EXPECT_EQ(msg.LEN, 8);
+  for (std::size_t i = 0; i < kExpectedZeroPayload.size(); ++i) {
+    EXPECT_EQ(msg.DATA[i], kExpectedZeroPayload[i]);
+  }
+}
+
+TEST(MitCanProtocolTest, DecoderRejectsEightByteCommandShapedFrames)
+{
+  mit_can_protocol::MsgEncoder encoder(1.0f, 0x0A);
+  mit_can_protocol::MsgDecoder decoder;
+  TPCANMsg msg{};
+  encoder.set_impedance(msg, 1.0f, 2.0f, 3.0f, 0.4f, 5.0f);
+
+  float position = 1.0f;
+  float velocity = 1.0f;
+  float kp = 1.0f;
+  float kd = 1.0f;
+  float torque = 1.0f;
+  bool in_oc_mode = true;
+  bool has_fault = true;
+  decoder.get_states(msg, position, velocity, kp, kd, torque, in_oc_mode, has_fault);
+
+  EXPECT_FLOAT_EQ(position, 0.0f);
+  EXPECT_FLOAT_EQ(velocity, 0.0f);
+  EXPECT_FLOAT_EQ(kp, 0.0f);
+  EXPECT_FLOAT_EQ(kd, 0.0f);
+  EXPECT_FLOAT_EQ(torque, 0.0f);
+  EXPECT_FALSE(in_oc_mode);
+  EXPECT_FALSE(has_fault);
+}
+
 TEST(AristoActuatorTest, SmoothsTorqueForJointImpedanceCommands)
 {
   auto config = make_aristo_config(0x0A, 0x0A);
@@ -171,6 +211,30 @@ TEST(AristoActuatorTest, SmoothsTorqueForJointImpedanceCommands)
   const auto third_command = actuator.set_joint_impedance(target);
   ASSERT_TRUE(third_command.has_value());
   EXPECT_NEAR(decode_command_torque(third_command->frame), 0.75f, 0.02f);
+}
+
+TEST(AristoActuatorTest, NonFiniteImpedanceTargetDoesNotBuildCommandOrPoisonSmoothing)
+{
+  auto config = make_aristo_config(0x0A, 0x0A);
+  config.core.gear_ratio = 2.0f;
+  config.torque_smoothing = 0.5f;
+  aristo_actuator::Actuator actuator(config);
+
+  can_hardware_common::ActuatorTarget target{};
+  target.position = 0.0f;
+  target.velocity = 0.0f;
+  target.stiffness = 0.0f;
+  target.damping = 0.0f;
+  target.torque = 0.0f;
+  ASSERT_TRUE(actuator.set_joint_impedance(target).has_value());
+
+  target.torque = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_FALSE(actuator.set_joint_impedance(target).has_value());
+
+  target.torque = 1.0f;
+  const auto command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(command.has_value());
+  EXPECT_NEAR(decode_command_torque(command->frame), 0.5f, 0.02f);
 }
 
 TEST(AristoActuatorTest, ZeroTorqueSmoothingDisablesSmoothing)

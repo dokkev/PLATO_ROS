@@ -25,14 +25,14 @@ The repository is used for:
 | `hardware_interface/plato_hardware_interface/` | PLATO ros2_control hardware plugin, GIM/Dynamixel CAN handling, five-bar linkage, actuator/linkage config loaders, and PLATO launch helpers. |
 | `hardware_interface/aristo_hardware_interface/` | Aristo ros2_control hardware plugin, Aristo CAN protocol/model, actuator config, and hardware test tools. |
 | `hardware_interface/turntable_hardware_interface/` | Dynamixel-based turntable support and minimum-jerk trajectory utility. |
-| `controllers/joint_impedance_controller/` | Shared joint-space impedance controller plugin plus trajectory/impedance preset helper node. |
+| `controllers/ros2_control/joint_impedance_controller/` | Shared joint-space impedance controller plugin plus trajectory/impedance preset helper node. |
 | `controllers/plato_grasp_controller/` | PLATO grasp task planner/node, saved joint-position storage, grasp plans, and pipeline tests. |
 | `controllers/parallel_grasp_controller/` | Parallel grasp command node and command examples. |
-| `controllers/adaptive_nail_controller/` | Force/torque feedback adaptive grasp node. |
-| `controllers/posture_controller/` | Keyboard-driven posture selection node. |
+| `controllers/aristo_grasp_controller/` | Pinocchio-backed Aristo grasp command node. |
 | `bringup/plato_bringup/` | PLATO controller-manager YAML, robot-state publisher wiring, controller spawners, and RViz bringup. |
 | `bringup/aristo_bringup/` | Aristo controller-manager YAML, robot-state publisher wiring, TF helpers, optional fake hardware, and RViz bringup. |
 | `plato_description/` | URDF/Xacro, ros2_control Xacro, meshes, and RViz config for PLATO/Aristo. |
+| `plato_robot_system/` | Shared Pinocchio robot model/state wrapper used by controllers and planning. |
 | `plato_utils/` | Shared C++ utilities: PID, interpolation, watchdog, YAML helpers, joint state ordering, and joint-position storage. |
 | `plato_teleop/` | Python teleop nodes for SpaceMouse, grasp-task keyboard commands, and conversion helpers. |
 | `maestro_teleop/` | C++ teleoperation conversion utilities for Maestro input streams. |

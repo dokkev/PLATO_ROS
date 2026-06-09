@@ -1,5 +1,6 @@
 #include "aristo_hardware_interface/can_protocol.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 
@@ -12,18 +13,28 @@ constexpr uint8_t kCmdReadStates = 0xF1;
 
 bool is_state_frame(const TPCANMsg & frame)
 {
-  return frame.LEN == 8 || (frame.LEN >= 7 && frame.DATA[0] == kCmdReadStates);
+  return frame.LEN == 7 && frame.DATA[0] == kCmdReadStates;
+}
+
+bool is_finite_target(const can_hardware_common::ActuatorTarget & target)
+{
+  return std::isfinite(target.position) &&
+         std::isfinite(target.velocity) &&
+         std::isfinite(target.stiffness) &&
+         std::isfinite(target.damping) &&
+         std::isfinite(target.torque);
 }
 }  // namespace
 
 CANProtocol::CANProtocol(
   const can_hardware_common::ActuatorCoreConfig & config)
 : config_(config),
-  encoder_(config.gear_ratio, config.can_tx_id),
+  encoder_(config.can_tx_id),
   decoder_(),
   onoff_msg_(make_message_(config.can_tx_id, 8)),
   cmd_msg_(make_message_(config.can_tx_id, 8)),
-  config_msg_(make_message_(config.can_tx_id, 7))
+  config_msg_(make_message_(config.can_tx_id, 7)),
+  read_msg_(make_message_(config.can_tx_id, 1))
 {
   validate_direction_(config_);
 }
@@ -31,13 +42,17 @@ CANProtocol::CANProtocol(
 std::optional<actuator::TxCommand> CANProtocol::make_impedance_command(
   const can_hardware_common::ActuatorTarget & joint_target)
 {
+  if (!is_finite_target(joint_target)) {
+    return std::nullopt;
+  }
+
   encoder_.set_impedance(
     cmd_msg_,
-    map_joint_to_motor_frame_(joint_target.position),
-    map_joint_to_motor_frame_(joint_target.velocity),
-    joint_target.stiffness,
-    joint_target.damping,
-    map_joint_to_motor_frame_(joint_target.torque));
+    to_protocol_(joint_target.position),
+    to_protocol_(joint_target.velocity),
+    joint_target.stiffness * cmdEffortScale,
+    joint_target.damping * cmdEffortScale,
+    to_protocol_(joint_target.torque) * cmdEffortScale);
   return actuator::TxCommand{cmd_msg_};
 }
 
@@ -49,14 +64,14 @@ actuator::TxCommand CANProtocol::make_torque_command(float joint_torque)
     0.0f,
     0.0f,
     0.0f,
-    map_joint_to_motor_frame_(joint_torque));
+    to_protocol_(joint_torque) * cmdEffortScale);
   return actuator::TxCommand{cmd_msg_};
 }
 
 std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
   const TPCANMsg & frame)
 {
-  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || !is_state_frame(frame)) {
+  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || frame.ID != config_.can_rx_id || !is_state_frame(frame)) {
     return std::nullopt;
   }
 
@@ -68,7 +83,7 @@ std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
   float unused_kp = 0.0f;
   float unused_kd = 0.0f;
 
-  decoder_.get_states(
+  if (!decoder_.get_states(
     frame,
     motor_position,
     motor_velocity,
@@ -76,13 +91,17 @@ std::optional<can_hardware_common::DecodedFeedback> CANProtocol::decode(
     unused_kd,
     motor_torque,
     in_oc_mode,
-    has_fault);
+    has_fault))
+  {
+    return std::nullopt;
+  }
 
   can_hardware_common::DecodedFeedback decoded;
   decoded.has_state = true;
-  decoded.state.position = map_motor_to_joint_frame_(motor_position);
-  decoded.state.velocity = map_motor_to_joint_frame_(motor_velocity);
-  decoded.state.torque = map_motor_to_joint_frame_(motor_torque);
+  decoded.state.position = from_protocol_(motor_position);
+  decoded.state.velocity = from_protocol_(motor_velocity);
+  decoded.state.torque = from_protocol_(motor_torque) *
+    fbEffortScale;
   decoded.in_oc_mode = in_oc_mode;
   decoded.has_fault = has_fault;
   decoded.motor_enabled = in_oc_mode && !has_fault;
@@ -119,6 +138,61 @@ actuator::TxCommand CANProtocol::make_default_can_limits_command()
   return actuator::TxCommand{config_msg_};
 }
 
+actuator::TxCommand CANProtocol::make_read_motor_params_command()
+{
+  encoder_.read_motor_params(read_msg_);
+  return actuator::TxCommand{read_msg_};
+}
+
+actuator::TxCommand CANProtocol::make_read_can_limits_command()
+{
+  encoder_.read_can_limits(read_msg_);
+  return actuator::TxCommand{read_msg_};
+}
+
+actuator::TxCommand CANProtocol::make_read_state_command()
+{
+  encoder_.read_states(read_msg_);
+  return actuator::TxCommand{read_msg_};
+}
+
+bool CANProtocol::try_update_motor_params(const TPCANMsg & frame)
+{
+  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || frame.ID != config_.can_rx_id) {
+    return false;
+  }
+
+  mit_can_protocol::MotorParams params;
+  if (!decoder_.get_motor_params(frame, params)) {
+    return false;
+  }
+
+  motor_params_ = params;
+  has_motor_params_ = true;
+  return true;
+}
+
+bool CANProtocol::try_update_can_limits(const TPCANMsg & frame)
+{
+  if (frame.MSGTYPE != PCAN_MESSAGE_STANDARD || frame.ID != config_.can_rx_id) {
+    return false;
+  }
+  if (frame.LEN != 7 || frame.DATA[0] != 0xF0) {
+    return false;
+  }
+
+  const auto limits = decoder_.get_limits(frame);
+  if (!limits) {
+    return false;
+  }
+
+  active_limits_ = *limits;
+  encoder_.set_active_limits(active_limits_);
+  decoder_.set_active_limits(active_limits_);
+  has_active_limits_ = true;
+  return true;
+}
+
 TPCANMsg CANProtocol::make_message_(uint32_t can_id, uint8_t len)
 {
   TPCANMsg msg;
@@ -137,7 +211,7 @@ void CANProtocol::validate_direction_(
   }
 }
 
-float CANProtocol::map_joint_to_motor_frame_(float joint_value, bool apply_offset) const
+float CANProtocol::to_protocol_(float joint_value, bool apply_offset) const
 {
   const float direction = static_cast<float>(config_.direction);
   return apply_offset ?
@@ -145,12 +219,12 @@ float CANProtocol::map_joint_to_motor_frame_(float joint_value, bool apply_offse
          joint_value * direction;
 }
 
-float CANProtocol::map_motor_to_joint_frame_(float motor_value, bool apply_offset) const
+float CANProtocol::from_protocol_(float protocol_value, bool apply_offset) const
 {
   const float direction = static_cast<float>(config_.direction);
   return apply_offset ?
-         (motor_value - config_.position_offset) * direction :
-         motor_value * direction;
+         (protocol_value - config_.position_offset) * direction :
+         protocol_value * direction;
 }
 
 }  // namespace aristo_actuator

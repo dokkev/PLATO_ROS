@@ -1,120 +1,76 @@
+defaults:
+  position_offset: 0.0 # zeroing offsets are handled at the driver level, so these should all be zero
+  torque_constant: 0.52
+  gear_ratio: 8.0
+  torque_cmd_smoothing: 0.5
+  torque_meas_smoothing: 0.5
+  limits:
+    velocity: 40.21
+    effort: 1270.0
+    stiffness: 2000.0
+    damping: 80.0
+
 actuators:
   - name: thumb_roll
     tx_id: 0x0A
     rx_id: 0x0A
-    position_offset: 0.0
     direction: -1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -0.2617994
       position_max: 0.7853982
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.5
 
   - name: thumb_yaw
     tx_id: 0x0B
     rx_id: 0x0B
-    position_offset: 0.0
     direction: 1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -0.7853982
       position_max: 0.7853982
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.5
 
   - name: thumb_mcp
     tx_id: 0x0C
     rx_id: 0x0C
-    position_offset: 0.0
     direction: -1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0
 
   - name: thumb_pip
     tx_id: 0x0D
     rx_id: 0x0D
-    position_offset: 0.0
     direction: -1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 3.1415927
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0
 
   - name: index_mcp
     tx_id: 0x0E
     rx_id: 0x0E
-    position_offset: 0.0
     direction: -1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0
 
   - name: index_pip
     tx_id: 0x0F
     rx_id: 0x0F
-    position_offset: 0.0
     direction: -1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 3.1415927
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0
 
   - name: middle_mcp
     tx_id: 0x10
     rx_id: 0x10
-    position_offset: 0.0
     direction: 1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0
 
   - name: middle_pip
     tx_id: 0x11
     rx_id: 0x11
-    position_offset: 0.0
     direction: 1
-    torque_constant: 0.52
-    gear_ratio: 8.0
     limits:
       position_min: -1.0471976
       position_max: 3.1415927
-      velocity: 40.21
-      effort: 1.27
-      stiffness: 5.0
-      damping: 2.0

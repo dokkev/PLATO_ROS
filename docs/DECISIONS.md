@@ -284,7 +284,7 @@ Trade-offs:
 
 ### Related files
 
-- `controllers/joint_impedance_controller/`
+- `controllers/ros2_control/joint_impedance_controller/`
 - `hardware_interface/plato_hardware_interface/`
 - `hardware_interface/aristo_hardware_interface/`
 - `bringup/plato_bringup/config/`

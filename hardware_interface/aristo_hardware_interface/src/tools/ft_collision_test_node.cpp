@@ -131,8 +131,8 @@ public:
         auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.resize(8, 0.0);
         msg.velocity.resize(8, 0.0);
-        msg.stiffness.resize(8, 2.0);
-        msg.damping.resize(8, 0.1);
+        msg.stiffness.resize(8, 2000.0);
+        msg.damping.resize(8, 100.0);
         msg.effort_ff.resize(8, 0.0);
         impedance_pub_->publish(msg);
         
@@ -225,8 +225,8 @@ private:
             auto msg = plato_interfaces::msg::ImpedanceCommands();
             msg.position.resize(8, 0.0);
             msg.velocity.resize(8, 0.0);
-            msg.stiffness.resize(8, 2.0);
-            msg.damping.resize(8, 0.1);
+            msg.stiffness.resize(8, 2000.0);
+            msg.damping.resize(8, 100.0);
             msg.effort_ff.resize(8, 0.0);
             
             msg.position[4] = joint5_start_;  // Command to start position
@@ -265,8 +265,8 @@ private:
         auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.resize(8, 0.0);
         msg.velocity.resize(8, 0.0);
-        msg.stiffness.resize(8, 2.0);  // Moderate stiffness
-        msg.damping.resize(8, 0.1);     // Moderate damping
+        msg.stiffness.resize(8, 2000.0);  // Moderate stiffness, mNm/rad
+        msg.damping.resize(8, 100.0);     // Moderate damping, mNm/(rad/s)
         msg.effort_ff.resize(8, 0.0);
         
         // Set joint 5 (index 4, since joint numbering starts from 1) position
@@ -309,8 +309,8 @@ private:
         auto msg = plato_interfaces::msg::ImpedanceCommands();
         msg.position.assign(8, 0.0);
         msg.velocity.assign(8, 0.0);
-        msg.stiffness.assign(8, 2.0);
-        msg.damping.assign(8, 0.1);
+        msg.stiffness.assign(8, 2000.0);
+        msg.damping.assign(8, 100.0);
         msg.effort_ff.assign(8, 0.0);
         impedance_pub_->publish(msg);
     }

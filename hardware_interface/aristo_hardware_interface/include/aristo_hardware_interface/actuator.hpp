@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 
+#include "aristo_hardware_interface/mit_can_protocol.hpp"
 #include "can_hardware_common/actuator.hpp"
 
 namespace aristo_actuator
@@ -16,6 +17,8 @@ struct Config
 {
   can_hardware_common::ActuatorCoreConfig core;
   actuator::Limits limits;
+  float torque_cmd_smoothing = 1.0f;
+  float torque_meas_smoothing = 0.0f;
 };
 
 class Actuator
@@ -33,6 +36,9 @@ public:
   actuator::TxCommand stop_control();
   actuator::TxCommand set_current_position_as_zero();
   actuator::TxCommand set_default_can_limits();
+  actuator::TxCommand read_motor_params();
+  actuator::TxCommand read_can_limits();
+  actuator::TxCommand read_state();
 
   actuator::TxCommand set_joint_torque(float joint_torque);
   std::optional<actuator::TxCommand> set_joint_impedance(
@@ -48,6 +54,10 @@ public:
   uint32_t get_rx_id() const { return config_.core.can_rx_id; }
   bool is_enabled() const { return motor_enabled_; }
   bool has_feedback() const { return has_feedback_; }
+  bool has_motor_params() const { return has_motor_params_; }
+  bool has_active_limits() const { return has_active_limits_; }
+  const mit_can_protocol::MotorParams & motor_params() const { return motor_params_; }
+  const mit_can_protocol::MitLimits & active_limits() const { return active_limits_; }
 
 private:
   enum class SoftLimitState
@@ -61,6 +71,11 @@ private:
   float clamp_torque_near_bounds_(float joint_torque) const;
   void determine_current_state_();
   void clamp_impedance_target_(can_hardware_common::ActuatorTarget & joint_target) const;
+  void filter_soft_limit_command_(can_hardware_common::ActuatorTarget & joint_target);
+  float smooth_torque_cmd_(float torque);
+  void reset_torque_cmd_smoothing_(float torque);
+  float smooth_torque_meas_(float effort);
+  void reset_torque_meas_smoothing_(float effort);
   void apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded);
 
   Config config_;
@@ -69,11 +84,21 @@ private:
   can_hardware_common::ActuatorStatus status_;
   bool motor_enabled_ = false;
   bool has_feedback_ = false;
+  bool has_motor_params_ = false;
+  bool has_active_limits_ = false;
+  mit_can_protocol::MotorParams motor_params_{};
+  mit_can_protocol::MitLimits active_limits_{};
+  float smoothed_torque_cmd_ = 0.0f;
+  bool has_smoothed_torque_cmd_ = false;
+  float smoothed_torque_meas_ = 0.0f;
+  bool has_smoothed_torque_meas_ = false;
   SoftLimitState control_state_ = SoftLimitState::kOperational;
 
   static constexpr float kJointLimitSafetyMargin = 0.05f;
-  static constexpr float kSoftLimitMargin = 0.174f;
-  static constexpr float kSoftLimitHysteresis = 0.02f;
+  static constexpr float kSoftLimitEnterMargin = 0.174f;
+  static constexpr float kSoftLimitExitMargin = kSoftLimitEnterMargin * 1.5f;
+  static constexpr float kOverLimitStiffnessMNmPerRad = 200.0f;
+  static constexpr float kOverLimitDampingMNmPerRadS = 5.0f;
 };
 
 }  // namespace aristo_actuator

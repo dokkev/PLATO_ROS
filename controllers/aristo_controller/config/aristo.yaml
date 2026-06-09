@@ -1,0 +1,45 @@
+schema: "aristo_joint_space_control/v1"
+
+robot_model:
+  urdf_path: "package://plato_description/urdf/generated/aristo.urdf"
+  is_floating_base: false
+  base_frame: "base_link"
+  fixed_thumb: true  # Overrides all joint 0 and joint 1 commands to zero.
+
+controller:
+  dt: 0.01
+  command_type: "joint_impedance"
+  num_joints: 8
+
+driver_gains:
+  # Driver-local impedance gains used in RobotCommand.kp / RobotCommand.kd.
+  # These are sent to the embedded driver and are separate from host-side FSM gains.
+  # Limit enforcement is handled by the actuator/hardware layer.
+  #
+  # Units follow the Aristo command convention:
+  #   kp: mNm/rad
+  #   kd: mNm/(rad/s)
+  kp: [0.0, 0.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+  kd: [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+state_machine:
+  states:
+    - id: 0
+      name: initialize
+      duration: 2.0
+      stay_here: true
+      params:
+        target_jpos: 0.0
+        kp: 0.0
+        kd: 0.0
+
+    - id: 1
+      name: hold
+      stay_here: true
+      params:
+        kp: 0.0
+        kd: 0.0
+
+debug:
+  enabled: false
+  print_interval: 5.0

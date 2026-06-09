@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "controller_interface/controller_interface.hpp"
+#include "aristo_controller/config/aristo_config.hpp"
 #include "hardware_interface/loaned_command_interface.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
 #include "plato_robot_system/sensor/nari_touch.hpp"
@@ -71,11 +72,16 @@ private:
   void publish_controller_state(
     const rclcpp::Time & time,
     const plato_robot_system::RobotCommand & command);
+  bool configure_from_control_config(
+    plato_robot_system::ControlArchitecture & architecture,
+    plato_robot_system::RobotSystem & robot);
   void write_command(const plato_robot_system::RobotCommand & command);
 
   std::vector<std::string> joint_names_;
   std::vector<std::string> tactile_topics_;
+  std::string control_config_yaml_path_;
   bool compute_impedance_torque_{false};
+  bool fixed_thumb_{false};
 
   std::vector<double> positions_;
   std::vector<double> velocities_;

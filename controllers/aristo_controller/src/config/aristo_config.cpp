@@ -1,4 +1,4 @@
-#include "aristo_state_machines/config/aristo_config.hpp"
+#include "aristo_controller/config/aristo_config.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -8,7 +8,7 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <yaml-cpp/yaml.h>
 
-namespace aristo_state_machines::config
+namespace aristo_controller::config
 {
 namespace
 {
@@ -83,7 +83,7 @@ Eigen::VectorXd parse_vector_or_scalar(
 
 std::string default_aristo_config_path()
 {
-  return ament_index_cpp::get_package_share_directory("aristo_state_machines") +
+  return ament_index_cpp::get_package_share_directory("aristo_controller") +
          "/config/aristo.yaml";
 }
 
@@ -104,12 +104,26 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   const auto debug = root["debug"];
   config.debug_enabled = optional_scalar<bool>(debug, "enabled", false);
 
+  const auto driver_gains = required_node(root, "driver_gains");
+  config.driver_gains.kp = parse_vector_or_scalar(driver_gains, "kp", config.num_joints, 0.0);
+  config.driver_gains.kd = parse_vector_or_scalar(driver_gains, "kd", config.num_joints, 0.0);
+  if (
+    !config.driver_gains.IsValid() ||
+    !config.driver_gains.HasValidDimensions(config.num_joints))
+  {
+    throw std::runtime_error("driver_gains produced invalid driver PD gains");
+  }
+
   const auto state_machine = required_node(root, "state_machine");
   const auto states = required_node(state_machine, "states");
   const auto initialize = state_by_name(states, "initialize");
   const auto initialize_params = required_node(initialize, "params");
 
   config.initialize.id = optional_scalar<plato_robot_system::StateId>(initialize, "id", 0);
+  config.initialize.duration_sec = optional_scalar<double>(initialize, "duration", 2.0);
+  if (config.initialize.duration_sec <= 0.0) {
+    throw std::runtime_error("initialize.duration must be positive");
+  }
   config.initialize.target_jpos =
     parse_vector_or_scalar(initialize_params, "target_jpos", config.num_joints, 0.0);
   config.initialize.kp = parse_vector_or_scalar(initialize_params, "kp", config.num_joints, 0.0);
@@ -118,4 +132,4 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   return config;
 }
 
-}  // namespace aristo_state_machines::config
+}  // namespace aristo_controller::config

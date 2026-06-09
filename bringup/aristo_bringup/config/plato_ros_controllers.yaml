@@ -36,4 +36,4 @@ plato2:
       tactile_topics:
         - /tactile_0/tactile_states
         - /tactile_1/tactile_states
-      control_config_yaml_path: "package://aristo_state_machines/config/aristo.yaml"
+      control_config_yaml_path: "package://aristo_controller/config/aristo.yaml"

@@ -10,6 +10,8 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>pluginlib</buildtool_depend>
 
+  <depend>ament_index_cpp</depend>
+  <depend>aristo_controller</depend>
   <depend>controller_interface</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>

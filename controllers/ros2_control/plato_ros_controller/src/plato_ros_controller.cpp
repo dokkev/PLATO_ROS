@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
+#include "ament_index_cpp/get_package_share_directory.hpp"
+#include "aristo_controller/state_machines/initialize.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "plato_robot_system/sensor/nari_touch_adapter.hpp"
@@ -32,6 +35,24 @@ std::vector<std::string> default_tactile_topics()
   return {};
 }
 
+std::string resolve_package_url(const std::string & path)
+{
+  const std::string prefix = "package://";
+  if (path.rfind(prefix, 0) != 0) {
+    return path;
+  }
+
+  const auto package_and_path = path.substr(prefix.size());
+  const auto slash = package_and_path.find('/');
+  if (slash == std::string::npos || slash == 0 || slash + 1 >= package_and_path.size()) {
+    throw std::runtime_error("Invalid package URL: " + path);
+  }
+
+  const auto package_name = package_and_path.substr(0, slash);
+  const auto relative_path = package_and_path.substr(slash + 1);
+  return ament_index_cpp::get_package_share_directory(package_name) + "/" + relative_path;
+}
+
 }  // namespace
 
 PlatoRosController::PlatoRosController()
@@ -53,6 +74,7 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 {
   joint_names_ = get_node()->get_parameter("joints").as_string_array();
   tactile_topics_ = get_node()->get_parameter("tactile_topics").as_string_array();
+  control_config_yaml_path_ = get_node()->get_parameter("control_config_yaml_path").as_string();
   compute_impedance_torque_ = get_node()->get_parameter("compute_impedance_torque").as_bool();
 
   if (joint_names_.empty()) {
@@ -76,13 +98,19 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   control_architecture_.config().compute_impedance_torque = compute_impedance_torque_;
   control_architecture_.SetRobot(robot_);
   control_architecture_.Configure(static_cast<int>(num_joints), static_cast<int>(num_joints));
-  if (configure_control_architecture(control_architecture_) !=
-    controller_interface::CallbackReturn::SUCCESS)
-  {
-    return controller_interface::CallbackReturn::ERROR;
+  if (!control_config_yaml_path_.empty()) {
+    if (!configure_from_control_config(control_architecture_, *robot_)) {
+      return controller_interface::CallbackReturn::ERROR;
+    }
+  } else {
+    if (configure_control_architecture(control_architecture_) !=
+      controller_interface::CallbackReturn::SUCCESS)
+    {
+      return controller_interface::CallbackReturn::ERROR;
+    }
+    register_robot_states(control_architecture_, *robot_);
+    configure_initial_state(control_architecture_);
   }
-  register_robot_states(control_architecture_, *robot_);
-  configure_initial_state(control_architecture_);
   control_architecture_.Initialize();
 
   nari_touch_.clear();
@@ -246,7 +274,28 @@ void PlatoRosController::configure_initial_state(
 
 void PlatoRosController::filter_command(plato_robot_system::RobotCommand * command) const
 {
-  (void)command;
+  if (!fixed_thumb_ || command == nullptr) {
+    return;
+  }
+
+  constexpr Eigen::Index kNumFixedThumbJoints = 2;
+  for (Eigen::Index joint_index = 0; joint_index < kNumFixedThumbJoints; ++joint_index) {
+    if (joint_index < command->q_cmd.size()) {
+      command->q_cmd[joint_index] = 0.0;
+    }
+    if (joint_index < command->qdot_cmd.size()) {
+      command->qdot_cmd[joint_index] = 0.0;
+    }
+    if (joint_index < command->tau_cmd.size()) {
+      command->tau_cmd[joint_index] = 0.0;
+    }
+    if (joint_index < command->kp.size()) {
+      command->kp[joint_index] = 0.0;
+    }
+    if (joint_index < command->kd.size()) {
+      command->kd[joint_index] = 0.0;
+    }
+  }
 }
 
 void PlatoRosController::read_state_interfaces()
@@ -441,6 +490,67 @@ void PlatoRosController::publish_controller_state(
     msg.effort_fb[i] = 0.0;
   }
   controller_state_pub_->publish(msg);
+}
+
+bool PlatoRosController::configure_from_control_config(
+  plato_robot_system::ControlArchitecture & architecture,
+  plato_robot_system::RobotSystem & robot)
+{
+  try {
+    const auto resolved_path = resolve_package_url(control_config_yaml_path_);
+    const auto aristo_config =
+      aristo_controller::config::load_aristo_config(resolved_path);
+
+    if (architecture.nq() != aristo_config.num_joints ||
+      architecture.nv() != aristo_config.num_joints)
+    {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Control config expects %d joints, but control architecture has nq=%d nv=%d",
+        aristo_config.num_joints,
+        architecture.nq(),
+        architecture.nv());
+      return false;
+    }
+
+    fixed_thumb_ = aristo_config.fixed_thumb;
+    architecture.setTimingEnabled(aristo_config.debug_enabled);
+    architecture.SetDriverPdGainsConfig(aristo_config.driver_gains);
+
+    auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
+      aristo_config.initialize.id,
+      aristo_controller::state_machines::InitializeState::kName,
+      &robot);
+    initialize->SetTargetPosition(aristo_config.initialize.target_jpos);
+    initialize->SetDuration(aristo_config.initialize.duration_sec);
+    initialize->SetFeedbackGains(aristo_config.initialize.kp, aristo_config.initialize.kd);
+    architecture.RegisterState(std::move(initialize));
+
+    if (!architecture.SetStartState(aristo_config.initialize.id) ||
+      !architecture.RequestState(aristo_config.initialize.id))
+    {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Failed to select initialize state id %d from control config",
+        aristo_config.initialize.id);
+      return false;
+    }
+
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Loaded control config '%s' and selected state 'initialize' (id=%d, fixed_thumb=%s)",
+      resolved_path.c_str(),
+      aristo_config.initialize.id,
+      fixed_thumb_ ? "true" : "false");
+    return true;
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(
+      get_node()->get_logger(),
+      "Failed to load control config '%s': %s",
+      control_config_yaml_path_.c_str(),
+      e.what());
+    return false;
+  }
 }
 
 void PlatoRosController::write_command(const plato_robot_system::RobotCommand & command)

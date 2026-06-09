@@ -16,12 +16,19 @@ find_package(pinocchio REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/control/fsm_handler.cpp
+  src/control/pid_controller.cpp
   src/control/plato_control_architecture.cpp
   src/control/state_machine.cpp
   src/robot/robot_system.cpp
   src/sensor/nari_touch.cpp
   src/sensor/nari_touch_adapter.cpp
   src/sensor/tactile_state.cpp
+  src/task/joint_task.cpp
+  src/trajectory/euclidean_trajectory.cpp
+  src/trajectory/interpolation.cpp
+  src/trajectory/joint_integrator.cpp
+  src/trajectory/se3_trajectory.cpp
+  src/trajectory/trajectory_base.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

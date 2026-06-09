@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
+  ament_index_cpp
+  aristo_controller
   controller_interface
   hardware_interface
   pluginlib

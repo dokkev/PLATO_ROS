@@ -97,6 +97,7 @@ private:
   static constexpr float kJointLimitSafetyMargin = 0.05f;
   static constexpr float kSoftLimitEnterMargin = 0.174f;
   static constexpr float kSoftLimitExitMargin = kSoftLimitEnterMargin * 1.5f;
+  static constexpr float kOverLimitStiffnessMNmPerRad = 200.0f;
   static constexpr float kOverLimitDampingMNmPerRadS = 5.0f;
 };
 

@@ -691,7 +691,7 @@ TEST(AristoActuatorTest, OverLimitUsesDampingOnlySafetyCommand)
   const float q_meas = actuator.get_feedback().position;
 
   can_hardware_common::ActuatorTarget target{};
-  target.position = 0.0f;
+  target.position = q_meas;
   target.velocity = -1.0f;
   target.stiffness = 2000.0f;
   target.damping = 80.0f;
@@ -707,6 +707,68 @@ TEST(AristoActuatorTest, OverLimitUsesDampingOnlySafetyCommand)
     decode_command_damping(command->frame),
     5.0f * aristo_actuator::cmdEffortScale,
     0.01f);
+}
+
+TEST(AristoActuatorTest, LowerOverLimitAllowsInwardCommandWithConservativeGains)
+{
+  auto config = make_aristo_config(0x0A, 0x0A);
+  config.torque_cmd_smoothing = 0.0f;
+  config.limits.position_limit_min = -1.0f;
+  config.limits.position_limit_max = 1.0f;
+  aristo_actuator::Actuator actuator(config);
+
+  actuator.process_rx_frame(make_state_response(-1.02f, -0.5f));
+  ASSERT_TRUE(actuator.has_feedback());
+
+  can_hardware_common::ActuatorTarget target{};
+  target.position = 0.0f;
+  target.velocity = 1.0f;
+  target.stiffness = 2000.0f;
+  target.damping = 80.0f;
+  target.torque = 1000.0f;
+
+  const auto command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(command.has_value());
+  EXPECT_NEAR(decode_command_position(command->frame), target.position, 0.01f);
+  EXPECT_NEAR(decode_command_velocity(command->frame), target.velocity, 0.02f);
+  EXPECT_NEAR(
+    decode_command_torque(command->frame),
+    target.torque * aristo_actuator::cmdEffortScale,
+    0.02f);
+  EXPECT_NEAR(
+    decode_command_stiffness(command->frame),
+    200.0f * aristo_actuator::cmdEffortScale,
+    0.1f);
+  EXPECT_NEAR(
+    decode_command_damping(command->frame),
+    5.0f * aristo_actuator::cmdEffortScale,
+    0.01f);
+}
+
+TEST(AristoActuatorTest, UpperOverLimitBlocksOutwardCommandButAllowsInwardPart)
+{
+  auto config = make_aristo_config(0x0A, 0x0A);
+  config.torque_cmd_smoothing = 0.0f;
+  config.limits.position_limit_min = -1.0f;
+  config.limits.position_limit_max = 1.0f;
+  aristo_actuator::Actuator actuator(config);
+
+  actuator.process_rx_frame(make_state_response(1.02f, 0.5f));
+  ASSERT_TRUE(actuator.has_feedback());
+  const float q_meas = actuator.get_feedback().position;
+
+  can_hardware_common::ActuatorTarget target{};
+  target.position = q_meas + 0.1f;
+  target.velocity = -1.0f;
+  target.stiffness = 2000.0f;
+  target.damping = 80.0f;
+  target.torque = 1000.0f;
+
+  const auto command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(command.has_value());
+  EXPECT_NEAR(decode_command_position(command->frame), q_meas, 0.01f);
+  EXPECT_NEAR(decode_command_velocity(command->frame), target.velocity, 0.02f);
+  EXPECT_NEAR(decode_command_torque(command->frame), 0.0f, 0.02f);
 }
 
 TEST(AristoActuatorTest, ScalesDecodedProtocolTorqueForJointEffort)

@@ -230,5 +230,5 @@ ros2 run rqt_console rqt_console
 
 ## References
 - FT Sensor Test Tool: `src/tools/ft_sensor_can_test.cpp`
-- Impedance Controller: `controllers/joint_impedance_controller`
+- Impedance Controller: `controllers/ros2_control/joint_impedance_controller`
 - FT Sensor CAN Interface: `ft_sensor_can.hpp/cpp`

@@ -1,0 +1,39 @@
+plato2:
+  controller_manager:
+    ros__parameters:
+      update_rate: 100  # Hz
+
+      plato2_joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+      aristo_controller:
+        type: plato_ros_controller/PlatoRosController
+
+  plato2_joint_state_broadcaster:
+    ros__parameters:
+      joints:
+        - joint1
+        - joint2
+        - joint3
+        - joint4
+        - joint5
+        - joint6
+        - joint7
+        - joint8
+
+  aristo_controller:
+    ros__parameters:
+      joints:
+        - joint1
+        - joint2
+        - joint3
+        - joint4
+        - joint5
+        - joint6
+        - joint7
+        - joint8
+
+      tactile_topics:
+        - /tactile_0/tactile_states
+        - /tactile_1/tactile_states
+      control_config_yaml_path: "package://aristo_state_machines/config/aristo.yaml"

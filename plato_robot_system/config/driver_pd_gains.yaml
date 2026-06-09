@@ -1,0 +1,11 @@
+driver_pd_gains:
+  # Driver-local impedance gains used in RobotCommand.kp / RobotCommand.kd.
+  # These are sent to the embedded driver and are separate from host-side
+  # FSM feedback gains named kp_fb / kd_fb.
+  # Limit enforcement is handled by the actuator/hardware layer.
+  #
+  # Units follow the Aristo command convention:
+  #   kp: mNm/rad
+  #   kd: mNm/(rad/s)
+  kp: [0.0, 0.0, 500.0, 500.0, 100.0, 100.0, 100.0, 100.0]
+  kd: [0.0, 0.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0]

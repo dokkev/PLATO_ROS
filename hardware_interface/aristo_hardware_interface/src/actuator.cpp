@@ -96,8 +96,8 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
   const can_hardware_common::ActuatorTarget & joint_target_in)
 {
   can_hardware_common::ActuatorTarget joint_target = joint_target_in;
-  clamp_impedance_target_(joint_target);
   determine_current_state_();
+  clamp_impedance_target_(joint_target);
 
   joint_target.torque = smooth_torque_cmd_(joint_target.torque);
   filter_soft_limit_command_(joint_target);
@@ -209,8 +209,10 @@ void Actuator::clamp_impedance_target_(can_hardware_common::ActuatorTarget & joi
   if (std::isfinite(config_.limits.position_limit_min) &&
     std::isfinite(config_.limits.position_limit_max))
   {
-    joint_target.position = std::clamp(
-      joint_target.position, config_.limits.position_limit_min, config_.limits.position_limit_max);
+    if (control_state_ != SoftLimitState::kOverLimit) {
+      joint_target.position = std::clamp(
+        joint_target.position, config_.limits.position_limit_min, config_.limits.position_limit_max);
+    }
   }
   if (std::isfinite(config_.limits.velocity_limit)) {
     joint_target.velocity = std::clamp(
@@ -283,19 +285,76 @@ void Actuator::filter_soft_limit_command_(can_hardware_common::ActuatorTarget & 
       }
       break;
     case SoftLimitState::kOverLimit:
-      joint_target.position = feedback_.position;
-      joint_target.velocity = 0.0f;
-      joint_target.torque = 0.0f;
-      joint_target.stiffness = 0.0f;
-      joint_target.damping = kOverLimitDampingMNmPerRadS;
-      reset_torque_cmd_smoothing_(0.0f);
-      RCLCPP_WARN_THROTTLE(
-        logger(),
-        log_clock(),
-        1000,
-        "Aristo actuator 0x%X over position limit: damping-only safety mode active",
-        get_tx_id());
+    {
+      const bool below_lower = std::isfinite(config_.limits.position_limit_min) &&
+        feedback_.position < config_.limits.position_limit_min;
+      const bool above_upper = std::isfinite(config_.limits.position_limit_max) &&
+        feedback_.position > config_.limits.position_limit_max;
+
+      const bool inward_position = (below_lower && joint_target.position > feedback_.position) ||
+        (above_upper && joint_target.position < feedback_.position);
+      const bool inward_velocity = (below_lower && joint_target.velocity > 0.0f) ||
+        (above_upper && joint_target.velocity < 0.0f);
+      const bool inward_torque = (below_lower && joint_target.torque > 0.0f) ||
+        (above_upper && joint_target.torque < 0.0f);
+      const bool has_inward_command = inward_position || inward_velocity || inward_torque;
+
+      if (!has_inward_command) {
+        joint_target.position = feedback_.position;
+        joint_target.velocity = 0.0f;
+        joint_target.torque = 0.0f;
+        joint_target.stiffness = 0.0f;
+        joint_target.damping = kOverLimitDampingMNmPerRadS;
+        reset_torque_cmd_smoothing_(0.0f);
+        RCLCPP_WARN_THROTTLE(
+          logger(),
+          log_clock(),
+          1000,
+          "Aristo actuator 0x%X over position limit: damping-only safety mode active",
+          get_tx_id());
+        break;
+      }
+
+      if (below_lower) {
+        if (joint_target.position < feedback_.position) {
+          joint_target.position = feedback_.position;
+          clipped = true;
+        }
+        if (joint_target.velocity < 0.0f) {
+          joint_target.velocity = 0.0f;
+          clipped = true;
+        }
+        if (joint_target.torque < 0.0f) {
+          joint_target.torque = 0.0f;
+          clipped = true;
+        }
+      } else if (above_upper) {
+        if (joint_target.position > feedback_.position) {
+          joint_target.position = feedback_.position;
+          clipped = true;
+        }
+        if (joint_target.velocity > 0.0f) {
+          joint_target.velocity = 0.0f;
+          clipped = true;
+        }
+        if (joint_target.torque > 0.0f) {
+          joint_target.torque = 0.0f;
+          clipped = true;
+        }
+      }
+
+      joint_target.stiffness = std::min(joint_target.stiffness, kOverLimitStiffnessMNmPerRad);
+      joint_target.damping = std::min(joint_target.damping, kOverLimitDampingMNmPerRadS);
+      if (clipped) {
+        RCLCPP_WARN_THROTTLE(
+          logger(),
+          log_clock(),
+          1000,
+          "Aristo actuator 0x%X over position limit: outward command clipped",
+          get_tx_id());
+      }
       break;
+    }
     case SoftLimitState::kOperational:
       break;
   }

@@ -1,0 +1,9 @@
+<library path="plato_ros_controller">
+  <class name="plato_ros_controller/PlatoRosController"
+         type="plato_ros_controller::PlatoRosController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      ControlArchitecture-backed ros2_control controller with NARITouch topic subscribers.
+    </description>
+  </class>
+</library>

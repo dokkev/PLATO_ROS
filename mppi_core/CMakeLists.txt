@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
+find_package(plato_robot_system REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 set(${PROJECT_NAME}_SOURCES
@@ -20,7 +21,6 @@ set(${PROJECT_NAME}_SOURCES
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
   src/rollout/grasp_state_rollout_model.cpp
-  src/robot/robot_system.cpp
   src/util/mppi_config.cpp
   src/util/rollout_config.cpp
   src/util/task_config.cpp
@@ -35,6 +35,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
+  plato_robot_system::plato_robot_system
   Eigen3::Eigen
   pinocchio::pinocchio
   yaml-cpp
@@ -110,6 +111,6 @@ endif()
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME}Targets HAS_LIBRARY_TARGET)
-ament_export_dependencies(eigen3_cmake_module Eigen3 pinocchio yaml-cpp)
+ament_export_dependencies(eigen3_cmake_module Eigen3 pinocchio plato_robot_system yaml-cpp)
 
 ament_package()

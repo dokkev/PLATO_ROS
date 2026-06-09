@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "mppi_core/contact/contact_kinematics.hpp"
+#include "mppi_core/tactile/tactile_transition.hpp"
 
 namespace mppi_core {
 namespace {

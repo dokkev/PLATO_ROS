@@ -238,6 +238,10 @@ std::filesystem::path MppiCorePackageRoot() {
   return std::filesystem::path(__FILE__).parent_path().parent_path();
 }
 
+std::filesystem::path PlatoNariTouchUrdfPath() {
+  return std::filesystem::path(MPPI_CORE_PLATO_NARITOUCH_URDF_PATH);
+}
+
 std::vector<mppi_core::TactileState,
             Eigen::aligned_allocator<mppi_core::TactileState>>
 MakeTactileSensors(const mppi_core::TactileState& first_tactile,
@@ -520,6 +524,100 @@ TEST(GraspStateTest, ExplicitTwoSensorStateRequiresBothTactileStates) {
   const auto invalid_state =
       mppi_core::MakeGraspState(robot, tactile0, tactile1);
   EXPECT_FALSE(invalid_state.valid);
+}
+
+TEST(PlatoNariTouchUrdfTest, RobotSystemLoadsTactileFrames) {
+  const auto urdf_path = PlatoNariTouchUrdfPath();
+  ASSERT_TRUE(std::filesystem::exists(urdf_path)) << urdf_path;
+
+  const mppi_core::RobotSystem robot_system(urdf_path.string());
+  ASSERT_TRUE(robot_system.hasModel());
+  EXPECT_EQ(robot_system.nq(), 8);
+  EXPECT_EQ(robot_system.nv(), 8);
+  EXPECT_EQ(robot_system.state().q.size(), robot_system.nq());
+  EXPECT_EQ(robot_system.state().qdot.size(), robot_system.nv());
+  EXPECT_EQ(robot_system.state().tau.size(), robot_system.nv());
+
+  const auto& model = robot_system.model();
+  for (const char* frame_name :
+       {"thumb_distal_tactile", "index_distal_tactile",
+        "middle_distal_tactile"}) {
+    EXPECT_LT(model.getFrameId(frame_name), model.frames.size())
+        << frame_name;
+  }
+  for (const char* joint_name : {"joint1", "joint6", "joint8"}) {
+    EXPECT_LT(model.getJointId(joint_name), model.joints.size()) << joint_name;
+  }
+}
+
+TEST(PlatoNariTouchUrdfTest,
+     IndexTactilePointJacobianMatchesFiniteDifference) {
+  const auto urdf_path = PlatoNariTouchUrdfPath();
+  ASSERT_TRUE(std::filesystem::exists(urdf_path)) << urdf_path;
+
+  const mppi_core::RobotSystem robot_system(urdf_path.string());
+  const auto& model = robot_system.model();
+  const pinocchio::FrameIndex sensor_frame_id =
+      model.getFrameId("index_distal_tactile");
+  ASSERT_LT(sensor_frame_id, model.frames.size());
+  const pinocchio::JointIndex joint_id = model.getJointId("joint6");
+  ASSERT_LT(joint_id, model.joints.size());
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.frame_name = "index_distal_tactile";
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d{1.0e-3, -0.5e-3}, 1.0, true));
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  const auto robot = mppi_core::MakeRobotState(
+      pinocchio::neutral(model), Eigen::VectorXd::Zero(model.nv),
+      Eigen::VectorXd::Zero(model.nv));
+  Eigen::VectorXd tangent_step = Eigen::VectorXd::Zero(model.nv);
+  tangent_step[model.joints[joint_id].idx_v()] = 0.2;
+
+  pinocchio::Data data(model);
+  mppi_core::PinocchioContactKinematicsContext context;
+  context.model = &model;
+  context.data = &data;
+  context.sensor_frame_id = sensor_frame_id;
+
+  const auto motions = mppi_core::ComputeHemisphereMotions(
+      robot, tactile, tangent_step, context);
+
+  ASSERT_EQ(motions.size(), 1U);
+  EXPECT_EQ(motions[0].J_contact_world.rows(), 3);
+  EXPECT_EQ(motions[0].J_contact_world.cols(), model.nv);
+  EXPECT_EQ(motions[0].J_normal.size(), model.nv);
+  EXPECT_TRUE(motions[0].J_contact_world.allFinite());
+  EXPECT_TRUE(motions[0].J_normal.allFinite());
+  EXPECT_GT(motions[0].delta_position_sensor_m.norm(), 1.0e-6);
+
+  pinocchio::Data finite_difference_data(model);
+  pinocchio::forwardKinematics(model, finite_difference_data, robot.q);
+  pinocchio::updateFramePlacements(model, finite_difference_data);
+  const Eigen::Matrix3d current_sensor_rotation =
+      finite_difference_data.oMf[sensor_frame_id].rotation();
+  const Eigen::Vector3d point_world_before = WorldPointPosition(
+      model, &finite_difference_data, sensor_frame_id, robot.q,
+      HemispherePointSensorM(tactile.hemispheres[0]));
+
+  const double eps = 1.0e-6;
+  const Eigen::VectorXd q_next =
+      pinocchio::integrate(model, robot.q, eps * tangent_step);
+  const Eigen::Vector3d point_world_after = WorldPointPosition(
+      model, &finite_difference_data, sensor_frame_id, q_next,
+      HemispherePointSensorM(tactile.hemispheres[0]));
+  const Eigen::Vector3d finite_difference_delta_sensor =
+      current_sensor_rotation.transpose() *
+      (point_world_after - point_world_before);
+
+  EXPECT_NEAR((eps * motions[0].delta_position_sensor_m -
+               finite_difference_delta_sensor)
+                  .norm(),
+              0.0, 1.0e-8);
 }
 
 TEST(GraspContactKinematicsTest, EmptyOrInactiveHemispheresReturnEmpty) {

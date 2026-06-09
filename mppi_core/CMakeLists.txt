@@ -62,12 +62,48 @@ install(EXPORT ${PROJECT_NAME}Targets
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(plato_description REQUIRED)
+
+  find_program(XACRO_EXECUTABLE xacro)
+  if(NOT XACRO_EXECUTABLE)
+    message(FATAL_ERROR "xacro executable is required for mppi_core tests")
+  endif()
+
+  get_filename_component(
+    PLATO_DESCRIPTION_SHARE_DIR "${plato_description_DIR}/.." ABSOLUTE)
+  get_filename_component(
+    PLATO_DESCRIPTION_PREFIX "${plato_description_DIR}/../../.." ABSOLUTE)
+  set(PLATO_NARITOUCH_XACRO
+    "${PLATO_DESCRIPTION_SHARE_DIR}/urdf/plato_naritouch.urdf.xacro")
+  set(PLATO_NARITOUCH_TEST_URDF
+    "${CMAKE_CURRENT_BINARY_DIR}/plato_naritouch.urdf")
+
+  add_custom_command(
+    OUTPUT "${PLATO_NARITOUCH_TEST_URDF}"
+    COMMAND ${CMAKE_COMMAND} -E env
+      "AMENT_PREFIX_PATH=${PLATO_DESCRIPTION_PREFIX}:$ENV{AMENT_PREFIX_PATH}"
+      "${XACRO_EXECUTABLE}"
+      -o "${PLATO_NARITOUCH_TEST_URDF}"
+      "${PLATO_NARITOUCH_XACRO}"
+      "fake_hardware:=true"
+      "zeroing:=false"
+    DEPENDS
+      "${PLATO_NARITOUCH_XACRO}"
+      "${PLATO_DESCRIPTION_SHARE_DIR}/urdf/xacro/plato_naritouch_description.xacro"
+      "${PLATO_DESCRIPTION_SHARE_DIR}/urdf/ros2_control/plato.ros2_control.xacro"
+    VERBATIM
+  )
+  add_custom_target(plato_naritouch_urdf_for_test
+    DEPENDS "${PLATO_NARITOUCH_TEST_URDF}")
 
   ament_add_gtest(test_mppi_core
     test/test_mppi_core.cpp
   )
   if(TARGET test_mppi_core)
+    add_dependencies(test_mppi_core plato_naritouch_urdf_for_test)
     target_link_libraries(test_mppi_core ${PROJECT_NAME})
+    target_compile_definitions(test_mppi_core PRIVATE
+      MPPI_CORE_PLATO_NARITOUCH_URDF_PATH=\"${PLATO_NARITOUCH_TEST_URDF}\")
   endif()
 endif()
 

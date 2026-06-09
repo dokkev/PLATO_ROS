@@ -6,12 +6,21 @@
 #include <stdexcept>
 
 #include "aristo_hardware_interface/can_protocol.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 namespace aristo_actuator
 {
 
 namespace
 {
+auto logger() { return rclcpp::get_logger("aristo_actuator"); }
+
+rclcpp::Clock & log_clock()
+{
+  static rclcpp::Clock clock(RCL_STEADY_TIME);
+  return clock;
+}
+
 void validate_direction(const Config & config)
 {
   if (config.core.direction != 1 && config.core.direction != -1) {
@@ -58,6 +67,21 @@ actuator::TxCommand Actuator::set_default_can_limits()
   return protocol_->make_default_can_limits_command();
 }
 
+actuator::TxCommand Actuator::read_motor_params()
+{
+  return protocol_->make_read_motor_params_command();
+}
+
+actuator::TxCommand Actuator::read_can_limits()
+{
+  return protocol_->make_read_can_limits_command();
+}
+
+actuator::TxCommand Actuator::read_state()
+{
+  return protocol_->make_read_state_command();
+}
+
 actuator::TxCommand Actuator::set_joint_torque(float joint_torque)
 {
   joint_torque = clamp_torque_near_bounds_(joint_torque);
@@ -75,16 +99,8 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
   clamp_impedance_target_(joint_target);
   determine_current_state_();
 
-  if (control_state_ == SoftLimitState::kOverLimit) {
-    joint_target.position = feedback_.position;
-    joint_target.velocity = 0.0f;
-    joint_target.stiffness = 0.0f;
-    joint_target.damping = 0.0f;
-    joint_target.torque = 0.0f;
-    reset_torque_smoothing_(0.0f);
-  } else {
-    joint_target.torque = smooth_impedance_torque_(joint_target.torque);
-  }
+  joint_target.torque = smooth_torque_cmd_(joint_target.torque);
+  filter_soft_limit_command_(joint_target);
 
   auto command = protocol_->make_impedance_command(joint_target);
   if (!command) {
@@ -97,6 +113,18 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
 void Actuator::process_rx_frame(const TPCANMsg & msg)
 {
   if (msg.ID != get_rx_id()) {
+    return;
+  }
+
+  if (protocol_->try_update_motor_params(msg)) {
+    motor_params_ = protocol_->motor_params();
+    has_motor_params_ = true;
+    return;
+  }
+
+  if (protocol_->try_update_can_limits(msg)) {
+    active_limits_ = protocol_->active_limits();
+    has_active_limits_ = true;
     return;
   }
 
@@ -152,28 +180,25 @@ void Actuator::determine_current_state_()
     return;
   }
 
-  if (feedback_.position <= config_.limits.position_limit_min ||
-    feedback_.position >= config_.limits.position_limit_max)
+  const float q_meas = feedback_.position;
+  const float q_min = config_.limits.position_limit_min;
+  const float q_max = config_.limits.position_limit_max;
+
+  if (q_meas < q_min || q_meas > q_max)
   {
     control_state_ = SoftLimitState::kOverLimit;
-  } else if (
-    feedback_.position < config_.limits.position_limit_min + kSoftLimitMargin &&
-    feedback_.velocity < 0.0f)
-  {
-    control_state_ = SoftLimitState::kLowerLimit;
-  } else if (
-    feedback_.position > config_.limits.position_limit_max - kSoftLimitMargin &&
-    feedback_.velocity > 0.0f)
-  {
-    control_state_ = SoftLimitState::kUpperLimit;
   } else if (control_state_ == SoftLimitState::kLowerLimit) {
-    if (feedback_.position > config_.limits.position_limit_min + kSoftLimitMargin + kSoftLimitHysteresis) {
+    if (q_meas > q_min + kSoftLimitExitMargin) {
       control_state_ = SoftLimitState::kOperational;
     }
   } else if (control_state_ == SoftLimitState::kUpperLimit) {
-    if (feedback_.position < config_.limits.position_limit_max - kSoftLimitMargin - kSoftLimitHysteresis) {
+    if (q_meas < q_max - kSoftLimitExitMargin) {
       control_state_ = SoftLimitState::kOperational;
     }
+  } else if (q_meas < q_min + kSoftLimitEnterMargin) {
+    control_state_ = SoftLimitState::kLowerLimit;
+  } else if (q_meas > q_max - kSoftLimitEnterMargin) {
+    control_state_ = SoftLimitState::kUpperLimit;
   } else {
     control_state_ = SoftLimitState::kOperational;
   }
@@ -205,33 +230,128 @@ void Actuator::clamp_impedance_target_(can_hardware_common::ActuatorTarget & joi
   }
 }
 
-float Actuator::smooth_impedance_torque_(float torque)
+void Actuator::filter_soft_limit_command_(can_hardware_common::ActuatorTarget & joint_target)
+{
+  if (!has_feedback_) {
+    return;
+  }
+
+  bool clipped = false;
+  switch (control_state_) {
+    case SoftLimitState::kLowerLimit:
+      if (joint_target.position < feedback_.position) {
+        joint_target.position = feedback_.position;
+        clipped = true;
+      }
+      if (joint_target.velocity < 0.0f) {
+        joint_target.velocity = 0.0f;
+        clipped = true;
+      }
+      if (joint_target.torque < 0.0f) {
+        joint_target.torque = 0.0f;
+        clipped = true;
+      }
+      if (clipped) {
+        RCLCPP_WARN_THROTTLE(
+          logger(),
+          log_clock(),
+          1000,
+          "Aristo actuator 0x%X lower soft limit: outward command clipped",
+          get_tx_id());
+      }
+      break;
+    case SoftLimitState::kUpperLimit:
+      if (joint_target.position > feedback_.position) {
+        joint_target.position = feedback_.position;
+        clipped = true;
+      }
+      if (joint_target.velocity > 0.0f) {
+        joint_target.velocity = 0.0f;
+        clipped = true;
+      }
+      if (joint_target.torque > 0.0f) {
+        joint_target.torque = 0.0f;
+        clipped = true;
+      }
+      if (clipped) {
+        RCLCPP_WARN_THROTTLE(
+          logger(),
+          log_clock(),
+          1000,
+          "Aristo actuator 0x%X upper soft limit: outward command clipped",
+          get_tx_id());
+      }
+      break;
+    case SoftLimitState::kOverLimit:
+      joint_target.position = feedback_.position;
+      joint_target.velocity = 0.0f;
+      joint_target.torque = 0.0f;
+      joint_target.stiffness = 0.0f;
+      joint_target.damping = kOverLimitDampingMNmPerRadS;
+      reset_torque_cmd_smoothing_(0.0f);
+      RCLCPP_WARN_THROTTLE(
+        logger(),
+        log_clock(),
+        1000,
+        "Aristo actuator 0x%X over position limit: damping-only safety mode active",
+        get_tx_id());
+      break;
+    case SoftLimitState::kOperational:
+      break;
+  }
+}
+
+float Actuator::smooth_torque_cmd_(float torque)
 {
   if (!std::isfinite(torque)) {
     return torque;
   }
 
-  const float smoothing = config_.torque_smoothing;
-  if (smoothing <= 0.0f || !has_smoothed_impedance_torque_) {
-    reset_torque_smoothing_(torque);
+  const float smoothing = config_.torque_cmd_smoothing;
+  if (smoothing <= 0.0f || !has_smoothed_torque_cmd_) {
+    reset_torque_cmd_smoothing_(torque);
     return torque;
   }
 
-  smoothed_impedance_torque_ =
-    smoothing * smoothed_impedance_torque_ + (1.0f - smoothing) * torque;
-  return smoothed_impedance_torque_;
+  smoothed_torque_cmd_ =
+    smoothing * smoothed_torque_cmd_ + (1.0f - smoothing) * torque;
+  return smoothed_torque_cmd_;
 }
 
-void Actuator::reset_torque_smoothing_(float torque)
+void Actuator::reset_torque_cmd_smoothing_(float torque)
 {
-  smoothed_impedance_torque_ = torque;
-  has_smoothed_impedance_torque_ = true;
+  smoothed_torque_cmd_ = torque;
+  has_smoothed_torque_cmd_ = true;
+}
+
+float Actuator::smooth_torque_meas_(float effort)
+{
+  if (!std::isfinite(effort)) {
+    return effort;
+  }
+
+  const float smoothing = config_.torque_meas_smoothing;
+  if (smoothing <= 0.0f || !has_smoothed_torque_meas_) {
+    reset_torque_meas_smoothing_(effort);
+    return effort;
+  }
+
+  smoothed_torque_meas_ =
+    smoothing * smoothed_torque_meas_ + (1.0f - smoothing) * effort;
+  return smoothed_torque_meas_;
+}
+
+void Actuator::reset_torque_meas_smoothing_(float effort)
+{
+  smoothed_torque_meas_ = effort;
+  has_smoothed_torque_meas_ = true;
 }
 
 void Actuator::apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded)
 {
   if (decoded.has_state) {
     feedback_ = decoded.state;
+    feedback_.torque = smooth_torque_meas_(feedback_.torque);
     has_feedback_ = true;
   }
 

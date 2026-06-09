@@ -29,6 +29,10 @@ public:
     bool has_feedback = false;
     bool in_oc_mode = false;
     bool has_fault = false;
+    bool has_motor_params = false;
+    bool has_active_limits = false;
+    mit_can_protocol::MotorParams motor_params{};
+    mit_can_protocol::MitLimits active_limits{};
   };
 
   explicit Hand(std::vector<aristo_actuator::Config> actuator_configs);
@@ -50,6 +54,7 @@ private:
   static constexpr std::chrono::microseconds kDirectTxInterFrameGap{250};
   static constexpr std::chrono::microseconds kDirectTxFrameTimeout{10000};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
+  static constexpr std::chrono::milliseconds kStartupMetadataTimeout{500};
 
   bool update_measurements_() override;
   void refresh_state_snapshot_() override;
@@ -60,9 +65,16 @@ private:
   bool execute_direct_frames_(
     const std::vector<TPCANMsg> & frames,
     std::chrono::microseconds timeout);
+  bool query_startup_metadata_();
+  bool confirm_mit_mode_(std::chrono::milliseconds timeout);
+  bool wait_for_motor_params_(std::size_t actuator_index, std::chrono::milliseconds timeout);
+  bool wait_for_active_limits_(std::size_t actuator_index, std::chrono::milliseconds timeout);
+  bool startup_metadata_ready_() const;
+  bool actuator_has_motor_params_(std::size_t actuator_index) const;
+  bool actuator_has_active_limits_(std::size_t actuator_index) const;
+  bool actuator_in_mit_mode_(std::size_t actuator_index) const;
   can_hardware_common::CanBus::RxPollResult poll_can_bus();
   TPCANStatus send_frame_blocking_(const TPCANMsg & frame, std::chrono::microseconds timeout);
-  void print_hardware_info_(const char * actuator_total_label = "Total Actuators") const;
   void mark_rx_frame_();
   bool has_fresh_rx_(std::chrono::steady_clock::time_point now) const;
 

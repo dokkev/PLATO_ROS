@@ -1,9 +1,11 @@
 impedance_preset:
-  default_level: 10.0
+  # Aristo hardware interprets effort-like command interfaces in mNm units:
+  # effort_ff = mNm, stiffness = mNm/rad, damping = mNm/(rad/s).
+  default_level: 2.0
   filter_alpha: 0.03
   min:
     stiffness: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     damping: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   max:
-    stiffness: [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    damping: [0.0, 0.0, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10]
+    stiffness: [0.0, 0.0, 2000.0, 2000.0, 2000.0, 2000.0, 2000.0, 2000.0]
+    damping: [0.0, 0.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0]

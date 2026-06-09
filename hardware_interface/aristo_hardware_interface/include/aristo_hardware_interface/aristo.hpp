@@ -2,7 +2,6 @@
 #define ARISTO_HARDWARE_INTERFACE__ARISTO_HPP_
 
 #include <memory>
-#include <string>
 
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/system_interface.hpp>
@@ -49,7 +48,6 @@ public:
 
 private:
   std::unique_ptr<aristo_hand::Hand> hand_;
-  std::string activation_summary_path_ = "/tmp/aristo_activation_summary.txt";
   bool zeroing_requested_ = false;
 };
 

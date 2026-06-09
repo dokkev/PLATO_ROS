@@ -3,7 +3,6 @@
 #include "plato_hardware_interface/utils/parameter_utils.hpp"
 
 #include <exception>
-#include <fstream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -30,6 +29,15 @@ std::string activation_label(const aristo_hand::Hand::ActuatorActivationStatus &
 {
   if (status.enabled) {
     return std::string(kColorGreen) + "ENABLED" + kColorReset;
+  }
+  if (status.has_motor_params && status.has_active_limits && !status.has_feedback) {
+    return std::string(kColorYellow) + "NO_F1_STATE" + kColorReset;
+  }
+  if (status.has_motor_params && status.has_active_limits) {
+    return std::string(kColorYellow) + "NOT_IN_OC" + kColorReset;
+  }
+  if (status.has_motor_params || status.has_active_limits) {
+    return std::string(kColorYellow) + "METADATA_PARTIAL" + kColorReset;
   }
   return std::string(kColorRed) + "FAILED" + kColorReset;
 }
@@ -78,6 +86,24 @@ std::string format_activation_summary(
     table.width(7);
     table << std::left << bool_label(status.in_oc_mode) << std::right;
     table << " | " << fault_label << "\n";
+    table << "     params: ";
+    if (status.has_motor_params) {
+      table << "pole_pairs=" << static_cast<int>(status.motor_params.pole_pairs)
+            << ", torque_constant_nm_per_a=" << status.motor_params.torque_constant_nm_per_a
+            << ", driver_gear_ratio=" << static_cast<int>(status.motor_params.gear_ratio);
+    } else {
+      table << std::string(kColorYellow) + "not received" + kColorReset;
+    }
+    table << "\n";
+    table << "     limits: ";
+    if (status.has_active_limits) {
+      table << "Pos_Max=" << status.active_limits.pos_max_rad
+            << " rad, Vel_Max=" << status.active_limits.vel_max_rad_s
+            << " rad/s, T_Max=" << status.active_limits.t_max_nm << " Nm";
+    } else {
+      table << std::string(kColorYellow) + "using defaults" + kColorReset;
+    }
+    table << "\n";
   }
 
   const bool all_enabled = enabled_count == statuses.size();
@@ -91,16 +117,13 @@ std::string format_activation_summary(
   return table.str();
 }
 
-bool write_activation_summary(
-  const std::string & path,
+void log_activation_summary(
   const std::vector<aristo_hand::Hand::ActuatorActivationStatus> & statuses)
 {
-  std::ofstream output(path, std::ios::out | std::ios::trunc);
-  if (!output.is_open()) {
-    return false;
-  }
-  output << format_activation_summary(statuses);
-  return output.good();
+  RCLCPP_INFO(
+    rclcpp::get_logger("AristoHardware"),
+    "%s",
+    format_activation_summary(statuses).c_str());
 }
 
 }  // namespace
@@ -141,12 +164,6 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
     info_.hardware_parameters.find("actuator_config_yaml_path");
   if (actuator_config_path_it != info_.hardware_parameters.end()) {
     actuator_config_yaml_path_override = actuator_config_path_it->second;
-  }
-
-  const auto activation_summary_path_it =
-    info_.hardware_parameters.find("activation_summary_path");
-  if (activation_summary_path_it != info_.hardware_parameters.end()) {
-    activation_summary_path_ = activation_summary_path_it->second;
   }
 
   try {
@@ -221,22 +238,17 @@ hardware_interface::CallbackReturn AristoHardware::on_activate(
       "Aristo embedded zeroing requested.");
   }
   if (!hand_->enable(zeroing_requested_)) {
-    RCLCPP_WARN(
+    RCLCPP_ERROR(
       rclcpp::get_logger("AristoHardware"),
       zeroing_requested_ ?
-      "One or more Aristo actuators failed to enable/embedded-zero. Continuing activation." :
-      "One or more Aristo actuators failed to enable. Continuing activation.");
+      "One or more Aristo actuators failed to enable/embedded-zero." :
+      "One or more Aristo actuators failed to enable.");
+    (void)hand_->read();
+    log_activation_summary(hand_->actuator_activation_statuses());
+    return hardware_interface::CallbackReturn::ERROR;
   }
   (void)hand_->read();
-  if (!write_activation_summary(
-      activation_summary_path_,
-      hand_->actuator_activation_statuses()))
-  {
-    RCLCPP_WARN(
-      rclcpp::get_logger("AristoHardware"),
-      "Failed to write Aristo activation summary to '%s'",
-      activation_summary_path_.c_str());
-  }
+  log_activation_summary(hand_->actuator_activation_statuses());
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;
 }

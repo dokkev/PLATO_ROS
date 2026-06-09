@@ -108,12 +108,19 @@ Config parse_config(const YAML::Node & node)
   config.core.torque_constant = parse_float(node, "torque_constant");
   config.core.gear_ratio = parse_float(node, "gear_ratio");
   config.limits = parse_limits(node);
-  config.torque_smoothing = parse_optional_float(node, "torque_smoothing", 1.0f);
-  if (!std::isfinite(config.torque_smoothing) ||
-    config.torque_smoothing < 0.0f ||
-    config.torque_smoothing > 1.0f)
+  config.torque_cmd_smoothing = parse_optional_float(node, "torque_cmd_smoothing", 1.0f);
+  if (!std::isfinite(config.torque_cmd_smoothing) ||
+    config.torque_cmd_smoothing < 0.0f ||
+    config.torque_cmd_smoothing > 1.0f)
   {
-    throw std::runtime_error("torque_smoothing must be finite and within [0, 1]");
+    throw std::runtime_error("torque_cmd_smoothing must be finite and within [0, 1]");
+  }
+  config.torque_meas_smoothing = parse_optional_float(node, "torque_meas_smoothing", 0.0f);
+  if (!std::isfinite(config.torque_meas_smoothing) ||
+    config.torque_meas_smoothing < 0.0f ||
+    config.torque_meas_smoothing > 1.0f)
+  {
+    throw std::runtime_error("torque_meas_smoothing must be finite and within [0, 1]");
   }
   return config;
 }

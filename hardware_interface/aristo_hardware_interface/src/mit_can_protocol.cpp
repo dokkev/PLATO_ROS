@@ -11,6 +11,7 @@ namespace mit_can_protocol
 
 static constexpr uint8_t CMD_CFG_LIMITS = 0xF0;
 static constexpr uint8_t CMD_READ_STATES = 0xF1;
+static constexpr uint8_t CMD_MOTOR_PARAMS = 0xB0;
 static constexpr uint8_t CMD_CLEAR_FAULT = 0xAF;
 static constexpr uint8_t CMD_EXIT_OC_MODE = 0xCF;
 static constexpr uint8_t CMD_SET_ZERO = 0xB1;
@@ -67,6 +68,20 @@ static float finite_or_zero(float value)
   return std::isfinite(value) ? value : 0.0f;
 }
 
+static bool valid_positive_limit(float value)
+{
+  return std::isfinite(value) && value > 0.0f;
+}
+
+static MitLimits sanitize_limits(const MitLimits & limits)
+{
+  MitLimits sanitized;
+  sanitized.pos_max_rad = valid_positive_limit(limits.pos_max_rad) ? limits.pos_max_rad : POS_MAX;
+  sanitized.vel_max_rad_s = valid_positive_limit(limits.vel_max_rad_s) ? limits.vel_max_rad_s : VEL_MAX;
+  sanitized.t_max_nm = valid_positive_limit(limits.t_max_nm) ? limits.t_max_nm : T_MAX;
+  return sanitized;
+}
+
 static void pack_oc_frame(
   TPCANMsg & msg,
   float pos_rad,
@@ -79,22 +94,24 @@ static void pack_oc_frame(
   bool kd_set,
   float tq_nm,
   bool tq_set,
-  float pos_max,
-  float vel_max,
-  float t_max,
+  const MitLimits & limits,
   uint8_t tx_id)
 {
   reset_message(msg, tx_id | STDID_OC_BIT, 8);
+  const MitLimits active_limits = sanitize_limits(limits);
 
-  const float pos_val = pos_set ? std::clamp(finite_or_zero(pos_rad), -pos_max, pos_max) : 0.0f;
-  const float vel_val = vel_set ? std::clamp(finite_or_zero(vel_rps), -vel_max, vel_max) : 0.0f;
-  const float tq_val = tq_set ? std::clamp(finite_or_zero(tq_nm), -t_max, t_max) : 0.0f;
+  const float pos_val = pos_set ?
+    std::clamp(finite_or_zero(pos_rad), -active_limits.pos_max_rad, active_limits.pos_max_rad) : 0.0f;
+  const float vel_val = vel_set ?
+    std::clamp(finite_or_zero(vel_rps), -active_limits.vel_max_rad_s, active_limits.vel_max_rad_s) : 0.0f;
+  const float tq_val = tq_set ?
+    std::clamp(finite_or_zero(tq_nm), -active_limits.t_max_nm, active_limits.t_max_nm) : 0.0f;
   const float kp_val = kp_set ? std::clamp(finite_or_zero(kp), 0.0f, KP_MAX) : 0.0f;
   const float kd_val = kd_set ? std::clamp(finite_or_zero(kd), 0.0f, KD_MAX) : 0.0f;
 
-  const uint16_t p16 = map_signed_16(pos_val, pos_max);
-  const uint16_t v12 = map_signed_12(vel_val, vel_max);
-  const uint16_t t12 = map_signed_12(tq_val, t_max);
+  const uint16_t p16 = map_signed_16(pos_val, active_limits.pos_max_rad);
+  const uint16_t v12 = map_signed_12(vel_val, active_limits.vel_max_rad_s);
+  const uint16_t t12 = map_signed_12(tq_val, active_limits.t_max_nm);
   const uint16_t kp12 = static_cast<uint16_t>(kp_val * (MAX_12BIT / KP_MAX) + 0.5f);
   const uint16_t kd12 = static_cast<uint16_t>(kd_val * (MAX_12BIT / KD_MAX) + 0.5f);
 
@@ -134,6 +151,12 @@ void MsgEncoder::set_can_limits(
   msg.DATA[6] = static_cast<uint8_t>(tq_u16 >> 8);
 }
 
+void MsgEncoder::read_can_limits(TPCANMsg & msg)
+{
+  reset_message(msg, tx_id_, 1);
+  msg.DATA[0] = CMD_CFG_LIMITS;
+}
+
 void MsgEncoder::set_default_can_limits(TPCANMsg & msg)
 {
   reset_message(msg, tx_id_, 7);
@@ -149,6 +172,18 @@ void MsgEncoder::set_default_can_limits(TPCANMsg & msg)
   msg.DATA[4] = static_cast<uint8_t>(kVelMaxU16 >> 8);
   msg.DATA[5] = static_cast<uint8_t>(kTorqueMaxU16 & 0xFF);
   msg.DATA[6] = static_cast<uint8_t>(kTorqueMaxU16 >> 8);
+}
+
+void MsgEncoder::read_motor_params(TPCANMsg & msg)
+{
+  reset_message(msg, tx_id_, 1);
+  msg.DATA[0] = CMD_MOTOR_PARAMS;
+}
+
+void MsgEncoder::read_states(TPCANMsg & msg)
+{
+  reset_message(msg, tx_id_, 1);
+  msg.DATA[0] = CMD_READ_STATES;
 }
 
 void MsgEncoder::set_zero_position(TPCANMsg & msg)
@@ -171,9 +206,7 @@ void MsgEncoder::start_motor(TPCANMsg & msg)
     true,
     0.0f,
     true,
-    POS_MAX,
-    VEL_MAX,
-    T_MAX,
+    active_limits_,
     tx_id_);
 }
 
@@ -202,29 +235,28 @@ void MsgEncoder::set_impedance(
   const float kd,
   const float torque_nm)
 {
-  const float motor_position = position_rad;
-  const float motor_velocity = velocity_rps;
-  const float motor_torque = torque_nm * 2.0f / gear_ratio_;
-
   pack_oc_frame(
     msg,
-    motor_position,
+    position_rad,
     true,
-    motor_velocity,
+    velocity_rps,
     true,
     kp,
     true,
     kd,
     true,
-    motor_torque,
+    torque_nm,
     true,
-    POS_MAX,
-    VEL_MAX,
-    T_MAX,
+    active_limits_,
     tx_id_);
 }
 
-void MsgDecoder::get_states(
+void MsgEncoder::set_active_limits(const MitLimits & limits)
+{
+  active_limits_ = sanitize_limits(limits);
+}
+
+bool MsgDecoder::get_states(
   const TPCANMsg & msg,
   float & position,
   float & velocity,
@@ -249,14 +281,16 @@ void MsgDecoder::get_states(
     position = velocity = kp = kd = torque = 0.0f;
     in_oc_mode = false;
     has_fault = false;
-    return;
+    return false;
   }
 
-  position = unmap_signed_16(p16, POS_MAX);
-  velocity = unmap_signed_12(v12, VEL_MAX);
-  torque = unmap_signed_12(t12, T_MAX);
+  const MitLimits active_limits = sanitize_limits(active_limits_);
+  position = unmap_signed_16(p16, active_limits.pos_max_rad);
+  velocity = unmap_signed_12(v12, active_limits.vel_max_rad_s);
+  torque = unmap_signed_12(t12, active_limits.t_max_nm);
   kp = 0.0f;
   kd = 0.0f;
+  return true;
 }
 
 void MsgDecoder::get_limits(
@@ -278,6 +312,44 @@ void MsgDecoder::get_limits(
   pos_max_rad = pos_u16 * 0.1f;
   vel_max_rps = vel_u16 * 0.01f;
   tq_max_nm = tq_u16 * 0.01f;
+}
+
+std::optional<MitLimits> MsgDecoder::get_limits(const TPCANMsg & msg) const
+{
+  float pos_max_rad = 0.0f;
+  float vel_max_rad_s = 0.0f;
+  float tq_max_nm = 0.0f;
+  get_limits(msg, pos_max_rad, vel_max_rad_s, tq_max_nm);
+  if (!valid_positive_limit(pos_max_rad) ||
+    !valid_positive_limit(vel_max_rad_s) ||
+    !valid_positive_limit(tq_max_nm))
+  {
+    return std::nullopt;
+  }
+
+  return MitLimits{pos_max_rad, vel_max_rad_s, tq_max_nm};
+}
+
+bool MsgDecoder::get_motor_params(const TPCANMsg & msg, MotorParams & params) const
+{
+  if (msg.LEN != 7 || msg.DATA[0] != CMD_MOTOR_PARAMS) {
+    return false;
+  }
+
+  MotorParams decoded;
+  decoded.pole_pairs = msg.DATA[1];
+  std::memcpy(&decoded.torque_constant_nm_per_a, &msg.DATA[2], sizeof(decoded.torque_constant_nm_per_a));
+  decoded.gear_ratio = msg.DATA[6];
+
+  if (!std::isfinite(decoded.torque_constant_nm_per_a) ||
+    decoded.torque_constant_nm_per_a <= 0.0f ||
+    decoded.torque_constant_nm_per_a > 100.0f)
+  {
+    return false;
+  }
+
+  params = decoded;
+  return true;
 }
 
 }  // namespace mit_can_protocol

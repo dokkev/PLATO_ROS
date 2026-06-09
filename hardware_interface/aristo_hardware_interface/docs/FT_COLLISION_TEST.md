@@ -88,12 +88,6 @@ ros2 run aristo_hardware_interface ft_collision_test_node \
 | `-` | Decrease velocity by 0.05 rad/s |
 | `q` | Quit the node |
 
-## Configuration File
-Edit the configuration file at:
-```
-aristo_hardware_interface/config/ft_collision_test.yaml
-```
-
 ## Workflow Example
 
 ### 1. Start the Hardware and Controllers
@@ -231,7 +225,6 @@ ros2 run rqt_console rqt_console
 
 ## Related Files
 - **Source**: `src/tools/ft_collision_test_node.cpp`
-- **Config**: `config/ft_collision_test.yaml`
 - **FT Sensor Class**: `include/aristo_hardware_interface/ft_sensor_can.hpp`
 - **FT Sensor Implementation**: `src/ft_sensor_can.cpp`
 

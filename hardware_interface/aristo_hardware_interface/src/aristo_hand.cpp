@@ -139,6 +139,28 @@ void Hand::print_hardware_info_(const char * actuator_total_label) const
   }
 }
 
+std::vector<Hand::ActuatorActivationStatus> Hand::actuator_activation_statuses() const
+{
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  std::vector<ActuatorActivationStatus> statuses;
+  statuses.reserve(actuators_.size());
+
+  for (size_t i = 0; i < actuators_.size(); ++i) {
+    const auto & actuator = actuators_[i];
+    const auto & status = actuator.get_status();
+    statuses.push_back(ActuatorActivationStatus{
+      i,
+      actuator.get_tx_id(),
+      actuator.get_rx_id(),
+      actuator.is_enabled(),
+      actuator.has_feedback(),
+      status.in_oc_mode,
+      status.has_fault});
+  }
+
+  return statuses;
+}
+
 bool Hand::update_measurements_()
 {
   last_rx_result_ = poll_can_bus();

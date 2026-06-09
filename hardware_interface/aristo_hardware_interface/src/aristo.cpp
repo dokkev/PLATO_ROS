@@ -3,7 +3,9 @@
 #include "plato_hardware_interface/utils/parameter_utils.hpp"
 
 #include <exception>
+#include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <pluginlib/class_list_macros.hpp>
@@ -11,6 +13,97 @@
 
 namespace aristo_hardware_interface
 {
+namespace
+{
+
+constexpr const char * kColorGreen = "\033[32m";
+constexpr const char * kColorRed = "\033[31m";
+constexpr const char * kColorYellow = "\033[33m";
+constexpr const char * kColorReset = "\033[0m";
+
+const char * bool_label(bool value)
+{
+  return value ? "yes" : "no";
+}
+
+std::string activation_label(const aristo_hand::Hand::ActuatorActivationStatus & status)
+{
+  if (status.enabled) {
+    return std::string(kColorGreen) + "ENABLED" + kColorReset;
+  }
+  return std::string(kColorRed) + "FAILED" + kColorReset;
+}
+
+std::string format_activation_summary(
+  const std::vector<aristo_hand::Hand::ActuatorActivationStatus> & statuses)
+{
+  std::ostringstream table;
+  table << "\n";
+  table << "================ Aristo Activation Summary ================\n";
+  table << " idx | joint        | tx   | rx   | status  | feedback | oc_mode | fault\n";
+  table << "-----+--------------+------+------+---------+----------+---------+------\n";
+
+  size_t enabled_count = 0;
+  for (const auto & status : statuses) {
+    enabled_count += status.enabled ? 1U : 0U;
+    const std::string fault_label = status.has_fault ?
+      std::string(kColorYellow) + "yes" + kColorReset :
+      "no";
+    std::ostringstream joint_name;
+    joint_name << "joint" << (status.index + 1);
+
+    table << " ";
+    table.width(3);
+    table << status.index + 1;
+    table << " | ";
+    table.width(12);
+    table << std::left << joint_name.str() << std::right;
+    table << " | 0x";
+    table.width(2);
+    table.fill('0');
+    table << std::uppercase << std::hex << status.tx_id << std::dec << std::nouppercase;
+    table.fill(' ');
+    table << " | 0x";
+    table.width(2);
+    table.fill('0');
+    table << std::uppercase << std::hex << status.rx_id << std::dec << std::nouppercase;
+    table.fill(' ');
+    table << " | ";
+    table.width(16);
+    table << std::left << activation_label(status) << std::right;
+    table << " | ";
+    table.width(8);
+    table << std::left << bool_label(status.has_feedback) << std::right;
+    table << " | ";
+    table.width(7);
+    table << std::left << bool_label(status.in_oc_mode) << std::right;
+    table << " | " << fault_label << "\n";
+  }
+
+  const bool all_enabled = enabled_count == statuses.size();
+  table << "------------------------------------------------------------\n";
+  table << " Enabled actuators: " << enabled_count << "/" << statuses.size() << " ";
+  table << (all_enabled ?
+    std::string(kColorGreen) + "OK" + kColorReset :
+    std::string(kColorRed) + "CHECK FAILED ACTUATORS" + kColorReset);
+  table << "\n";
+  table << "============================================================\n";
+  return table.str();
+}
+
+bool write_activation_summary(
+  const std::string & path,
+  const std::vector<aristo_hand::Hand::ActuatorActivationStatus> & statuses)
+{
+  std::ofstream output(path, std::ios::out | std::ios::trunc);
+  if (!output.is_open()) {
+    return false;
+  }
+  output << format_activation_summary(statuses);
+  return output.good();
+}
+
+}  // namespace
 
 hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interface::HardwareInfo & info)
 {
@@ -48,6 +141,12 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
     info_.hardware_parameters.find("actuator_config_yaml_path");
   if (actuator_config_path_it != info_.hardware_parameters.end()) {
     actuator_config_yaml_path_override = actuator_config_path_it->second;
+  }
+
+  const auto activation_summary_path_it =
+    info_.hardware_parameters.find("activation_summary_path");
+  if (activation_summary_path_it != info_.hardware_parameters.end()) {
+    activation_summary_path_ = activation_summary_path_it->second;
   }
 
   try {
@@ -127,6 +226,16 @@ hardware_interface::CallbackReturn AristoHardware::on_activate(
       zeroing_requested_ ?
       "One or more Aristo actuators failed to enable/embedded-zero. Continuing activation." :
       "One or more Aristo actuators failed to enable. Continuing activation.");
+  }
+  (void)hand_->read();
+  if (!write_activation_summary(
+      activation_summary_path_,
+      hand_->actuator_activation_statuses()))
+  {
+    RCLCPP_WARN(
+      rclcpp::get_logger("AristoHardware"),
+      "Failed to write Aristo activation summary to '%s'",
+      activation_summary_path_.c_str());
   }
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;

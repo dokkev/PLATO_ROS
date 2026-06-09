@@ -81,6 +81,9 @@ std::optional<actuator::TxCommand> Actuator::set_joint_impedance(
     joint_target.stiffness = 0.0f;
     joint_target.damping = 0.0f;
     joint_target.torque = 0.0f;
+    reset_torque_smoothing_(0.0f);
+  } else {
+    joint_target.torque = smooth_impedance_torque_(joint_target.torque);
   }
 
   auto command = protocol_->make_impedance_command(joint_target);
@@ -200,6 +203,25 @@ void Actuator::clamp_impedance_target_(can_hardware_common::ActuatorTarget & joi
     joint_target.damping = std::clamp(
       joint_target.damping, 0.0f, config_.limits.damping_limit);
   }
+}
+
+float Actuator::smooth_impedance_torque_(float torque)
+{
+  const float smoothing = config_.torque_smoothing;
+  if (smoothing <= 0.0f || !has_smoothed_impedance_torque_) {
+    reset_torque_smoothing_(torque);
+    return torque;
+  }
+
+  smoothed_impedance_torque_ =
+    smoothing * smoothed_impedance_torque_ + (1.0f - smoothing) * torque;
+  return smoothed_impedance_torque_;
+}
+
+void Actuator::reset_torque_smoothing_(float torque)
+{
+  smoothed_impedance_torque_ = torque;
+  has_smoothed_impedance_torque_ = true;
 }
 
 void Actuator::apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded)

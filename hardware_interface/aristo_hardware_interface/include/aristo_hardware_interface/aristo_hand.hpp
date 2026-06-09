@@ -2,6 +2,7 @@
 #define ARISTO_HARDWARE_INTERFACE__ARISTO_HAND_HPP_
 
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -19,6 +20,17 @@ class Hand : public can_hardware_common::core::CanHandBase
 public:
   static constexpr size_t kNumActuators = 8;
 
+  struct ActuatorActivationStatus
+  {
+    size_t index = 0;
+    uint32_t tx_id = 0;
+    uint32_t rx_id = 0;
+    bool enabled = false;
+    bool has_feedback = false;
+    bool in_oc_mode = false;
+    bool has_fault = false;
+  };
+
   explicit Hand(std::vector<aristo_actuator::Config> actuator_configs);
   Hand(const Hand &) = delete;
   Hand & operator=(const Hand &) = delete;
@@ -29,6 +41,7 @@ public:
   bool write_joint_commands() { return write(); }
 
   size_t get_num_actuators() const { return kNumActuators; }
+  std::vector<ActuatorActivationStatus> actuator_activation_statuses() const;
 
 private:
   using LifecyclePlan = can_hardware_common::core::LifecyclePlan;

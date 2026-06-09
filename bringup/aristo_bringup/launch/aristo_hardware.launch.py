@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
@@ -21,6 +21,7 @@ def generate_launch_description():
     joint_state_broadcaster_name = LaunchConfiguration("joint_state_broadcaster_name")
     joint_impedance_controller_name = LaunchConfiguration("joint_impedance_controller_name")
     actuator_config_yaml_path = LaunchConfiguration("actuator_config_yaml_path")
+    activation_summary_path = LaunchConfiguration("activation_summary_path")
     publish_world_pose = LaunchConfiguration("publish_world_pose")
     world_frame = LaunchConfiguration("world_frame")
 
@@ -83,6 +84,11 @@ def generate_launch_description():
             ),
         ),
         DeclareLaunchArgument(
+            "activation_summary_path",
+            default_value="/tmp/aristo_activation_summary.txt",
+            description="Path used to replay the Aristo actuator activation summary after controllers start.",
+        ),
+        DeclareLaunchArgument(
             "publish_world_pose",
             default_value="false",
             description="Publish index fingertip pose in world_frame when that TF tree is available.",
@@ -108,6 +114,9 @@ def generate_launch_description():
             " ",
             "actuator_config_yaml_path:=",
             actuator_config_yaml_path,
+            " ",
+            "activation_summary_path:=",
+            activation_summary_path,
         ]
     )
     robot_description = {
@@ -193,6 +202,23 @@ def generate_launch_description():
         output="screen",
     )
 
+    print_activation_summary = ExecuteProcess(
+        cmd=[
+            FindExecutable(name="bash"),
+            "-lc",
+            [
+                "if [ -f '",
+                activation_summary_path,
+                "' ]; then cat '",
+                activation_summary_path,
+                "'; else echo 'Aristo activation summary not found: ",
+                activation_summary_path,
+                "'; fi",
+            ],
+        ],
+        output="screen",
+    )
+
     start_rviz_after_jsb = RegisterEventHandler(
         OnProcessExit(target_action=joint_state_broadcaster_spawner, on_exit=[rviz])
     )
@@ -200,6 +226,12 @@ def generate_launch_description():
         OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
             on_exit=[joint_impedance_controller_spawner],
+        )
+    )
+    print_summary_after_impedance = RegisterEventHandler(
+        OnProcessExit(
+            target_action=joint_impedance_controller_spawner,
+            on_exit=[print_activation_summary],
         )
     )
 
@@ -213,6 +245,7 @@ def generate_launch_description():
             index_fingertip_pose_pub,
             joint_state_broadcaster_spawner,
             start_impedance_after_jsb,
+            print_summary_after_impedance,
             start_rviz_after_jsb,
         ]
     )

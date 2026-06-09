@@ -4,6 +4,7 @@
   <xacro:arg name="fake_hardware" default="false"/>
   <xacro:arg name="zeroing" default="false"/>
   <xacro:arg name="actuator_config_yaml_path" default=""/>
+  <xacro:arg name="activation_summary_path" default="/tmp/aristo_activation_summary.txt"/>
 
   <!-- Root link for TF tree -->
   <link name="base_link"/>
@@ -17,8 +18,9 @@
   <xacro:aristo_description connector_link="base_link" xyz="0 0 0" rpy="0 0 0"/>
   <xacro:aristo_ros2_control
     name="aristo_ros2_control"
-    fake_hardware="$(arg fake_hardware)"
-    zeroing="$(arg zeroing)"
-    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"/>
+	    fake_hardware="$(arg fake_hardware)"
+	    zeroing="$(arg zeroing)"
+	    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"
+	    activation_summary_path="$(arg activation_summary_path)"/>
 
 </robot>

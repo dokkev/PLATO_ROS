@@ -41,6 +41,20 @@ std::vector<aristo_actuator::Actuator> make_aristo_actuators(std::size_t count)
   return actuators;
 }
 
+float decode_command_torque(const TPCANMsg & msg)
+{
+  mit_can_protocol::MsgDecoder decoder;
+  float position = 0.0f;
+  float velocity = 0.0f;
+  float kp = 0.0f;
+  float kd = 0.0f;
+  float torque = 0.0f;
+  bool in_oc_mode = false;
+  bool has_fault = false;
+  decoder.get_states(msg, position, velocity, kp, kd, torque, in_oc_mode, has_fault);
+  return torque;
+}
+
 TEST(AristoProtocolTest, EnableBuildsDirectFrames)
 {
   auto actuators = make_aristo_actuators(4);
@@ -130,6 +144,54 @@ TEST(MitCanProtocolTest, ZeroImpedanceCommandHasStableMidpointEncoding)
     EXPECT_EQ(first.DATA[i], kExpectedZeroPayload[i]);
     EXPECT_EQ(second.DATA[i], kExpectedZeroPayload[i]);
   }
+}
+
+TEST(AristoActuatorTest, SmoothsTorqueForJointImpedanceCommands)
+{
+  auto config = make_aristo_config(0x0A, 0x0A);
+  config.core.gear_ratio = 2.0f;
+  config.torque_smoothing = 0.5f;
+  aristo_actuator::Actuator actuator(config);
+
+  can_hardware_common::ActuatorTarget target{};
+  target.position = 0.0f;
+  target.velocity = 0.0f;
+  target.stiffness = 0.0f;
+  target.damping = 0.0f;
+  target.torque = 0.0f;
+  const auto first_command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(first_command.has_value());
+  EXPECT_NEAR(decode_command_torque(first_command->frame), 0.0f, 0.01f);
+
+  target.torque = 1.0f;
+  const auto second_command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(second_command.has_value());
+  EXPECT_NEAR(decode_command_torque(second_command->frame), 0.5f, 0.02f);
+
+  const auto third_command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(third_command.has_value());
+  EXPECT_NEAR(decode_command_torque(third_command->frame), 0.75f, 0.02f);
+}
+
+TEST(AristoActuatorTest, ZeroTorqueSmoothingDisablesSmoothing)
+{
+  auto config = make_aristo_config(0x0A, 0x0A);
+  config.core.gear_ratio = 2.0f;
+  config.torque_smoothing = 0.0f;
+  aristo_actuator::Actuator actuator(config);
+
+  can_hardware_common::ActuatorTarget target{};
+  target.position = 0.0f;
+  target.velocity = 0.0f;
+  target.stiffness = 0.0f;
+  target.damping = 0.0f;
+  target.torque = 0.0f;
+  ASSERT_TRUE(actuator.set_joint_impedance(target).has_value());
+
+  target.torque = 1.0f;
+  const auto command = actuator.set_joint_impedance(target);
+  ASSERT_TRUE(command.has_value());
+  EXPECT_NEAR(decode_command_torque(command->frame), 1.0f, 0.02f);
 }
 
 }  // namespace

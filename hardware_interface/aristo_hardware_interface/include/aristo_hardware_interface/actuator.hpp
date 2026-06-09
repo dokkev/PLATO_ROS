@@ -16,6 +16,7 @@ struct Config
 {
   can_hardware_common::ActuatorCoreConfig core;
   actuator::Limits limits;
+  float torque_smoothing = 1.0f;
 };
 
 class Actuator
@@ -61,6 +62,8 @@ private:
   float clamp_torque_near_bounds_(float joint_torque) const;
   void determine_current_state_();
   void clamp_impedance_target_(can_hardware_common::ActuatorTarget & joint_target) const;
+  float smooth_impedance_torque_(float torque);
+  void reset_torque_smoothing_(float torque);
   void apply_decoded_feedback_(const can_hardware_common::DecodedFeedback & decoded);
 
   Config config_;
@@ -69,6 +72,8 @@ private:
   can_hardware_common::ActuatorStatus status_;
   bool motor_enabled_ = false;
   bool has_feedback_ = false;
+  float smoothed_impedance_torque_ = 0.0f;
+  bool has_smoothed_impedance_torque_ = false;
   SoftLimitState control_state_ = SoftLimitState::kOperational;
 
   static constexpr float kJointLimitSafetyMargin = 0.05f;

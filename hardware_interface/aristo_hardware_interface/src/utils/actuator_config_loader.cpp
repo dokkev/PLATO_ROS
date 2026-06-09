@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cmath>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -65,6 +66,21 @@ float parse_float(const YAML::Node & node, const char * key)
   return value.as<float>();
 }
 
+float parse_optional_float(
+  const YAML::Node & node,
+  const char * key,
+  float default_value)
+{
+  const auto value = node[key];
+  if (!value) {
+    return default_value;
+  }
+  if (!value.IsScalar()) {
+    throw std::runtime_error(std::string("Expected scalar field: ") + key);
+  }
+  return value.as<float>();
+}
+
 actuator::Limits parse_limits(const YAML::Node & node)
 {
   const auto limits_node = node["limits"];
@@ -92,6 +108,13 @@ Config parse_config(const YAML::Node & node)
   config.core.torque_constant = parse_float(node, "torque_constant");
   config.core.gear_ratio = parse_float(node, "gear_ratio");
   config.limits = parse_limits(node);
+  config.torque_smoothing = parse_optional_float(node, "torque_smoothing", 1.0f);
+  if (!std::isfinite(config.torque_smoothing) ||
+    config.torque_smoothing < 0.0f ||
+    config.torque_smoothing > 1.0f)
+  {
+    throw std::runtime_error("torque_smoothing must be finite and within [0, 1]");
+  }
   return config;
 }
 

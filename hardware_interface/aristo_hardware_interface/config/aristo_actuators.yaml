@@ -6,6 +6,7 @@ actuators:
     direction: -1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -0.2617994
       position_max: 0.7853982
@@ -21,6 +22,7 @@ actuators:
     direction: 1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -0.7853982
       position_max: 0.7853982
@@ -36,6 +38,7 @@ actuators:
     direction: -1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
@@ -51,6 +54,7 @@ actuators:
     direction: -1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 3.1415927
@@ -66,6 +70,7 @@ actuators:
     direction: -1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
@@ -81,6 +86,7 @@ actuators:
     direction: -1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 3.1415927
@@ -96,6 +102,7 @@ actuators:
     direction: 1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 1.2217305
@@ -111,6 +118,7 @@ actuators:
     direction: 1
     torque_constant: 0.52
     gear_ratio: 8.0
+    torque_smoothing: 0.5
     limits:
       position_min: -1.0471976
       position_max: 3.1415927

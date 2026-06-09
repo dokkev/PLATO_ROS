@@ -5,6 +5,18 @@
 namespace aristo_hand
 {
 
+bool is_dangerous_all_zero_mit_command(const TPCANMsg & frame)
+{
+  if ((frame.ID & 0x400U) == 0U || frame.LEN != 8U) {
+    return false;
+  }
+
+  return std::all_of(
+    std::begin(frame.DATA),
+    std::begin(frame.DATA) + frame.LEN,
+    [](uint8_t byte) { return byte == 0U; });
+}
+
 void AristoProtocol::append_enable_frames(
   std::vector<aristo_actuator::Actuator> & actuators,
   std::vector<TPCANMsg> & direct_frames) const
@@ -32,6 +44,17 @@ void AristoProtocol::append_zero_frames(
   direct_frames.reserve(direct_frames.size() + actuators.size());
   for (auto & actuator : actuators) {
     direct_frames.push_back(actuator.set_current_position_as_zero().frame);
+  }
+}
+
+void AristoProtocol::append_startup_query_frames(
+  std::vector<aristo_actuator::Actuator> & actuators,
+  std::vector<TPCANMsg> & direct_frames) const
+{
+  direct_frames.reserve(direct_frames.size() + actuators.size() * 2U);
+  for (auto & actuator : actuators) {
+    direct_frames.push_back(actuator.read_motor_params().frame);
+    direct_frames.push_back(actuator.read_can_limits().frame);
   }
 }
 
@@ -83,6 +106,9 @@ void AristoProtocol::append_impedance_frames(
 {
   direct_frames.reserve(direct_frames.size() + std::min(impedance_targets.size(), actuators.size()));
   for (std::size_t i = 0; i < impedance_targets.size() && i < actuators.size(); ++i) {
+    if (!actuators[i].has_motor_params() || !actuators[i].has_active_limits()) {
+      continue;
+    }
     if (const auto command = actuators[i].set_joint_impedance(impedance_targets[i])) {
       direct_frames.push_back(command->frame);
     }

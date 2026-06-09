@@ -4,6 +4,7 @@
 
 #include <exception>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <pluginlib/class_list_macros.hpp>
@@ -11,6 +12,121 @@
 
 namespace aristo_hardware_interface
 {
+namespace
+{
+
+constexpr const char * kColorGreen = "\033[32m";
+constexpr const char * kColorRed = "\033[31m";
+constexpr const char * kColorYellow = "\033[33m";
+constexpr const char * kColorReset = "\033[0m";
+
+const char * bool_label(bool value)
+{
+  return value ? "yes" : "no";
+}
+
+std::string activation_label(const aristo_hand::Hand::ActuatorActivationStatus & status)
+{
+  if (status.enabled) {
+    return std::string(kColorGreen) + "ENABLED" + kColorReset;
+  }
+  if (status.has_motor_params && status.has_active_limits && !status.has_feedback) {
+    return std::string(kColorYellow) + "NO_F1_STATE" + kColorReset;
+  }
+  if (status.has_motor_params && status.has_active_limits) {
+    return std::string(kColorYellow) + "NOT_IN_OC" + kColorReset;
+  }
+  if (status.has_motor_params || status.has_active_limits) {
+    return std::string(kColorYellow) + "METADATA_PARTIAL" + kColorReset;
+  }
+  return std::string(kColorRed) + "FAILED" + kColorReset;
+}
+
+std::string format_activation_summary(
+  const std::vector<aristo_hand::Hand::ActuatorActivationStatus> & statuses)
+{
+  std::ostringstream table;
+  table << "\n";
+  table << "================ Aristo Activation Summary ================\n";
+  table << " idx | joint        | tx   | rx   | status  | feedback | oc_mode | fault\n";
+  table << "-----+--------------+------+------+---------+----------+---------+------\n";
+
+  size_t enabled_count = 0;
+  for (const auto & status : statuses) {
+    enabled_count += status.enabled ? 1U : 0U;
+    const std::string fault_label = status.has_fault ?
+      std::string(kColorYellow) + "yes" + kColorReset :
+      "no";
+    std::ostringstream joint_name;
+    joint_name << "joint" << (status.index + 1);
+
+    table << " ";
+    table.width(3);
+    table << status.index + 1;
+    table << " | ";
+    table.width(12);
+    table << std::left << joint_name.str() << std::right;
+    table << " | 0x";
+    table.width(2);
+    table.fill('0');
+    table << std::uppercase << std::hex << status.tx_id << std::dec << std::nouppercase;
+    table.fill(' ');
+    table << " | 0x";
+    table.width(2);
+    table.fill('0');
+    table << std::uppercase << std::hex << status.rx_id << std::dec << std::nouppercase;
+    table.fill(' ');
+    table << " | ";
+    table.width(16);
+    table << std::left << activation_label(status) << std::right;
+    table << " | ";
+    table.width(8);
+    table << std::left << bool_label(status.has_feedback) << std::right;
+    table << " | ";
+    table.width(7);
+    table << std::left << bool_label(status.in_oc_mode) << std::right;
+    table << " | " << fault_label << "\n";
+    table << "     params: ";
+    if (status.has_motor_params) {
+      table << "pole_pairs=" << static_cast<int>(status.motor_params.pole_pairs)
+            << ", torque_constant_nm_per_a=" << status.motor_params.torque_constant_nm_per_a
+            << ", driver_gear_ratio=" << static_cast<int>(status.motor_params.gear_ratio);
+    } else {
+      table << std::string(kColorYellow) + "not received" + kColorReset;
+    }
+    table << "\n";
+    table << "     limits: ";
+    if (status.has_active_limits) {
+      table << "Pos_Max=" << status.active_limits.pos_max_rad
+            << " rad, Vel_Max=" << status.active_limits.vel_max_rad_s
+            << " rad/s, T_Max=" << status.active_limits.t_max_nm << " Nm";
+    } else {
+      table << std::string(kColorYellow) + "using defaults" + kColorReset;
+    }
+    table << "\n";
+  }
+
+  const bool all_enabled = enabled_count == statuses.size();
+  table << "------------------------------------------------------------\n";
+  table << " Enabled actuators: " << enabled_count << "/" << statuses.size() << " ";
+  table << (all_enabled ?
+    std::string(kColorGreen) + "OK" + kColorReset :
+    std::string(kColorRed) + "CHECK FAILED ACTUATORS" + kColorReset);
+  table << "\n";
+  table << "============================================================\n";
+  return table.str();
+}
+
+void log_activation_summary(
+  const std::vector<aristo_hand::Hand::ActuatorActivationStatus> & statuses)
+{
+  RCLCPP_INFO(
+    rclcpp::get_logger("AristoHardware"),
+    "%s",
+    format_activation_summary(statuses).c_str());
+}
+
+}  // namespace
 
 hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interface::HardwareInfo & info)
 {
@@ -122,12 +238,17 @@ hardware_interface::CallbackReturn AristoHardware::on_activate(
       "Aristo embedded zeroing requested.");
   }
   if (!hand_->enable(zeroing_requested_)) {
-    RCLCPP_WARN(
+    RCLCPP_ERROR(
       rclcpp::get_logger("AristoHardware"),
       zeroing_requested_ ?
-      "One or more Aristo actuators failed to enable/embedded-zero. Continuing activation." :
-      "One or more Aristo actuators failed to enable. Continuing activation.");
+      "One or more Aristo actuators failed to enable/embedded-zero." :
+      "One or more Aristo actuators failed to enable.");
+    (void)hand_->read();
+    log_activation_summary(hand_->actuator_activation_statuses());
+    return hardware_interface::CallbackReturn::ERROR;
   }
+  (void)hand_->read();
+  log_activation_summary(hand_->actuator_activation_statuses());
   RCLCPP_INFO(rclcpp::get_logger("AristoHardware"), "Activated");
   return hardware_interface::CallbackReturn::SUCCESS;
 }

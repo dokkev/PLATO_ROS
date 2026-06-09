@@ -11,8 +11,9 @@
 #include "mppi_core/core/action_sequence.hpp"
 #include "mppi_core/core/mppi_config.hpp"
 #include "mppi_core/costs/cost_term_base.hpp"
-#include "mppi_core/grasp_types.hpp"
-#include "mppi_core/model/rollout.hpp"
+#include "mppi_core/robot/robot_system.hpp"
+#include "mppi_core/rollout/rollout_model.hpp"
+#include "mppi_core/state/grasp_observation.hpp"
 
 namespace mppi_core {
 
@@ -20,7 +21,7 @@ struct RolloutTrace {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   // states[0] is the initial rollout state. states[k + 1] is after actions[k].
-  std::vector<RobotRolloutState> states;
+  std::vector<GraspState> states;
   std::vector<Eigen::VectorXd> actions;
   std::vector<double> step_costs;
   double total_cost{0.0};
@@ -51,7 +52,7 @@ class MPPIOptimizer {
   double EvaluateRollout(const GraspObservation& observation,
                          const ActionSequence& actions) const;
   RobotCommand MakeCommand(const GraspObservation& observation,
-                           const Eigen::VectorXd& delta_q_ref) const;
+                           const Eigen::VectorXd& qddot_sol) const;
   void UpdateNominalActionSequence();
 
   bool initialized_{false};

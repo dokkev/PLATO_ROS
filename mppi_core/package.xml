@@ -12,9 +12,12 @@
   <depend>eigen3_cmake_module</depend>
   <depend>Eigen3</depend>
   <depend>pinocchio</depend>
+  <depend>plato_robot_system</depend>
   <depend>yaml-cpp</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>plato_description</test_depend>
+  <test_depend>xacro</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -15,7 +15,7 @@ install(DIRECTORY launch
 )
 
 # Install config files
-install(FILES config/ros2_controllers.yaml
+install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
 )
 

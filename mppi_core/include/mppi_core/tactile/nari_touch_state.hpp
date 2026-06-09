@@ -4,15 +4,15 @@
 
 #pragma once
 
-#include <algorithm>
+#include <Eigen/Core>
 #include <array>
 #include <cmath>
 #include <cstddef>
-
-#include <Eigen/Core>
+#include <string>
 
 namespace mppi_core {
 
+// Sensor-specific contact state from NARI-Touch tactile_state.contact_state.
 enum class NariTouchContactState : int {
   kNoContact = 0,
   kFewContacts = 1,
@@ -32,7 +32,8 @@ struct NariTouchUnitState {
   // Local center-of-pressure offset from position_m.
   Eigen::Vector2d cop{Eigen::Vector2d::Zero()};
 
-  double normal_force{0.0};
+  // Optional per-unit normal force if the upstream NARI source provides it.
+  double normal_force_n{0.0};
 };
 
 inline std::array<Eigen::Vector2d, kNariTouchUnitCount>
@@ -45,11 +46,6 @@ NariTouchUnitPositionsM() {
   };
 }
 
-inline Eigen::Vector3d NariTouchUnitSensorPosition(
-    const NariTouchUnitState& unit) {
-  return Eigen::Vector3d{unit.position_m.x(), unit.position_m.y(), 0.0};
-}
-
 struct NariTouchState {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -60,22 +56,27 @@ struct NariTouchState {
     }
   }
 
-  // NARI-specific slip/shear state.
-  // Convention:
-  //   x/y = translational shear displacement components in tactile frame.
-  //   z   = rotational shear displacement around tactile normal.
-  Eigen::Vector3d slip_state{Eigen::Vector3d::Zero()};
+  bool valid{false};
+  double stamp_sec{0.0};
 
-  // Time derivative of slip_state.
-  Eigen::Vector3d slip_velocity_state{Eigen::Vector3d::Zero()};
-
-  // Contact centroid velocity in tactile frame.
-  Eigen::Vector2d centroid_velocity_mps{Eigen::Vector2d::Zero()};
-
-  // Aggregate normal force fallback.
-  double force_z{0.0};
+  int sensor_index{-1};
+  std::string frame_name{};
 
   NariTouchContactState contact_state{NariTouchContactState::kNoContact};
+
+  // Sensor-level aggregate force from the NARI source.
+  Eigen::Vector3d force_n{Eigen::Vector3d::Zero()};
+
+  // Sensor-level aggregate shear/slip features from the NARI source.
+  Eigen::Vector2d shear_displacement_m{Eigen::Vector2d::Zero()};
+  double rotational_shear_rad{0.0};
+
+  Eigen::Vector2d shear_velocity_mps{Eigen::Vector2d::Zero()};
+  double rotational_shear_velocity_radps{0.0};
+
+  double slip_score{0.0};
+  double slip_velocity_score{0.0};
+  double incipient_slip_score{0.0};
 
   std::array<NariTouchUnitState, kNariTouchUnitCount> units{};
 
@@ -92,6 +93,12 @@ struct NariTouchState {
     return false;
   }
 
+  bool hasEnoughContact() const {
+    return contact_state == NariTouchContactState::kEnoughContacts;
+  }
+
+  bool readyForMppiStart() const { return valid && hasEnoughContact(); }
+
   std::size_t contactUnitCount() const {
     std::size_t count = 0;
     for (const auto& unit : units) {
@@ -101,69 +108,14 @@ struct NariTouchState {
     }
     return count;
   }
-
-  std::size_t contactNodeCount() const { return contactUnitCount(); }
 };
-
-using NariTouchNodeState = NariTouchUnitState;
-inline constexpr std::size_t kNariTouchNodeCount = kNariTouchUnitCount;
-
-inline std::array<Eigen::Vector2d, kNariTouchNodeCount>
-NariTouchNodePositionsM() {
-  return NariTouchUnitPositionsM();
-}
-
-inline Eigen::Vector3d NariTouchNodeSensorPosition(
-    const NariTouchNodeState& node) {
-  return NariTouchUnitSensorPosition(node);
-}
 
 constexpr int ToContactStateValue(NariTouchContactState state) {
   return static_cast<int>(state);
 }
 
-inline double ComputeNariTouchTotalNormalForceN(
-    const NariTouchState& sensor) {
-  double unit_force_sum = 0.0;
-  for (const auto& unit : sensor.units) {
-    if (std::isfinite(unit.normal_force) && unit.normal_force > 0.0) {
-      unit_force_sum += unit.normal_force;
-    }
-  }
-  if (unit_force_sum > 0.0) {
-    return unit_force_sum;
-  }
-
-  if (!std::isfinite(sensor.force_z)) {
-    return 0.0;
-  }
-  return std::max(0.0, sensor.force_z);
-}
-
-inline double ComputeNariTouchSlipMagnitude(const NariTouchState& sensor) {
-  if (!sensor.slip_state.allFinite()) {
-    return 0.0;
-  }
-  return sensor.slip_state.norm();
-}
-
-inline double ComputeNariTouchSlipVelocityMagnitude(
-    const NariTouchState& sensor) {
-  if (!sensor.slip_velocity_state.allFinite()) {
-    return 0.0;
-  }
-  return sensor.slip_velocity_state.norm();
-}
-
-inline double ComputeNariTouchSlipRisk(const NariTouchState& sensor,
-                                       double velocity_weight) {
-  return ComputeNariTouchSlipMagnitude(sensor) +
-         std::max(0.0, velocity_weight) *
-             ComputeNariTouchSlipVelocityMagnitude(sensor);
-}
-
-inline bool ComputeNariTouchContactCentroidM(
-    const NariTouchState& sensor, Eigen::Vector2d* centroid_m) {
+inline bool ComputeNariTouchContactCentroidM(const NariTouchState& sensor,
+                                             Eigen::Vector2d* centroid_m) {
   if (centroid_m == nullptr) {
     return false;
   }
@@ -177,8 +129,8 @@ inline bool ComputeNariTouchContactCentroidM(
     }
 
     double weight = 1.0;
-    if (std::isfinite(unit.normal_force) && unit.normal_force > 0.0) {
-      weight = unit.normal_force;
+    if (std::isfinite(unit.normal_force_n) && unit.normal_force_n > 0.0) {
+      weight = unit.normal_force_n;
     }
 
     Eigen::Vector2d contact_position_m = unit.position_m;

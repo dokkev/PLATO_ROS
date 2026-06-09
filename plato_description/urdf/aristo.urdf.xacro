@@ -17,8 +17,8 @@
   <xacro:aristo_description connector_link="base_link" xyz="0 0 0" rpy="0 0 0"/>
   <xacro:aristo_ros2_control
     name="aristo_ros2_control"
-    fake_hardware="$(arg fake_hardware)"
-    zeroing="$(arg zeroing)"
-    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"/>
+	    fake_hardware="$(arg fake_hardware)"
+	    zeroing="$(arg zeroing)"
+	    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"/>
 
 </robot>

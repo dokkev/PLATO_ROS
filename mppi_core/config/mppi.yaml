@@ -8,8 +8,16 @@ mppi:
   temperature: 1.0
   random_seed: 1
 
-  # Action is delta_q_ref per MPPI step. Scalars expand to all controlled joints.
+  # Action is solver joint acceleration qddot_sol per MPPI step.
+  # Units are rad/s^2 for revolute joints and m/s^2 for prismatic joints.
+  # Scalars expand to all controlled joints.
   action:
-    lower_bound: -0.002
-    upper_bound: 0.002
-    noise_std: 0.002
+    lower_bound: -2.0
+    upper_bound: 2.0
+    noise_std: 0.5
+
+  # Embedded 1 kHz local impedance gains for:
+  # tau_driver = tau_cmd + kp * (q_cmd - q_meas) + kd * (qdot_cmd - qdot_meas).
+  command:
+    kp: 20.0
+    kd: 1.0

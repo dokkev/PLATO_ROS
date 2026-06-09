@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>aristo_controller</name>
+  <version>0.1.0</version>
+  <description>Aristo-specific state machines and controller configuration helpers.</description>
+
+  <maintainer email="dongho@utexas.edu">dk</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>plato_robot_system</depend>
+  <build_depend>yaml-cpp</build_depend>
+  <build_export_depend>yaml-cpp</build_export_depend>
+  <exec_depend>yaml-cpp</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -12,6 +12,8 @@
 namespace aristo_hand
 {
 
+bool is_dangerous_all_zero_mit_command(const TPCANMsg & frame);
+
 class AristoProtocol
 {
 public:
@@ -29,9 +31,13 @@ public:
     std::vector<aristo_actuator::Actuator> & actuators,
     std::vector<TPCANMsg> & direct_frames) const;
 
-  void append_zero_frames(
-    std::vector<aristo_actuator::Actuator> & actuators,
-    std::vector<TPCANMsg> & direct_frames) const;
+	  void append_zero_frames(
+	    std::vector<aristo_actuator::Actuator> & actuators,
+	    std::vector<TPCANMsg> & direct_frames) const;
+
+	  void append_startup_query_frames(
+	    std::vector<aristo_actuator::Actuator> & actuators,
+	    std::vector<TPCANMsg> & direct_frames) const;
 
   void initialize_rx_dispatch(const std::vector<aristo_actuator::Actuator> & actuators);
 

@@ -202,7 +202,6 @@ def generate_launch_description():
             on_exit=[joint_impedance_controller_spawner],
         )
     )
-
     return LaunchDescription(
         declared_arguments
         + [

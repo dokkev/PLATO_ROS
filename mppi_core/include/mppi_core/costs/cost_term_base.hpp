@@ -8,7 +8,7 @@
 
 #include <Eigen/Core>
 
-#include "mppi_core/model/rollout.hpp"
+#include "mppi_core/rollout/rollout_model.hpp"
 
 namespace mppi_core {
 
@@ -22,7 +22,7 @@ class CostTermBase {
  public:
   virtual ~CostTermBase() = default;
 
-  virtual double Evaluate(const RobotRolloutState& state,
+  virtual double Evaluate(const GraspState& state,
                           const Eigen::Ref<const Eigen::VectorXd>& action,
                           const CostContext& context) const = 0;
 };

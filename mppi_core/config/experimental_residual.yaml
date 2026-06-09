@@ -1,0 +1,17 @@
+# Residual/contact-force rollout is disabled in the MVP.
+# Future residual correction should happen as observation-time GraspState
+# correction, not as horizon dynamics.
+
+rollout:
+  contact_force_rollout:
+    enable_force_projection_update: true
+    force_lowpass_alpha: 0.5
+    max_predicted_normal_force_n: 20.0
+    shear_force_gain_m_per_n_s: 0.0001
+    rotational_shear_gain_rad_per_nm_s: 0.01
+    friction_violation_confidence_decay: 0.2
+    negative_normal_confidence_decay: 0.5
+    min_active_hemisphere_count: 4
+    min_contact_confidence: 0.001
+    shear_ref_m: 0.001
+    rotational_shear_ref_rad: 0.02

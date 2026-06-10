@@ -15,7 +15,9 @@
   - `0.0` = Parallel grasp (fingers mirrored)
   - `1.0` = Maximum flexion (~45° inward bend)
 
-- **f** (optional, default=0.0): Force (reserved for future use)
+- **f** (optional): Desired normal force [N]. If omitted, the node uses
+  `/grasp_force_reference/target_normal_force_n` only while
+  `/grasp_force_reference/reference_valid` is true.
 
 ---
 
@@ -69,12 +71,12 @@ ros2 topic pub --once /plato2/parallel_grasp_controller/commands std_msgs/msg/Fl
 
 You can send fewer than 3 values - missing values default to safe settings:
 
-### Just grasp distance (phi=0.0, f=0.0):
+### Just grasp distance (phi=0.0, force reference if valid):
 ```bash
 ros2 topic pub --once /plato2/parallel_grasp_controller/commands std_msgs/msg/Float64MultiArray "data: [0.5]"
 ```
 
-### Grasp distance + contact angle (f=0.0):
+### Grasp distance + contact angle (force reference if valid):
 ```bash
 ros2 topic pub --once /plato2/parallel_grasp_controller/commands std_msgs/msg/Float64MultiArray "data: [0.3, 0.7]"
 ```

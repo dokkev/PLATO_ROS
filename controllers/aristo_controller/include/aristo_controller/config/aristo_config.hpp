@@ -5,11 +5,28 @@
 
 #include <string>
 
+#include "aristo_controller/state_machines/grasp_teleop.hpp"
+#include "aristo_controller/state_machines/joint_teleop.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
 
 namespace aristo_controller::config
 {
+
+struct StateConfig
+{
+  plato_robot_system::StateId id{0};
+};
+
+struct GraspTeleopConfig : public StateConfig
+{
+  aristo_controller::state_machines::GraspTeleopStateConfig state;
+};
+
+struct JointTeleopConfig : public StateConfig
+{
+  aristo_controller::state_machines::JointTeleopStateConfig state;
+};
 
 struct InitializeConfig
 {
@@ -34,7 +51,11 @@ struct AristoConfig
   bool debug_enabled{false};
   RobotModelConfig robot_model;
   plato_robot_system::DriverPdGainsConfig driver_gains;
+  StateConfig idle;
   InitializeConfig initialize;
+  JointTeleopConfig joint_teleop;
+  GraspTeleopConfig grasp_teleop;
+  StateConfig mppi_grasp;
 };
 
 std::string default_aristo_config_path();

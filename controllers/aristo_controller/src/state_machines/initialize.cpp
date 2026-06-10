@@ -51,13 +51,13 @@ void InitializeState::OnExit()
   joint_task_.Reset();
 }
 
-bool InitializeState::GetCommand(plato_robot_system::RobotCommand * command) const
+bool InitializeState::PopulateCommand(plato_robot_system::RobotCommand * command) const
 {
   if (command == nullptr || robot_ == nullptr || !robot_->hasState()) {
     return false;
   }
 
-  return joint_task_.BuildCommand(robot_->state(), elapsed_time(), dt(), command);
+  return joint_task_.PopulateCommand(robot_->state(), elapsed_time(), dt(), command);
 }
 
 }  // namespace aristo_controller::state_machines

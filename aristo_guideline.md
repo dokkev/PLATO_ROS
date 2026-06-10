@@ -76,8 +76,8 @@ Input topic:
 
 ## Notes
 
-- Parallel grasp launches Naritouch and the object state estimator. Joint teleop
-  and the joint trajectory launch do not launch tactile sensing.
+- Parallel grasp launches Naritouch and the reference grasp force generator.
+  Joint teleop and the joint trajectory launch do not launch tactile sensing.
 - Do not use the old `grasp_node` or `/naritouch_grasp_demo/start_grasp`
   commands from the old branch.
 - To verify hardware:

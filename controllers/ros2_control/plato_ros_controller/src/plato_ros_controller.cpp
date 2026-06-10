@@ -2,13 +2,18 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
+#include "aristo_controller/state_machines/grasp_teleop.hpp"
+#include "aristo_controller/state_machines/idle.hpp"
 #include "aristo_controller/state_machines/initialize.hpp"
+#include "aristo_controller/state_machines/joint_teleop.hpp"
+#include "aristo_controller/state_machines/mppi_grasp.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -84,7 +89,14 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
 {
   auto_declare<std::vector<std::string>>("joints", std::vector<std::string>{});
   auto_declare<std::vector<std::string>>("tactile_topics", default_tactile_topics());
-  auto_declare<bool>("compute_impedance_torque", false);
+  auto_declare<std::string>("joint_teleop_command_topic", "~/joint_teleop");
+  auto_declare<std::string>("grasp_teleop_command_topic", "~/grasp_teleop_command");
+  auto_declare<std::string>(
+    "grasp_force_reference_topic",
+    "/grasp_force_reference/target_normal_force_n");
+  auto_declare<std::string>(
+    "grasp_force_reference_valid_topic",
+    "/grasp_force_reference/reference_valid");
   auto_declare<std::string>("control_config_yaml_path", "");
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -94,8 +106,19 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 {
   joint_names_ = get_node()->get_parameter("joints").as_string_array();
   tactile_topics_ = get_node()->get_parameter("tactile_topics").as_string_array();
+  joint_teleop_command_topic_ =
+    get_node()->get_parameter("joint_teleop_command_topic").as_string();
+  grasp_teleop_command_topic_ =
+    get_node()->get_parameter("grasp_teleop_command_topic").as_string();
+  grasp_force_reference_topic_ =
+    get_node()->get_parameter("grasp_force_reference_topic").as_string();
+  grasp_force_reference_valid_topic_ =
+    get_node()->get_parameter("grasp_force_reference_valid_topic").as_string();
   control_config_yaml_path_ = get_node()->get_parameter("control_config_yaml_path").as_string();
-  compute_impedance_torque_ = get_node()->get_parameter("compute_impedance_torque").as_bool();
+  joint_teleop_state_ = nullptr;
+  grasp_teleop_state_ = nullptr;
+  grasp_force_reference_n_.store(0.0);
+  grasp_force_reference_valid_.store(false);
 
   if (joint_names_.empty()) {
     RCLCPP_ERROR(get_node()->get_logger(), "'joints' parameter is empty");
@@ -115,7 +138,6 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   efforts_.assign(num_joints, 0.0);
 
   robot_ = std::make_shared<plato_robot_system::RobotSystem>();
-  control_architecture_.config().compute_impedance_torque = compute_impedance_torque_;
   control_architecture_.SetRobot(robot_);
   if (!control_config_yaml_path_.empty()) {
     if (!configure_from_control_config(control_architecture_, *robot_)) {
@@ -150,6 +172,8 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
       plato_robot_system::sensor::ConvertNARITouchToTactileState(nari_touch_[i].sample());
   }
   rt_tactile_ptr_.writeFromNonRT(tactile_vector);
+  rt_joint_teleop_command_ptr_.writeFromNonRT(std::shared_ptr<JointTeleopCommand>{});
+  rt_grasp_teleop_command_ptr_.writeFromNonRT(std::shared_ptr<GraspTeleopCommand>{});
 
   tactile_subs_.clear();
   tactile_subs_.reserve(tactile_topics_.size());
@@ -158,15 +182,60 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
       tactile_topics_[i], rclcpp::SensorDataQoS(),
       [this, i](const TactileMsg::SharedPtr msg) { tactile_callback(i, msg); }));
   }
+  if (!joint_teleop_command_topic_.empty()) {
+    joint_teleop_command_sub_ = get_node()->create_subscription<JointTeleopMsg>(
+      joint_teleop_command_topic_,
+      rclcpp::SystemDefaultsQoS(),
+      [this](const JointTeleopMsg::SharedPtr msg) {
+        joint_teleop_command_callback(msg);
+      });
+  }
+  if (!grasp_teleop_command_topic_.empty()) {
+    grasp_teleop_command_sub_ = get_node()->create_subscription<GraspTeleopMsg>(
+      grasp_teleop_command_topic_,
+      rclcpp::SystemDefaultsQoS(),
+      [this](const GraspTeleopMsg::SharedPtr msg) {
+        grasp_teleop_command_callback(msg);
+      });
+  }
+  if (!grasp_force_reference_topic_.empty()) {
+    grasp_force_reference_sub_ = get_node()->create_subscription<GraspForceReferenceMsg>(
+      grasp_force_reference_topic_,
+      rclcpp::SystemDefaultsQoS(),
+      [this](const GraspForceReferenceMsg::SharedPtr msg) {
+        grasp_force_reference_callback(msg);
+      });
+  }
+  if (!grasp_force_reference_valid_topic_.empty()) {
+    grasp_force_reference_valid_sub_ =
+      get_node()->create_subscription<GraspForceReferenceValidMsg>(
+        grasp_force_reference_valid_topic_,
+        rclcpp::SystemDefaultsQoS(),
+        [this](const GraspForceReferenceValidMsg::SharedPtr msg) {
+          grasp_force_reference_valid_callback(msg);
+        });
+  }
   controller_state_pub_ =
     get_node()->create_publisher<plato_interfaces::msg::ImpedanceControllerState>(
       "~/controller_state", rclcpp::SystemDefaultsQoS());
+  request_state_srv_ = get_node()->create_service<RequestStateSrv>(
+    "~/request_state",
+    [this](
+      const std::shared_ptr<RequestStateSrv::Request> request,
+      std::shared_ptr<RequestStateSrv::Response> response)
+    {
+      request_state_callback(request, response);
+    });
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Configured Plato ROS controller with %zu joints and %zu tactile topics",
+    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', and grasp force reference topics '%s'/'%s'",
     num_joints,
-    tactile_topics_.size());
+    tactile_topics_.size(),
+    joint_teleop_command_topic_.c_str(),
+    grasp_teleop_command_topic_.c_str(),
+    grasp_force_reference_topic_.c_str(),
+    grasp_force_reference_valid_topic_.c_str());
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -229,15 +298,33 @@ controller_interface::return_type PlatoRosController::update(
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Robot state contains non-finite values");
+    write_zero_command();
     return controller_interface::return_type::ERROR;
   }
 
+  apply_pending_state_request();
+  sync_joint_teleop_input();
+  sync_grasp_teleop_input();
+
+  plato_robot_system::ControlUpdateResult control_result;
   try {
-    control_architecture_.Update(robot_state, period.seconds());
+    control_result = control_architecture_.Update(robot_state, period.seconds());
   } catch (const std::exception & e) {
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Control architecture update failed: %s", e.what());
+    if (!write_safe_hold_command(robot_state)) {
+      write_zero_command();
+    }
+    return controller_interface::return_type::ERROR;
+  }
+  if (!control_result.ok) {
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *(get_node()->get_clock()), 1000,
+      "Control architecture update failed: %s", control_result.reason.c_str());
+    if (!write_safe_hold_command(robot_state)) {
+      write_zero_command();
+    }
     return controller_interface::return_type::ERROR;
   }
   const auto & command = control_architecture_.command();
@@ -245,6 +332,9 @@ controller_interface::return_type PlatoRosController::update(
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Control architecture produced an invalid command");
+    if (!write_safe_hold_command(robot_state)) {
+      write_zero_command();
+    }
     return controller_interface::return_type::ERROR;
   }
 
@@ -254,6 +344,9 @@ controller_interface::return_type PlatoRosController::update(
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Controller command filter produced an invalid command");
+    if (!write_safe_hold_command(robot_state)) {
+      write_zero_command();
+    }
     return controller_interface::return_type::ERROR;
   }
   publish_controller_state(time, filtered_command_);
@@ -310,7 +403,7 @@ void PlatoRosController::register_robot_states(
 void PlatoRosController::configure_initial_state(
   plato_robot_system::ControlArchitecture & architecture)
 {
-  architecture.RequestMode(plato_robot_system::ControlMode::kHold);
+  (void)architecture;
 }
 
 void PlatoRosController::filter_command(plato_robot_system::RobotCommand * command) const
@@ -496,6 +589,174 @@ void PlatoRosController::tactile_callback(
   rt_tactile_ptr_.writeFromNonRT(tactile_vector);
 }
 
+void PlatoRosController::joint_teleop_command_callback(
+  const JointTeleopMsg::SharedPtr msg)
+{
+  const auto expected_size = joint_names_.size();
+  if (!msg || msg->data.size() != expected_size) {
+    const auto size = msg ? msg->data.size() : 0U;
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Ignoring joint teleop command with %zu values; expected %zu joint positions.",
+      size,
+      expected_size);
+    return;
+  }
+
+  JointTeleopCommand command;
+  command.target_jpos.resize(static_cast<Eigen::Index>(expected_size));
+  for (std::size_t i = 0; i < expected_size; ++i) {
+    command.target_jpos[static_cast<Eigen::Index>(i)] = msg->data[i];
+  }
+
+  if (!command.target_jpos.allFinite()) {
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Ignoring joint teleop command with non-finite values.");
+    return;
+  }
+
+  rt_joint_teleop_command_ptr_.writeFromNonRT(
+    std::make_shared<JointTeleopCommand>(command));
+}
+
+void PlatoRosController::sync_joint_teleop_input()
+{
+  if (joint_teleop_state_ == nullptr || !robot_) {
+    return;
+  }
+
+  const auto command_ptr = rt_joint_teleop_command_ptr_.readFromRT();
+  if (command_ptr == nullptr || !*command_ptr) {
+    return;
+  }
+
+  try {
+    const auto target_q =
+      map_joint_positions_to_model_q((**command_ptr).target_jpos, *robot_);
+    if (!joint_teleop_state_->SetTargetPosition(target_q)) {
+      RCLCPP_WARN_THROTTLE(
+        get_node()->get_logger(),
+        *(get_node()->get_clock()),
+        1000,
+        "Joint teleop state rejected the latest target position command.");
+    }
+  } catch (const std::exception & e) {
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Failed to map joint teleop target into model coordinates: %s",
+      e.what());
+  }
+}
+
+void PlatoRosController::grasp_teleop_command_callback(
+  const GraspTeleopMsg::SharedPtr msg)
+{
+  if (!msg || msg->data.size() < 2U || msg->data.size() > 3U) {
+    const auto size = msg ? msg->data.size() : 0U;
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Ignoring grasp teleop command with %zu values; expected [u, phi] or [u, phi, f].",
+      size);
+    return;
+  }
+
+  GraspTeleopCommand command;
+  command.u = msg->data[0];
+  command.phi = msg->data[1];
+  if (msg->data.size() == 3U) {
+    command.desired_force_n = msg->data[2];
+    command.has_desired_force = true;
+  }
+
+  if (
+    !std::isfinite(command.u) ||
+    !std::isfinite(command.phi) ||
+    (command.has_desired_force &&
+    (!std::isfinite(command.desired_force_n) || command.desired_force_n < 0.0)))
+  {
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Ignoring grasp teleop command with non-finite or negative values.");
+    return;
+  }
+
+  rt_grasp_teleop_command_ptr_.writeFromNonRT(
+    std::make_shared<GraspTeleopCommand>(command));
+}
+
+void PlatoRosController::grasp_force_reference_callback(
+  const GraspForceReferenceMsg::SharedPtr msg)
+{
+  if (!msg) {
+    return;
+  }
+
+  if (!std::isfinite(msg->data) || msg->data < 0.0) {
+    grasp_force_reference_n_.store(0.0);
+    grasp_force_reference_valid_.store(false);
+    RCLCPP_WARN_THROTTLE(
+      get_node()->get_logger(),
+      *(get_node()->get_clock()),
+      1000,
+      "Ignoring invalid grasp force reference target.");
+    return;
+  }
+
+  grasp_force_reference_n_.store(msg->data);
+}
+
+void PlatoRosController::grasp_force_reference_valid_callback(
+  const GraspForceReferenceValidMsg::SharedPtr msg)
+{
+  if (!msg) {
+    return;
+  }
+  grasp_force_reference_valid_.store(msg->data);
+}
+
+void PlatoRosController::sync_grasp_teleop_input()
+{
+  if (grasp_teleop_state_ == nullptr) {
+    return;
+  }
+
+  const auto command_ptr = rt_grasp_teleop_command_ptr_.readFromRT();
+  const bool has_command = command_ptr != nullptr && *command_ptr;
+
+  aristo_controller::state_machines::GraspTeleopInput input;
+  input.u = std::numeric_limits<double>::quiet_NaN();
+  input.phi = std::numeric_limits<double>::quiet_NaN();
+
+  bool has_explicit_force = false;
+  if (has_command) {
+    input.u = (**command_ptr).u;
+    input.phi = (**command_ptr).phi;
+    if ((**command_ptr).has_desired_force) {
+      input.desired_force_n = (**command_ptr).desired_force_n;
+      has_explicit_force = true;
+    }
+  }
+
+  if (!has_explicit_force) {
+    input.desired_force_n = grasp_force_reference_valid_.load() ?
+      grasp_force_reference_n_.load() :
+      grasp_teleop_state_->default_desired_force_n();
+  }
+
+  grasp_teleop_state_->SetInput(input);
+}
+
 plato_robot_system::sensor::NARITouchSample PlatoRosController::convert_tactile_msg(
   const std::size_t index,
   const TactileMsg & msg) const
@@ -593,6 +854,55 @@ void PlatoRosController::publish_controller_state(
   controller_state_pub_->publish(msg);
 }
 
+void PlatoRosController::request_state_callback(
+  std::shared_ptr<RequestStateSrv::Request> request,
+  std::shared_ptr<RequestStateSrv::Response> response)
+{
+  const auto requested_state_id =
+    static_cast<plato_robot_system::StateId>(request->state_id);
+  if (requested_state_id < 0) {
+    response->success = false;
+    response->message = "state_id must be nonnegative";
+    return;
+  }
+
+  const auto * fsm_handler = control_architecture_.fsmHandler();
+  const auto & states = fsm_handler->states();
+  const auto state_it = states.find(requested_state_id);
+  if (state_it == states.end() || !state_it->second) {
+    response->success = false;
+    response->message = "state_id " + std::to_string(requested_state_id) +
+      " is not registered";
+    return;
+  }
+
+  pending_requested_state_id_.store(requested_state_id);
+  response->success = true;
+  response->message = "accepted request for state_id " +
+    std::to_string(requested_state_id) + " (" + state_it->second->name() + ")";
+
+  RCLCPP_INFO(
+    get_node()->get_logger(),
+    "Accepted FSM state request: id=%d name='%s'",
+    requested_state_id,
+    state_it->second->name().c_str());
+}
+
+void PlatoRosController::apply_pending_state_request()
+{
+  const auto requested_state_id = pending_requested_state_id_.exchange(-1);
+  if (requested_state_id < 0) {
+    return;
+  }
+
+  if (!control_architecture_.RequestState(requested_state_id)) {
+    RCLCPP_ERROR(
+      get_node()->get_logger(),
+      "Queued FSM state request id %d was rejected by ControlArchitecture",
+      requested_state_id);
+  }
+}
+
 bool PlatoRosController::configure_from_control_config(
   plato_robot_system::ControlArchitecture & architecture,
   plato_robot_system::RobotSystem & robot)
@@ -630,6 +940,44 @@ bool PlatoRosController::configure_from_control_config(
       return false;
     }
     architecture.SetDriverPdGainsConfig(driver_gains);
+
+    auto idle = std::make_unique<aristo_controller::state_machines::IdleState>(
+      aristo_config.idle.id,
+      architecture.nq(),
+      architecture.nv());
+    architecture.RegisterState(std::move(idle));
+
+    auto joint_teleop_config = aristo_config.joint_teleop.state;
+    joint_teleop_config.joint_task.kp_task =
+      map_joint_values_to_model_v(aristo_config.joint_teleop.state.joint_task.kp_task);
+    joint_teleop_config.joint_task.kd_task =
+      map_joint_values_to_model_v(aristo_config.joint_teleop.state.joint_task.kd_task);
+
+    auto joint_teleop = std::make_unique<aristo_controller::state_machines::JointTeleopState>(
+      aristo_config.joint_teleop.id,
+      &robot);
+    if (!joint_teleop->ConfigureTask(joint_teleop_config)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure joint_teleop task");
+      return false;
+    }
+    joint_teleop_state_ = joint_teleop.get();
+    architecture.RegisterState(std::move(joint_teleop));
+
+    auto grasp_teleop_config = aristo_config.grasp_teleop.state;
+
+    auto grasp_teleop = std::make_unique<aristo_controller::state_machines::GraspTeleopState>(
+      aristo_config.grasp_teleop.id,
+      &robot);
+    if (!grasp_teleop->ConfigureTask(grasp_teleop_config)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure grasp_teleop task");
+      return false;
+    }
+    grasp_teleop_state_ = grasp_teleop.get();
+    architecture.RegisterState(std::move(grasp_teleop));
+
+    auto mppi_grasp = std::make_unique<aristo_controller::state_machines::MPPIGraspState>(
+      aristo_config.mppi_grasp.id);
+    architecture.RegisterState(std::move(mppi_grasp));
 
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,
@@ -730,6 +1078,51 @@ bool PlatoRosController::configure_model_joint_mapping(
     model_v_indices_.push_back(static_cast<Eigen::Index>(joint.idx_v()));
   }
   return true;
+}
+
+plato_robot_system::RobotCommand PlatoRosController::make_safe_hold_command(
+  const plato_robot_system::RobotState & state) const
+{
+  plato_robot_system::RobotCommand command;
+  command.Resize(control_architecture_.nq(), control_architecture_.nv());
+  if (!plato_robot_system::IsValid(state) ||
+    state.q.size() != command.q_cmd.size() ||
+    state.qdot.size() != command.qdot_cmd.size())
+  {
+    command.valid = false;
+    return command;
+  }
+
+  command.q_cmd = state.q;
+  command.qdot_cmd.setZero();
+  command.tau_cmd.setZero();
+  command.stamp_sec = state.time_s;
+  command.valid = true;
+  control_architecture_.FinalizeCommand(&command);
+  return command;
+}
+
+bool PlatoRosController::write_safe_hold_command(const plato_robot_system::RobotState & state)
+{
+  auto safe_command = make_safe_hold_command(state);
+  filter_command(&safe_command);
+  if (!safe_command.IsUsable()) {
+    return false;
+  }
+
+  write_command(safe_command);
+  return true;
+}
+
+void PlatoRosController::write_zero_command()
+{
+  for (std::size_t i = 0; i < joint_names_.size(); ++i) {
+    set_command_interface_value(position_command_interfaces_[i].get(), 0.0);
+    set_command_interface_value(velocity_command_interfaces_[i].get(), 0.0);
+    set_command_interface_value(effort_command_interfaces_[i].get(), 0.0);
+    set_command_interface_value(stiffness_command_interfaces_[i].get(), 0.0);
+    set_command_interface_value(damping_command_interfaces_[i].get(), 0.0);
+  }
 }
 
 Eigen::VectorXd PlatoRosController::map_joint_positions_to_model_q(

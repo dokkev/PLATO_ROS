@@ -34,11 +34,61 @@ state_machine:
         kd_task: 0.0
 
     - id: 1
-      name: hold
+      name: idle
+      stay_here: true
+
+    - id: 2
+      name: joint_teleop
       stay_here: true
       params:
+        # Float64MultiArray target joint positions are smoothed with a first-order LPF.
+        # 0 freezes the command, and 1 applies the target immediately.
+        lpf_alpha: 0.1
+
+        # Host-side task feedback gains for tau_cmd only. Driver-local gains
+        # still come from driver_gains.kp/kd during command finalization.
         kp_task: 0.0
         kd_task: 0.0
+
+    - id: 3
+      name: grasp_teleop
+      stay_here: true
+      params:
+        # Teleop input is [u, phi] or [u, phi, f]:
+        #   u   = 0 closed, 1 open
+        #   phi = posture interpolation coordinate
+        #   f   = optional desired normal force override [N]
+        #
+        # If f is omitted, plato_ros_controller uses the external
+        # /grasp_force_reference target while reference_valid is true and falls
+        # back to this default force otherwise.
+        default_u: 0.8
+        default_phi: 0.0
+        default_desired_force_n: 1.0
+
+        grasp_task:
+          # Core experiment knobs only. Less-frequently changed QP weights,
+          # contact policy, safety rates, QP damping, and geometry behavior use
+          # plato_robot_system::task::GraspTaskConfig header defaults.
+          distance_closed_m: 0.015
+          distance_open_m: 0.085
+
+          force_exit_u_threshold: 0.75
+
+          q_posture_phi0: [0.0, 0.0, 0.0, 0.0]
+          q_posture_phi1: [-0.35, -0.15, 0.35, 0.15]
+          fallback_close_axis_base: [0.0, 0.0, -1.0]
+
+          kp_tactile_fb: 0.02
+
+          # Conservative first hardware bring-up limits.
+          max_qddot_rad_s2: 5.0
+          max_velocity_rad_s: 0.5
+          max_torque_nm: 0.05
+
+    - id: 4
+      name: mppi_grasp
+      stay_here: true
 
 debug:
   enabled: false

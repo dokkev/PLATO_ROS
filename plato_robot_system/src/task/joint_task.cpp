@@ -1,7 +1,5 @@
 #include "plato_robot_system/task/joint_task.hpp"
 
-#include <limits>
-
 namespace plato_robot_system::task
 {
 
@@ -11,7 +9,6 @@ void JointTask::SetTaskFeedbackGains(
 {
   kp_task_ = kp_task;
   kd_task_ = kd_task;
-  ConfigurePidControllers();
 }
 
 bool JointTask::StartMinJerk(
@@ -30,13 +27,7 @@ bool JointTask::StartMinJerk(
   if (kd_task_.size() != state.qdot.size()) {
     kd_task_ = Eigen::VectorXd::Zero(state.qdot.size());
   }
-  if (kp_task_.size() != kd_task_.size() ||
-    static_cast<Eigen::Index>(pid_controllers_.size()) != state.qdot.size())
-  {
-    ConfigurePidControllers();
-  }
-
-  if (static_cast<Eigen::Index>(pid_controllers_.size()) != state.qdot.size()) {
+  if (kp_task_.size() != state.qdot.size() || kd_task_.size() != state.qdot.size()) {
     return false;
   }
 
@@ -57,35 +48,31 @@ bool JointTask::StartMinJerk(
 
 void JointTask::Reset()
 {
-  for (auto & controller : pid_controllers_) {
-    controller.Reset();
-  }
 }
 
-bool JointTask::BuildCommand(
+bool JointTask::PopulateCommand(
   const RobotState & state,
   const double elapsed_time_sec,
   const double dt_sec,
   RobotCommand * command) const
 {
+  (void)dt_sec;
   if (command == nullptr || !trajectory_initialized_ || !HasCompatibleState(state)) {
     return false;
   }
-  if (static_cast<Eigen::Index>(pid_controllers_.size()) != state.qdot.size()) {
+  if (kp_task_.size() != state.qdot.size() || kd_task_.size() != state.qdot.size()) {
     return false;
   }
 
   const auto & sample = trajectory_.EvaluateSample(elapsed_time_sec);
+  if (sample.value.size() != state.q.size() || sample.derivative.size() != state.qdot.size()) {
+    return false;
+  }
   command_.q_cmd = sample.value;
   command_.qdot_cmd = sample.derivative;
-  // RobotCommand.kp/kd are driver-local gains. Host-side task feedback only
-  // contributes to tau_cmd here.
-  command_.kp.setZero();
-  command_.kd.setZero();
-  for (Eigen::Index i = 0; i < command_.tau_cmd.size(); ++i) {
-    const auto error = command_.q_cmd[i] - state.q[i];
-    command_.tau_cmd[i] = pid_controllers_[static_cast<std::size_t>(i)].Compute(error, dt_sec);
-  }
+  command_.tau_cmd =
+    kp_task_.cwiseProduct(command_.q_cmd - state.q) +
+    kd_task_.cwiseProduct(command_.qdot_cmd - state.qdot);
 
   command_.stamp_sec = state.time_s;
   command_.valid = command_.HasValidDimensions() && command_.AllFinite();
@@ -95,20 +82,6 @@ bool JointTask::BuildCommand(
 
   *command = command_;
   return true;
-}
-
-void JointTask::ConfigurePidControllers()
-{
-  pid_controllers_.clear();
-  if (kp_task_.size() <= 0 || kp_task_.size() != kd_task_.size()) {
-    return;
-  }
-
-  pid_controllers_.reserve(static_cast<std::size_t>(kp_task_.size()));
-  for (Eigen::Index i = 0; i < kp_task_.size(); ++i) {
-    pid_controllers_.push_back(
-      PIDController(kp_task_[i], 0.0, kd_task_[i], 0.0, std::numeric_limits<double>::max()));
-  }
 }
 
 bool JointTask::HasCompatibleState(const RobotState & state) const

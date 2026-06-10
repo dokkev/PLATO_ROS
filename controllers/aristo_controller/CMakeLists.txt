@@ -23,7 +23,11 @@ endforeach()
 
 add_library(${PROJECT_NAME} SHARED
   src/config/aristo_config.cpp
+  src/state_machines/grasp_teleop.cpp
+  src/state_machines/idle.cpp
   src/state_machines/initialize.cpp
+  src/state_machines/joint_teleop.cpp
+  src/state_machines/mppi_grasp.cpp
 )
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -53,6 +57,22 @@ install(EXPORT ${PROJECT_NAME}Targets
   FILE ${PROJECT_NAME}Targets.cmake
   DESTINATION share/${PROJECT_NAME}/cmake
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  set(ARISTO_CONTROLLER_CONFIG_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/aristo.yaml")
+
+  ament_add_gtest(aristo_config_test
+    test/aristo_config_test.cpp
+  )
+  if(TARGET aristo_config_test)
+    target_link_libraries(aristo_config_test ${PROJECT_NAME})
+    target_compile_definitions(aristo_config_test PRIVATE
+      ARISTO_CONTROLLER_CONFIG_PATH=\"${ARISTO_CONTROLLER_CONFIG_PATH}\")
+  endif()
+endif()
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})

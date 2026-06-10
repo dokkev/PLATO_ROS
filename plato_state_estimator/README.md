@@ -1,110 +1,108 @@
-# PLATO2 State Estimator
+# PLATO State Estimator
 
-State estimation package for the PLATO2 robot system, including object state estimation and slip detection.
+This package contains small sensing helpers for PLATO/Aristo experiments.
 
-## Nodes
+## Reference Grasp Force Generator
 
-### object_state_estimator
+The executable `object_state_estimator_node` currently runs a
+`ReferenceGraspForceGeneratorNode`. The executable name is kept for temporary
+launch compatibility, but the node is not a full object-state estimator.
 
-Estimates the slip state of a grasped object using dual tactile sensors and calculates minimal grasping force to prevent slip.
+It uses two tactile sensors to publish:
 
-**Theory:**
-Based on "Theoretical Derivation and Realization of Adaptive Grasping Based on Rotational Incipient Slip Detection" by T. Narita et al., ICRA 2020.
+- a scalar target normal grasp force,
+- whether that force reference is valid,
+- measured normal-force diagnostics,
+- shear displacement diagnostics,
+- a slip diagnostic state.
 
-#### Subscribed Topics
+Task-level decisions such as closing, releasing, mode transitions, fallback
+motion, MPPI, or whole-body control belong in the controller/state-machine
+layer. This node only reports a safe reference and diagnostics.
 
-- `/tactile_0/tactile_states` ([sdr_grasp_msgs/Tactile](../../nari_touch/sdr_grasp_msgs/msg/Tactile.msg))
-  Tactile sensor data from first gripper finger
+### Subscribed Topics
 
-- `/tactile_1/tactile_states` ([sdr_grasp_msgs/Tactile](../../nari_touch/sdr_grasp_msgs/msg/Tactile.msg))
-  Tactile sensor data from second gripper finger
+- `/tactile_0/tactile_states` (`sdr_grasp_msgs/msg/Tactile`)
+- `/tactile_1/tactile_states` (`sdr_grasp_msgs/msg/Tactile`)
 
-#### Published Topics
+### Published Topics
 
-- `/object_state/minimal_force` (std_msgs/Float32)
-  Minimal normal force [N] required to prevent object slip
+- `/grasp_force_reference/target_normal_force_n` (`std_msgs/msg/Float64`)
+- `/grasp_force_reference/reference_valid` (`std_msgs/msg/Bool`)
+- `/grasp_force_reference/measured_normal_force_min_n` (`std_msgs/msg/Float64`)
+- `/grasp_force_reference/measured_normal_force_avg_n` (`std_msgs/msg/Float64`)
+- `/grasp_force_reference/shear_translation_mm` (`std_msgs/msg/Float64`)
+- `/grasp_force_reference/shear_rotation_rad` (`std_msgs/msg/Float64`)
+- `/grasp_force_reference/slip_state` (`std_msgs/msg/String`)
 
-- `/object_state/estimated_wrench` (geometry_msgs/Wrench)
-  Estimated wrench on the object including normal and tangential forces
+Deprecated compatibility topics:
 
-#### Parameters
+- `/object_state/minimal_force` (`std_msgs/msg/Float32`)
+  Publishes `target_normal_force_n` only when `reference_valid=true`.
+- `/object_state/measured_force` (`std_msgs/msg/Float64`)
+  Publishes the conservative measured normal-force minimum.
 
-##### Material Properties
-- `E_star` (double, default: 1.0e6 Pa)
-  Effective Young's modulus
+### Safety Semantics
 
-- `G_star` (double, default: 0.4e6 Pa)
-  Transverse elastic modulus
+`reference_valid` is the field a downstream force controller should trust.
 
-- `C_n` (double, default: 1.0)
-  Contact surface constant
+- No contact: `reference_valid=false`, `slip_state=NO_CONTACT`, target force is
+  `0.0` only as informational output.
+- One-sided or weak contact: `reference_valid=false`,
+  `slip_state=PARTIAL_CONTACT`. This must not be interpreted as a command to
+  track zero force.
+- Valid two-sided contact: target force is positive, clamped, and based on shear
+  magnitude and shear growth rate.
 
-- `lambda_n` (double, default: 1.0)
-  Scaling factor for 3D contact
+Measured normal force is reported as:
 
-- `n` (int, default: 2)
-  Order of contact surface (2 for quadric/hemisphere)
+- `measured_normal_force_min_n = min(f0z, f1z)` when both sensors have contact,
+- `measured_normal_force_avg_n = 0.5 * (f0z + f1z)` when both sensors have contact,
+- for one-sided contact, min is `0.0` and avg treats the missing side as zero.
 
-##### Slip Detection
-- `translational_slip_threshold` (double, default: 0.5 mm)
-  Threshold for detecting translational slip
+### Force Reference Law
 
-- `rotational_slip_threshold` (double, default: 0.05 rad)
-  Threshold for detecting rotational slip
+The generator sign-corrects raw tactile shear into a common reference frame,
+averages both sensors, then computes:
 
-##### Control
-- `update_rate` (double, default: 100.0 Hz)
-  Update frequency
+```txt
+u_trans_mm = sqrt(ux_avg^2 + uy_avg^2)
+u_rot_rad  = abs(utheta_avg)
 
-- `min_contact_force` (double, default: 0.5 N)
-  Minimum force to maintain contact
+force_increment_n =
+    k_trans_n_per_mm   * max(0, u_trans_mm - trans_deadband_mm)
+  + d_trans_n_per_mm_s * positive_trans_rate_mm_s
+  + k_rot_n_per_rad    * max(0, u_rot_rad - rot_deadband_rad)
+  + d_rot_n_per_rad_s  * positive_rot_rate_rad_s
 
-- `max_force_limit` (double, default: 30.0 N)
-  **SAFETY LIMIT** - Maximum allowed force
-
-##### PID Gains
-- `pid_tx_p`, `pid_tx_i`, `pid_tx_d` (double, default: [1.8, 0.0, 4.5])
-  PID gains for translational control
-
-- `pid_theta_p`, `pid_theta_i`, `pid_theta_d` (double, default: [30.0, 0.0, 90.0])
-  PID gains for rotational control
-
-## Implementation Details
-
-### State Machine
-
-The estimator implements a state machine to track object slip:
-
-1. **NO_CONTACT**: No sensors detect contact
-2. **PARTIAL_CONTACT**: Only one sensor detects contact (object not fully grasped)
-3. **STABLE_GRASP**: Both sensors in contact, no slip detected
-4. **TRANSLATIONAL_SLIP**: Translational slip detected
-5. **ROTATIONAL_SLIP**: Rotational slip detected
-6. **COMBINED_SLIP**: Both translational and rotational slip
-
-### Force Calculation
-
-The minimal force is calculated based on equations (12) and (14) from the Narita paper:
-
-**Translational force (Eq. 12):**
-```
-u_x = F_x / (G* * ((n+1)/(2n) * F_N/(E*C_n*λ_n))^(1/(n+1)))
+target_normal_force_n =
+    clamp(base_force_n + force_increment_n,
+          min_contact_force_n,
+          max_force_limit_n)
 ```
 
-**Rotational force (Eq. 14):**
-```
-u_θ = 3T_θ / (2G* * ((n+1)/(2n) * F_N/(E*C_n*λ_n))^(2/(n+1)))
-```
+This is shear-displacement feedback. It does not compute analytical Narita
+minimal force because tangential force and moment inputs are not available here.
 
-Where:
-- `u_x, u_y`: Translational shear displacements
-- `u_θ`: Rotational shear displacement
-- `F_N`: Normal (grasp) force
-- `T_θ`: Applied moment
+### Parameters
 
-The controller uses PID control to drive shear displacements to zero, which corresponds to preventing slip.
+See `config/object_state_estimator.yaml`.
 
-## Usage
+Important parameters:
+
+- `base_force_n`
+- `min_contact_force_n`
+- `max_force_limit_n`
+- `trans_deadband_mm`
+- `rot_deadband_rad`
+- `translational_slip_threshold_mm`
+- `rotational_slip_threshold_rad`
+- `k_trans_n_per_mm`
+- `d_trans_n_per_mm_s`
+- `k_rot_n_per_rad`
+- `d_rot_n_per_rad_s`
+- `tactile0_shear_x_sign`, `tactile0_shear_y_sign`, `tactile0_shear_theta_sign`
+- `tactile1_shear_x_sign`, `tactile1_shear_y_sign`, `tactile1_shear_theta_sign`
 
 ### Launch
 
@@ -112,50 +110,23 @@ The controller uses PID control to drive shear displacements to zero, which corr
 ros2 launch plato_state_estimator object_state_estimator.launch.py
 ```
 
-### With custom configuration
+With a custom config:
 
 ```bash
 ros2 launch plato_state_estimator object_state_estimator.launch.py \
-    config_file:=/path/to/custom_config.yaml
+  config_file:=/path/to/object_state_estimator.yaml
 ```
 
-### Monitor minimal force
+### Validation
+
+Build this package from the workspace root:
 
 ```bash
-ros2 topic echo /object_state/minimal_force
+colcon build --packages-select plato_state_estimator
 ```
 
-## Dependencies
+Run the core unit test:
 
-- `rclcpp`
-- `geometry_msgs`
-- `std_msgs`
-- `plato_utils` (PID controller)
-- `sdr_grasp_msgs` (from nari_touch package)
-
-## Integration with Grasp Controller
-
-This node publishes the minimal force needed to maintain a stable grasp. The parallel grasp controller should subscribe to `/object_state/minimal_force` and use it as the target force during dynamic manipulation.
-
-## Safety Considerations
-
-- **Always set `max_force_limit` appropriately for your gripper and objects**
-- Test with non-fragile objects first
-- Monitor the `/object_state/estimated_wrench` topic for unexpected forces
-- Tune PID gains carefully to avoid oscillations
-
-## Tuning Guide
-
-1. **Start with default PID gains** from the paper
-2. **Adjust slip thresholds** based on your sensor sensitivity:
-   - If false positives (detecting slip when stable): increase thresholds
-   - If missing slips: decrease thresholds
-3. **Tune PID gains** if force oscillates or responds slowly:
-   - Increase P for faster response
-   - Increase D to reduce oscillations
-   - Add small I term only if steady-state error exists
-4. **Validate material properties** (E*, G*) if calculated forces seem incorrect
-
-## References
-
-[1] T. Narita, S. Nagakari, W. Conus, T. Tsuboi and K. Nagasaka, "Theoretical Derivation and Realization of Adaptive Grasping Based on Rotational Incipient Slip Detection," 2020 IEEE International Conference on Robotics and Automation (ICRA), 2020, pp. 531-537.
+```bash
+./build/plato_state_estimator/reference_grasp_force_generator_test --gtest_color=no
+```

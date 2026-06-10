@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Launch file for Object State Estimator node.
+Launch file for the reference grasp force generator.
 
-This node estimates the slip state of a grasped object using two tactile sensors
-and calculates the minimal force needed to prevent slip based on the theory from:
-"Theoretical Derivation and Realization of Adaptive Grasping Based on
-Rotational Incipient Slip Detection" (T. Narita et al., ICRA 2020)
+The executable name is kept temporarily for compatibility, but the node
+publishes a scalar normal-force reference and diagnostics rather than a full
+object-state estimate.
 """
 
 import os
@@ -24,14 +23,14 @@ def generate_launch_description():
     config_file_arg = DeclareLaunchArgument(
         'config_file',
         default_value=os.path.join(pkg_dir, 'config', 'object_state_estimator.yaml'),
-        description='Full path to the configuration file'
+        description='Full path to the reference grasp force generator configuration file'
     )
 
     # Create the node
-    object_state_estimator_node = Node(
+    reference_grasp_force_generator_node = Node(
         package='plato_state_estimator',
         executable='object_state_estimator_node',
-        name='object_state_estimator',
+        name='reference_grasp_force_generator',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
         remappings=[
@@ -41,5 +40,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         config_file_arg,
-        object_state_estimator_node
+        reference_grasp_force_generator_node
     ])

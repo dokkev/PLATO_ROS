@@ -13,15 +13,6 @@
 
 namespace plato_robot_system {
 
-enum class ControlMode {
-  kIdle = 10000,
-  kHold = 10001,
-  kJointImpedance = 10002,
-  kFault = 10003,
-};
-
-const char* ControlModeName(ControlMode mode);
-
 struct ArchTimingStats {
   double model_us{0.0};
   double fsm_us{0.0};
@@ -41,30 +32,19 @@ struct DriverPdGainsConfig {
 };
 
 struct ControlArchitectureConfig {
-  bool compute_impedance_torque{false};
   DriverPdGainsConfig driver_pd_gains;
 };
 
-struct ImpedanceSetpoint {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  Eigen::VectorXd q_cmd;
-  Eigen::VectorXd qdot_cmd;
-  Eigen::VectorXd tau_ff_cmd;
-  Eigen::VectorXd kp_task;
-  Eigen::VectorXd kd_task;
-
-  void Resize(int nq, int nv = -1);
-  bool HasValidDimensions() const;
-  bool AllFinite() const;
+struct ControlState {
+  StateId current_state_id{-1};
+  StateId requested_state_id{-1};
+  bool command_valid{false};
+  std::string status{"idle"};
 };
 
-struct ControlState {
-  ControlMode mode{ControlMode::kIdle};
-  ControlMode requested_mode{ControlMode::kHold};
-  bool command_valid{false};
-  bool faulted{false};
-  std::string status{"idle"};
+struct ControlUpdateResult {
+  bool ok{false};
+  std::string reason;
 };
 
 // ControlArchitecture owns the per-tick control orchestration.
@@ -90,7 +70,7 @@ class ControlArchitecture {
   void Configure(int nq, int nv = -1);
   void SetRobot(std::shared_ptr<RobotSystem> robot);
   void Initialize();
-  void Update(const RobotState& state, double dt);
+  ControlUpdateResult Update(const RobotState& state, double dt);
 
   bool IsConfigured() const { return nq_ > 0 && nv_ > 0; }
   bool initialized() const { return initialized_; }
@@ -102,33 +82,22 @@ class ControlArchitecture {
   ControlArchitectureConfig& config() { return config_; }
 
   const ControlState& control_state() const { return control_state_; }
-  ControlMode mode() const { return control_state_.mode; }
+  StateId current_state_id() const { return control_state_.current_state_id; }
   FSMHandler* fsmHandler() { return &fsm_handler_; }
   const FSMHandler* fsmHandler() const { return &fsm_handler_; }
   const RobotCommand& command() const { return cmd_; }
   const RobotCommand& robot_command() const { return cmd_; }
 
-  void SetComputeImpedanceTorque(bool enabled);
-  bool compute_impedance_torque() const { return config_.compute_impedance_torque; }
   void SetDriverPdGainsConfig(const DriverPdGainsConfig& config);
   const DriverPdGainsConfig& driver_pd_gains_config() const {
     return config_.driver_pd_gains;
   }
 
-  void SetImpedanceSetpoint(const ImpedanceSetpoint& setpoint);
-  ImpedanceSetpoint ClampImpedanceSetpoint(const ImpedanceSetpoint& setpoint) const;
-  void ClearImpedanceSetpoint();
   void RegisterState(std::unique_ptr<State> state);
   bool SetStartState(StateId id);
   bool RequestState(StateId id);
   bool RequestState(const std::string& name);
-  void RequestMode(ControlMode mode);
-  void RequestFault(const std::string& reason);
-  void ClearFault();
-
-  ImpedanceSetpoint MakeHoldSetpoint(
-      const Eigen::Ref<const Eigen::VectorXd>& q_current) const;
-  ImpedanceSetpoint MakeZeroSetpoint() const;
+  void FinalizeCommand(RobotCommand* command) const;
 
   void setTimingEnabled(bool enabled) { timing_enabled_ = enabled; }
   bool timingEnabled() const { return timing_enabled_; }
@@ -141,14 +110,19 @@ class ControlArchitecture {
   void UpdateStateMachine(double current_time, double dt);
   StateId RequestedStateId() const;
   void UpdateControlStateFromFsm();
-  void EvaluateCommand();
-  void InitializeCommandFromRobotState();
+  void EvaluateCommand(double current_time, double dt);
 
   void Fail(const std::string& error);
-  void ApplyDriverPdGains(RobotCommand* command) const;
-  bool CheckSetpoint(
-      const ImpedanceSetpoint& setpoint,
-      const RobotState& state,
+  bool PopulateIdleCommand(double stamp_sec, RobotCommand* command) const;
+  bool SwitchToIdleAndPopulateCommand(
+      double current_time,
+      double dt,
+      RobotCommand* command);
+  bool ValidatePopulatedCommand(
+      const RobotCommand& command,
+      std::string* error) const;
+  bool ValidateFinalCommand(
+      const RobotCommand& command,
       std::string* error) const;
 
   ControlArchitectureConfig config_;
@@ -160,12 +134,9 @@ class ControlArchitecture {
   ControlState control_state_;
   FSMHandler fsm_handler_;
   bool fsm_initialized_{false};
-  StateId requested_state_id_{static_cast<StateId>(ControlMode::kHold)};
-  ImpedanceSetpoint pending_impedance_;
-  bool has_pending_impedance_{false};
+  StateId requested_state_id_{-1};
 
   RobotCommand cmd_;
-  bool command_initialized_{false};
 
   bool timing_enabled_{false};
   ArchTimingStats timing_stats_;

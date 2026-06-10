@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -10,9 +11,9 @@
 #include "plato_interfaces/srv/save_joint_position.hpp"
 #include "plato_utils/joint_position_storage.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/float64.hpp"
-#include "std_msgs/msg/float32.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 
 namespace
@@ -41,13 +42,21 @@ public:
       "/plato2/joint_states", rclcpp::SensorDataQoS(),
       std::bind(&ParallelGraspNode::joint_state_callback, this, _1));
 
-    minimal_force_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-      "/object_state/minimal_force", 10,
-      std::bind(&ParallelGraspNode::minimal_force_callback, this, _1));
+    target_normal_force_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+      "/grasp_force_reference/target_normal_force_n", 10,
+      std::bind(&ParallelGraspNode::target_normal_force_callback, this, _1));
 
-    measured_force_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-      "/object_state/measured_force", 10,
-      std::bind(&ParallelGraspNode::measured_force_callback, this, _1));
+    reference_valid_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "/grasp_force_reference/reference_valid", 10,
+      std::bind(&ParallelGraspNode::reference_valid_callback, this, _1));
+
+    measured_normal_force_min_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+      "/grasp_force_reference/measured_normal_force_min_n", 10,
+      std::bind(&ParallelGraspNode::measured_normal_force_min_callback, this, _1));
+
+    measured_normal_force_avg_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+      "/grasp_force_reference/measured_normal_force_avg_n", 10,
+      std::bind(&ParallelGraspNode::measured_normal_force_avg_callback, this, _1));
 
     position_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/plato2/joint_impedance_trajectory_controller/commands", 10);
@@ -64,8 +73,12 @@ public:
     RCLCPP_INFO(this->get_logger(), "Expecting commands: [u, phi, f] where:");
     RCLCPP_INFO(this->get_logger(), "  u   = grasp distance [0,1] (0=closed, 1=open)");
     RCLCPP_INFO(this->get_logger(), "  phi = contact angle [0,1] (0=parallel, 1=flexed)");
-    RCLCPP_INFO(this->get_logger(), "  f   = desired force (optional, activates force control when > 0)");
-    RCLCPP_INFO(this->get_logger(), "Subscribing to /object_state/minimal_force and /object_state/measured_force");
+    RCLCPP_INFO(
+      this->get_logger(),
+      "  f   = desired force (optional; omitted value uses valid grasp force reference)");
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Subscribing to /grasp_force_reference target/valid/measured force topics");
     RCLCPP_INFO(
       this->get_logger(),
       "Joint position save service available at %s/save_joint_position",
@@ -90,24 +103,53 @@ private:
     last_positions_ = positions;
   }
 
-  void minimal_force_callback(const std_msgs::msg::Float32::SharedPtr msg)
+  void target_normal_force_callback(const std_msgs::msg::Float64::SharedPtr msg)
   {
     if (msg) {
-      minimal_force_ = static_cast<double>(msg->data);
+      if (!std::isfinite(msg->data) || msg->data < 0.0) {
+        target_normal_force_n_ = 0.0;
+        reference_valid_ = false;
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 1000,
+          "Ignoring invalid target_normal_force_n reference");
+        return;
+      }
+      target_normal_force_n_ = msg->data;
       static int callback_counter = 0;
       if (++callback_counter % 100 == 0) {
-        std::cout << "[MINIMAL FORCE CALLBACK] Received: " << minimal_force_ << std::endl;
+        std::cout << "[FORCE REFERENCE CALLBACK] target_normal_force_n="
+                  << target_normal_force_n_ << std::endl;
       }
     }
   }
 
-  void measured_force_callback(const std_msgs::msg::Float64::SharedPtr msg)
+  void reference_valid_callback(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (msg) {
-      measured_force_ = msg->data;
+      reference_valid_ = msg->data;
+    }
+  }
+
+  void measured_normal_force_min_callback(const std_msgs::msg::Float64::SharedPtr msg)
+  {
+    if (msg) {
+      measured_normal_force_min_n_ = std::isfinite(msg->data) ? std::max(0.0, msg->data) : 0.0;
       static int callback_counter = 0;
       if (++callback_counter % 100 == 0) {
-        std::cout << "[MEASURED FORCE CALLBACK] Received: " << measured_force_ << std::endl;
+        std::cout << "[MEASURED FORCE CALLBACK] min_n="
+                  << measured_normal_force_min_n_ << std::endl;
+      }
+    }
+  }
+
+  void measured_normal_force_avg_callback(const std_msgs::msg::Float64::SharedPtr msg)
+  {
+    if (msg) {
+      measured_normal_force_avg_n_ = std::isfinite(msg->data) ? std::max(0.0, msg->data) : 0.0;
+      static int callback_counter = 0;
+      if (++callback_counter % 100 == 0) {
+        std::cout << "[MEASURED FORCE CALLBACK] avg_n="
+                  << measured_normal_force_avg_n_ << std::endl;
       }
     }
   }
@@ -123,8 +165,9 @@ private:
       if (msg->data.size() > 2) {
         commands[2] = msg->data[2];  // f_d: desired force (from command)
       } else {
-        // If no force command provided, use minimal_force from topic
-        commands[2] = minimal_force_;
+        // If no force command is provided, use the reference generator only
+        // when it reports that the scalar force reference is valid.
+        commands[2] = reference_valid_ ? target_normal_force_n_ : 0.0;
       }
     }
 
@@ -132,12 +175,14 @@ private:
     static int debug_counter = 0;
     if (++debug_counter % 100 == 0) {
       std::cout << "[NODE] commands=[" << commands[0] << ", " << commands[1] << ", " << commands[2]
-                << "] measured_force=" << measured_force_
-                << " minimal_force=" << minimal_force_ << std::endl;
+                << "] reference_valid=" << reference_valid_
+                << " target_normal_force_n=" << target_normal_force_n_
+                << " measured_min_n=" << measured_normal_force_min_n_
+                << " measured_avg_n=" << measured_normal_force_avg_n_ << std::endl;
     }
 
     const auto & positions = last_positions_.empty() ? zero_positions_ : last_positions_;
-    controller_.update(commands, positions, measured_force_);
+    controller_.update(commands, positions, measured_normal_force_min_n_);
     const auto & target = controller_.get_commands();
 
     std_msgs::msg::Float64MultiArray cmd_msg;
@@ -191,15 +236,19 @@ private:
   ParallelGraspController controller_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr command_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr minimal_force_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr measured_force_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_normal_force_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr reference_valid_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr measured_normal_force_min_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr measured_normal_force_avg_sub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr position_pub_;
   rclcpp::Service<plato_interfaces::srv::SaveJointPosition>::SharedPtr save_joint_position_srv_;
 
   std::vector<double> last_positions_;
   const std::vector<double> zero_positions_ = std::vector<double>(kJointNames.size(), 0.0);
-  double minimal_force_ = 0.0;
-  double measured_force_ = 0.0;
+  double target_normal_force_n_ = 0.0;
+  double measured_normal_force_min_n_ = 0.0;
+  double measured_normal_force_avg_n_ = 0.0;
+  bool reference_valid_ = false;
   std::string joint_positions_yaml_path_;
 };
 

@@ -27,6 +27,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   msg/ImpedanceCommands.msg
   msg/ImpedanceControllerState.msg
   msg/ImpedanceParams.msg
+  srv/RequestState.srv
   srv/SaveJointPosition.srv
   DEPENDENCIES trajectory_msgs
  )

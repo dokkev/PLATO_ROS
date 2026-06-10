@@ -3,9 +3,6 @@
 
 #include <Eigen/Core>
 
-#include <vector>
-
-#include "plato_robot_system/control/pid_controller.hpp"
 #include "plato_robot_system/robot/robot_system.hpp"
 #include "plato_robot_system/trajectory/interpolation.hpp"
 
@@ -25,7 +22,7 @@ public:
     double duration_sec);
 
   void Reset();
-  bool BuildCommand(
+  bool PopulateCommand(
     const RobotState & state,
     double elapsed_time_sec,
     double dt_sec,
@@ -35,14 +32,12 @@ public:
   bool active() const { return trajectory_initialized_; }
 
 private:
-  void ConfigurePidControllers();
   bool HasCompatibleState(const RobotState & state) const;
 
   Eigen::VectorXd kp_task_;
   Eigen::VectorXd kd_task_;
   mutable bool trajectory_initialized_{false};
   mutable trajectory::MinJerkCurveVec trajectory_;
-  mutable std::vector<PIDController> pid_controllers_;
   mutable RobotCommand command_;
 };
 

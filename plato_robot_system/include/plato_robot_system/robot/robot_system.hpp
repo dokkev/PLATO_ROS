@@ -87,6 +87,11 @@ inline bool IsValid(const RobotState& robot) {
 // integrates it to q_cmd/qdot_cmd, computes tau_ff_cmd with Pinocchio RNEA,
 // and stores the final host-to-driver torque as tau_cmd.
 //
+// Ownership convention:
+//   q_cmd, qdot_cmd, tau_cmd: populated by task/state/planner code.
+//   kp, kd: populated only by ControlArchitecture::FinalizeCommand().
+//           These are driver-local impedance gains, not host task gains.
+//
 // Units inside plato_robot_system are SI:
 //   q_cmd: rad or m
 //   qdot_cmd: rad/s or m/s
@@ -101,11 +106,13 @@ struct RobotCommand {
 
   bool valid{false};
 
+  // Populated by task/state/planner code.
   Eigen::VectorXd q_cmd;
   Eigen::VectorXd qdot_cmd;
-
   Eigen::VectorXd tau_cmd;
 
+  // Populated only by ControlArchitecture::FinalizeCommand().
+  // Driver-local impedance gains.
   Eigen::VectorXd kp;
   Eigen::VectorXd kd;
 

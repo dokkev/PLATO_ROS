@@ -30,7 +30,7 @@ public:
   virtual void OnEnter() {}
   virtual void OnUpdate() {}
   virtual void OnExit() {}
-  virtual bool GetCommand(RobotCommand * command) const
+  virtual bool PopulateCommand(RobotCommand * command) const
   {
     (void)command;
     return false;

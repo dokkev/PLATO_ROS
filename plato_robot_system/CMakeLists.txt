@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
+find_package(proxsuite REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/control/fsm_handler.cpp
@@ -23,6 +24,8 @@ add_library(${PROJECT_NAME} SHARED
   src/sensor/nari_touch.cpp
   src/sensor/nari_touch_adapter.cpp
   src/sensor/tactile_state.cpp
+  src/task/grasp_task.cpp
+  src/task/joint_teleop_task.cpp
   src/task/joint_task.cpp
   src/trajectory/euclidean_trajectory.cpp
   src/trajectory/interpolation.cpp
@@ -39,6 +42,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_link_libraries(${PROJECT_NAME} PUBLIC
   Eigen3::Eigen
   pinocchio::pinocchio
+  proxsuite::proxsuite
 )
 
 install(TARGETS ${PROJECT_NAME}
@@ -64,7 +68,28 @@ install(EXPORT ${PROJECT_NAME}Targets
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
+
+  set(ARISTO_GENERATED_URDF
+    "${CMAKE_CURRENT_SOURCE_DIR}/../plato_description/urdf/generated/aristo.urdf")
+
+  ament_add_gtest(grasp_task_test
+    test/grasp_task_test.cpp
+  )
+  if(TARGET grasp_task_test)
+    target_link_libraries(grasp_task_test ${PROJECT_NAME})
+    target_compile_definitions(grasp_task_test PRIVATE
+      PLATO_ROBOT_SYSTEM_ARISTO_URDF_PATH=\"${ARISTO_GENERATED_URDF}\")
+  endif()
+
+  ament_add_gtest(joint_teleop_task_test
+    test/joint_teleop_task_test.cpp
+  )
+  if(TARGET joint_teleop_task_test)
+    target_link_libraries(joint_teleop_task_test ${PROJECT_NAME})
+  endif()
+
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
@@ -72,5 +97,5 @@ endif()
 
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME}Targets HAS_LIBRARY_TARGET)
-ament_export_dependencies(eigen3_cmake_module Eigen3 pinocchio)
+ament_export_dependencies(eigen3_cmake_module Eigen3 pinocchio proxsuite)
 ament_package()

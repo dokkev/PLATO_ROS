@@ -27,7 +27,7 @@ def generate_launch_description():
     estimator_params_arg = DeclareLaunchArgument(
         'estimator_params_file',
         default_value=estimator_params_default,
-        description='Path to object state estimator configuration YAML'
+        description='Path to reference grasp force generator configuration YAML'
     )
 
     joint_impedance_trajectory_controller_launch = IncludeLaunchDescription(
@@ -45,10 +45,10 @@ def generate_launch_description():
         )
     )
 
-    object_state_estimator_node = Node(
+    reference_grasp_force_generator_node = Node(
         package='plato_state_estimator',
         executable='object_state_estimator_node',
-        name='object_state_estimator',
+        name='reference_grasp_force_generator',
         output='screen',
         parameters=[LaunchConfiguration('estimator_params_file')],
     )
@@ -64,7 +64,7 @@ def generate_launch_description():
         controller_params_arg,
         estimator_params_arg,
         tactile_launch,
-        object_state_estimator_node,
+        reference_grasp_force_generator_node,
         joint_impedance_trajectory_controller_launch,
         parallel_grasp_node,
     ])

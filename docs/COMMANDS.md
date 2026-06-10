@@ -181,7 +181,7 @@ ros2 launch plato_teleop spacemouse_twist.launch.py
 ros2 launch plato_teleop spacemouse_state_machine.launch.py
 ```
 
-Object state estimator:
+Reference grasp force generator:
 
 ```bash
 cd ~/workspace/plato_ws
@@ -239,14 +239,6 @@ ros2 topic echo /plato2/joint_states
 ros2 topic echo /plato2/joint_impedance_controller/controller_state
 ```
 
-CAN utilities:
-
-```bash
-ip -details link show can0
-candump can0
-cansend can0 123#1122334455667788
-sudo ip link set can0 down
-```
 
 ## Validation Policy
 

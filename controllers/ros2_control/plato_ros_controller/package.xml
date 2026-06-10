@@ -22,6 +22,7 @@
   <depend>plato_interfaces</depend>
   <depend>plato_robot_system</depend>
   <depend>sdr_grasp_msgs</depend>
+  <depend>std_msgs</depend>
 
   <exec_depend>controller_manager</exec_depend>
 

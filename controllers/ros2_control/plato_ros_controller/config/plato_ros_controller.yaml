@@ -15,4 +15,7 @@ plato_ros_controller:
       - joint7
       - joint8
     tactile_topics: []
-    compute_impedance_torque: false
+    joint_teleop_command_topic: "~/joint_teleop"
+    grasp_teleop_command_topic: "~/grasp_teleop_command"
+    grasp_force_reference_topic: "/grasp_force_reference/target_normal_force_n"
+    grasp_force_reference_valid_topic: "/grasp_force_reference/reference_valid"

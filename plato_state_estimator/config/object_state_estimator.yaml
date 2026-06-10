@@ -1,33 +1,31 @@
-# Configuration for Object State Estimator
-# Based on equations from "Theoretical Derivation and Realization of Adaptive Grasping"
-# T. Narita et al., ICRA 2020
+# Configuration for the slip-aware reference grasp force generator.
+#
+# This node produces a scalar normal-force reference and diagnostics from two
+# tactile sensors. It does not estimate full object state or decide task modes.
 
-object_state_estimator:
+reference_grasp_force_generator:
   ros__parameters:
-    # Material properties (example values - adjust based on your gripper/sensor)
-    E_star: 1.0e6      # Effective Young's modulus [Pa]
-    G_star: 0.4e6      # Transverse elastic modulus [Pa]
-    C_n: 1.0           # Contact surface constant
-    lambda_n: 1.0      # Scaling factor for 3D contact
-    n: 2               # Order of contact surface (2 for quadric/hemisphere)
+    update_rate: 100.0
 
-    # Slip detection thresholds
-    translational_slip_threshold: 0.1  # [mm] - tune based on sensor sensitivity
-    rotational_slip_threshold: 0.05    # [rad] - tune based on sensor sensitivity
+    base_force_n: 1.0
+    min_contact_force_n: 0.5
+    max_force_limit_n: 30.0
 
-    # Control parameters
-    update_rate: 100.0        # [Hz] Update frequency
-    min_contact_force: 0.5    # [N] Minimum force to maintain contact
-    max_force_limit: 30.0     # [N] Maximum allowed force (SAFETY LIMIT)
+    trans_deadband_mm: 0.2
+    rot_deadband_rad: 0.03
 
-    # PID gains for translational control (x and y directions)
-    # From paper recommendations: [1.8, 0.0, 4.5]
-    pid_tx_p: 1.8
-    pid_tx_i: 0.0
-    pid_tx_d: 4.5
+    translational_slip_threshold_mm: 0.5
+    rotational_slip_threshold_rad: 0.05
 
-    # PID gains for rotational control
-    # From paper recommendations: [30.0, 0.0, 90.0]
-    pid_theta_p: 10.0
-    pid_theta_i: 0.0
-    pid_theta_d: 30.0
+    k_trans_n_per_mm: 2.0
+    d_trans_n_per_mm_s: 0.05
+
+    k_rot_n_per_rad: 10.0
+    d_rot_n_per_rad_s: 0.2
+
+    tactile0_shear_x_sign: 1.0
+    tactile0_shear_y_sign: 1.0
+    tactile0_shear_theta_sign: 1.0
+    tactile1_shear_x_sign: 1.0
+    tactile1_shear_y_sign: 1.0
+    tactile1_shear_theta_sign: 1.0

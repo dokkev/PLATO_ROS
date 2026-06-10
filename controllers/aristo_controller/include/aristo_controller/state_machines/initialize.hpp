@@ -30,7 +30,7 @@ public:
 
   void OnEnter() override;
   void OnExit() override;
-  bool GetCommand(plato_robot_system::RobotCommand * command) const override;
+  bool PopulateCommand(plato_robot_system::RobotCommand * command) const override;
 
   const plato_robot_system::RobotCommand & command() const { return joint_task_.command(); }
 

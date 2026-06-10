@@ -16,17 +16,13 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sdr_grasp_msgs REQUIRED)
-find_package(plato_utils REQUIRED)
 
 # Include directories
 include_directories(include)
 
-# Build core library (uses plato_utils for PID feedback)
-add_library(object_state_estimator SHARED
-  src/object_state_estimator.cpp
-)
-ament_target_dependencies(object_state_estimator
-  plato_utils
+# Build core library
+add_library(reference_grasp_force_generator SHARED
+  src/reference_grasp_force_generator.cpp
 )
 
 # Add executables
@@ -36,19 +32,18 @@ ament_target_dependencies(contact_estimator
   geometry_msgs
   std_msgs)
 
-add_executable(object_state_estimator_node src/object_state_estimator_node.cpp)
+add_executable(object_state_estimator_node src/reference_grasp_force_generator_node.cpp)
 target_link_libraries(object_state_estimator_node
-  object_state_estimator
+  reference_grasp_force_generator
 )
 ament_target_dependencies(object_state_estimator_node
   rclcpp
   geometry_msgs
   std_msgs
-  sdr_grasp_msgs
-  plato_utils)
+  sdr_grasp_msgs)
 
 # Install library
-install(TARGETS object_state_estimator
+install(TARGETS reference_grasp_force_generator
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -71,5 +66,17 @@ install(
   DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(reference_grasp_force_generator_test
+    test/reference_grasp_force_generator_test.cpp
+  )
+  if(TARGET reference_grasp_force_generator_test)
+    target_link_libraries(reference_grasp_force_generator_test
+      reference_grasp_force_generator)
+  endif()
+endif()
 
 ament_package()

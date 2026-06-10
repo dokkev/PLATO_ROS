@@ -97,14 +97,14 @@ bool IsValidConfig(const GraspTaskConfig & config)
          IsNonnegativeFinite(config.min_contact_force_n) &&
          IsNonnegativeFinite(config.kp_task) &&
          IsNonnegativeFinite(config.kd_task) &&
-         IsNonnegativeFinite(config.align_offset_limit_m) &&
-         IsNonnegativeFinite(config.kp_align) &&
-         IsNonnegativeFinite(config.kd_align) &&
+         IsNonnegativeFinite(config.lateral_offset_limit_m) &&
+         IsNonnegativeFinite(config.kp_lateral) &&
+         IsNonnegativeFinite(config.kd_lateral) &&
          IsFinite(config.kp_tactile_fb) &&
          IsFinite(config.kd_tactile_fb) &&
          IsValidWeight(config.w_task_motion) &&
          IsValidWeight(config.w_task_tactile_mode) &&
-         IsValidWeight(config.w_align) &&
+         IsValidWeight(config.w_lateral) &&
          IsValidWeight(config.w_tactile) &&
          IsValidWeight(config.w_posture) &&
          IsNonnegativeFinite(config.damping_qp) &&
@@ -231,7 +231,7 @@ bool GraspTask::PopulateCommand(
 {
   if (command == nullptr || !HasCompatibleState(robot, state) ||
     !IsFinite(dt_sec) || dt_sec <= kMinDt ||
-    !IsFinite(input.u_close) || !IsFinite(input.u_align) ||
+    !IsFinite(input.u_close) || !IsFinite(input.u_lateral) ||
     !IsFinite(input.desired_force_n))
   {
     return false;
@@ -241,7 +241,7 @@ bool GraspTask::PopulateCommand(
   }
 
   const double u_close = Clamp(input.u_close, 0.0, 1.0);
-  const double u_align = Clamp(input.u_align, 0.0, 1.0);
+  const double u_lateral = Clamp(input.u_lateral, 0.0, 1.0);
   const double desired_force_n = std::max(0.0, input.desired_force_n);
 
   const GraspTaskGripForceEstimate estimate = EstimateGripForceFromTactile(state);
@@ -256,7 +256,7 @@ bool GraspTask::PopulateCommand(
 
   status_.mode = mode_;
   status_.u_close = u_close;
-  status_.u_align = u_align;
+  status_.u_lateral = u_lateral;
   status_.desired_force_n = desired_force_n;
   status_.measured_force_n = estimate.measured_force_n;
   status_.force_enter_counter = force_enter_counter_;
@@ -265,7 +265,7 @@ bool GraspTask::PopulateCommand(
 
   GraspTaskCommand clamped_input;
   clamped_input.u_close = u_close;
-  clamped_input.u_align = u_align;
+  clamped_input.u_lateral = u_lateral;
   clamped_input.desired_force_n = desired_force_n;
 
   Eigen::VectorXd qddot_active;
@@ -310,7 +310,7 @@ bool GraspTask::CaptureEntryGeometry(RobotSystem & robot)
     if (!NormalizeVector(
         kFingerMotionPlaneNormalBase.cross(close_axis_base_),
         config_.min_axis_distance_m,
-        &align_axis_base_))
+        &lateral_axis_base_))
     {
       return false;
     }
@@ -468,7 +468,7 @@ bool GraspTask::SolveActiveAcceleration(
   const Eigen::Vector3d r = p_b - p_a;
   const Eigen::MatrixXd j_r = RestrictToActiveVelocityColumns(j_b_full - j_a_full);
   const Eigen::RowVectorXd j_task = close_axis_base_.transpose() * j_r;
-  const Eigen::RowVectorXd j_align = align_axis_base_.transpose() * j_r;
+  const Eigen::RowVectorXd j_lateral = lateral_axis_base_.transpose() * j_r;
 
   Eigen::VectorXd q_active(active_dof_);
   Eigen::VectorXd qdot_active(active_dof_);
@@ -485,19 +485,19 @@ bool GraspTask::SolveActiveAcceleration(
     input.u_close * (config_.distance_open_m - config_.distance_closed_m);
   const double d = close_axis_base_.dot(r);
   const double d_dot = (j_task * qdot_active)(0);
-  const double distance_error = d - d_des;
+  const double close_error = d - d_des;
   const double d_ddot_task_des =
-    -config_.kp_task * distance_error - config_.kd_task * d_dot;
-  status_.distance_error_m = distance_error;
+    -config_.kp_task * close_error - config_.kd_task * d_dot;
+  status_.close_error_m = close_error;
 
-  const double align_des =
-    (2.0 * input.u_align - 1.0) * config_.align_offset_limit_m;
-  const double align = align_axis_base_.dot(r);
-  const double align_dot = (j_align * qdot_active)(0);
-  const double align_error = align - align_des;
-  const double align_ddot_des =
-    -config_.kp_align * align_error - config_.kd_align * align_dot;
-  status_.align_error_m = align_error;
+  const double lateral_des =
+    (2.0 * input.u_lateral - 1.0) * config_.lateral_offset_limit_m;
+  const double lateral = lateral_axis_base_.dot(r);
+  const double lateral_dot = (j_lateral * qdot_active)(0);
+  const double lateral_error = lateral - lateral_des;
+  const double lateral_ddot_des =
+    -config_.kp_lateral * lateral_error - config_.kd_lateral * lateral_dot;
+  status_.lateral_error_m = lateral_error;
 
   double d_ddot_tactile_des = 0.0;
   double w_tactile_effective = 0.0;
@@ -534,10 +534,10 @@ bool GraspTask::SolveActiveAcceleration(
     ++row;
   }
 
-  if (config_.w_align > 0.0) {
-    const double weight = std::sqrt(config_.w_align);
-    a.row(row) = weight * j_align;
-    b[row] = weight * align_ddot_des;
+  if (config_.w_lateral > 0.0) {
+    const double weight = std::sqrt(config_.w_lateral);
+    a.row(row) = weight * j_lateral;
+    b[row] = weight * lateral_ddot_des;
     ++row;
   }
 

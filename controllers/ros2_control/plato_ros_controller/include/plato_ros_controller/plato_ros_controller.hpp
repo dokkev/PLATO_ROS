@@ -75,8 +75,8 @@ private:
   using JointTeleopMsg = std_msgs::msg::Float64MultiArray;
   struct GraspTeleopCommand
   {
-    double u{1.0};
-    double phi{0.0};
+    double u_close{1.0};
+    double u_lateral{0.5};
     double desired_force_n{0.0};
     bool has_desired_force{false};
   };

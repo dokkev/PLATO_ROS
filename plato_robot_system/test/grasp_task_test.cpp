@@ -58,6 +58,12 @@ double ContactAxisDistance(
   return axis_world.dot(ContactVector(robot));
 }
 
+Eigen::Vector3d ContactLateralAxis(const Eigen::Vector3d & close_axis_world)
+{
+  const Eigen::Vector3d motion_plane_normal{0.0, 1.0, 0.0};
+  return motion_plane_normal.cross(close_axis_world).normalized();
+}
+
 std::vector<int> ActiveVelocityIndices(const pinocchio::Model & model)
 {
   std::vector<int> indices;
@@ -126,12 +132,15 @@ plato_robot_system::task::GraspTaskConfig MakeTaskConfig(
   config.use_tactile_presence_for_contact = true;
   config.kp_task = 80.0;
   config.kd_task = 2.0;
-  config.q_posture_phi0 = Eigen::VectorXd::Zero(4);
-  config.q_posture_phi1 = Eigen::VectorXd::Zero(4);
+  config.lateral_offset_limit_m = 0.02;
+  config.kp_lateral = 80.0;
+  config.kd_lateral = 2.0;
+  config.q_posture = Eigen::VectorXd::Zero(4);
   config.kp_tactile_fb = 0.1;
   config.kd_tactile_fb = 0.0;
   config.w_task_motion = 100.0;
   config.w_task_tactile_mode = 1.0;
+  config.w_lateral = 100.0;
   config.w_tactile = 100.0;
   config.w_posture = 0.01;
   config.damping_qp = 1.0e-6;
@@ -215,8 +224,8 @@ TEST(GraspTaskTest, OpeningInputProducesSaneCommandAndIncreasesContactDistance)
   ASSERT_TRUE(task.OnEnter(robot, state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u = 1.0;
-  input.phi = 0.25;
+  input.u_close = 1.0;
+  input.u_lateral = 0.5;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
@@ -231,6 +240,46 @@ TEST(GraspTaskTest, OpeningInputProducesSaneCommandAndIncreasesContactDistance)
     state.time_s + kDtSec);
   robot.UpdateKinematics();
   EXPECT_GT(ContactAxisDistance(&robot, entry_axis), entry_distance + 1.0e-8);
+}
+
+TEST(GraspTaskTest, LateralInputProducesSaneCommandAndMovesContactOffset)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  const auto state = robot.state();
+  const Eigen::Vector3d entry_contact_vector = ContactVector(&robot);
+  ASSERT_GT(entry_contact_vector.norm(), 1.0e-6);
+  const Eigen::Vector3d close_axis = entry_contact_vector.normalized();
+  const Eigen::Vector3d lateral_axis = ContactLateralAxis(close_axis);
+  ASSERT_TRUE(lateral_axis.allFinite());
+  const double entry_distance = ContactAxisDistance(&robot, close_axis);
+  const double entry_lateral_offset = ContactAxisDistance(&robot, lateral_axis);
+
+  plato_robot_system::task::GraspTask task;
+  ASSERT_TRUE(task.Configure(robot.model(), MakeTaskConfig(entry_distance)));
+  ASSERT_TRUE(task.OnEnter(robot, state));
+
+  plato_robot_system::task::GraspTaskCommand input;
+  input.u_close = 0.5;
+  input.u_lateral = 1.0;
+  input.desired_force_n = 1.0;
+
+  plato_robot_system::RobotCommand command;
+  ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
+  EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
+  EXPECT_LT(task.status().lateral_error_m, 0.0);
+  ExpectSaneActiveOnlyCommand(robot, state, command);
+
+  robot.UpdateState(
+    command.q_cmd,
+    Eigen::VectorXd::Zero(robot.nv()),
+    Eigen::VectorXd::Zero(robot.nv()),
+    state.time_s + kDtSec);
+  robot.UpdateKinematics();
+  EXPECT_GT(
+    ContactAxisDistance(&robot, lateral_axis),
+    entry_lateral_offset + 1.0e-8);
 }
 
 TEST(GraspTaskTest, RejectsDegenerateFallbackCloseAxis)
@@ -261,8 +310,8 @@ TEST(GraspTaskTest, EnoughContactEnablesForceTrackingAndKeepsCommandSane)
   ASSERT_TRUE(task.OnEnter(robot, state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u = 0.2;
-  input.phi = 0.5;
+  input.u_close = 0.2;
+  input.u_lateral = 0.5;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
@@ -289,8 +338,8 @@ TEST(GraspTaskTest, InvalidTactileDuringForceTrackingFallsBackToMotionTeleop)
   ASSERT_TRUE(task.OnEnter(robot, contact_state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u = 0.2;
-  input.phi = 0.5;
+  input.u_close = 0.2;
+  input.u_lateral = 0.5;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
@@ -323,15 +372,15 @@ TEST(GraspTaskTest, OpeningCommandExitsForceTracking)
   ASSERT_TRUE(task.OnEnter(robot, state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u = 0.2;
-  input.phi = 0.5;
+  input.u_close = 0.2;
+  input.u_lateral = 0.5;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
   ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
   ASSERT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kForceTracking);
 
-  input.u = 1.0;
+  input.u_close = 1.0;
   ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
   EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
   ExpectSaneActiveOnlyCommand(robot, state, command);

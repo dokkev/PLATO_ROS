@@ -9,8 +9,8 @@ namespace aristo_controller::state_machines
 
 struct GraspTeleopInput
 {
-  double u{1.0};
-  double phi{0.0};
+  double u_close{1.0};
+  double u_lateral{0.5};
   double desired_force_n{1.0};
 };
 
@@ -18,8 +18,8 @@ struct GraspTeleopStateConfig
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  double default_u{1.0};
-  double default_phi{0.0};
+  double default_u_close{1.0};
+  double default_u_lateral{0.5};
   double default_desired_force_n{1.0};
 
   plato_robot_system::task::GraspTaskConfig grasp_task;

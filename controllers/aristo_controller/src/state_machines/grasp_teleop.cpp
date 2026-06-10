@@ -36,7 +36,7 @@ bool GraspTeleopState::ConfigureTask(
     return false;
   }
   if (
-    !IsFinite(config.default_u) || !IsFinite(config.default_phi) ||
+    !IsFinite(config.default_u_close) || !IsFinite(config.default_u_lateral) ||
     !IsFinite(config.default_desired_force_n))
   {
     task_configured_ = false;
@@ -50,8 +50,8 @@ bool GraspTeleopState::ConfigureTask(
   }
 
   config_ = config;
-  input_.u = std::clamp(config_.default_u, 0.0, 1.0);
-  input_.phi = std::clamp(config_.default_phi, 0.0, 1.0);
+  input_.u_close = std::clamp(config_.default_u_close, 0.0, 1.0);
+  input_.u_lateral = std::clamp(config_.default_u_lateral, 0.0, 1.0);
   input_.desired_force_n = std::max(0.0, config_.default_desired_force_n);
   task_configured_ = true;
   task_entered_ = false;
@@ -60,11 +60,11 @@ bool GraspTeleopState::ConfigureTask(
 
 void GraspTeleopState::SetInput(const GraspTeleopInput & input)
 {
-  if (IsFinite(input.u)) {
-    input_.u = std::clamp(input.u, 0.0, 1.0);
+  if (IsFinite(input.u_close)) {
+    input_.u_close = std::clamp(input.u_close, 0.0, 1.0);
   }
-  if (IsFinite(input.phi)) {
-    input_.phi = std::clamp(input.phi, 0.0, 1.0);
+  if (IsFinite(input.u_lateral)) {
+    input_.u_lateral = std::clamp(input.u_lateral, 0.0, 1.0);
   }
   if (IsFinite(input.desired_force_n)) {
     input_.desired_force_n = std::max(0.0, input.desired_force_n);
@@ -77,8 +77,8 @@ void GraspTeleopState::OnEnter()
   if (!task_configured_ || robot_ == nullptr || !robot_->hasState()) {
     return;
   }
-  input_.u = std::clamp(config_.default_u, 0.0, 1.0);
-  input_.phi = std::clamp(config_.default_phi, 0.0, 1.0);
+  input_.u_close = std::clamp(config_.default_u_close, 0.0, 1.0);
+  input_.u_lateral = std::clamp(config_.default_u_lateral, 0.0, 1.0);
   input_.desired_force_n = std::max(0.0, config_.default_desired_force_n);
   task_entered_ = grasp_task_.OnEnter(*robot_, robot_->state());
 }
@@ -99,8 +99,8 @@ bool GraspTeleopState::PopulateCommand(plato_robot_system::RobotCommand * comman
   const GraspTeleopInput input = input_;
 
   plato_robot_system::task::GraspTaskCommand task_command;
-  task_command.u = input.u;
-  task_command.phi = input.phi;
+  task_command.u_close = input.u_close;
+  task_command.u_lateral = input.u_lateral;
   task_command.desired_force_n = input.desired_force_n;
   return grasp_task_.PopulateCommand(
     *robot_,

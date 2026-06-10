@@ -54,16 +54,16 @@ state_machine:
       name: grasp_teleop
       stay_here: true
       params:
-        # Teleop input is [u, phi] or [u, phi, f]:
-        #   u   = 0 closed, 1 open
-        #   phi = posture interpolation coordinate
-        #   f   = optional desired normal force override [N]
+        # Teleop input is [u_close, u_lateral] or [u_close, u_lateral, f]:
+        #   u_close   = 0 closed, 1 open
+        #   u_lateral = 0.5 centered contact points, 0/1 lateral offsets
+        #   f         = optional desired normal force override [N]
         #
         # If f is omitted, plato_ros_controller uses the external
         # /grasp_force_reference target while reference_valid is true and falls
         # back to this default force otherwise.
-        default_u: 0.8
-        default_phi: 0.0
+        default_u_close: 0.8
+        default_u_lateral: 0.5
         default_desired_force_n: 1.0
 
         grasp_task:
@@ -72,14 +72,17 @@ state_machine:
           # plato_robot_system::task::GraspTaskConfig header defaults.
           distance_closed_m: 0.015
           distance_open_m: 0.085
+          lateral_offset_limit_m: 0.02
 
           force_exit_u_threshold: 0.75
 
-          q_posture_phi0: [0.0, 0.0, 0.0, 0.0]
-          q_posture_phi1: [-0.35, -0.15, 0.35, 0.15]
+          q_posture: [0.0, 0.0, 0.0, 0.0]
           fallback_close_axis_base: [0.0, 0.0, -1.0]
 
+          kp_lateral: 20.0
+          kd_lateral: 2.0
           kp_tactile_fb: 0.02
+          w_lateral: 5.0
 
           # Conservative first hardware bring-up limits.
           max_qddot_rad_s2: 5.0

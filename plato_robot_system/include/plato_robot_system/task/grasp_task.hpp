@@ -50,11 +50,11 @@ struct GraspTaskConfig
   double kp_task{20.0};
   double kd_task{2.0};
 
-  // Host-side in-plane contact-point alignment task. u_y=0.5 requests zero
-  // lateral offset; u_y=0/1 request +/- y_offset_limit_m.
-  double y_offset_limit_m{0.02};
-  double kp_y{20.0};
-  double kd_y{2.0};
+  // Host-side in-plane contact-point alignment task. u_lateral=0.5 requests zero
+  // lateral offset; u_lateral=0/1 request +/- lateral_offset_limit_m.
+  double lateral_offset_limit_m{0.02};
+  double kp_lateral{20.0};
+  double kd_lateral{2.0};
 
   Eigen::VectorXd q_posture;
 
@@ -66,7 +66,7 @@ struct GraspTaskConfig
 
   double w_task_motion{5.0};
   double w_task_tactile_mode{0.5};
-  double w_y{5.0};
+  double w_lateral{5.0};
   double w_tactile{10.0};
   double w_posture{0.05};
   double damping_qp{1.0e-5};
@@ -83,8 +83,8 @@ struct GraspTaskConfig
 
 struct GraspTaskCommand
 {
-  double u_x{1.0};
-  double u_y{0.5};
+  double u_close{1.0};
+  double u_lateral{0.5};
   double desired_force_n{1.0};
 };
 
@@ -105,14 +105,14 @@ struct GraspTaskStatus
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   GraspTaskMode mode{GraspTaskMode::kMotionTeleop};
-  double u_x{1.0};
-  double u_y{0.5};
+  double u_close{1.0};
+  double u_lateral{0.5};
   double desired_force_n{1.0};
   double measured_force_n{0.0};
   int force_enter_counter{0};
   int force_exit_contact_lost_counter{0};
-  double x_error_m{0.0};
-  double y_error_m{0.0};
+  double close_error_m{0.0};
+  double lateral_error_m{0.0};
   double force_error_n{0.0};
   bool qp_solved{false};
   Eigen::VectorXd qddot_active;
@@ -185,7 +185,7 @@ private:
   std::array<int, kThumbIndexActiveJoints.size()> active_v_indices_{};
 
   Eigen::Vector3d close_axis_base_{0.0, 0.0, -1.0};
-  Eigen::Vector3d align_axis_base_{1.0, 0.0, 0.0};
+  Eigen::Vector3d lateral_axis_base_{1.0, 0.0, 0.0};
   bool has_entry_geometry_{false};
 
   std::unique_ptr<proxsuite::proxqp::dense::QP<double>> qp_;

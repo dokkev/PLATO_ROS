@@ -138,10 +138,8 @@ plato_robot_system::task::GraspTaskConfig parse_grasp_task_config(
   config.force_exit_u_threshold =
     optional_scalar<double>(
       params, "force_exit_u_threshold", config.force_exit_u_threshold);
-  config.q_posture_phi0 =
-    parse_vector_or_scalar(params, "q_posture_phi0", active_dof, 0.0);
-  config.q_posture_phi1 =
-    parse_vector_or_scalar(params, "q_posture_phi1", active_dof, 0.0);
+  config.q_posture =
+    parse_vector_or_scalar(params, "q_posture", active_dof, 0.0);
   config.fallback_close_axis_base =
     parse_vector3_or_scalar(
       params, "fallback_close_axis_base", config.fallback_close_axis_base);
@@ -149,6 +147,13 @@ plato_robot_system::task::GraspTaskConfig parse_grasp_task_config(
     optional_scalar<double>(params, "kp_task", config.kp_task);
   config.kd_task =
     optional_scalar<double>(params, "kd_task", config.kd_task);
+  config.lateral_offset_limit_m =
+    optional_scalar<double>(
+      params, "lateral_offset_limit_m", config.lateral_offset_limit_m);
+  config.kp_lateral =
+    optional_scalar<double>(params, "kp_lateral", config.kp_lateral);
+  config.kd_lateral =
+    optional_scalar<double>(params, "kd_lateral", config.kd_lateral);
   config.kp_tactile_fb =
     optional_scalar<double>(params, "kp_tactile_fb", config.kp_tactile_fb);
   config.kd_tactile_fb =
@@ -157,6 +162,8 @@ plato_robot_system::task::GraspTaskConfig parse_grasp_task_config(
     optional_scalar<double>(params, "w_task_motion", config.w_task_motion);
   config.w_task_tactile_mode =
     optional_scalar<double>(params, "w_task_tactile_mode", config.w_task_tactile_mode);
+  config.w_lateral =
+    optional_scalar<double>(params, "w_lateral", config.w_lateral);
   config.w_tactile =
     optional_scalar<double>(params, "w_tactile", config.w_tactile);
   config.w_posture =
@@ -178,8 +185,10 @@ aristo_controller::state_machines::GraspTeleopStateConfig parse_grasp_teleop_sta
 {
   aristo_controller::state_machines::GraspTeleopStateConfig config;
 
-  config.default_u = optional_scalar<double>(params, "default_u", config.default_u);
-  config.default_phi = optional_scalar<double>(params, "default_phi", config.default_phi);
+  config.default_u_close =
+    optional_scalar<double>(params, "default_u_close", config.default_u_close);
+  config.default_u_lateral =
+    optional_scalar<double>(params, "default_u_lateral", config.default_u_lateral);
   config.default_desired_force_n =
     optional_scalar<double>(
       params, "default_desired_force_n", config.default_desired_force_n);

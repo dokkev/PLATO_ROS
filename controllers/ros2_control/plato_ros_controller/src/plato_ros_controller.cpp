@@ -90,7 +90,7 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
   auto_declare<std::vector<std::string>>("joints", std::vector<std::string>{});
   auto_declare<std::vector<std::string>>("tactile_topics", default_tactile_topics());
   auto_declare<std::string>("joint_teleop_command_topic", "~/joint_teleop");
-  auto_declare<std::string>("grasp_teleop_command_topic", "~/grasp_teleop_command");
+  auto_declare<std::string>("grasp_teleop_command_topic", "~/grasp_teleop");
   auto_declare<std::string>(
     "grasp_force_reference_topic",
     "/grasp_force_reference/target_normal_force_n");
@@ -664,22 +664,22 @@ void PlatoRosController::grasp_teleop_command_callback(
       get_node()->get_logger(),
       *(get_node()->get_clock()),
       1000,
-      "Ignoring grasp teleop command with %zu values; expected [u, phi] or [u, phi, f].",
+      "Ignoring grasp teleop command with %zu values; expected [u_close, u_lateral] or [u_close, u_lateral, f].",
       size);
     return;
   }
 
   GraspTeleopCommand command;
-  command.u = msg->data[0];
-  command.phi = msg->data[1];
+  command.u_close = msg->data[0];
+  command.u_lateral = msg->data[1];
   if (msg->data.size() == 3U) {
     command.desired_force_n = msg->data[2];
     command.has_desired_force = true;
   }
 
   if (
-    !std::isfinite(command.u) ||
-    !std::isfinite(command.phi) ||
+    !std::isfinite(command.u_close) ||
+    !std::isfinite(command.u_lateral) ||
     (command.has_desired_force &&
     (!std::isfinite(command.desired_force_n) || command.desired_force_n < 0.0)))
   {
@@ -735,13 +735,13 @@ void PlatoRosController::sync_grasp_teleop_input()
   const bool has_command = command_ptr != nullptr && *command_ptr;
 
   aristo_controller::state_machines::GraspTeleopInput input;
-  input.u = std::numeric_limits<double>::quiet_NaN();
-  input.phi = std::numeric_limits<double>::quiet_NaN();
+  input.u_close = std::numeric_limits<double>::quiet_NaN();
+  input.u_lateral = std::numeric_limits<double>::quiet_NaN();
 
   bool has_explicit_force = false;
   if (has_command) {
-    input.u = (**command_ptr).u;
-    input.phi = (**command_ptr).phi;
+    input.u_close = (**command_ptr).u_close;
+    input.u_lateral = (**command_ptr).u_lateral;
     if ((**command_ptr).has_desired_force) {
       input.desired_force_n = (**command_ptr).desired_force_n;
       has_explicit_force = true;

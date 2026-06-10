@@ -37,7 +37,7 @@ plato2:
         - /tactile_0/tactile_states
         - /tactile_1/tactile_states
       joint_teleop_command_topic: /plato2/aristo_controller/joint_teleop
-      grasp_teleop_command_topic: /plato2/parallel_grasp_controller/commands
+      grasp_teleop_command_topic: /plato2/aristo_controller/grasp_teleop
       grasp_force_reference_topic: /grasp_force_reference/target_normal_force_n
       grasp_force_reference_valid_topic: /grasp_force_reference/reference_valid
       control_config_yaml_path: "package://aristo_controller/config/aristo.yaml"

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
+#include <pinocchio/spatial/motion.hpp>
 #include <pinocchio/spatial/se3.hpp>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,8 @@ using TactileSensorVector =
 // Robot state container.
 //
 // RobotState is module-agnostic.
+// Units inside plato_robot_system are SI: q is rad or m, qdot is rad/s or m/s,
+// and tau is Nm or N.
 //
 // For real robot feedback:
 //   q/qdot/tau are the accepted current values for this control tick.
@@ -84,6 +87,13 @@ inline bool IsValid(const RobotState& robot) {
 // integrates it to q_cmd/qdot_cmd, computes tau_ff_cmd with Pinocchio RNEA,
 // and stores the final host-to-driver torque as tau_cmd.
 //
+// Units inside plato_robot_system are SI:
+//   q_cmd: rad or m
+//   qdot_cmd: rad/s or m/s
+//   tau_cmd: Nm or N
+//   kp: Nm/rad or N/m
+//   kd: Nm/(rad/s) or N/(m/s)
+//
 // The embedded driver may internally apply:
 //   tau_driver = tau_cmd + kp * (q_cmd - q) + kd * (qdot_cmd - qdot).
 struct RobotCommand {
@@ -143,15 +153,13 @@ struct RobotCommand {
 };
 
 inline RobotCommand MakeZeroHoldRobotCommand(
-    const Eigen::VectorXd& q_current, const Eigen::VectorXd& qdot_current,
-    const Eigen::VectorXd& kp_hold, const Eigen::VectorXd& kd_hold) {
+    const Eigen::VectorXd& q_current, const Eigen::VectorXd& qdot_current) {
   RobotCommand command;
   command.Resize(static_cast<int>(q_current.size()),
                  static_cast<int>(qdot_current.size()));
   command.q_cmd = q_current;
   command.qdot_cmd.setZero();
-  command.kp = kp_hold;
-  command.kd = kd_hold;
+  // Driver-local gains are attached during controller command finalization.
   command.valid = command.HasValidDimensions() && command.AllFinite() &&
                   qdot_current.allFinite();
   return command;
@@ -217,14 +225,34 @@ class RobotSystem {
 
   void ComputeAllTerms();
   void UpdateKinematics();
+  Eigen::VectorXd InverseDynamics(
+      const Eigen::Ref<const Eigen::VectorXd>& q,
+      const Eigen::Ref<const Eigen::VectorXd>& qdot,
+      const Eigen::Ref<const Eigen::VectorXd>& qddot);
+  Eigen::VectorXd Gravity(const Eigen::Ref<const Eigen::VectorXd>& q);
+  Eigen::MatrixXd MassMatrix(const Eigen::Ref<const Eigen::VectorXd>& q);
+  Eigen::VectorXd NonlinearEffects(
+      const Eigen::Ref<const Eigen::VectorXd>& q,
+      const Eigen::Ref<const Eigen::VectorXd>& qdot);
 
   pinocchio::FrameIndex FrameId(const std::string& frame_name) const;
+  pinocchio::SE3 FramePose(pinocchio::FrameIndex frame_id) const;
   pinocchio::SE3 FramePoseWorld(const std::string& frame_name) const;
   pinocchio::SE3 FramePoseWorld(pinocchio::FrameIndex frame_id) const;
+  pinocchio::Motion FrameVelocity(
+      pinocchio::FrameIndex frame_id,
+      pinocchio::ReferenceFrame reference_frame = pinocchio::LOCAL_WORLD_ALIGNED);
+  Eigen::Matrix<double, 6, Eigen::Dynamic> FrameJacobian(
+      pinocchio::FrameIndex frame_id,
+      pinocchio::ReferenceFrame reference_frame);
+  // Backward-compatible helper: returns a LOCAL_WORLD_ALIGNED frame Jacobian.
   Eigen::Matrix<double, 6, Eigen::Dynamic> FrameJacobianWorld(
       const std::string& frame_name);
   Eigen::Matrix<double, 6, Eigen::Dynamic> FrameJacobianWorld(
       pinocchio::FrameIndex frame_id);
+  Eigen::Matrix<double, 3, Eigen::Dynamic> PointJacobianWorld(
+      pinocchio::FrameIndex frame_id,
+      const Eigen::Ref<const Eigen::Vector3d>& point_in_frame);
 
  private:
   void ResetStateToNeutral();

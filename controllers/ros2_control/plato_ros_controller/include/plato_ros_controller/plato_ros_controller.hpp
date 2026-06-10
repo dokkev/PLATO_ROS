@@ -5,12 +5,14 @@
 
 #include <array>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
 #include "controller_interface/controller_interface.hpp"
 #include "aristo_controller/config/aristo_config.hpp"
 #include "hardware_interface/loaned_command_interface.hpp"
+#include "hardware_interface/loaned_state_interface.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
 #include "plato_robot_system/sensor/nari_touch.hpp"
 #include "plato_interfaces/msg/impedance_controller_state.hpp"
@@ -60,6 +62,7 @@ private:
     "index_distal_tactile"};
 
   void read_state_interfaces();
+  bool assign_state_interfaces();
   bool assign_command_interfaces();
   TactileSensorVector current_tactile_sensors();
   void tactile_callback(std::size_t index, const TactileMsg::SharedPtr msg);
@@ -75,6 +78,12 @@ private:
   bool configure_from_control_config(
     plato_robot_system::ControlArchitecture & architecture,
     plato_robot_system::RobotSystem & robot);
+  void configure_identity_joint_mapping(std::size_t num_joints);
+  bool configure_model_joint_mapping(const plato_robot_system::RobotSystem & robot);
+  Eigen::VectorXd map_joint_positions_to_model_q(
+    const Eigen::VectorXd & joint_positions,
+    const plato_robot_system::RobotSystem & robot) const;
+  Eigen::VectorXd map_joint_values_to_model_v(const Eigen::VectorXd & joint_values) const;
   void write_command(const plato_robot_system::RobotCommand & command);
 
   std::vector<std::string> joint_names_;
@@ -86,6 +95,19 @@ private:
   std::vector<double> positions_;
   std::vector<double> velocities_;
   std::vector<double> efforts_;
+  std::vector<Eigen::Index> model_q_indices_;
+  std::vector<Eigen::Index> model_v_indices_;
+  Eigen::VectorXd model_q_;
+  Eigen::VectorXd model_qdot_;
+  Eigen::VectorXd model_tau_;
+  plato_robot_system::RobotCommand filtered_command_;
+
+  std::vector<std::reference_wrapper<hardware_interface::LoanedStateInterface>>
+    position_state_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedStateInterface>>
+    velocity_state_interfaces_;
+  std::vector<std::reference_wrapper<hardware_interface::LoanedStateInterface>>
+    effort_state_interfaces_;
 
   std::vector<std::reference_wrapper<hardware_interface::LoanedCommandInterface>>
     position_command_interfaces_;
@@ -106,6 +128,7 @@ private:
   rclcpp::Publisher<plato_interfaces::msg::ImpedanceControllerState>::SharedPtr
     controller_state_pub_;
   std::vector<rclcpp::Subscription<TactileMsg>::SharedPtr> tactile_subs_;
+  std::mutex nari_touch_mutex_;
   std::vector<plato_robot_system::sensor::NARITouch> nari_touch_;
   std::vector<bool> tactile_stream_seen_;
 };

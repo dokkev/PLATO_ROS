@@ -263,6 +263,9 @@ tau_k = model torque / effort proxy
 ```
 
 The rollout does not simulate embedded driver impedance control.
+MPPI does not tune or populate `RobotCommand.kp` or `RobotCommand.kd`;
+driver-local gains are copied from controller `driver_gains` during command
+finalization outside the planner.
 
 The embedded driver may later apply:
 
@@ -604,8 +607,8 @@ qddot_sol
   -> tau_ff_cmd
 
 optional host-side feedback:
-  tau_fb_cmd = kp_fb * (q_cmd - q)
-             + kd_fb * (qdot_cmd - qdot)
+  tau_fb_cmd = kp_task * (q_cmd - q)
+             + kd_task * (qdot_cmd - qdot)
 
 final driver torque:
   tau_cmd = tau_ff_cmd + tau_fb_cmd
@@ -625,7 +628,7 @@ Here:
 
 ```txt
 kp, kd       = driver-local impedance gains
-kp_fb, kd_fb = host-side feedback gains
+kp_task, kd_task = host-side task feedback gains
 ```
 
 Do not mix these two gain layers.

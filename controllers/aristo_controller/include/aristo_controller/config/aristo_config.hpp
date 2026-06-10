@@ -16,15 +16,23 @@ struct InitializeConfig
   plato_robot_system::StateId id{0};
   double duration_sec{2.0};
   Eigen::VectorXd target_jpos;
-  Eigen::VectorXd kp;
-  Eigen::VectorXd kd;
+  Eigen::VectorXd kp_task;
+  Eigen::VectorXd kd_task;
+};
+
+struct RobotModelConfig
+{
+  std::string urdf_path;
+  bool is_floating_base{false};
+  std::string base_frame;
+  bool fixed_thumb{false};
 };
 
 struct AristoConfig
 {
   int num_joints{8};
-  bool fixed_thumb{false};
   bool debug_enabled{false};
+  RobotModelConfig robot_model;
   plato_robot_system::DriverPdGainsConfig driver_gains;
   InitializeConfig initialize;
 };

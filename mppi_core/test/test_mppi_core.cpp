@@ -376,19 +376,16 @@ TEST(RobotCommandTest, ResizeAndValidationSupportNqNvSplit) {
 TEST(RobotCommandTest, ZeroHoldAndInvalidHelpersSetUsability) {
   const Eigen::VectorXd q_current = Eigen::VectorXd::Constant(2, 0.3);
   const Eigen::VectorXd qdot_current = Eigen::VectorXd::Constant(2, 0.4);
-  const Eigen::VectorXd kp_hold = Eigen::VectorXd::Constant(2, 20.0);
-  const Eigen::VectorXd kd_hold = Eigen::VectorXd::Constant(2, 2.0);
 
-  const auto hold = mppi_core::MakeZeroHoldRobotCommand(q_current, qdot_current,
-                                                        kp_hold, kd_hold);
+  const auto hold = mppi_core::MakeZeroHoldRobotCommand(q_current, qdot_current);
 
   EXPECT_TRUE(hold.valid);
   EXPECT_TRUE(hold.IsUsable());
   EXPECT_NEAR(hold.q_cmd[0], 0.3, kTolerance);
   EXPECT_NEAR(hold.qdot_cmd.norm(), 0.0, kTolerance);
   EXPECT_NEAR(hold.tau_cmd.norm(), 0.0, kTolerance);
-  EXPECT_NEAR(hold.kp[0], 20.0, kTolerance);
-  EXPECT_NEAR(hold.kd[0], 2.0, kTolerance);
+  EXPECT_NEAR(hold.kp.norm(), 0.0, kTolerance);
+  EXPECT_NEAR(hold.kd.norm(), 0.0, kTolerance);
 
   const auto invalid = mppi_core::MakeInvalidRobotCommand(3, 2);
   EXPECT_FALSE(invalid.valid);
@@ -2716,9 +2713,6 @@ mppi:
     lower_bound: -0.003
     upper_bound: 0.004
     noise_std: 0.001
-  command:
-    kp: 30.0
-    kd: 1.5
 )");
 
   const auto config =
@@ -2733,15 +2727,28 @@ mppi:
   ASSERT_EQ(config.action_lower_bound.size(), 3);
   ASSERT_EQ(config.action_upper_bound.size(), 3);
   ASSERT_EQ(config.action_noise_std.size(), 3);
-  ASSERT_EQ(config.command_kp.size(), 3);
-  ASSERT_EQ(config.command_kd.size(), 3);
   for (Eigen::Index i = 0; i < 3; ++i) {
     EXPECT_NEAR(config.action_lower_bound[i], -0.003, kTolerance);
     EXPECT_NEAR(config.action_upper_bound[i], 0.004, kTolerance);
     EXPECT_NEAR(config.action_noise_std[i], 0.001, kTolerance);
-    EXPECT_NEAR(config.command_kp[i], 30.0, kTolerance);
-    EXPECT_NEAR(config.command_kd[i], 1.5, kTolerance);
   }
+}
+
+TEST(MPPIConfigTest, RejectsDriverLocalCommandGains) {
+  const YAML::Node root = YAML::Load(R"(
+mppi:
+  action:
+    lower_bound: -1.0
+    upper_bound: 1.0
+    noise_std: 0.1
+  command:
+    kp: 30.0
+    kd: 1.5
+)");
+
+  EXPECT_THROW(
+      (void)mppi_core::ParseMPPIConfig(root["mppi"], 3, mppi_core::MPPIConfig{}),
+      std::invalid_argument);
 }
 
 TEST(MPPIConfigTest, RejectsWrongSizedActionVectors) {
@@ -2951,8 +2958,8 @@ TEST(MPPIOptimizerTest, AllInvalidRolloutsReturnHoldCommand) {
   EXPECT_NEAR(command.q_cmd[0], 0.25, kTolerance);
   EXPECT_NEAR(command.qdot_cmd[0], 0.0, kTolerance);
   EXPECT_NEAR(command.tau_cmd[0], 0.0, kTolerance);
-  EXPECT_NEAR(command.kp[0], 20.0, kTolerance);
-  EXPECT_NEAR(command.kd[0], 1.0, kTolerance);
+  EXPECT_NEAR(command.kp[0], 0.0, kTolerance);
+  EXPECT_NEAR(command.kd[0], 0.0, kTolerance);
   EXPECT_NEAR(command.stamp_sec, 12.34, kTolerance);
 }
 

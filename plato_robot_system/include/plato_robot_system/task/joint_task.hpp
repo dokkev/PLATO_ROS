@@ -15,9 +15,9 @@ namespace plato_robot_system::task
 class JointTask
 {
 public:
-  void SetFeedbackGains(
-    const Eigen::Ref<const Eigen::VectorXd> & kp,
-    const Eigen::Ref<const Eigen::VectorXd> & kd);
+  void SetTaskFeedbackGains(
+    const Eigen::Ref<const Eigen::VectorXd> & kp_task,
+    const Eigen::Ref<const Eigen::VectorXd> & kd_task);
 
   bool StartMinJerk(
     const RobotState & state,
@@ -38,8 +38,8 @@ private:
   void ConfigurePidControllers();
   bool HasCompatibleState(const RobotState & state) const;
 
-  Eigen::VectorXd kp_;
-  Eigen::VectorXd kd_;
+  Eigen::VectorXd kp_task_;
+  Eigen::VectorXd kd_task_;
   mutable bool trajectory_initialized_{false};
   mutable trajectory::MinJerkCurveVec trajectory_;
   mutable std::vector<PIDController> pid_controllers_;

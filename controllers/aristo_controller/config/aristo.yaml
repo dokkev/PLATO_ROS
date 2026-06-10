@@ -12,15 +12,15 @@ controller:
   num_joints: 8
 
 driver_gains:
-  # Driver-local impedance gains used in RobotCommand.kp / RobotCommand.kd.
-  # These are sent to the embedded driver and are separate from host-side FSM gains.
+  # Driver-local impedance gains copied into RobotCommand.kp / RobotCommand.kd.
+  # These are sent to the embedded driver and are separate from host-side task gains.
   # Limit enforcement is handled by the actuator/hardware layer.
   #
-  # Units follow the Aristo command convention:
-  #   kp: mNm/rad
-  #   kd: mNm/(rad/s)
-  kp: [0.0, 0.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
-  kd: [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+  # RobotCommand uses SI units inside plato_robot_system:
+  #   kp: Nm/rad
+  #   kd: Nm/(rad/s)
+  kp: [0.0, 0.0, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+  kd: [0.0, 0.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
 
 state_machine:
   states:
@@ -30,15 +30,15 @@ state_machine:
       stay_here: true
       params:
         target_jpos: 0.0
-        kp: 0.0
-        kd: 0.0
+        kp_task: 0.0
+        kd_task: 0.0
 
     - id: 1
       name: hold
       stay_here: true
       params:
-        kp: 0.0
-        kd: 0.0
+        kp_task: 0.0
+        kd_task: 0.0
 
 debug:
   enabled: false

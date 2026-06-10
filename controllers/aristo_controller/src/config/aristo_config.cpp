@@ -30,6 +30,18 @@ YAML::Node required_node(const YAML::Node & node, const std::string & key)
   return node[key];
 }
 
+template<typename T>
+T required_scalar(const YAML::Node & node, const std::string & key)
+{
+  if (!node || !node[key]) {
+    throw std::runtime_error("Missing required YAML key '" + key + "'");
+  }
+  if (!node[key].IsScalar()) {
+    throw std::runtime_error("YAML key '" + key + "' must be a scalar");
+  }
+  return node[key].as<T>();
+}
+
 YAML::Node state_by_name(const YAML::Node & states, const std::string & name)
 {
   if (!states || !states.IsSequence()) {
@@ -79,6 +91,17 @@ Eigen::VectorXd parse_vector_or_scalar(
   return vector;
 }
 
+Eigen::VectorXd parse_required_vector_or_scalar(
+  const YAML::Node & node,
+  const std::string & key,
+  int size)
+{
+  if (!node || !node[key]) {
+    throw std::runtime_error("Missing required YAML key '" + key + "'");
+  }
+  return parse_vector_or_scalar(node, key, size, 0.0);
+}
+
 }  // namespace
 
 std::string default_aristo_config_path()
@@ -93,7 +116,14 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   AristoConfig config;
 
   const auto robot_model = required_node(root, "robot_model");
-  config.fixed_thumb = optional_scalar<bool>(robot_model, "fixed_thumb", false);
+  config.robot_model.urdf_path = required_scalar<std::string>(robot_model, "urdf_path");
+  if (config.robot_model.urdf_path.empty()) {
+    throw std::runtime_error("robot_model.urdf_path must not be empty");
+  }
+  config.robot_model.is_floating_base =
+    optional_scalar<bool>(robot_model, "is_floating_base", false);
+  config.robot_model.base_frame = optional_scalar<std::string>(robot_model, "base_frame", "");
+  config.robot_model.fixed_thumb = optional_scalar<bool>(robot_model, "fixed_thumb", false);
 
   const auto controller = required_node(root, "controller");
   config.num_joints = optional_scalar<int>(controller, "num_joints", 8);
@@ -126,8 +156,10 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   }
   config.initialize.target_jpos =
     parse_vector_or_scalar(initialize_params, "target_jpos", config.num_joints, 0.0);
-  config.initialize.kp = parse_vector_or_scalar(initialize_params, "kp", config.num_joints, 0.0);
-  config.initialize.kd = parse_vector_or_scalar(initialize_params, "kd", config.num_joints, 0.0);
+  config.initialize.kp_task =
+    parse_required_vector_or_scalar(initialize_params, "kp_task", config.num_joints);
+  config.initialize.kd_task =
+    parse_required_vector_or_scalar(initialize_params, "kd_task", config.num_joints);
 
   return config;
 }

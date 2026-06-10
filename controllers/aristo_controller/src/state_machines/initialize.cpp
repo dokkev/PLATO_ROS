@@ -25,11 +25,11 @@ void InitializeState::SetDuration(const double duration_sec)
   duration_sec_ = std::max(duration_sec, 1.0e-3);
 }
 
-void InitializeState::SetFeedbackGains(
-  const Eigen::Ref<const Eigen::VectorXd> & kp,
-  const Eigen::Ref<const Eigen::VectorXd> & kd)
+void InitializeState::SetTaskFeedbackGains(
+  const Eigen::Ref<const Eigen::VectorXd> & kp_task,
+  const Eigen::Ref<const Eigen::VectorXd> & kd_task)
 {
-  joint_task_.SetFeedbackGains(kp, kd);
+  joint_task_.SetTaskFeedbackGains(kp_task, kd_task);
 }
 
 void InitializeState::OnEnter()

@@ -14,6 +14,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   aristo_controller
   controller_interface
   hardware_interface
+  pinocchio
   pluginlib
   rclcpp
   rclcpp_lifecycle

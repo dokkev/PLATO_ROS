@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "plato_robot_system/sensor/nari_touch_adapter.hpp"
 #include "rclcpp/qos.hpp"
@@ -17,6 +19,11 @@ namespace plato_ros_controller
 {
 namespace
 {
+
+// Aristo ros2_control effort-like interfaces use mNm, while RobotSystem and
+// RobotCommand use SI units internally.
+constexpr double kMNmToNm = 1.0e-3;
+constexpr double kNmToMNm = 1.0e3;
 
 void set_command_interface_value(
   hardware_interface::LoanedCommandInterface & command_interface,
@@ -53,6 +60,19 @@ std::string resolve_package_url(const std::string & path)
   return ament_index_cpp::get_package_share_directory(package_name) + "/" + relative_path;
 }
 
+std::string load_robot_model_from_config(
+  const aristo_controller::config::RobotModelConfig & config,
+  plato_robot_system::RobotSystem & robot)
+{
+  const auto resolved_urdf_path = resolve_package_url(config.urdf_path);
+  if (config.is_floating_base) {
+    robot.LoadUrdf(resolved_urdf_path, pinocchio::JointModelFreeFlyer());
+  } else {
+    robot.LoadUrdf(resolved_urdf_path);
+  }
+  return resolved_urdf_path;
+}
+
 }  // namespace
 
 PlatoRosController::PlatoRosController()
@@ -81,7 +101,7 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
     RCLCPP_ERROR(get_node()->get_logger(), "'joints' parameter is empty");
     return controller_interface::CallbackReturn::ERROR;
   }
-  if (tactile_topics_.size() != kTactileFrameNames.size()) {
+  if (!tactile_topics_.empty() && tactile_topics_.size() != kTactileFrameNames.size()) {
     RCLCPP_ERROR(
       get_node()->get_logger(),
       "'tactile_topics' must be empty or contain exactly %zu topics for the hardcoded tactile frames",
@@ -97,12 +117,13 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   robot_ = std::make_shared<plato_robot_system::RobotSystem>();
   control_architecture_.config().compute_impedance_torque = compute_impedance_torque_;
   control_architecture_.SetRobot(robot_);
-  control_architecture_.Configure(static_cast<int>(num_joints), static_cast<int>(num_joints));
   if (!control_config_yaml_path_.empty()) {
     if (!configure_from_control_config(control_architecture_, *robot_)) {
       return controller_interface::CallbackReturn::ERROR;
     }
   } else {
+    control_architecture_.Configure(static_cast<int>(num_joints), static_cast<int>(num_joints));
+    configure_identity_joint_mapping(num_joints);
     if (configure_control_architecture(control_architecture_) !=
       controller_interface::CallbackReturn::SUCCESS)
     {
@@ -112,6 +133,11 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
     configure_initial_state(control_architecture_);
   }
   control_architecture_.Initialize();
+  model_q_.setZero(control_architecture_.nq());
+  model_qdot_.setZero(control_architecture_.nv());
+  model_tau_.setZero(control_architecture_.nv());
+  filtered_command_.Resize(control_architecture_.nq(), control_architecture_.nv());
+  filtered_command_.valid = false;
 
   nari_touch_.clear();
   nari_touch_.reserve(tactile_topics_.size());
@@ -148,6 +174,9 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 controller_interface::CallbackReturn PlatoRosController::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  if (!assign_state_interfaces()) {
+    return controller_interface::CallbackReturn::ERROR;
+  }
   read_state_interfaces();
   if (!assign_command_interfaces()) {
     return controller_interface::CallbackReturn::ERROR;
@@ -180,17 +209,22 @@ controller_interface::return_type PlatoRosController::update(
   const auto tactile_sensors = current_tactile_sensors();
   const auto num_joints = static_cast<Eigen::Index>(joint_names_.size());
 
-  Eigen::VectorXd q(num_joints);
-  Eigen::VectorXd qdot(num_joints);
-  Eigen::VectorXd tau(num_joints);
+  if (robot_ && robot_->hasModel()) {
+    model_q_ = robot_->state().q;
+  } else {
+    model_q_.setZero();
+  }
+  model_qdot_.setZero();
+  model_tau_.setZero();
   for (Eigen::Index i = 0; i < num_joints; ++i) {
-    q[i] = positions_[static_cast<std::size_t>(i)];
-    qdot[i] = velocities_[static_cast<std::size_t>(i)];
-    tau[i] = efforts_[static_cast<std::size_t>(i)];
+    const auto joint_index = static_cast<std::size_t>(i);
+    model_q_[model_q_indices_[joint_index]] = positions_[joint_index];
+    model_qdot_[model_v_indices_[joint_index]] = velocities_[joint_index];
+    model_tau_[model_v_indices_[joint_index]] = efforts_[joint_index];
   }
 
   auto robot_state = plato_robot_system::MakeRobotState(
-    q, qdot, tau, tactile_sensors, time.seconds());
+    model_q_, model_qdot_, model_tau_, tactile_sensors, time.seconds());
   if (!plato_robot_system::IsValid(robot_state)) {
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
@@ -198,7 +232,14 @@ controller_interface::return_type PlatoRosController::update(
     return controller_interface::return_type::ERROR;
   }
 
-  control_architecture_.Update(robot_state, period.seconds());
+  try {
+    control_architecture_.Update(robot_state, period.seconds());
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *(get_node()->get_clock()), 1000,
+      "Control architecture update failed: %s", e.what());
+    return controller_interface::return_type::ERROR;
+  }
   const auto & command = control_architecture_.command();
   if (!command.IsUsable()) {
     RCLCPP_ERROR_THROTTLE(
@@ -207,16 +248,16 @@ controller_interface::return_type PlatoRosController::update(
     return controller_interface::return_type::ERROR;
   }
 
-  auto filtered_command = command;
-  filter_command(&filtered_command);
-  if (!filtered_command.IsUsable()) {
+  filtered_command_ = command;
+  filter_command(&filtered_command_);
+  if (!filtered_command_.IsUsable()) {
     RCLCPP_ERROR_THROTTLE(
       get_node()->get_logger(), *(get_node()->get_clock()), 1000,
       "Controller command filter produced an invalid command");
     return controller_interface::return_type::ERROR;
   }
-  publish_controller_state(time, filtered_command);
-  write_command(filtered_command);
+  publish_controller_state(time, filtered_command_);
+  write_command(filtered_command_);
 
   return controller_interface::return_type::OK;
 }
@@ -280,20 +321,27 @@ void PlatoRosController::filter_command(plato_robot_system::RobotCommand * comma
 
   constexpr Eigen::Index kNumFixedThumbJoints = 2;
   for (Eigen::Index joint_index = 0; joint_index < kNumFixedThumbJoints; ++joint_index) {
-    if (joint_index < command->q_cmd.size()) {
-      command->q_cmd[joint_index] = 0.0;
+    const auto ros_joint_index = static_cast<std::size_t>(joint_index);
+    if (ros_joint_index >= model_q_indices_.size() || ros_joint_index >= model_v_indices_.size()) {
+      continue;
     }
-    if (joint_index < command->qdot_cmd.size()) {
-      command->qdot_cmd[joint_index] = 0.0;
+
+    const Eigen::Index q_index = model_q_indices_[ros_joint_index];
+    const Eigen::Index v_index = model_v_indices_[ros_joint_index];
+    if (q_index < command->q_cmd.size()) {
+      command->q_cmd[q_index] = 0.0;
     }
-    if (joint_index < command->tau_cmd.size()) {
-      command->tau_cmd[joint_index] = 0.0;
+    if (v_index < command->qdot_cmd.size()) {
+      command->qdot_cmd[v_index] = 0.0;
     }
-    if (joint_index < command->kp.size()) {
-      command->kp[joint_index] = 0.0;
+    if (v_index < command->tau_cmd.size()) {
+      command->tau_cmd[v_index] = 0.0;
     }
-    if (joint_index < command->kd.size()) {
-      command->kd[joint_index] = 0.0;
+    if (v_index < command->kp.size()) {
+      command->kp[v_index] = 0.0;
+    }
+    if (v_index < command->kd.size()) {
+      command->kd[v_index] = 0.0;
     }
   }
 }
@@ -301,10 +349,49 @@ void PlatoRosController::filter_command(plato_robot_system::RobotCommand * comma
 void PlatoRosController::read_state_interfaces()
 {
   for (std::size_t i = 0; i < joint_names_.size(); ++i) {
-    positions_[i] = read_state_interface_value(state_interfaces_[i * 3]);
-    velocities_[i] = read_state_interface_value(state_interfaces_[i * 3 + 1]);
-    efforts_[i] = read_state_interface_value(state_interfaces_[i * 3 + 2]);
+    positions_[i] = read_state_interface_value(position_state_interfaces_[i].get());
+    velocities_[i] = read_state_interface_value(velocity_state_interfaces_[i].get());
+    efforts_[i] = read_state_interface_value(effort_state_interfaces_[i].get()) * kMNmToNm;
   }
+}
+
+bool PlatoRosController::assign_state_interfaces()
+{
+  const auto num_joints = joint_names_.size();
+  position_state_interfaces_.clear();
+  velocity_state_interfaces_.clear();
+  effort_state_interfaces_.clear();
+
+  position_state_interfaces_.reserve(num_joints);
+  velocity_state_interfaces_.reserve(num_joints);
+  effort_state_interfaces_.reserve(num_joints);
+
+  for (const auto & joint_name : joint_names_) {
+    const auto pos_name = joint_name + "/" + hardware_interface::HW_IF_POSITION;
+    const auto vel_name = joint_name + "/" + hardware_interface::HW_IF_VELOCITY;
+    const auto eff_name = joint_name + "/" + hardware_interface::HW_IF_EFFORT;
+
+    for (auto & state_interface : state_interfaces_) {
+      const auto & iface_name = state_interface.get_name();
+      if (iface_name == pos_name) {
+        position_state_interfaces_.emplace_back(state_interface);
+      } else if (iface_name == vel_name) {
+        velocity_state_interfaces_.emplace_back(state_interface);
+      } else if (iface_name == eff_name) {
+        effort_state_interfaces_.emplace_back(state_interface);
+      }
+    }
+  }
+
+  if (
+    position_state_interfaces_.size() != num_joints ||
+    velocity_state_interfaces_.size() != num_joints ||
+    effort_state_interfaces_.size() != num_joints)
+  {
+    RCLCPP_FATAL(get_node()->get_logger(), "Not all state interfaces were found");
+    return false;
+  }
+  return true;
 }
 
 bool PlatoRosController::assign_command_interfaces()
@@ -371,14 +458,33 @@ void PlatoRosController::tactile_callback(
   const std::size_t index,
   const TactileMsg::SharedPtr msg)
 {
-  if (!msg || index >= nari_touch_.size()) {
+  if (!msg) {
     return;
   }
 
   const auto sample = convert_tactile_msg(index, *msg);
-  nari_touch_[index].Update(sample);
-  if (index < tactile_stream_seen_.size() && !tactile_stream_seen_[index]) {
-    tactile_stream_seen_[index] = true;
+  auto tactile_vector = std::make_shared<TactileSensorVector>();
+  bool first_sample_for_stream = false;
+
+  {
+    std::lock_guard<std::mutex> lock(nari_touch_mutex_);
+    if (index >= nari_touch_.size()) {
+      return;
+    }
+    nari_touch_[index].Update(sample);
+    if (index < tactile_stream_seen_.size() && !tactile_stream_seen_[index]) {
+      tactile_stream_seen_[index] = true;
+      first_sample_for_stream = true;
+    }
+
+    tactile_vector->reserve(nari_touch_.size());
+    for (const auto & sensor : nari_touch_) {
+      tactile_vector->push_back(
+        plato_robot_system::sensor::ConvertNARITouchToTactileState(sensor.sample()));
+    }
+  }
+
+  if (first_sample_for_stream) {
     RCLCPP_INFO(
       get_node()->get_logger(),
       "Receiving tactile stream %zu from '%s' for frame '%s'",
@@ -387,12 +493,6 @@ void PlatoRosController::tactile_callback(
       tactile_frame_name(index));
   }
 
-  auto tactile_vector = std::make_shared<TactileSensorVector>();
-  tactile_vector->reserve(nari_touch_.size());
-  for (const auto & sensor : nari_touch_) {
-    tactile_vector->push_back(
-      plato_robot_system::sensor::ConvertNARITouchToTactileState(sensor.sample()));
-  }
   rt_tactile_ptr_.writeFromNonRT(tactile_vector);
 }
 
@@ -478,15 +578,16 @@ void PlatoRosController::publish_controller_state(
   msg.effort_fb.resize(num_joints);
 
   for (std::size_t i = 0; i < num_joints; ++i) {
-    const auto index = static_cast<Eigen::Index>(i);
-    msg.position_desired[i] = command.q_cmd[index];
-    msg.velocity_desired[i] = command.qdot_cmd[index];
-    msg.position_error[i] = command.q_cmd[index] - positions_[i];
-    msg.velocity_error[i] = command.qdot_cmd[index] - velocities_[i];
-    msg.stiffness[i] = command.kp[index];
-    msg.damping[i] = command.kd[index];
-    msg.effort_desired[i] = command.tau_cmd[index];
-    msg.effort_ff[i] = command.tau_cmd[index];
+    const Eigen::Index q_index = model_q_indices_[i];
+    const Eigen::Index v_index = model_v_indices_[i];
+    msg.position_desired[i] = command.q_cmd[q_index];
+    msg.velocity_desired[i] = command.qdot_cmd[v_index];
+    msg.position_error[i] = command.q_cmd[q_index] - positions_[i];
+    msg.velocity_error[i] = command.qdot_cmd[v_index] - velocities_[i];
+    msg.stiffness[i] = command.kp[v_index];
+    msg.damping[i] = command.kd[v_index];
+    msg.effort_desired[i] = command.tau_cmd[v_index];
+    msg.effort_ff[i] = command.tau_cmd[v_index];
     msg.effort_fb[i] = 0.0;
   }
   controller_state_pub_->publish(msg);
@@ -497,33 +598,49 @@ bool PlatoRosController::configure_from_control_config(
   plato_robot_system::RobotSystem & robot)
 {
   try {
-    const auto resolved_path = resolve_package_url(control_config_yaml_path_);
+    const auto resolved_config_path = resolve_package_url(control_config_yaml_path_);
     const auto aristo_config =
-      aristo_controller::config::load_aristo_config(resolved_path);
+      aristo_controller::config::load_aristo_config(resolved_config_path);
 
-    if (architecture.nq() != aristo_config.num_joints ||
-      architecture.nv() != aristo_config.num_joints)
-    {
+    if (aristo_config.num_joints != static_cast<int>(joint_names_.size())) {
       RCLCPP_ERROR(
         get_node()->get_logger(),
-        "Control config expects %d joints, but control architecture has nq=%d nv=%d",
+        "Control config expects %d joints, but the controller was given %zu joint names",
         aristo_config.num_joints,
-        architecture.nq(),
-        architecture.nv());
+        joint_names_.size());
       return false;
     }
 
-    fixed_thumb_ = aristo_config.fixed_thumb;
+    const auto resolved_urdf_path = load_robot_model_from_config(aristo_config.robot_model, robot);
+    architecture.Configure(robot.nq(), robot.nv());
+    if (!configure_model_joint_mapping(robot)) {
+      return false;
+    }
+
+    fixed_thumb_ = aristo_config.robot_model.fixed_thumb;
     architecture.setTimingEnabled(aristo_config.debug_enabled);
-    architecture.SetDriverPdGainsConfig(aristo_config.driver_gains);
+    auto driver_gains = aristo_config.driver_gains;
+    driver_gains.kp = map_joint_values_to_model_v(aristo_config.driver_gains.kp);
+    driver_gains.kd = map_joint_values_to_model_v(aristo_config.driver_gains.kd);
+    if (!driver_gains.HasValidDimensions(architecture.nv())) {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Mapped driver gains have invalid dimensions for robot model nv=%d",
+        architecture.nv());
+      return false;
+    }
+    architecture.SetDriverPdGainsConfig(driver_gains);
 
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,
       aristo_controller::state_machines::InitializeState::kName,
       &robot);
-    initialize->SetTargetPosition(aristo_config.initialize.target_jpos);
+    initialize->SetTargetPosition(
+      map_joint_positions_to_model_q(aristo_config.initialize.target_jpos, robot));
     initialize->SetDuration(aristo_config.initialize.duration_sec);
-    initialize->SetFeedbackGains(aristo_config.initialize.kp, aristo_config.initialize.kd);
+    initialize->SetTaskFeedbackGains(
+      map_joint_values_to_model_v(aristo_config.initialize.kp_task),
+      map_joint_values_to_model_v(aristo_config.initialize.kd_task));
     architecture.RegisterState(std::move(initialize));
 
     if (!architecture.SetStartState(aristo_config.initialize.id) ||
@@ -538,8 +655,11 @@ bool PlatoRosController::configure_from_control_config(
 
     RCLCPP_INFO(
       get_node()->get_logger(),
-      "Loaded control config '%s' and selected state 'initialize' (id=%d, fixed_thumb=%s)",
-      resolved_path.c_str(),
+      "Loaded control config '%s', robot model '%s' (nq=%d, nv=%d), and selected state 'initialize' (id=%d, fixed_thumb=%s)",
+      resolved_config_path.c_str(),
+      resolved_urdf_path.c_str(),
+      robot.nq(),
+      robot.nv(),
       aristo_config.initialize.id,
       fixed_thumb_ ? "true" : "false");
     return true;
@@ -553,15 +673,117 @@ bool PlatoRosController::configure_from_control_config(
   }
 }
 
+void PlatoRosController::configure_identity_joint_mapping(const std::size_t num_joints)
+{
+  model_q_indices_.resize(num_joints);
+  model_v_indices_.resize(num_joints);
+  for (std::size_t i = 0; i < num_joints; ++i) {
+    const auto index = static_cast<Eigen::Index>(i);
+    model_q_indices_[i] = index;
+    model_v_indices_[i] = index;
+  }
+}
+
+bool PlatoRosController::configure_model_joint_mapping(
+  const plato_robot_system::RobotSystem & robot)
+{
+  if (!robot.hasModel()) {
+    configure_identity_joint_mapping(joint_names_.size());
+    return true;
+  }
+
+  model_q_indices_.clear();
+  model_v_indices_.clear();
+  model_q_indices_.reserve(joint_names_.size());
+  model_v_indices_.reserve(joint_names_.size());
+
+  const auto & model = robot.model();
+  for (const auto & joint_name : joint_names_) {
+    if (!model.existJointName(joint_name)) {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Robot model does not contain ros2_control joint '%s'",
+        joint_name.c_str());
+      return false;
+    }
+
+    const auto joint_id = model.getJointId(joint_name);
+    if (joint_id >= static_cast<pinocchio::JointIndex>(model.njoints)) {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Robot model returned invalid joint id for '%s'",
+        joint_name.c_str());
+      return false;
+    }
+
+    const auto & joint = model.joints[joint_id];
+    if (joint.nq() != 1 || joint.nv() != 1) {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "ros2_control joint '%s' maps to nq=%d nv=%d; this adapter expects one-DoF controlled joints",
+        joint_name.c_str(),
+        joint.nq(),
+        joint.nv());
+      return false;
+    }
+    model_q_indices_.push_back(static_cast<Eigen::Index>(joint.idx_q()));
+    model_v_indices_.push_back(static_cast<Eigen::Index>(joint.idx_v()));
+  }
+  return true;
+}
+
+Eigen::VectorXd PlatoRosController::map_joint_positions_to_model_q(
+  const Eigen::VectorXd & joint_positions,
+  const plato_robot_system::RobotSystem & robot) const
+{
+  if (joint_positions.size() != static_cast<Eigen::Index>(joint_names_.size())) {
+    if (joint_positions.size() == control_architecture_.nq()) {
+      return joint_positions;
+    }
+    throw std::runtime_error(
+      "Joint position vector must match either robot nq or the configured joint count");
+  }
+
+  Eigen::VectorXd model_q = robot.hasModel() ?
+    robot.state().q :
+    Eigen::VectorXd::Zero(control_architecture_.nq());
+  for (std::size_t i = 0; i < joint_names_.size(); ++i) {
+    model_q[model_q_indices_[i]] = joint_positions[static_cast<Eigen::Index>(i)];
+  }
+  return model_q;
+}
+
+Eigen::VectorXd PlatoRosController::map_joint_values_to_model_v(
+  const Eigen::VectorXd & joint_values) const
+{
+  if (joint_values.size() != static_cast<Eigen::Index>(joint_names_.size())) {
+    if (joint_values.size() == control_architecture_.nv()) {
+      return joint_values;
+    }
+    throw std::runtime_error(
+      "Joint tangent vector must match either robot nv or the configured joint count");
+  }
+
+  Eigen::VectorXd model_values = Eigen::VectorXd::Zero(control_architecture_.nv());
+  for (std::size_t i = 0; i < joint_names_.size(); ++i) {
+    model_values[model_v_indices_[i]] = joint_values[static_cast<Eigen::Index>(i)];
+  }
+  return model_values;
+}
+
 void PlatoRosController::write_command(const plato_robot_system::RobotCommand & command)
 {
   for (std::size_t i = 0; i < joint_names_.size(); ++i) {
-    const auto index = static_cast<Eigen::Index>(i);
-    set_command_interface_value(position_command_interfaces_[i].get(), command.q_cmd[index]);
-    set_command_interface_value(velocity_command_interfaces_[i].get(), command.qdot_cmd[index]);
-    set_command_interface_value(effort_command_interfaces_[i].get(), command.tau_cmd[index]);
-    set_command_interface_value(stiffness_command_interfaces_[i].get(), command.kp[index]);
-    set_command_interface_value(damping_command_interfaces_[i].get(), command.kd[index]);
+    const Eigen::Index q_index = model_q_indices_[i];
+    const Eigen::Index v_index = model_v_indices_[i];
+    set_command_interface_value(position_command_interfaces_[i].get(), command.q_cmd[q_index]);
+    set_command_interface_value(velocity_command_interfaces_[i].get(), command.qdot_cmd[v_index]);
+    set_command_interface_value(
+      effort_command_interfaces_[i].get(), command.tau_cmd[v_index] * kNmToMNm);
+    set_command_interface_value(
+      stiffness_command_interfaces_[i].get(), command.kp[v_index] * kNmToMNm);
+    set_command_interface_value(
+      damping_command_interfaces_[i].get(), command.kd[v_index] * kNmToMNm);
   }
 }
 

@@ -24,9 +24,9 @@ public:
 
   void SetTargetPosition(const Eigen::Ref<const Eigen::VectorXd> & target_jpos);
   void SetDuration(double duration_sec);
-  void SetFeedbackGains(
-    const Eigen::Ref<const Eigen::VectorXd> & kp,
-    const Eigen::Ref<const Eigen::VectorXd> & kd);
+  void SetTaskFeedbackGains(
+    const Eigen::Ref<const Eigen::VectorXd> & kp_task,
+    const Eigen::Ref<const Eigen::VectorXd> & kd_task);
 
   void OnEnter() override;
   void OnExit() override;

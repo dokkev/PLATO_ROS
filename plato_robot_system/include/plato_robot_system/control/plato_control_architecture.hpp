@@ -51,8 +51,8 @@ struct ImpedanceSetpoint {
   Eigen::VectorXd q_cmd;
   Eigen::VectorXd qdot_cmd;
   Eigen::VectorXd tau_ff_cmd;
-  Eigen::VectorXd kp;
-  Eigen::VectorXd kd;
+  Eigen::VectorXd kp_task;
+  Eigen::VectorXd kd_task;
 
   void Resize(int nq, int nv = -1);
   bool HasValidDimensions() const;

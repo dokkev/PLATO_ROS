@@ -5,12 +5,12 @@
 namespace plato_robot_system::task
 {
 
-void JointTask::SetFeedbackGains(
-  const Eigen::Ref<const Eigen::VectorXd> & kp,
-  const Eigen::Ref<const Eigen::VectorXd> & kd)
+void JointTask::SetTaskFeedbackGains(
+  const Eigen::Ref<const Eigen::VectorXd> & kp_task,
+  const Eigen::Ref<const Eigen::VectorXd> & kd_task)
 {
-  kp_ = kp;
-  kd_ = kd;
+  kp_task_ = kp_task;
+  kd_task_ = kd_task;
   ConfigurePidControllers();
 }
 
@@ -24,13 +24,13 @@ bool JointTask::StartMinJerk(
     return false;
   }
 
-  if (kp_.size() != state.qdot.size()) {
-    kp_ = Eigen::VectorXd::Zero(state.qdot.size());
+  if (kp_task_.size() != state.qdot.size()) {
+    kp_task_ = Eigen::VectorXd::Zero(state.qdot.size());
   }
-  if (kd_.size() != state.qdot.size()) {
-    kd_ = Eigen::VectorXd::Zero(state.qdot.size());
+  if (kd_task_.size() != state.qdot.size()) {
+    kd_task_ = Eigen::VectorXd::Zero(state.qdot.size());
   }
-  if (kp_.size() != kd_.size() ||
+  if (kp_task_.size() != kd_task_.size() ||
     static_cast<Eigen::Index>(pid_controllers_.size()) != state.qdot.size())
   {
     ConfigurePidControllers();
@@ -78,6 +78,8 @@ bool JointTask::BuildCommand(
   const auto & sample = trajectory_.EvaluateSample(elapsed_time_sec);
   command_.q_cmd = sample.value;
   command_.qdot_cmd = sample.derivative;
+  // RobotCommand.kp/kd are driver-local gains. Host-side task feedback only
+  // contributes to tau_cmd here.
   command_.kp.setZero();
   command_.kd.setZero();
   for (Eigen::Index i = 0; i < command_.tau_cmd.size(); ++i) {
@@ -98,14 +100,14 @@ bool JointTask::BuildCommand(
 void JointTask::ConfigurePidControllers()
 {
   pid_controllers_.clear();
-  if (kp_.size() <= 0 || kp_.size() != kd_.size()) {
+  if (kp_task_.size() <= 0 || kp_task_.size() != kd_task_.size()) {
     return;
   }
 
-  pid_controllers_.reserve(static_cast<std::size_t>(kp_.size()));
-  for (Eigen::Index i = 0; i < kp_.size(); ++i) {
+  pid_controllers_.reserve(static_cast<std::size_t>(kp_task_.size()));
+  for (Eigen::Index i = 0; i < kp_task_.size(); ++i) {
     pid_controllers_.push_back(
-      PIDController(kp_[i], 0.0, kd_[i], 0.0, std::numeric_limits<double>::max()));
+      PIDController(kp_task_[i], 0.0, kd_task_[i], 0.0, std::numeric_limits<double>::max()));
   }
 }
 

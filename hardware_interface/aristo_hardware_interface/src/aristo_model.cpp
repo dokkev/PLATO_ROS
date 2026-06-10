@@ -54,6 +54,12 @@ void AristoModel::update_joint_states(
     joint_positions(static_cast<Eigen::Index>(kIndexMcpIndex));
   joint_positions(static_cast<Eigen::Index>(kMiddlePipIndex)) -=
     joint_positions(static_cast<Eigen::Index>(kMiddleMcpIndex));
+  joint_velocities(static_cast<Eigen::Index>(kThumbPipIndex)) -=
+    joint_velocities(static_cast<Eigen::Index>(kThumbMcpIndex));
+  joint_velocities(static_cast<Eigen::Index>(kIndexPipIndex)) -=
+    joint_velocities(static_cast<Eigen::Index>(kIndexMcpIndex));
+  joint_velocities(static_cast<Eigen::Index>(kMiddlePipIndex)) -=
+    joint_velocities(static_cast<Eigen::Index>(kMiddleMcpIndex));
 
   JointMapd joint_position_map(joint_states.position_data());
   JointMapd joint_velocity_map(joint_states.velocity_data());
@@ -77,7 +83,7 @@ void AristoModel::build_impedance_targets(
   const ConstJointMapd joint_torque_cmd_map(joint_commands.effort_data());
 
   JointArrayf joint_position_cmd = joint_position_cmd_map.cast<float>();
-  const JointArrayf joint_velocity_cmd = joint_velocity_cmd_map.cast<float>();
+  JointArrayf joint_velocity_cmd = joint_velocity_cmd_map.cast<float>();
   const JointArrayf joint_stiffness_cmd = joint_stiffness_cmd_map.cast<float>();
   const JointArrayf joint_damping_cmd = joint_damping_cmd_map.cast<float>();
   const JointArrayf joint_torque_cmd = joint_torque_cmd_map.cast<float>();
@@ -88,6 +94,12 @@ void AristoModel::build_impedance_targets(
     actuators[kIndexMcpIndex].get_feedback().position;
   joint_position_cmd(static_cast<Eigen::Index>(kMiddlePipIndex)) +=
     actuators[kMiddleMcpIndex].get_feedback().position;
+  joint_velocity_cmd(static_cast<Eigen::Index>(kThumbPipIndex)) +=
+    joint_velocity_cmd(static_cast<Eigen::Index>(kThumbMcpIndex));
+  joint_velocity_cmd(static_cast<Eigen::Index>(kIndexPipIndex)) +=
+    joint_velocity_cmd(static_cast<Eigen::Index>(kIndexMcpIndex));
+  joint_velocity_cmd(static_cast<Eigen::Index>(kMiddlePipIndex)) +=
+    joint_velocity_cmd(static_cast<Eigen::Index>(kMiddleMcpIndex));
 
   impedance_targets.clear();
   impedance_targets.reserve(actuators.size());

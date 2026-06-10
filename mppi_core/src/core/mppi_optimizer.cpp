@@ -16,8 +16,6 @@ namespace mppi_core {
 namespace {
 
 constexpr double kLargeCost = 1.0e30;
-constexpr double kDefaultCommandKp = 20.0;
-constexpr double kDefaultCommandKd = 1.0;
 
 Eigen::VectorXd DefaultVector(std::size_t dim, double value) {
   return Eigen::VectorXd::Constant(static_cast<Eigen::Index>(dim), value);
@@ -35,12 +33,6 @@ void PrepareConfigVectors(MPPIConfig* config) {
   }
   if (config->action_noise_std.size() == 0) {
     config->action_noise_std = DefaultVector(dim, 1.0);
-  }
-  if (config->command_kp.size() == 0) {
-    config->command_kp = DefaultVector(dim, kDefaultCommandKp);
-  }
-  if (config->command_kd.size() == 0) {
-    config->command_kd = DefaultVector(dim, kDefaultCommandKd);
   }
 }
 
@@ -221,8 +213,6 @@ void CheckConfig(const MPPIConfig& config) {
                  "action_upper_bound");
   CheckVectorDim(config.action_noise_std, config.action_dim,
                  "action_noise_std");
-  CheckVectorDim(config.command_kp, config.action_dim, "command_kp");
-  CheckVectorDim(config.command_kd, config.action_dim, "command_kd");
 
   if (!IsFiniteOrInfinite(config.action_lower_bound) ||
       !IsFiniteOrInfinite(config.action_upper_bound)) {
@@ -231,11 +221,6 @@ void CheckConfig(const MPPIConfig& config) {
   if (!IsFiniteAndNonnegative(config.action_noise_std)) {
     throw std::invalid_argument(
         "MPPIConfig: action_noise_std must be finite and nonnegative");
-  }
-  if (!IsFiniteAndNonnegative(config.command_kp) ||
-      !IsFiniteAndNonnegative(config.command_kd)) {
-    throw std::invalid_argument(
-        "MPPIConfig: command gains must be finite and nonnegative");
   }
   for (Eigen::Index i = 0; i < config.action_lower_bound.size(); ++i) {
     if (config.action_lower_bound[i] > config.action_upper_bound[i]) {
@@ -517,8 +502,8 @@ RobotCommand MPPIOptimizer::MakeCommand(
   const Eigen::VectorXd tau_ff_cmd =
       CommandFeedForwardTorqueOrZero(observation, qddot_sol);
   command.tau_cmd = tau_ff_cmd;
-  command.kp = config_.command_kp;
-  command.kd = config_.command_kd;
+  // Driver-local RobotCommand.kp/kd are attached during command finalization
+  // from driver_gains, outside the MPPI planner.
   command.valid = command.HasValidDimensions() && command.AllFinite();
   return command;
 }

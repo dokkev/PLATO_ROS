@@ -173,6 +173,10 @@ tau_ff_cmd = RNEA(q, qdot, qddot_sol)
 tau_cmd    = tau_ff_cmd
 ```
 
+The MPPI command builder does not tune or populate driver-local gains.
+`RobotCommand.kp` and `RobotCommand.kd` are copied from controller
+`driver_gains` during command finalization outside the planner.
+
 The embedded driver may then apply:
 
 ```text

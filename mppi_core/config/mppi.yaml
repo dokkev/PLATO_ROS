@@ -16,8 +16,6 @@ mppi:
     upper_bound: 2.0
     noise_std: 0.5
 
-  # Embedded 1 kHz local impedance gains for:
-  # tau_driver = tau_cmd + kp * (q_cmd - q_meas) + kd * (qdot_cmd - qdot_meas).
-  command:
-    kp: 20.0
-    kd: 1.0
+  # MPPI emits q_cmd, qdot_cmd, and tau_ff/tau_cmd only.
+  # Driver-local RobotCommand.kp/kd are copied from driver_gains during command
+  # finalization outside the planner.

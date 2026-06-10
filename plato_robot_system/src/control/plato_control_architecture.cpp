@@ -97,20 +97,20 @@ void ImpedanceSetpoint::Resize(int nq, int nv) {
   q_cmd = Eigen::VectorXd::Zero(nq);
   qdot_cmd = Eigen::VectorXd::Zero(nv);
   tau_ff_cmd = Eigen::VectorXd::Zero(nv);
-  kp = Eigen::VectorXd::Zero(nv);
-  kd = Eigen::VectorXd::Zero(nv);
+  kp_task = Eigen::VectorXd::Zero(nv);
+  kd_task = Eigen::VectorXd::Zero(nv);
 }
 
 bool ImpedanceSetpoint::HasValidDimensions() const {
   const Eigen::Index nq = q_cmd.size();
   const Eigen::Index nv = qdot_cmd.size();
-  return nq > 0 && nv > 0 && tau_ff_cmd.size() == nv && kp.size() == nv &&
-         kd.size() == nv;
+  return nq > 0 && nv > 0 && tau_ff_cmd.size() == nv &&
+         kp_task.size() == nv && kd_task.size() == nv;
 }
 
 bool ImpedanceSetpoint::AllFinite() const {
   return q_cmd.allFinite() && qdot_cmd.allFinite() && tau_ff_cmd.allFinite() &&
-         kp.allFinite() && kd.allFinite();
+         kp_task.allFinite() && kd_task.allFinite();
 }
 
 void DriverPdGainsConfig::Resize(int nv) {
@@ -301,9 +301,13 @@ void ControlArchitecture::RequestFault(const std::string& reason) {
 }
 
 void ControlArchitecture::ClearFault() {
-  if (control_state_.mode == ControlMode::kFault) {
-    control_state_ = ControlState{};
-  }
+  control_state_ = ControlState{};
+  control_state_.requested_mode = ControlMode::kHold;
+  requested_state_id_ = StateIdFromMode(ControlMode::kHold);
+  has_pending_impedance_ = false;
+  control_state_.command_valid = false;
+  InitializeStateMachine();
+  (void)fsm_handler_.RequestState(requested_state_id_);
 }
 
 ImpedanceSetpoint ControlArchitecture::MakeHoldSetpoint(
@@ -493,7 +497,11 @@ void ControlArchitecture::EvaluateCommand() {
     return;
   }
 
-  cmd_.Resize(nq_, nv_);
+  if (cmd_.q_cmd.size() != nq_ || cmd_.qdot_cmd.size() != nv_ ||
+      cmd_.tau_cmd.size() != nv_ || cmd_.kp.size() != nv_ ||
+      cmd_.kd.size() != nv_) {
+    cmd_.Resize(nq_, nv_);
+  }
   cmd_.q_cmd = setpoint.q_cmd;
   cmd_.qdot_cmd = setpoint.qdot_cmd;
   cmd_.kp.setZero();
@@ -501,8 +509,10 @@ void ControlArchitecture::EvaluateCommand() {
   cmd_.tau_cmd = setpoint.tau_ff_cmd;
 
   if (config_.compute_impedance_torque) {
-    cmd_.tau_cmd += setpoint.kp.cwiseProduct(setpoint.q_cmd - state.q) +
-                    setpoint.kd.cwiseProduct(setpoint.qdot_cmd - state.qdot);
+    const Eigen::VectorXd tau_fb_cmd =
+        setpoint.kp_task.cwiseProduct(setpoint.q_cmd - state.q) +
+        setpoint.kd_task.cwiseProduct(setpoint.qdot_cmd - state.qdot);
+    cmd_.tau_cmd += tau_fb_cmd;
   }
   ApplyDriverPdGains(&cmd_);
 
@@ -530,6 +540,9 @@ void ControlArchitecture::InitializeCommandFromRobotState() {
   cmd_.q_cmd = robot_->q();
   cmd_.qdot_cmd = robot_->qdot();
   cmd_.tau_cmd.setZero(nv_);
+  cmd_.kp.setZero();
+  cmd_.kd.setZero();
+  ApplyDriverPdGains(&cmd_);
   cmd_.valid = cmd_.HasValidDimensions() && cmd_.AllFinite();
   command_initialized_ = true;
 }
@@ -568,8 +581,8 @@ bool ControlArchitecture::CheckSetpoint(
     return false;
   }
   if (setpoint.q_cmd.size() != nq_ || setpoint.qdot_cmd.size() != nv_ ||
-      setpoint.tau_ff_cmd.size() != nv_ || setpoint.kp.size() != nv_ ||
-      setpoint.kd.size() != nv_) {
+      setpoint.tau_ff_cmd.size() != nv_ || setpoint.kp_task.size() != nv_ ||
+      setpoint.kd_task.size() != nv_) {
     if (error) {
       *error = "impedance setpoint dimension mismatch";
     }

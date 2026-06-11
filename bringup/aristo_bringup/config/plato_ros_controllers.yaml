@@ -41,3 +41,6 @@ plato2:
       grasp_force_reference_topic: /grasp_force_reference/target_normal_force_n
       grasp_force_reference_valid_topic: /grasp_force_reference/reference_valid
       control_config_yaml_path: "package://aristo_controller/config/aristo.yaml"
+      publish_robust_grasp_debug_markers: true
+      robust_grasp_debug_marker_topic: ~/robust_grasp_debug_markers
+      robust_grasp_debug_frame_id: base_link

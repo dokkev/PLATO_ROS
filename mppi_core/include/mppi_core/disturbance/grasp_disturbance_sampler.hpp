@@ -15,12 +15,28 @@
 
 namespace mppi_core {
 
+struct ObjectDisturbanceSamplerConfig {
+  double linear_velocity_std_mps{0.0};
+  double linear_velocity_max_mps{0.0};
+
+  double angular_velocity_std_radps{0.0};
+  double angular_velocity_max_radps{0.0};
+
+  double pose_xyz_std_m{0.0};
+  double pose_xyz_max_m{0.0};
+
+  double pose_rpy_std_rad{0.0};
+  double pose_rpy_max_rad{0.0};
+};
+
 struct GraspDisturbanceSamplerConfig {
   std::size_t num_disturbance_rollouts{32};
   std::size_t horizon_steps{20};
   std::size_t tactile_sensor_count{2};
 
   std::uint32_t random_seed{7};
+
+  ObjectDisturbanceSamplerConfig object;
 
   double tangent_velocity_std_mps{0.004};
   double tangent_velocity_max_mps{0.020};

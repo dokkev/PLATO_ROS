@@ -5,6 +5,132 @@ preserve or intentionally replace.
 
 ---
 
+## 2026-06-11 - Jenga Object Support Is Scenario Evaluation
+
+Status: Accepted
+
+### Context
+
+The object-aware grasp TODO was narrowed to a defensible MVP: known Jenga box
+geometry, approximate initial pose, sampled pose perturbations, and geometric
+hemisphere-object support evaluation.
+
+### Decision
+
+Use `VirtualObjectBelief` particles as sampled Jenga pose scenarios. For each
+candidate hand action rollout, Pinocchio computes tactile hemisphere world
+positions and `ObjectContactSupportEvaluator` queries primitive signed distance
+against those sampled object poses. The resulting cost penalizes contact loss,
+support deficit, edge risk, and excessive distance-derived force proxy.
+
+This is not object dynamics, contact-force simulation, or true future contact
+prediction.
+
+### Consequences
+
+- Rollout action selection can now use object-prior geometry without adding a
+  rigid-body object simulator.
+- The implementation is suitable for figure/debug visualization because it logs
+  selected action names, object sample count, geometry query count, predicted
+  support count, and edge/contact-loss diagnostics.
+- Mesh/FCL/URDF collision parsing, RViz visualization, and hardware timing
+  validation remain future work.
+
+Related files:
+
+- `mppi_core/object/jenga_block.urdf`
+- `mppi_core/include/mppi_core/object/object_contact_support_evaluator.hpp`
+- `mppi_core/src/object/object_contact_support_evaluator.cpp`
+- `mppi_core/src/costs/robust_grasp_state_cost.cpp`
+- `mppi_core/src/policy/robust_grasp_policy.cpp`
+
+---
+
+## 2026-06-11 - Object Belief Initialization Is Contact-Weighted Sampling
+
+Status: Accepted
+
+### Context
+
+After adding an object belief slot to `GraspState`, the first object-aware step
+is to initialize that belief when tactile contact appears. This should not yet
+be a full pose optimizer or object dynamics model.
+
+### Decision
+
+Initialize `VirtualObjectBelief` from measured joint configuration, active
+tactile contact points, tactile contact normals, and an object pose prior. The
+initializer samples particles around the prior and assigns weights from:
+
+- contact point to object primitive surface distance,
+- tactile normal versus object surface normal alignment,
+- particle pose distance from the prior.
+
+Use local Pinocchio `Data` for contact extraction so initialization does not
+mutate `RobotSystem` state. Keep mesh/URDF surface parsing out of this phase;
+URDF or mesh handles can be scored only when primitive dimensions are provided.
+
+### Consequences
+
+- Touch-time object belief is now contact-consistent instead of display-only.
+- The rollout still does not predict object pose or object contact dynamics.
+- Future work can replace the sampler with an optimizer without changing the
+  `VirtualObjectBelief` state contract.
+
+### Related files
+
+- `mppi_core/include/mppi_core/object/object_belief_initializer.hpp`
+- `mppi_core/include/mppi_core/object/object_contact_prediction.hpp`
+- `mppi_core/include/mppi_core/object/object_geometry_query.hpp`
+- `mppi_core/src/object/object_belief_initializer.cpp`
+- `mppi_core/src/object/object_contact_prediction.cpp`
+- `mppi_core/src/object/object_geometry_query.cpp`
+- `mppi_core/test/test_mppi_core.cpp`
+
+---
+
+## 2026-06-11 - MPPI GraspState Carries Virtual Object Belief
+
+Status: Accepted
+
+### Context
+
+The grasp rollout was tactile-only: `GraspState` carried robot and tactile
+state, disturbances only moved tactile observations, and the initial rollout
+root could follow the current reference instead of measured feedback. That made
+virtual object visualization tempting but would have hidden the missing object
+state behind a display-only artifact.
+
+### Decision
+
+Add optional object prior and virtual object belief types to `mppi_core`.
+`GraspObservation` may carry `ObjectPrior` and `VirtualObjectBelief`, and
+`GraspState` now carries `VirtualObjectBelief`. Empty object fields remain valid
+so the tactile-only rollout path still works. Rollout propagation preserves the
+belief without inventing object motion yet. Initial rollout states use valid
+measured `q_meas/qdot_meas` when available, while command generation can still
+integrate from the current reference.
+
+### Consequences
+
+- Object-aware rollout work now has a real state slot for object particles,
+  geometry handles, and observation priors.
+- Tactile-only transition remains the fallback until object-contact transition
+  and costs are implemented.
+- Visualization should consume state/belief from rollout, not fabricate object
+  support independently of the planner.
+
+### Related files
+
+- `mppi_core/include/mppi_core/object/object_prior.hpp`
+- `mppi_core/include/mppi_core/object/virtual_object_state.hpp`
+- `mppi_core/include/mppi_core/object/object_contact_belief.hpp`
+- `mppi_core/include/mppi_core/state/grasp_state.hpp`
+- `mppi_core/include/mppi_core/state/grasp_observation.hpp`
+- `mppi_core/object/jenga_block.urdf`
+
+---
+
 ## 2026-06-07 - MPPI Splits Controller, Rollout, And Task Config
 
 Status: Accepted
@@ -53,7 +179,7 @@ YAML parser implementations and parser helper logic live under `src/util`.
 
 - `mppi_core/config/rollout.yaml`
 - `mppi_core/config/experimental_residual.yaml`
-- `mppi_core/task/jenga.yaml`
+- `mppi_core/task/grasp_hold.yaml`
 - `mppi_core/MPPI.md`
 - `mppi_core/include/mppi_core/config/rollout_config.hpp`
 - `mppi_core/include/mppi_core/task/task_config.hpp`

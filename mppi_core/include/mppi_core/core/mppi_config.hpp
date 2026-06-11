@@ -22,6 +22,9 @@ struct MPPIConfig {
   Eigen::VectorXd action_lower_bound;
   Eigen::VectorXd action_upper_bound;
   Eigen::VectorXd action_noise_std;
+  Eigen::VectorXd action_noise_clip;
+  Eigen::VectorXd qdot_lower_bound;
+  Eigen::VectorXd qdot_upper_bound;
 };
 
 }  // namespace mppi_core

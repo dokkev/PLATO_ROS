@@ -33,12 +33,12 @@ bool HasMatchingShape(const GraspState& state,
 
 }  // namespace
 
-DisturbedRolloutStepResult StepGraspStateWithDisturbance(
+DisturbedRolloutStepResult StepTactileOnlyGraspStateWithDisturbance(
     const GraspState& state,
     const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
     const GraspDisturbanceStep& disturbance,
     const RolloutContext& context,
-    const DisturbedGraspRolloutConfig& config, const double dt) {
+    const TactileOnlyContactTransitionConfig& config, const double dt) {
   DisturbedRolloutStepResult result;
   if (!std::isfinite(dt) || dt <= 0.0 || !qddot_sol.allFinite() ||
       !HasMatchingShape(state, disturbance, context)) {
@@ -48,6 +48,7 @@ DisturbedRolloutStepResult StepGraspStateWithDisturbance(
   result.next_state.robot =
       StepRobotState(state.robot, qddot_sol, context.robot_system, dt);
   result.next_state.tactile_sensors = state.tactile_sensors;
+  result.next_state.object_belief = state.object_belief;
   if (!IsValid(result.next_state.robot)) {
     return result;
   }
@@ -86,9 +87,20 @@ DisturbedRolloutStepResult StepGraspStateWithDisturbance(
 
   result.next_state.valid =
       IsValid(result.next_state.robot) &&
-      HasValidTactileSensors(result.next_state);
+      HasValidTactileSensors(result.next_state) &&
+      IsValidVirtualObjectBelief(result.next_state.object_belief);
   result.valid = result.next_state.valid;
   return result;
+}
+
+DisturbedRolloutStepResult StepGraspStateWithDisturbance(
+    const GraspState& state,
+    const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
+    const GraspDisturbanceStep& disturbance,
+    const RolloutContext& context,
+    const TactileOnlyContactTransitionConfig& config, const double dt) {
+  return StepTactileOnlyGraspStateWithDisturbance(
+      state, qddot_sol, disturbance, context, config, dt);
 }
 
 }  // namespace mppi_core

@@ -13,9 +13,11 @@
 
 namespace mppi_core {
 
-struct DisturbedGraspRolloutConfig {
+struct TactileOnlyContactTransitionConfig {
   DisturbedTactileTransitionConfig tactile_transition;
 };
+
+using DisturbedGraspRolloutConfig = TactileOnlyContactTransitionConfig;
 
 struct DisturbedRolloutStepResult {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -24,11 +26,18 @@ struct DisturbedRolloutStepResult {
   bool valid{false};
 };
 
+DisturbedRolloutStepResult StepTactileOnlyGraspStateWithDisturbance(
+    const GraspState& state,
+    const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
+    const GraspDisturbanceStep& disturbance,
+    const RolloutContext& context,
+    const TactileOnlyContactTransitionConfig& config, double dt);
+
 DisturbedRolloutStepResult StepGraspStateWithDisturbance(
     const GraspState& state,
     const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
     const GraspDisturbanceStep& disturbance,
     const RolloutContext& context,
-    const DisturbedGraspRolloutConfig& config, double dt);
+    const TactileOnlyContactTransitionConfig& config, double dt);
 
 }  // namespace mppi_core

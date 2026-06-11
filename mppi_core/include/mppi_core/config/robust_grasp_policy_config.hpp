@@ -25,6 +25,10 @@ RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
     const YAML::Node& params,
     RobustGraspStateCostConfig defaults = {});
 
+ObjectContactSupportEvaluatorConfig ParseObjectContactSupportEvaluatorConfig(
+    const YAML::Node& params,
+    ObjectContactSupportEvaluatorConfig defaults = {});
+
 GraspActionLibraryConfig ParseGraspActionLibraryConfig(
     const YAML::Node& params, std::size_t action_dim,
     GraspActionLibraryConfig defaults = {});

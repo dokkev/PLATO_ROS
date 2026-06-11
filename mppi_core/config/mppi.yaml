@@ -1,6 +1,6 @@
 mppi:
   # Rollout horizon in seconds = horizon_steps * dt.
-  horizon_steps: 20
+  horizon_steps: 3
   dt: 0.01
 
   # Sampling budget and MPPI weighting temperature.
@@ -12,9 +12,13 @@ mppi:
   # Units are rad/s^2 for revolute joints and m/s^2 for prismatic joints.
   # Scalars expand to all controlled joints.
   action:
-    lower_bound: -2.0
-    upper_bound: 2.0
-    noise_std: 0.5
+    lower_bound: -20.0
+    upper_bound: 20.0
+    noise_std: 1.0
+    noise_clip: 10.0
+
+  state:
+    qdot_limit: 10.0
 
   # MPPI emits q_cmd, qdot_cmd, and tau_ff/tau_cmd only.
   # Driver-local RobotCommand.kp/kd are copied from driver_gains during command

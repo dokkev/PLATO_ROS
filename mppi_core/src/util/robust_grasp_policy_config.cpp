@@ -80,6 +80,22 @@ std::size_t ReadActionDim(const YAML::Node& rollout,
   return yaml_action_dim;
 }
 
+RobustGraspControlMode ParseControlMode(
+    const std::string& value,
+    const RobustGraspControlMode default_value) {
+  if (value.empty()) {
+    return default_value;
+  }
+  if (value == "continuous_qddot_mppi") {
+    return RobustGraspControlMode::kContinuousQddotMppi;
+  }
+  if (value == "discrete_action_selector") {
+    return RobustGraspControlMode::kDiscreteActionSelector;
+  }
+  throw std::invalid_argument(
+      "ParseRobustGraspPolicyConfig: unknown control_mode '" + value + "'");
+}
+
 }  // namespace
 
 GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
@@ -100,6 +116,40 @@ GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
   defaults.random_seed = static_cast<std::uint32_t>(
       yaml_utils::ReadSize(safe_params, "random_seed",
                            defaults.random_seed));
+  const YAML::Node object_disturbance =
+      yaml_utils::ReadSection(safe_params, "object_disturbance");
+  defaults.object.linear_velocity_std_mps =
+      yaml_utils::ReadDouble(
+          object_disturbance, "linear_velocity_std_mps",
+          defaults.object.linear_velocity_std_mps);
+  defaults.object.linear_velocity_max_mps =
+      yaml_utils::ReadDouble(
+          object_disturbance, "linear_velocity_max_mps",
+          defaults.object.linear_velocity_max_mps);
+  defaults.object.angular_velocity_std_radps =
+      yaml_utils::ReadDouble(
+          object_disturbance, "angular_velocity_std_radps",
+          defaults.object.angular_velocity_std_radps);
+  defaults.object.angular_velocity_max_radps =
+      yaml_utils::ReadDouble(
+          object_disturbance, "angular_velocity_max_radps",
+          defaults.object.angular_velocity_max_radps);
+  defaults.object.pose_xyz_std_m =
+      yaml_utils::ReadDouble(
+          object_disturbance, "pose_xyz_std_m",
+          defaults.object.pose_xyz_std_m);
+  defaults.object.pose_xyz_max_m =
+      yaml_utils::ReadDouble(
+          object_disturbance, "pose_xyz_max_m",
+          defaults.object.pose_xyz_max_m);
+  defaults.object.pose_rpy_std_rad =
+      yaml_utils::ReadDouble(
+          object_disturbance, "pose_rpy_std_rad",
+          defaults.object.pose_rpy_std_rad);
+  defaults.object.pose_rpy_max_rad =
+      yaml_utils::ReadDouble(
+          object_disturbance, "pose_rpy_max_rad",
+          defaults.object.pose_rpy_max_rad);
   defaults.tangent_velocity_std_mps =
       yaml_utils::ReadDouble(safe_params, "tangent_velocity_std_mps",
                              defaults.tangent_velocity_std_mps);
@@ -196,6 +246,86 @@ DisturbedTactileTransitionConfig ParseDisturbedTactileTransitionConfig(
   return defaults;
 }
 
+ObjectContactSupportEvaluatorConfig ParseObjectContactSupportEvaluatorConfig(
+    const YAML::Node& params,
+    ObjectContactSupportEvaluatorConfig defaults) {
+  const YAML::Node safe_params =
+      yaml_utils::HasValue(params) ? params : YAML::Node();
+  CheckMap(safe_params, "ParseObjectContactSupportEvaluatorConfig");
+
+  defaults.enabled =
+      yaml_utils::ReadBool(safe_params, "enabled", defaults.enabled);
+  defaults.max_object_samples =
+      yaml_utils::ReadSize(safe_params, "max_object_samples",
+                           defaults.max_object_samples);
+  defaults.max_object_samples =
+      yaml_utils::ReadSize(safe_params, "object_pose_samples",
+                           defaults.max_object_samples);
+  defaults.min_active_tactile_sensors =
+      yaml_utils::ReadSize(safe_params, "min_active_tactile_sensors",
+                           defaults.min_active_tactile_sensors);
+  defaults.min_active_hemisphere_total =
+      yaml_utils::ReadSize(safe_params, "min_active_hemisphere_total",
+                           defaults.min_active_hemisphere_total);
+  defaults.contact_birth_margin_m =
+      yaml_utils::ReadDouble(safe_params, "contact_birth_margin_m",
+                             defaults.contact_birth_margin_m);
+  defaults.contact_loss_margin_m =
+      yaml_utils::ReadDouble(safe_params, "contact_loss_margin_m",
+                             defaults.contact_loss_margin_m);
+  defaults.contact_stiffness_n_per_m =
+      yaml_utils::ReadDouble(safe_params, "contact_stiffness_n_per_m",
+                             defaults.contact_stiffness_n_per_m);
+  defaults.hemisphere_radius_m =
+      yaml_utils::ReadDouble(safe_params, "hemisphere_radius_m",
+                             defaults.hemisphere_radius_m);
+  defaults.support_distance_scale_m =
+      yaml_utils::ReadDouble(safe_params, "support_distance_scale_m",
+                             defaults.support_distance_scale_m);
+  defaults.max_allowed_penetration_m =
+      yaml_utils::ReadDouble(safe_params, "max_allowed_penetration_m",
+                             defaults.max_allowed_penetration_m);
+  defaults.target_predicted_normal_force_n =
+      yaml_utils::ReadDouble(
+          safe_params, "target_predicted_normal_force_n",
+          defaults.target_predicted_normal_force_n);
+  defaults.max_predicted_normal_force_n =
+      yaml_utils::ReadDouble(safe_params, "max_predicted_normal_force_n",
+                             defaults.max_predicted_normal_force_n);
+  defaults.min_predicted_contact_force_n =
+      yaml_utils::ReadDouble(safe_params, "min_predicted_contact_force_n",
+                             defaults.min_predicted_contact_force_n);
+  defaults.max_predicted_force_per_sensor_n =
+      yaml_utils::ReadDouble(safe_params, "max_predicted_force_per_sensor_n",
+                             defaults.max_predicted_force_per_sensor_n);
+  defaults.contact_loss_weight =
+      yaml_utils::ReadDouble(safe_params, "contact_loss_weight",
+                             defaults.contact_loss_weight);
+  defaults.support_weight =
+      yaml_utils::ReadDouble(safe_params, "support_weight",
+                             defaults.support_weight);
+  defaults.edge_weight =
+      yaml_utils::ReadDouble(safe_params, "edge_weight",
+                             defaults.edge_weight);
+  defaults.penetration_weight =
+      yaml_utils::ReadDouble(safe_params, "penetration_weight",
+                             defaults.penetration_weight);
+  defaults.predicted_force_low_weight =
+      yaml_utils::ReadDouble(
+          safe_params, "predicted_force_low_weight",
+          defaults.predicted_force_low_weight);
+  defaults.predicted_force_high_weight =
+      yaml_utils::ReadDouble(safe_params, "predicted_force_high_weight",
+                             defaults.predicted_force_high_weight);
+  defaults.target_edge_margin_m =
+      yaml_utils::ReadDouble(safe_params, "target_edge_margin_m",
+                             defaults.target_edge_margin_m);
+  defaults.use_particle_weights =
+      yaml_utils::ReadBool(safe_params, "use_particle_weights",
+                           defaults.use_particle_weights);
+  return defaults;
+}
+
 RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
     const YAML::Node& params, RobustGraspStateCostConfig defaults) {
   const YAML::Node safe_params =
@@ -271,6 +401,17 @@ RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
   defaults.tau_weight =
       yaml_utils::ReadDouble(safe_params, "tau_weight",
                              defaults.tau_weight);
+  defaults.object_support.min_active_tactile_sensors =
+      defaults.min_active_tactile_sensors;
+  defaults.object_support.min_active_hemisphere_total =
+      defaults.min_active_hemisphere_total;
+  defaults.object_support.contact_loss_weight =
+      defaults.contact_loss_weight;
+  defaults.object_support.support_weight =
+      defaults.support_weight;
+  defaults.object_support = ParseObjectContactSupportEvaluatorConfig(
+      yaml_utils::ReadSection(safe_params, "object_support"),
+      defaults.object_support);
   return defaults;
 }
 
@@ -399,6 +540,17 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
       ReadActionDim(rollout, action_dim, defaults);
   defaults.rollout =
       ParseMPPIConfig(rollout, resolved_action_dim, defaults.rollout);
+  defaults.control_mode = ParseControlMode(
+      yaml_utils::ReadString(safe_params, "control_mode", ""),
+      defaults.control_mode);
+  defaults.continuous_control_rate_cost_weight =
+      yaml_utils::ReadDouble(
+          safe_params, "continuous_control_rate_cost_weight",
+          defaults.continuous_control_rate_cost_weight);
+  defaults.continuous_smoothing_alpha =
+      yaml_utils::ReadDouble(
+          safe_params, "continuous_smoothing_alpha",
+          defaults.continuous_smoothing_alpha);
 
   const YAML::Node start = yaml_utils::ReadSection(safe_params, "start");
   defaults.start.min_enough_contact_sensors =
@@ -416,10 +568,14 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
       defaults.disturbance_sampler);
   defaults.disturbance_sampler.horizon_steps = defaults.rollout.horizon_steps;
 
-  defaults.disturbed_rollout.tactile_transition =
+  defaults.tactile_only_transition.tactile_transition =
       ParseDisturbedTactileTransitionConfig(
-          yaml_utils::ReadSection(safe_params, "tactile_transition"),
-          defaults.disturbed_rollout.tactile_transition);
+          yaml_utils::ReadSection(
+              safe_params,
+              yaml_utils::HasValue(safe_params["tactile_only_transition"])
+                  ? "tactile_only_transition"
+                  : "tactile_transition"),
+          defaults.tactile_only_transition.tactile_transition);
   defaults.cost = ParseRobustGraspStateCostConfig(
       yaml_utils::ReadSection(safe_params, "cost"), defaults.cost);
   defaults.action_library = ParseGraspActionLibraryConfig(

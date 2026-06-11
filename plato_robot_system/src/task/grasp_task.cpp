@@ -44,29 +44,6 @@ int NonnegativeTicks(const int ticks)
   return std::max(0, ticks);
 }
 
-bool ExtractNormalForceN(
-  const sensor::TactileState * tactile,
-  double * normal_force_n)
-{
-  if (normal_force_n == nullptr || tactile == nullptr || !tactile->valid) {
-    return false;
-  }
-
-  double force_n = tactile->ActiveHemisphereNormalForceN();
-  if (!IsFinite(force_n) || force_n <= 0.0) {
-    if (!tactile->total_force_n.allFinite()) {
-      return false;
-    }
-    force_n = tactile->total_force_n.z();
-  }
-  if (!IsFinite(force_n)) {
-    return false;
-  }
-
-  *normal_force_n = std::max(0.0, force_n);
-  return true;
-}
-
 bool HasValidParallelGeometry(const GraspTaskConfig & config)
 {
   return IsFinite(config.parallel_tip_radius_m) &&
@@ -100,18 +77,32 @@ bool IsValidConfig(const GraspTaskConfig & config)
          HasValidParallelGeometry(config);
 }
 
-const char * ContactStateName(const int contact_state)
+sensor::TactileForceAggregation ToTactileForceAggregation(
+  const GraspTaskConfig::ForceAggregation aggregation)
 {
-  switch (contact_state) {
-    case sensor::TactileState::kNoContact:
-      return "no_contact";
-    case sensor::TactileState::kFewContacts:
-      return "few_contacts";
-    case sensor::TactileState::kEnoughContacts:
-      return "enough_contacts";
-    default:
-      return "unknown";
+  switch (aggregation) {
+    case GraspTaskConfig::ForceAggregation::kMin:
+      return sensor::TactileForceAggregation::kMin;
+    case GraspTaskConfig::ForceAggregation::kAverage:
+      return sensor::TactileForceAggregation::kAverage;
   }
+  return sensor::TactileForceAggregation::kMin;
+}
+
+sensor::TactileGripObservationConfig BuildGripObservationConfig(
+  const GraspTaskConfig & config)
+{
+  sensor::TactileGripObservationConfig observation_config;
+  observation_config.frame_a_name =
+    std::string(kThumbIndexFrameA.data(), kThumbIndexFrameA.size());
+  observation_config.frame_b_name =
+    std::string(kThumbIndexFrameB.data(), kThumbIndexFrameB.size());
+  observation_config.min_contact_force_n = config.min_contact_force_n;
+  observation_config.use_tactile_presence_for_contact =
+    config.use_tactile_presence_for_contact;
+  observation_config.force_aggregation =
+    ToTactileForceAggregation(config.force_aggregation);
+  return observation_config;
 }
 
 }  // namespace
@@ -231,7 +222,7 @@ bool GraspTask::BuildMotionTarget(
   const double phi = Clamp01(input.phi);
   const double desired_force_n = std::max(0.0, input.desired_force_n);
 
-  const GraspTaskGripForceEstimate estimate = EstimateGripForceFromTactile(state);
+  const sensor::TactileGripObservation estimate = EstimateGripForceFromTactile(state);
   PrintContactStatesIfNeeded(state, estimate);
   UpdateMode(estimate, u_open);
   if (mode_ == GraspTaskMode::kForceTracking && !estimate.valid_force) {
@@ -256,10 +247,8 @@ bool GraspTask::BuildMotionTarget(
   status_.lost_contact_a = estimate.lost_contact_a;
   status_.lost_contact_b = estimate.lost_contact_b;
   status_.valid_force = estimate.valid_force;
-  status_.contact_count =
-    (estimate.contact_a ? 1 : 0) + (estimate.contact_b ? 1 : 0);
-  status_.enough_contact_count =
-    (estimate.enough_contact_a ? 1 : 0) + (estimate.enough_contact_b ? 1 : 0);
+  status_.contact_count = estimate.ContactCount();
+  status_.enough_contact_count = estimate.EnoughContactCount();
   status_.force_enter_counter = force_enter_counter_;
   status_.force_exit_contact_lost_counter = force_exit_contact_lost_counter_;
 
@@ -303,73 +292,17 @@ bool GraspTask::CaptureReferencePosture(const RobotState & state)
   return has_reference_posture_;
 }
 
-GraspTaskGripForceEstimate GraspTask::EstimateGripForceFromTactile(
+sensor::TactileGripObservation GraspTask::EstimateGripForceFromTactile(
   const RobotState & state) const
 {
-  GraspTaskGripForceEstimate estimate;
-  const sensor::TactileState * tactile_a = nullptr;
-  const sensor::TactileState * tactile_b = nullptr;
-  const std::string frame_a_name(kThumbIndexFrameA);
-  const std::string frame_b_name(kThumbIndexFrameB);
-  for (const auto & tactile : state.tactile_sensors) {
-    if (tactile.frame_name == frame_a_name) {
-      tactile_a = &tactile;
-    } else if (tactile.frame_name == frame_b_name) {
-      tactile_b = &tactile;
-    }
-  }
-
-  const bool has_force_a = ExtractNormalForceN(tactile_a, &estimate.force_a_n);
-  const bool has_force_b = ExtractNormalForceN(tactile_b, &estimate.force_b_n);
-
-  if (config_.use_tactile_presence_for_contact) {
-    estimate.contact_a =
-      tactile_a != nullptr && tactile_a->valid && tactile_a->HasContact();
-    estimate.contact_b =
-      tactile_b != nullptr && tactile_b->valid && tactile_b->HasContact();
-    estimate.enough_contact_a =
-      tactile_a != nullptr && tactile_a->valid && tactile_a->HasEnoughContact();
-    estimate.enough_contact_b =
-      tactile_b != nullptr && tactile_b->valid && tactile_b->HasEnoughContact();
-    estimate.lost_contact_a =
-      tactile_a == nullptr || !tactile_a->valid ||
-      tactile_a->contact_state == sensor::TactileState::kNoContact;
-    estimate.lost_contact_b =
-      tactile_b == nullptr || !tactile_b->valid ||
-      tactile_b->contact_state == sensor::TactileState::kNoContact;
-  } else {
-    estimate.enough_contact_a =
-      has_force_a && estimate.force_a_n >= config_.min_contact_force_n;
-    estimate.enough_contact_b =
-      has_force_b && estimate.force_b_n >= config_.min_contact_force_n;
-    estimate.contact_a = estimate.enough_contact_a;
-    estimate.contact_b = estimate.enough_contact_b;
-    estimate.lost_contact_a =
-      !has_force_a || estimate.force_a_n < config_.min_contact_force_n;
-    estimate.lost_contact_b =
-      !has_force_b || estimate.force_b_n < config_.min_contact_force_n;
-  }
-
-  estimate.valid_force = has_force_a && has_force_b;
-  if (!estimate.valid_force) {
-    return estimate;
-  }
-
-  switch (config_.force_aggregation) {
-    case GraspTaskConfig::ForceAggregation::kMin:
-      estimate.measured_force_n = std::min(estimate.force_a_n, estimate.force_b_n);
-      break;
-    case GraspTaskConfig::ForceAggregation::kAverage:
-      estimate.measured_force_n = 0.5 * (estimate.force_a_n + estimate.force_b_n);
-      break;
-  }
-  estimate.valid_force = IsFinite(estimate.measured_force_n);
-  return estimate;
+  return sensor::ObserveTactileGrip(
+    state.tactile_sensors,
+    BuildGripObservationConfig(config_));
 }
 
 void GraspTask::PrintContactStatesIfNeeded(
   const RobotState & state,
-  const GraspTaskGripForceEstimate & estimate)
+  const sensor::TactileGripObservation & estimate)
 {
   if (!config_.debug_print_contact_states || !std::isfinite(state.time_s)) {
     return;
@@ -388,16 +321,14 @@ void GraspTask::PrintContactStatesIfNeeded(
   message << std::fixed << std::setprecision(4)
           << "[grasp_task] tactile contact states t=" << state.time_s
           << " sensors=" << state.tactile_sensors.size()
-          << " contact_count="
-          << ((estimate.contact_a ? 1 : 0) + (estimate.contact_b ? 1 : 0))
-          << " enough_count="
-          << ((estimate.enough_contact_a ? 1 : 0) + (estimate.enough_contact_b ? 1 : 0));
+          << " contact_count=" << estimate.ContactCount()
+          << " enough_count=" << estimate.EnoughContactCount();
 
   for (const auto & tactile : state.tactile_sensors) {
     message << " | idx=" << tactile.sensor_index
             << " frame=" << tactile.frame_name
             << " valid=" << (tactile.valid ? "true" : "false")
-            << " state=" << ContactStateName(tactile.contact_state)
+            << " state=" << sensor::TactileContactStateName(tactile.contact_state)
             << " active_hemi=" << tactile.ActiveHemisphereCount()
             << " force_n=" << tactile.ActiveHemisphereNormalForceN();
   }
@@ -406,7 +337,7 @@ void GraspTask::PrintContactStatesIfNeeded(
 }
 
 void GraspTask::UpdateMode(
-  const GraspTaskGripForceEstimate & estimate,
+  const sensor::TactileGripObservation & estimate,
   const double u)
 {
   if (mode_ == GraspTaskMode::kMotionTeleop) {
@@ -474,7 +405,7 @@ bool GraspTask::BuildParallelJointPositionTarget(
   const RobotSystem & robot,
   const RobotState & state,
   const GraspTaskCommand & input,
-  const GraspTaskGripForceEstimate & estimate,
+  const sensor::TactileGripObservation & estimate,
   const double dt_sec,
   Eigen::VectorXd * q_target_out)
 {

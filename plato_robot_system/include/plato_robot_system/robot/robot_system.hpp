@@ -18,8 +18,7 @@
 
 namespace plato_robot_system {
 
-using TactileSensorVector =
-    std::vector<sensor::TactileState, Eigen::aligned_allocator<sensor::TactileState>>;
+using TactileSensorVector = sensor::TactileStateVector;
 
 // Robot state container.
 //

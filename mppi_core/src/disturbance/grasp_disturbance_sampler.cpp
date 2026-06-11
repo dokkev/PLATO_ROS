@@ -42,6 +42,14 @@ void ValidateConfig(const GraspDisturbanceSamplerConfig& config) {
         "GraspDisturbanceSamplerConfig: tactile_sensor_count must be positive");
   }
   if (!IsNonnegativeFinite(config.tangent_velocity_std_mps) ||
+      !IsNonnegativeFinite(config.object.linear_velocity_std_mps) ||
+      !IsNonnegativeFinite(config.object.linear_velocity_max_mps) ||
+      !IsNonnegativeFinite(config.object.angular_velocity_std_radps) ||
+      !IsNonnegativeFinite(config.object.angular_velocity_max_radps) ||
+      !IsNonnegativeFinite(config.object.pose_xyz_std_m) ||
+      !IsNonnegativeFinite(config.object.pose_xyz_max_m) ||
+      !IsNonnegativeFinite(config.object.pose_rpy_std_rad) ||
+      !IsNonnegativeFinite(config.object.pose_rpy_max_rad) ||
       !IsNonnegativeFinite(config.tangent_velocity_max_mps) ||
       !IsNonnegativeFinite(config.rotational_velocity_std_radps) ||
       !IsNonnegativeFinite(config.rotational_velocity_max_radps) ||
@@ -70,6 +78,18 @@ CommonGraspDisturbance Antithetic(
   out.rotational_velocity_radps = -out.rotational_velocity_radps;
   out.normal_force_rate_nps = -out.normal_force_rate_nps;
   out.cop_drift_velocity_grasp_mps = -out.cop_drift_velocity_grasp_mps;
+  return out;
+}
+
+VirtualObjectDisturbance Antithetic(
+    const VirtualObjectDisturbance& disturbance) {
+  VirtualObjectDisturbance out = disturbance;
+  out.linear_velocity_world_mps = -out.linear_velocity_world_mps;
+  out.angular_velocity_world_radps = -out.angular_velocity_world_radps;
+  out.position_offset_world_m = -out.position_offset_world_m;
+  out.rpy_offset_world_rad = -out.rpy_offset_world_rad;
+  out.external_force_world_n = -out.external_force_world_n;
+  out.external_torque_world_nm = -out.external_torque_world_nm;
   return out;
 }
 
@@ -115,6 +135,53 @@ CommonGraspDisturbance SampleCommonDisturbance(
           SampleClampedNormal(
               rng, config.cop_drift_velocity_std_mps,
               config.cop_drift_velocity_max_mps)};
+  disturbance.dropout = dropout_dist != nullptr && (*dropout_dist)(*rng);
+  disturbance.valid = true;
+  return disturbance;
+}
+
+VirtualObjectDisturbance SampleObjectDisturbance(
+    std::mt19937* rng, const ObjectDisturbanceSamplerConfig& config,
+    std::bernoulli_distribution* dropout_dist) {
+  VirtualObjectDisturbance disturbance;
+  disturbance.linear_velocity_world_mps =
+      Eigen::Vector3d{
+          SampleClampedNormal(
+              rng, config.linear_velocity_std_mps,
+              config.linear_velocity_max_mps),
+          SampleClampedNormal(
+              rng, config.linear_velocity_std_mps,
+              config.linear_velocity_max_mps),
+          SampleClampedNormal(
+              rng, config.linear_velocity_std_mps,
+              config.linear_velocity_max_mps)};
+  disturbance.angular_velocity_world_radps =
+      Eigen::Vector3d{
+          SampleClampedNormal(
+              rng, config.angular_velocity_std_radps,
+              config.angular_velocity_max_radps),
+          SampleClampedNormal(
+              rng, config.angular_velocity_std_radps,
+              config.angular_velocity_max_radps),
+          SampleClampedNormal(
+              rng, config.angular_velocity_std_radps,
+              config.angular_velocity_max_radps)};
+  disturbance.position_offset_world_m =
+      Eigen::Vector3d{
+          SampleClampedNormal(rng, config.pose_xyz_std_m,
+                              config.pose_xyz_max_m),
+          SampleClampedNormal(rng, config.pose_xyz_std_m,
+                              config.pose_xyz_max_m),
+          SampleClampedNormal(rng, config.pose_xyz_std_m,
+                              config.pose_xyz_max_m)};
+  disturbance.rpy_offset_world_rad =
+      Eigen::Vector3d{
+          SampleClampedNormal(rng, config.pose_rpy_std_rad,
+                              config.pose_rpy_max_rad),
+          SampleClampedNormal(rng, config.pose_rpy_std_rad,
+                              config.pose_rpy_max_rad),
+          SampleClampedNormal(rng, config.pose_rpy_std_rad,
+                              config.pose_rpy_max_rad)};
   disturbance.dropout = dropout_dist != nullptr && (*dropout_dist)(*rng);
   disturbance.valid = true;
   return disturbance;
@@ -202,9 +269,13 @@ GraspDisturbanceSampler::SampleBatch() {
           config_.tactile_sensor_count);
       disturbance_step.valid = true;
       if (pair_source != nullptr && step < pair_source->steps.size()) {
+        disturbance_step.object_disturbance =
+            Antithetic(pair_source->steps[step].object_disturbance);
         disturbance_step.common_grasp_disturbance = Antithetic(
             pair_source->steps[step].common_grasp_disturbance);
       } else {
+        disturbance_step.object_disturbance =
+            SampleObjectDisturbance(&rng_, config_.object, &dropout_dist);
         disturbance_step.common_grasp_disturbance =
             SampleCommonDisturbance(&rng_, config_, &dropout_dist);
       }

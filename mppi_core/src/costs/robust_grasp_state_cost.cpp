@@ -29,6 +29,32 @@ bool IsFiniteAndNonnegative(const double value) {
   return std::isfinite(value) && value >= 0.0;
 }
 
+bool IsValidObjectSupportCostConfig(
+    const ObjectContactSupportEvaluatorConfig& config) {
+  return config.max_object_samples > 0 &&
+         config.min_active_tactile_sensors > 0 &&
+         config.min_active_hemisphere_total > 0 &&
+         IsFiniteAndNonnegative(config.contact_birth_margin_m) &&
+         IsFiniteAndNonnegative(config.contact_loss_margin_m) &&
+         config.contact_loss_margin_m >= config.contact_birth_margin_m &&
+         IsFiniteAndNonnegative(config.contact_stiffness_n_per_m) &&
+         IsFiniteAndNonnegative(config.hemisphere_radius_m) &&
+         IsFiniteAndNonnegative(config.support_distance_scale_m) &&
+         config.support_distance_scale_m > 0.0 &&
+         IsFiniteAndNonnegative(config.max_allowed_penetration_m) &&
+         IsFiniteAndNonnegative(config.target_predicted_normal_force_n) &&
+         IsFiniteAndNonnegative(config.max_predicted_normal_force_n) &&
+         IsFiniteAndNonnegative(config.min_predicted_contact_force_n) &&
+         IsFiniteAndNonnegative(config.max_predicted_force_per_sensor_n) &&
+         IsFiniteAndNonnegative(config.contact_loss_weight) &&
+         IsFiniteAndNonnegative(config.support_weight) &&
+         IsFiniteAndNonnegative(config.edge_weight) &&
+         IsFiniteAndNonnegative(config.penetration_weight) &&
+         IsFiniteAndNonnegative(config.predicted_force_low_weight) &&
+         IsFiniteAndNonnegative(config.predicted_force_high_weight) &&
+         IsFiniteAndNonnegative(config.target_edge_margin_m);
+}
+
 void ValidateConfig(const RobustGraspStateCostConfig& config) {
   if (!IsFiniteAndNonnegative(config.contact_loss_weight) ||
       !IsFiniteAndNonnegative(config.support_weight) ||
@@ -49,6 +75,7 @@ void ValidateConfig(const RobustGraspStateCostConfig& config) {
       !IsFiniteAndNonnegative(config.contact_line_alignment_deadband_m) ||
       !IsFiniteAndNonnegative(config.qddot_weight) ||
       !IsFiniteAndNonnegative(config.tau_weight) ||
+      !IsValidObjectSupportCostConfig(config.object_support) ||
       !config.close_axis_base.allFinite() ||
       config.close_axis_base.norm() <= 1.0e-12 ||
       config.min_normal_force_per_sensor_n >
@@ -57,6 +84,13 @@ void ValidateConfig(const RobustGraspStateCostConfig& config) {
         "RobustGraspStateCostConfig: invalid numeric field");
   }
 }
+
+struct ForceCostTerms {
+  double preload_cost{0.0};
+  double balance_cost{0.0};
+
+  double totalCost() const { return preload_cost + balance_cost; }
+};
 
 double ContactSupportCost(const GraspState& state,
                           const RobustGraspStateCostConfig& config) {
@@ -78,11 +112,11 @@ double ContactSupportCost(const GraspState& state,
   return cost;
 }
 
-double ForceCost(const GraspState& state,
-                 const RobustGraspStateCostConfig& config) {
+ForceCostTerms ForceCost(const GraspState& state,
+                         const RobustGraspStateCostConfig& config) {
+  ForceCostTerms terms;
   std::vector<double> active_forces_n;
   active_forces_n.reserve(state.tactile_sensors.size());
-  double cost = 0.0;
   for (const auto& tactile : state.tactile_sensors) {
     if (!tactile.hasActiveHemisphereContact()) {
       continue;
@@ -91,12 +125,14 @@ double ForceCost(const GraspState& state,
         std::max(0.0, tactile.activeHemisphereNormalForceN());
     active_forces_n.push_back(force_n);
     if (force_n < config.min_normal_force_per_sensor_n) {
-      cost += config.force_low_weight *
-              Square(config.min_normal_force_per_sensor_n - force_n);
+      terms.preload_cost +=
+          config.force_low_weight *
+          Square(config.min_normal_force_per_sensor_n - force_n);
     }
     if (force_n > config.max_normal_force_per_sensor_n) {
-      cost += config.force_high_weight *
-              Square(force_n - config.max_normal_force_per_sensor_n);
+      terms.preload_cost +=
+          config.force_high_weight *
+          Square(force_n - config.max_normal_force_per_sensor_n);
     }
   }
 
@@ -105,8 +141,8 @@ double ForceCost(const GraspState& state,
         *std::min_element(active_forces_n.begin(), active_forces_n.end());
     const double force_deficit_n =
         std::max(0.0, config.target_normal_force_n - weakest_force_n);
-    cost += config.force_low_weight *
-            Square(force_deficit_n);
+    terms.preload_cost +=
+        config.force_low_weight * Square(force_deficit_n);
   }
 
   if (active_forces_n.size() >= 2U) {
@@ -115,9 +151,9 @@ double ForceCost(const GraspState& state,
     const double imbalance_n = *max_force_it - *min_force_it;
     const double excess_n =
         HingeExcess(imbalance_n, config.force_balance_deadband_n);
-    cost += config.force_balance_weight * Square(excess_n);
+    terms.balance_cost += config.force_balance_weight * Square(excess_n);
   }
-  return cost;
+  return terms;
 }
 
 double ShearCost(const GraspState& state,
@@ -230,17 +266,40 @@ double RobustGraspStateCost::Evaluate(
     const GraspState& state,
     const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
     const RolloutContext& context) const {
+  return Evaluate(state, qddot_sol, context, nullptr);
+}
+
+double RobustGraspStateCost::Evaluate(
+    const GraspState& state,
+    const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
+    const RolloutContext& context,
+    RobustGraspStateCostBreakdown* breakdown) const {
   if (!state.valid || !qddot_sol.allFinite()) {
     return 1.0e30;
   }
 
-  double cost = ContactSupportCost(state, config_);
-  cost += ForceCost(state, config_);
-  cost += ShearCost(state, config_);
-  cost += ContactLineAlignmentCost(state, context, config_);
-  cost += config_.qddot_weight * qddot_sol.squaredNorm();
+  RobustGraspStateCostBreakdown local;
+  local.tactile_contact_support_cost = ContactSupportCost(state, config_);
+  const ForceCostTerms force_terms = ForceCost(state, config_);
+  local.preload_cost = force_terms.preload_cost;
+  local.force_balance_cost = force_terms.balance_cost;
+  local.force_cost = force_terms.totalCost();
+  local.shear_cost = ShearCost(state, config_);
+  local.contact_line_alignment_cost =
+      ContactLineAlignmentCost(state, context, config_);
+  local.action_cost = config_.qddot_weight * qddot_sol.squaredNorm();
   if (state.robot.tau.size() > 0 && state.robot.tau.allFinite()) {
-    cost += config_.tau_weight * state.robot.tau.squaredNorm();
+    local.torque_cost = config_.tau_weight * state.robot.tau.squaredNorm();
+  }
+  local.object_support =
+      EvaluateObjectContactSupport(state, context, config_.object_support);
+  if (local.object_support.valid) {
+    local.object_support_cost = local.object_support.totalCost();
+  }
+
+  const double cost = local.totalCost();
+  if (breakdown != nullptr) {
+    *breakdown = local;
   }
   return std::isfinite(cost) ? cost : 1.0e30;
 }

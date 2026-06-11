@@ -8,6 +8,8 @@
 #include <Eigen/StdVector>
 #include <vector>
 
+#include "mppi_core/object/object_contact_belief.hpp"
+#include "mppi_core/object/object_prior.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/tactile/tactile_sensor_context.hpp"
 #include "mppi_core/tactile/tactile_state.hpp"
@@ -42,6 +44,11 @@ struct GraspObservation {
 
   std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
       tactile_meas;
+
+  // Optional object prior/belief for object-aware contact rollout. Empty
+  // defaults keep the tactile-only rollout path valid.
+  ObjectPrior object_prior;
+  VirtualObjectBelief object_belief;
 
   // Pinocchio RNEA updates Data as a computation cache, so this pointer is
   // single-thread only. Parallel rollout should replace it with per-worker

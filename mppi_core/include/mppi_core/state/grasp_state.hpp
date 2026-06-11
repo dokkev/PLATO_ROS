@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "mppi_core/object/object_contact_belief.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/tactile/tactile_state.hpp"
 
@@ -23,7 +24,12 @@ struct GraspState {
   std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
       tactile_sensors;
 
+  VirtualObjectBelief object_belief;
+
   std::size_t tactileSensorCount() const { return tactile_sensors.size(); }
+  bool hasObjectBelief() const {
+    return HasVirtualObjectBelief(object_belief);
+  }
 
   bool hasAnyTactileContact() const {
     for (const auto& tactile : tactile_sensors) {
@@ -65,40 +71,47 @@ inline bool HasValidTactileSensors(const GraspState& state) {
 inline GraspState MakeGraspState(
     const RobotState& robot,
     const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
-        tactile_sensors) {
+        tactile_sensors,
+    const VirtualObjectBelief& object_belief = {}) {
   GraspState state;
   state.robot = robot;
   state.tactile_sensors = tactile_sensors;
-  state.valid = IsValid(robot) && HasValidTactileSensors(state);
+  state.object_belief = object_belief;
+  state.valid = IsValid(robot) && HasValidTactileSensors(state) &&
+                IsValidVirtualObjectBelief(state.object_belief);
   return state;
 }
 
 inline GraspState MakeGraspState(const RobotState& robot,
                                  const TactileState& first_tactile,
-                                 const TactileState& second_tactile) {
+                                 const TactileState& second_tactile,
+                                 const VirtualObjectBelief& object_belief = {}) {
   std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
       tactile_sensors;
   tactile_sensors.reserve(2);
   tactile_sensors.push_back(first_tactile);
   tactile_sensors.push_back(second_tactile);
-  return MakeGraspState(robot, tactile_sensors);
+  return MakeGraspState(robot, tactile_sensors, object_belief);
 }
 
 inline GraspState MakeGraspState(
     const Eigen::VectorXd& q, const Eigen::VectorXd& qdot,
     const Eigen::VectorXd& tau,
     const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
-        tactile_sensors) {
-  return MakeGraspState(MakeRobotState(q, qdot, tau), tactile_sensors);
+        tactile_sensors,
+    const VirtualObjectBelief& object_belief = {}) {
+  return MakeGraspState(MakeRobotState(q, qdot, tau), tactile_sensors,
+                        object_belief);
 }
 
 inline GraspState MakeGraspState(const Eigen::VectorXd& q,
                                  const Eigen::VectorXd& qdot,
                                  const Eigen::VectorXd& tau,
                                  const TactileState& first_tactile,
-                                 const TactileState& second_tactile) {
+                                 const TactileState& second_tactile,
+                                 const VirtualObjectBelief& object_belief = {}) {
   return MakeGraspState(MakeRobotState(q, qdot, tau), first_tactile,
-                        second_tactile);
+                        second_tactile, object_belief);
 }
 
 struct GraspStartConfig {

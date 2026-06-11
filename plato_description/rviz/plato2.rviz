@@ -9,6 +9,7 @@ Panels:
         - /RobotModel1
         - /RobotModel1/Mass Properties1
         - /RobotModel1/Description Topic1
+        - /Robust Grasp Debug1
         - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.5
@@ -123,6 +124,19 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Robust Grasp Debug
+      Namespaces:
+        {}
+      Queue Size: 10
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plato2/aristo_controller/robust_grasp_debug_markers
+      Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true
       Filter (blacklist): ""

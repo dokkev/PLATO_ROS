@@ -1,12 +1,13 @@
 # Robust Grasp Policy
 
-`RobustGraspPolicy` is a disturbance-aware blind grasp-state predictor. It does
-not estimate object pose and does not simulate a rigid object body.
+`RobustGraspPolicy` is a disturbance-aware grasp-state scenario evaluator. It
+does not estimate the true object pose and does not simulate a rigid object
+body.
 
 The prediction state remains:
 
 ```text
-GraspState = RobotState + vector<TactileState>
+GraspState = RobotState + vector<TactileState> + optional VirtualObjectBelief
 ```
 
 The policy differs from `MPPIOptimizer` in two important ways:
@@ -17,6 +18,9 @@ The policy differs from `MPPIOptimizer` in two important ways:
 2. Randomness is applied to tactile/contact disturbances:
    tangent drift, rotational shear, normal-force rate, friction scale, CoP
    drift, and dropout.
+3. If a valid Jenga/object belief is available, object particles are treated as
+   sampled pose scenarios. The cost uses primitive signed-distance queries from
+   rollout hemisphere centers to the sampled object poses.
 
 The corrective action coefficients are:
 
@@ -30,8 +34,9 @@ enabled for sign checks, but the primary search is sampled coefficient actions,
 not hard-coded joint-space presets.
 
 Disturbance samples include one common hidden grasp disturbance plus smaller
-sensor-local noise. This keeps the two fingertip contacts tied to one hidden
-object/contact disturbance without requiring object-pose estimation.
+sensor-local noise. Object belief particles provide a separate scenario set for
+geometric contact support evaluation without claiming true object-pose
+prediction.
 
 Each candidate action sequence is rolled out against many pre-sampled
 `GraspDisturbanceSequence`s. The selected action minimizes:
@@ -52,6 +57,12 @@ costs. Inside the safe force interval, force-balance deadband, alignment
 deadband, and low-shear region, the best action should be zero because action
 effort and action-rate costs make unnecessary motion worse.
 
+Object support terms are also hinge costs. They penalize predicted loss of
+measured contacts, insufficient predicted support count, small predicted edge
+margin on the tactile grid, and excessive signed-distance force proxy. The
+proxy force is only a scenario score derived from distance to the primitive
+object surface.
+
 The disturbed transition updates:
 
 - tactile shear and shear velocity
@@ -59,6 +70,11 @@ The disturbed transition updates:
 - hemisphere normal force
 - contact loss from unloading, dropout, shear/rotation limits, or low force
 - neighbor-based contact birth
+
+The object support evaluator separately allows geometry-based contact birth for
+inactive hemispheres when their signed distance to a sampled Jenga pose falls
+inside the contact margin. This does not mutate tactile state; it contributes
+to rollout cost and diagnostics.
 
 The policy should only run after measured tactile contact exists on both
 fingers. It is a grasp stabilizer, not a first-contact finder.

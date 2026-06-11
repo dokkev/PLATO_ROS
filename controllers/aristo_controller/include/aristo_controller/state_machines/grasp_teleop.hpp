@@ -18,14 +18,14 @@ struct GraspTeleopStateConfig
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  double default_u{0.0};
+  double default_u{0.5};
   double default_phi{0.0};
   double default_desired_force_n{1.0};
   bool shared_grasp_control{false};
-  int shared_control_min_contact_sensors{1};
+  int shared_control_min_contact_sensors{2};
   int shared_control_enter_debounce_ticks{3};
   bool shared_control_requires_u_below_threshold{true};
-  bool shared_control_requires_enough_contact{false};
+  bool shared_control_requires_enough_contact{true};
 
   plato_robot_system::task::GraspTaskConfig grasp_task;
 };

@@ -8,7 +8,6 @@
 #include "aristo_controller/state_machines/grasp_force.hpp"
 #include "aristo_controller/state_machines/grasp_teleop.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
-#include "aristo_controller/state_machines/mppi_motion_grasp.hpp"
 #include "aristo_controller/state_machines/robust_grasp_mpc.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
@@ -45,11 +44,6 @@ struct JointPositionConfig : public StateConfig
   Eigen::VectorXd kd_task;
 };
 
-struct MPPIMotionGraspConfig : public StateConfig
-{
-  aristo_controller::state_machines::MPPIMotionGraspStateConfig state;
-};
-
 struct RobustGraspMpcConfig : public StateConfig
 {
   aristo_controller::state_machines::RobustGraspMpcStateConfig state;
@@ -76,7 +70,6 @@ struct AristoConfig
   JointTeleopConfig joint_teleop;
   GraspTeleopConfig grasp_teleop;
   GraspForceConfig grasp_force;
-  MPPIMotionGraspConfig mppi_motion_grasp;
   RobustGraspMpcConfig robust_grasp_mpc;
 };
 

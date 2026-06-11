@@ -147,6 +147,20 @@ MPPIConfig ParseMPPIConfig(const YAML::Node& params, std::size_t action_dim,
       action, "upper_bound", action_dim, defaults.action_upper_bound);
   defaults.action_noise_std = ReadVectorXdOrScalar(
       action, "noise_std", action_dim, defaults.action_noise_std);
+  defaults.action_noise_clip = ReadVectorXdOrScalar(
+      action, "noise_clip", action_dim, defaults.action_noise_clip);
+
+  const YAML::Node state = ReadSection(safe_params, "state");
+  defaults.qdot_lower_bound = ReadVectorXdOrScalar(
+      state, "qdot_lower_bound", action_dim, defaults.qdot_lower_bound);
+  defaults.qdot_upper_bound = ReadVectorXdOrScalar(
+      state, "qdot_upper_bound", action_dim, defaults.qdot_upper_bound);
+  const Eigen::VectorXd qdot_limit = ReadVectorXdOrScalar(
+      state, "qdot_limit", action_dim, Eigen::VectorXd());
+  if (qdot_limit.size() > 0) {
+    defaults.qdot_lower_bound = -qdot_limit;
+    defaults.qdot_upper_bound = qdot_limit;
+  }
 
   // Backward-compatible flat fields for older experimental configs.
   defaults.action_lower_bound =
@@ -157,6 +171,21 @@ MPPIConfig ParseMPPIConfig(const YAML::Node& params, std::size_t action_dim,
                            defaults.action_upper_bound);
   defaults.action_noise_std = ReadVectorXdOrScalar(
       safe_params, "action_noise_std", action_dim, defaults.action_noise_std);
+  defaults.action_noise_clip = ReadVectorXdOrScalar(
+      safe_params, "action_noise_clip", action_dim,
+      defaults.action_noise_clip);
+  defaults.qdot_lower_bound =
+      ReadVectorXdOrScalar(safe_params, "qdot_lower_bound", action_dim,
+                           defaults.qdot_lower_bound);
+  defaults.qdot_upper_bound =
+      ReadVectorXdOrScalar(safe_params, "qdot_upper_bound", action_dim,
+                           defaults.qdot_upper_bound);
+  const Eigen::VectorXd flat_qdot_limit = ReadVectorXdOrScalar(
+      safe_params, "qdot_limit", action_dim, Eigen::VectorXd());
+  if (flat_qdot_limit.size() > 0) {
+    defaults.qdot_lower_bound = -flat_qdot_limit;
+    defaults.qdot_upper_bound = flat_qdot_limit;
+  }
 
   if (safe_params["command"] || safe_params["command_kp"] ||
       safe_params["command_kd"]) {

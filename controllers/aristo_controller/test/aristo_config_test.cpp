@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <string>
+
+#include <yaml-cpp/yaml.h>
 
 #include "aristo_controller/config/aristo_config.hpp"
 
@@ -17,6 +21,8 @@ std::filesystem::path AristoConfigPath()
 TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
 {
   ASSERT_TRUE(std::filesystem::exists(AristoConfigPath())) << AristoConfigPath();
+  ASSERT_TRUE(
+    std::filesystem::exists(AristoConfigPath().parent_path() / "robust_mpc_param.yaml"));
 
   const auto config =
     aristo_controller::config::load_aristo_config(AristoConfigPath().string());
@@ -27,7 +33,6 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_EQ(config.grasp_ready.id, 3);
   EXPECT_EQ(config.grasp_teleop.id, 4);
   EXPECT_EQ(config.grasp_force.id, 6);
-  EXPECT_EQ(config.mppi_motion_grasp.id, 7);
   EXPECT_EQ(config.robust_grasp_mpc.id, 8);
   EXPECT_EQ(config.poke.id, 1);
   EXPECT_TRUE(config.initialize.lifecycle.stay_here);
@@ -86,7 +91,7 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
 
   const auto & grasp_task = config.grasp_teleop.state.grasp_task;
   const plato_robot_system::task::GraspTaskConfig header_defaults;
-  EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_u, 0.7);
+  EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_u, 0.5);
   EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_phi, 0.0);
   EXPECT_TRUE(config.grasp_teleop.state.shared_grasp_control);
   EXPECT_EQ(config.grasp_teleop.state.shared_control_min_contact_sensors, 2);
@@ -126,38 +131,6 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(grasp_force_task.force_exit_u_threshold, 0.75);
   EXPECT_DOUBLE_EQ(grasp_force_task.kp_tactile_u_fb, 0.02);
 
-  const auto & mppi_motion_grasp = config.mppi_motion_grasp.state;
-  EXPECT_TRUE(mppi_motion_grasp.enabled);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_u, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_phi, 0.5);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_desired_force_n, 1.0);
-  EXPECT_EQ(mppi_motion_grasp.initiation.contact_enter_debounce_ticks, 3);
-  EXPECT_EQ(mppi_motion_grasp.initiation.contact_exit_debounce_ticks, 3);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.contacted_finger_hold_weight, 50.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.moving_finger_target_weight, 10.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.posture_weight, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.max_reference_tracking_error_rad, 0.5);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_velocity_rad_s, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_torque_nm, 0.2);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_torque_rate_nm_per_s, 2.0);
-  EXPECT_EQ(mppi_motion_grasp.mppi.horizon_steps, 20U);
-  EXPECT_EQ(mppi_motion_grasp.mppi.num_rollouts, 256U);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_lower_bound[0], -4.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_upper_bound[0], 4.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_noise_std[0], 1.0);
-  EXPECT_FALSE(mppi_motion_grasp.logging.enabled);
-  EXPECT_EQ(mppi_motion_grasp.logging.output_directory, "/tmp/mppi_eval");
-  EXPECT_EQ(mppi_motion_grasp.logging.file_prefix, "mppi_motion_grasp");
-  EXPECT_EQ(mppi_motion_grasp.logging.rollout_log_stride, 1);
-  EXPECT_EQ(mppi_motion_grasp.logging.max_logged_horizon_steps, 0);
-  EXPECT_EQ(mppi_motion_grasp.logging.flush_every_n_ticks, 10);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.cost.q_target_weight, 20.0);
-  EXPECT_DOUBLE_EQ(mppi_motion_grasp.cost.line_of_action_weight, 5.0);
-  EXPECT_TRUE(mppi_motion_grasp.cost.enable_line_of_action_cost);
-  ASSERT_EQ(mppi_motion_grasp.grasp_task.q_ready.size(), config.num_joints);
-  EXPECT_TRUE(mppi_motion_grasp.grasp_task.q_ready.isApprox(expected_grasp_ready_target));
-  EXPECT_FALSE(mppi_motion_grasp.grasp_task.force_feedback_enabled);
-
   const auto & robust_grasp = config.robust_grasp_mpc.state;
   EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 30U);
   EXPECT_EQ(robust_grasp.policy.rollout.action_dim, static_cast<std::size_t>(config.num_joints));
@@ -167,11 +140,69 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_EQ(robust_grasp.policy.disturbance_sampler.num_disturbance_rollouts, 32U);
   EXPECT_EQ(robust_grasp.policy.disturbance_sampler.tactile_sensor_count, 2U);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.disturbance_sampler.sensor_local_noise_scale, 0.25);
+  EXPECT_TRUE(mppi_core::IsValidObjectPrior(robust_grasp.object_prior));
+  EXPECT_EQ(robust_grasp.object_prior.name, "jenga_block");
+  EXPECT_EQ(
+    robust_grasp.object_prior.geometry.type,
+    mppi_core::ObjectGeometryType::kBox);
+  EXPECT_DOUBLE_EQ(
+    robust_grasp.object_prior.geometry.primitive_size_m.x(),
+    0.15);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 200.0);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.force_balance_weight, 10.0);
+  EXPECT_TRUE(robust_grasp.policy.cost.object_support.enabled);
+  EXPECT_EQ(robust_grasp.policy.cost.object_support.max_object_samples, 16U);
+  EXPECT_DOUBLE_EQ(
+    robust_grasp.policy.cost.object_support.contact_birth_margin_m,
+    0.001);
+  EXPECT_DOUBLE_EQ(
+    robust_grasp.policy.cost.object_support.contact_loss_margin_m,
+    0.003);
   EXPECT_EQ(robust_grasp.policy.action_library.num_action_samples, 32U);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.action_library.target_min_normal_force_n, 1.0);
   EXPECT_TRUE(robust_grasp.policy.require_both_contact_for_update);
   EXPECT_TRUE(robust_grasp.policy.return_hold_when_not_ready);
   EXPECT_TRUE(robust_grasp.debug.print_status);
+}
+
+TEST(AristoConfigTest, GraspTeleopHardcodedFieldsIgnoreYamlValues)
+{
+  auto root = YAML::LoadFile(AristoConfigPath().string());
+  bool found_grasp_teleop = false;
+  bool found_robust_grasp_mpc = false;
+  for (auto state : root["state_machine"]["states"]) {
+    if (state["name"] && state["name"].as<std::string>() == "grasp_teleop") {
+      auto params = state["params"];
+      params["default_u"] = 0.99;
+      params["default_phi"] = 0.88;
+      params["shared_control_min_contact_sensors"] = 9;
+      params["shared_control_enter_debounce_ticks"] = 11;
+      params["shared_control_requires_enough_contact"] = false;
+      found_grasp_teleop = true;
+    } else if (state["name"] && state["name"].as<std::string>() == "robust_grasp_mpc") {
+      state["params_file"] =
+        (AristoConfigPath().parent_path() / "robust_mpc_param.yaml").string();
+      found_robust_grasp_mpc = true;
+    }
+  }
+  ASSERT_TRUE(found_grasp_teleop);
+  ASSERT_TRUE(found_robust_grasp_mpc);
+
+  const auto temp_path =
+    std::filesystem::temp_directory_path() / "aristo_hardcoded_config_test.yaml";
+  {
+    std::ofstream out(temp_path);
+    ASSERT_TRUE(out.good()) << temp_path;
+    out << root;
+  }
+
+  const auto config =
+    aristo_controller::config::load_aristo_config(temp_path.string());
+  std::filesystem::remove(temp_path);
+
+  EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_u, 0.5);
+  EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_phi, 0.0);
+  EXPECT_EQ(config.grasp_teleop.state.shared_control_min_contact_sensors, 2);
+  EXPECT_EQ(config.grasp_teleop.state.shared_control_enter_debounce_ticks, 3);
+  EXPECT_TRUE(config.grasp_teleop.state.shared_control_requires_enough_contact);
 }

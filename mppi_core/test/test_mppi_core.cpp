@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "mppi_core/config/mppi_config.hpp"
+#include "mppi_core/config/robust_grasp_policy_config.hpp"
 #include "mppi_core/config/rollout_config.hpp"
 #include "mppi_core/contact/contact_force_correction.hpp"
 #include "mppi_core/contact/contact_force_projection.hpp"
@@ -37,9 +38,15 @@
 #include "mppi_core/costs/grasp_stability_cost.hpp"
 #include "mppi_core/logging/mppi_rollout_logger.hpp"
 #include "mppi_core/logging/vector_csv.hpp"
+#include "mppi_core/object/object_belief_initializer.hpp"
+#include "mppi_core/object/object_contact_prediction.hpp"
+#include "mppi_core/object/object_contact_support_evaluator.hpp"
+#include "mppi_core/object/object_geometry_query.hpp"
+#include "mppi_core/policy/continuous_qddot_mppi.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/rollout/contact_force_rollout.hpp"
 #include "mppi_core/rollout/grasp_state_rollout_model.hpp"
+#include "mppi_core/rollout/object_prior_grasp_rollout.hpp"
 #include "mppi_core/state/grasp_observation.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 #include "mppi_core/task/task_config.hpp"
@@ -262,6 +269,42 @@ MakeTactileSensors(const mppi_core::TactileState& first_tactile,
   tactile_sensors.push_back(first_tactile);
   tactile_sensors.push_back(second_tactile);
   return tactile_sensors;
+}
+
+mppi_core::VirtualObjectBelief MakeTestObjectBelief() {
+  mppi_core::ObjectGeometryHandle geometry;
+  geometry.name = "test_box";
+  geometry.type = mppi_core::ObjectGeometryType::kBox;
+  geometry.primitive_size_m = Eigen::Vector3d{0.04, 0.03, 0.02};
+  geometry.valid = true;
+
+  mppi_core::VirtualObjectState particle;
+  particle.pose_world.translation() = Eigen::Vector3d{0.01, -0.02, 0.03};
+  particle.velocity_world.setZero();
+  particle.weight = 1.0;
+  particle.valid = true;
+
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = geometry;
+  belief.particles.push_back(particle);
+  belief.valid = true;
+  return belief;
+}
+
+mppi_core::ObjectPrior MakeTestBoxObjectPrior(
+    const Eigen::Vector3d& center_world_m,
+    const Eigen::Vector3d& size_m = Eigen::Vector3d{0.1, 0.1, 0.1}) {
+  mppi_core::ObjectPrior prior;
+  prior.name = "test_box_prior";
+  prior.geometry.name = "test_box";
+  prior.geometry.type = mppi_core::ObjectGeometryType::kBox;
+  prior.geometry.primitive_size_m = size_m;
+  prior.geometry.valid = true;
+  prior.initial_pose_world.translation() = center_world_m;
+  prior.position_std_m = Eigen::Vector3d{0.01, 0.01, 0.01};
+  prior.rpy_std_rad = Eigen::Vector3d{0.05, 0.05, 0.05};
+  prior.valid = true;
+  return prior;
 }
 
 std::vector<mppi_core::TactileSensorContext> MakeTactileContexts(
@@ -633,6 +676,878 @@ TEST(GraspStateTest, ExplicitTwoSensorStateRequiresBothTactileStates) {
   const auto invalid_state =
       mppi_core::MakeGraspState(robot, tactile0, tactile1);
   EXPECT_FALSE(invalid_state.valid);
+}
+
+TEST(GraspStateTest, ObjectBeliefIsOptionalAndCarriedWhenProvided) {
+  const mppi_core::RobotState robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Zero(2), Eigen::VectorXd::Zero(2),
+      Eigen::VectorXd::Zero(2));
+
+  mppi_core::TactileState tactile0;
+  tactile0.valid = true;
+  mppi_core::TactileState tactile1;
+  tactile1.valid = true;
+
+  const auto tactile_only_state =
+      mppi_core::MakeGraspState(robot, tactile0, tactile1);
+  EXPECT_TRUE(tactile_only_state.valid);
+  EXPECT_FALSE(tactile_only_state.hasObjectBelief());
+
+  const auto object_belief = MakeTestObjectBelief();
+  const auto object_state =
+      mppi_core::MakeGraspState(robot, tactile0, tactile1, object_belief);
+  EXPECT_TRUE(object_state.valid);
+  EXPECT_TRUE(object_state.hasObjectBelief());
+  ASSERT_EQ(object_state.object_belief.particleCount(), 1U);
+  EXPECT_NEAR(object_state.object_belief.particles[0].pose_world.translation().x(),
+              0.01, kTolerance);
+}
+
+TEST(ObjectGeometryQueryTest, BoxQueryUsesSignedDistanceConvention) {
+  mppi_core::ObjectGeometryHandle geometry;
+  geometry.name = "box";
+  geometry.type = mppi_core::ObjectGeometryType::kBox;
+  geometry.primitive_size_m = Eigen::Vector3d{0.1, 0.1, 0.1};
+  geometry.valid = true;
+
+  const Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
+  const mppi_core::ObjectGeometryQuery query(geometry);
+
+  const auto outside = query.Query(pose, Eigen::Vector3d{0.0, 0.0, 0.06});
+  EXPECT_TRUE(outside.valid);
+  EXPECT_NEAR(outside.signed_distance_m, 0.01, kTolerance);
+  EXPECT_NEAR(outside.closest_point_world.z(), 0.05, kTolerance);
+  EXPECT_NEAR(outside.normal_world.z(), 1.0, kTolerance);
+
+  const auto surface = query.Query(pose, Eigen::Vector3d{0.0, 0.0, 0.05});
+  EXPECT_TRUE(surface.valid);
+  EXPECT_NEAR(surface.signed_distance_m, 0.0, kTolerance);
+  EXPECT_NEAR(surface.normal_world.z(), 1.0, kTolerance);
+
+  const auto inside = query.Query(pose, Eigen::Vector3d::Zero());
+  EXPECT_TRUE(inside.valid);
+  EXPECT_NEAR(inside.signed_distance_m, -0.05, kTolerance);
+}
+
+TEST(ObjectBeliefInitializerTest,
+     InitializesParticleWeightsFromMeasuredContactAndPrior) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(3, Eigen::Vector2d::Zero()));
+
+  mppi_core::ObjectBeliefInitializationConfig config;
+  config.particle_count = 1;
+  config.random_seed = 4;
+
+  const Eigen::VectorXd q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  const mppi_core::TactileState inactive_tactile =
+      MakeInactiveTactileState(tactile);
+  const auto result = mppi_core::InitializeObjectBeliefFromContacts(
+      prior, q_meas, MakeTactileSensors(tactile, inactive_tactile),
+      MakeTactileContextsForStates(&kinematics, tactile, nullptr,
+                                   inactive_tactile),
+      config);
+
+  EXPECT_TRUE(result.valid);
+  ASSERT_EQ(result.contacts.size(), 1U);
+  ASSERT_EQ(result.belief.particleCount(), 1U);
+  EXPECT_TRUE(result.belief.valid);
+  EXPECT_NEAR(result.belief.particles[0].weight, 1.0, kTolerance);
+  EXPECT_NEAR(result.contacts[0].point_world_m.z(), 0.05, kTolerance);
+  EXPECT_NEAR(result.contacts[0].normal_world.z(), -1.0, kTolerance);
+  EXPECT_NEAR(result.best_surface_distance_m, 0.0, kTolerance);
+  EXPECT_NEAR(result.best_normal_alignment_error, 0.0, kTolerance);
+
+  config.min_contact_count = 2;
+  const auto not_enough_contacts = mppi_core::InitializeObjectBeliefFromContacts(
+      prior, q_meas, MakeTactileSensors(tactile, inactive_tactile),
+      MakeTactileContextsForStates(&kinematics, tactile, nullptr,
+                                   inactive_tactile),
+      config);
+  EXPECT_FALSE(not_enough_contacts.valid);
+}
+
+TEST(ObjectBeliefInitializerTest, ObservationInitializationUsesMeasuredQ) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(0, Eigen::Vector2d::Zero()));
+  const mppi_core::TactileState inactive_tactile =
+      MakeInactiveTactileState(tactile);
+
+  mppi_core::HemisphereGeometry geometry;
+  geometry.hemisphere_index = 0;
+  geometry.center_sensor_m = Eigen::Vector3d::Zero();
+  geometry.normal_sensor = Eigen::Vector3d::UnitZ();
+
+  mppi_core::TactileSensorContext tactile_context;
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+  tactile_context.hemispheres.push_back(geometry);
+
+  mppi_core::GraspObservation observation;
+  observation.q_ref_current = Eigen::VectorXd::Zero(1);
+  observation.q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  observation.tactile_meas = MakeTactileSensors(tactile, inactive_tactile);
+  observation.tactile_contexts =
+      {tactile_context, mppi_core::TactileSensorContext{}};
+  observation.object_prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+
+  mppi_core::ObjectBeliefInitializationConfig config;
+  config.particle_count = 1;
+
+  const auto result =
+      mppi_core::InitializeObjectBeliefFromObservation(observation, config);
+
+  EXPECT_TRUE(result.valid);
+  ASSERT_EQ(result.contacts.size(), 1U);
+  EXPECT_NEAR(result.contacts[0].point_world_m.z(), 0.05, kTolerance);
+  EXPECT_NEAR(result.best_surface_distance_m, 0.0, kTolerance);
+
+  const auto resolved = mppi_core::ResolveObjectBeliefForObservation(
+      observation, observation.q_meas, config);
+  EXPECT_TRUE(mppi_core::HasVirtualObjectBelief(resolved));
+  EXPECT_TRUE(mppi_core::IsValidVirtualObjectBelief(resolved));
+  ASSERT_EQ(resolved.particleCount(), 1U);
+  EXPECT_NEAR(resolved.particles[0].weight, 1.0, kTolerance);
+}
+
+TEST(ObjectContactPredictionTest,
+     PredictsInactiveHemisphereBirthFromObjectDistance) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kNoContact;
+  tactile.hemispheres.push_back(MakeHemisphere(
+      0, Eigen::Vector2d::Zero(), 0.0, false));
+
+  mppi_core::HemisphereGeometry geometry;
+  geometry.hemisphere_index = 0;
+  geometry.center_sensor_m = Eigen::Vector3d::Zero();
+  geometry.normal_sensor = Eigen::Vector3d::UnitZ();
+
+  mppi_core::TactileSensorContext tactile_context;
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+  tactile_context.hemispheres.push_back(geometry);
+
+  mppi_core::VirtualObjectState object;
+  object.pose_world.setIdentity();
+  object.velocity_world.setZero();
+  object.weight = 1.0;
+  object.valid = true;
+  const auto object_prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+
+  mppi_core::ObjectContactPredictionConfig config;
+  config.contact_distance_threshold_m = 0.002;
+  config.contact_stiffness_n_per_m = 500.0;
+  config.min_predicted_contact_force_n = 0.001;
+
+  const Eigen::VectorXd q = Eigen::VectorXd::Constant(1, 0.05);
+  const mppi_core::TactileState inactive_tactile =
+      MakeInactiveTactileState(tactile);
+  const auto near_predictions = mppi_core::PredictObjectHemisphereContacts(
+      q, MakeTactileSensors(tactile, inactive_tactile),
+      {tactile_context, mppi_core::TactileSensorContext{}}, object,
+      object_prior.geometry, config);
+
+  ASSERT_EQ(near_predictions.size(), 1U);
+  EXPECT_FALSE(near_predictions[0].measured_contact);
+  EXPECT_TRUE(near_predictions[0].predicted_contact);
+  EXPECT_NEAR(near_predictions[0].signed_distance_m, 0.0, kTolerance);
+  EXPECT_GT(near_predictions[0].predicted_normal_force_n, 0.0);
+
+  object.pose_world.translation().z() = -0.02;
+  const auto far_predictions = mppi_core::PredictObjectHemisphereContacts(
+      q, MakeTactileSensors(tactile, inactive_tactile),
+      {tactile_context, mppi_core::TactileSensorContext{}}, object,
+      object_prior.geometry, config);
+
+  ASSERT_EQ(far_predictions.size(), 1U);
+  EXPECT_FALSE(far_predictions[0].predicted_contact);
+  EXPECT_GT(far_predictions[0].signed_distance_m,
+            config.contact_distance_threshold_m);
+}
+
+TEST(ObjectContactSupportEvaluatorTest,
+     StableSurfaceContactHasLowScenarioCost) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(
+      0, Eigen::Vector2d{0.0, 0.0}, 1.0, true));
+  tactile.hemispheres.push_back(MakeHemisphere(
+      1, Eigen::Vector2d{0.002, 0.0}, 0.0, false));
+  tactile.hemispheres.push_back(MakeHemisphere(
+      2, Eigen::Vector2d{0.0, 0.002}, 0.0, false));
+  tactile.hemispheres.push_back(MakeHemisphere(
+      3, Eigen::Vector2d{0.002, 0.002}, 0.0, false));
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectState object;
+  object.pose_world.setIdentity();
+  object.velocity_world.setZero();
+  object.weight = 1.0;
+  object.valid = true;
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(object);
+  belief.valid = true;
+
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.05), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  const auto state = mppi_core::MakeGraspState(
+      robot,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      belief);
+
+  mppi_core::RolloutContext context;
+  context.tactile_contexts =
+      std::vector<mppi_core::TactileSensorContext>{
+          MakeTactileContextForState(tactile)};
+  context.tactile_contexts[0].sensor_index = 0;
+  context.tactile_contexts[0].kinematics = &kinematics;
+
+  mppi_core::ObjectContactSupportEvaluatorConfig config;
+  config.min_active_tactile_sensors = 1;
+  config.min_active_hemisphere_total = 1;
+  config.contact_birth_margin_m = 0.002;
+  config.contact_loss_margin_m = 0.004;
+  config.min_predicted_contact_force_n = 0.001;
+  config.target_edge_margin_m = 0.0;
+
+  const auto evaluation =
+      mppi_core::EvaluateObjectContactSupport(state, context, config);
+
+  EXPECT_TRUE(evaluation.valid);
+  EXPECT_EQ(evaluation.object_sample_count, 1U);
+  EXPECT_EQ(evaluation.geometry_query_count, 4U);
+  EXPECT_NEAR(evaluation.measured_active_hemisphere_total, 1.0, kTolerance);
+  EXPECT_NEAR(evaluation.predicted_active_hemisphere_total, 4.0, kTolerance);
+  EXPECT_NEAR(evaluation.lost_measured_contact_count, 0.0, kTolerance);
+  EXPECT_NEAR(evaluation.totalCost(), 0.0, kTolerance);
+}
+
+TEST(ObjectContactSupportEvaluatorTest,
+     LostSurfaceContactAddsContactLossAndSupportCost) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(
+      0, Eigen::Vector2d::Zero(), 1.0, true));
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectState object;
+  object.pose_world.setIdentity();
+  object.velocity_world.setZero();
+  object.weight = 1.0;
+  object.valid = true;
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(object);
+  belief.valid = true;
+
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.08), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  const auto state = mppi_core::MakeGraspState(
+      robot,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      belief);
+
+  mppi_core::RolloutContext context;
+  context.tactile_contexts =
+      std::vector<mppi_core::TactileSensorContext>{
+          MakeTactileContextForState(tactile)};
+  context.tactile_contexts[0].sensor_index = 0;
+  context.tactile_contexts[0].kinematics = &kinematics;
+
+  mppi_core::ObjectContactSupportEvaluatorConfig config;
+  config.min_active_tactile_sensors = 1;
+  config.min_active_hemisphere_total = 1;
+  config.contact_birth_margin_m = 0.002;
+  config.contact_loss_margin_m = 0.004;
+  config.min_predicted_contact_force_n = 0.001;
+
+  const auto evaluation =
+      mppi_core::EvaluateObjectContactSupport(state, context, config);
+
+  EXPECT_TRUE(evaluation.valid);
+  EXPECT_NEAR(evaluation.predicted_active_hemisphere_total, 0.0, kTolerance);
+  EXPECT_NEAR(evaluation.lost_measured_contact_count, 1.0, kTolerance);
+  EXPECT_GT(evaluation.contact_loss_cost, 0.0);
+  EXPECT_GT(evaluation.support_cost, 0.0);
+  EXPECT_GT(evaluation.totalCost(), 0.0);
+}
+
+TEST(ObjectContactSupportEvaluatorTest,
+     InactiveHemisphereUsesFixedGeometryCenterInsteadOfStaleCop) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kNoContact;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d{0.50, 0.50}, 0.0, false));
+
+  mppi_core::HemisphereGeometry geometry;
+  geometry.hemisphere_index = 0;
+  geometry.center_sensor_m = Eigen::Vector3d::Zero();
+  geometry.normal_sensor = Eigen::Vector3d::UnitZ();
+
+  mppi_core::TactileSensorContext tactile_context;
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+  tactile_context.hemispheres.push_back(geometry);
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(mppi_core::VirtualObjectState{});
+  belief.particles[0].pose_world.setIdentity();
+  belief.particles[0].weight = 1.0;
+  belief.particles[0].valid = true;
+  belief.valid = true;
+
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.05), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  const auto state = mppi_core::MakeGraspState(
+      robot,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      belief);
+
+  mppi_core::RolloutContext context;
+  context.tactile_contexts = {tactile_context};
+
+  mppi_core::ObjectContactSupportEvaluatorConfig config;
+  config.min_active_tactile_sensors = 1;
+  config.min_active_hemisphere_total = 1;
+  config.contact_birth_margin_m = 0.002;
+  config.contact_loss_margin_m = 0.004;
+  config.min_predicted_contact_force_n = 0.001;
+  config.target_predicted_normal_force_n = 0.0;
+  config.target_edge_margin_m = 0.0;
+
+  const auto evaluation =
+      mppi_core::EvaluateObjectContactSupport(state, context, config);
+
+  ASSERT_TRUE(evaluation.valid);
+  EXPECT_NEAR(evaluation.predicted_active_hemisphere_total, 1.0, kTolerance);
+  EXPECT_TRUE(evaluation.support_summary.predicted_centroid_sensor_m.allFinite());
+  EXPECT_NEAR(evaluation.support_summary.predicted_centroid_sensor_m.x(), 0.0,
+              kTolerance);
+  EXPECT_NEAR(evaluation.support_summary.predicted_centroid_sensor_m.y(), 0.0,
+              kTolerance);
+}
+
+TEST(ObjectContactSupportEvaluatorTest,
+     HemisphereRadiusConvertsCenterDistanceToSurfaceGap) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+
+  auto tactile_context = MakeTactileContextForState(tactile);
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+  ASSERT_EQ(tactile_context.hemispheres.size(), 1U);
+  tactile_context.hemispheres[0].radius_m = 0.001;
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(mppi_core::VirtualObjectState{});
+  belief.particles[0].pose_world.setIdentity();
+  belief.particles[0].weight = 1.0;
+  belief.particles[0].valid = true;
+  belief.valid = true;
+
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.051), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  const auto state = mppi_core::MakeGraspState(
+      robot,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      belief);
+
+  mppi_core::RolloutContext context;
+  context.tactile_contexts = {tactile_context};
+
+  mppi_core::ObjectContactSupportEvaluatorConfig config;
+  config.min_active_tactile_sensors = 1;
+  config.min_active_hemisphere_total = 1;
+  config.contact_birth_margin_m = 0.002;
+  config.contact_loss_margin_m = 0.004;
+  config.min_predicted_contact_force_n = 0.0;
+  config.target_predicted_normal_force_n = 0.0;
+  config.target_edge_margin_m = 0.0;
+
+  const auto evaluation =
+      mppi_core::EvaluateObjectContactSupport(state, context, config);
+
+  ASSERT_TRUE(evaluation.valid);
+  EXPECT_NEAR(evaluation.min_signed_distance_m, 0.0, kTolerance);
+  EXPECT_NEAR(evaluation.predicted_active_hemisphere_total, 1.0, kTolerance);
+  EXPECT_NEAR(evaluation.penetration_cost, 0.0, kTolerance);
+}
+
+TEST(ObjectContactSupportEvaluatorTest,
+     ExcessiveHemispherePenetrationAddsCost) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+
+  auto tactile_context = MakeTactileContextForState(tactile);
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+  tactile_context.hemispheres[0].radius_m = 0.001;
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(mppi_core::VirtualObjectState{});
+  belief.particles[0].pose_world.setIdentity();
+  belief.particles[0].weight = 1.0;
+  belief.particles[0].valid = true;
+  belief.valid = true;
+
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.048), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  const auto state = mppi_core::MakeGraspState(
+      robot,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      belief);
+
+  mppi_core::RolloutContext context;
+  context.tactile_contexts = {tactile_context};
+
+  mppi_core::ObjectContactSupportEvaluatorConfig config;
+  config.min_active_tactile_sensors = 1;
+  config.min_active_hemisphere_total = 1;
+  config.contact_birth_margin_m = 0.002;
+  config.contact_loss_margin_m = 0.004;
+  config.min_predicted_contact_force_n = 0.0;
+  config.target_predicted_normal_force_n = 0.0;
+  config.max_allowed_penetration_m = 0.001;
+  config.penetration_weight = 10.0;
+  config.target_edge_margin_m = 0.0;
+
+  const auto evaluation =
+      mppi_core::EvaluateObjectContactSupport(state, context, config);
+
+  ASSERT_TRUE(evaluation.valid);
+  EXPECT_LT(evaluation.min_signed_distance_m, -config.max_allowed_penetration_m);
+  EXPECT_GT(evaluation.penetration_cost, 0.0);
+  EXPECT_GT(evaluation.totalCost(), 0.0);
+}
+
+TEST(GraspDisturbanceSamplerTest,
+     ZeroObjectDisturbanceConfigProducesZeroSamples) {
+  mppi_core::GraspDisturbanceSamplerConfig config;
+  config.num_disturbance_rollouts = 3;
+  config.horizon_steps = 2;
+  config.tactile_sensor_count = 1;
+  config.tangent_velocity_std_mps = 0.0;
+  config.tangent_velocity_max_mps = 0.0;
+  config.rotational_velocity_std_radps = 0.0;
+  config.rotational_velocity_max_radps = 0.0;
+  config.normal_force_rate_std_nps = 0.0;
+  config.normal_force_rate_max_nps = 0.0;
+  config.cop_drift_velocity_std_mps = 0.0;
+  config.cop_drift_velocity_max_mps = 0.0;
+  config.sensor_local_noise_scale = 0.0;
+  config.friction_scale_std = 0.0;
+  config.friction_scale_min = 1.0;
+  config.friction_scale_max = 1.0;
+
+  mppi_core::GraspDisturbanceSampler sampler(config);
+  const auto batch = sampler.SampleBatch();
+
+  ASSERT_EQ(batch.size(), 3U);
+  for (const auto& sequence : batch) {
+    ASSERT_EQ(sequence.steps.size(), 2U);
+    for (const auto& step : sequence.steps) {
+      EXPECT_TRUE(step.object_disturbance.linear_velocity_world_mps.isZero(0.0));
+      EXPECT_TRUE(step.object_disturbance.angular_velocity_world_radps.isZero(0.0));
+      EXPECT_TRUE(step.object_disturbance.position_offset_world_m.isZero(0.0));
+      EXPECT_TRUE(step.object_disturbance.rpy_offset_world_rad.isZero(0.0));
+    }
+  }
+}
+
+TEST(GraspDisturbanceSamplerTest,
+     ObjectDisturbanceSamplesAreSeededAndNonzeroWhenEnabled) {
+  mppi_core::GraspDisturbanceSamplerConfig config;
+  config.num_disturbance_rollouts = 4;
+  config.horizon_steps = 1;
+  config.tactile_sensor_count = 1;
+  config.random_seed = 42;
+  config.object.linear_velocity_std_mps = 0.01;
+  config.object.linear_velocity_max_mps = 0.02;
+  config.object.angular_velocity_std_radps = 0.1;
+  config.object.angular_velocity_max_radps = 0.2;
+
+  mppi_core::GraspDisturbanceSampler first(config);
+  mppi_core::GraspDisturbanceSampler second(config);
+  const auto first_batch = first.SampleBatch();
+  const auto second_batch = second.SampleBatch();
+
+  ASSERT_EQ(first_batch.size(), second_batch.size());
+  bool saw_nonzero = false;
+  bool saw_difference = false;
+  for (std::size_t i = 0; i < first_batch.size(); ++i) {
+    const auto& a = first_batch[i].steps[0].object_disturbance;
+    const auto& b = second_batch[i].steps[0].object_disturbance;
+    EXPECT_TRUE(a.linear_velocity_world_mps.isApprox(
+        b.linear_velocity_world_mps, kTolerance));
+    EXPECT_TRUE(a.angular_velocity_world_radps.isApprox(
+        b.angular_velocity_world_radps, kTolerance));
+    saw_nonzero = saw_nonzero ||
+                  a.linear_velocity_world_mps.norm() > 0.0 ||
+                  a.angular_velocity_world_radps.norm() > 0.0;
+    if (i > 0) {
+      const auto& prev = first_batch[i - 1].steps[0].object_disturbance;
+      saw_difference = saw_difference ||
+                       !a.linear_velocity_world_mps.isApprox(
+                           prev.linear_velocity_world_mps, kTolerance) ||
+                       !a.angular_velocity_world_radps.isApprox(
+                           prev.angular_velocity_world_radps, kTolerance);
+    }
+  }
+  EXPECT_TRUE(saw_nonzero);
+  EXPECT_TRUE(saw_difference);
+}
+
+TEST(ContinuousQddotMppiTest, SoftWeightsPreferLowerCostAndSumToOne) {
+  const std::vector<double> weights =
+      mppi_core::ComputeSoftMppiWeights({10.0, 0.0, 2.0}, 1.0);
+
+  ASSERT_EQ(weights.size(), 3U);
+  const double sum = weights[0] + weights[1] + weights[2];
+  EXPECT_NEAR(sum, 1.0, kTolerance);
+  EXPECT_GT(weights[1], weights[2]);
+  EXPECT_GT(weights[2], weights[0]);
+
+  const std::vector<double> sharp =
+      mppi_core::ComputeSoftMppiWeights({0.0, 1.0}, 0.1);
+  const std::vector<double> smooth =
+      mppi_core::ComputeSoftMppiWeights({0.0, 1.0}, 10.0);
+  EXPECT_GT(sharp[0] - sharp[1], smooth[0] - smooth[1]);
+}
+
+TEST(ContinuousQddotMppiTest, StepRobotStateEnforcesQdotLimit) {
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Zero(1), Eigen::VectorXd::Constant(1, 0.9),
+      Eigen::VectorXd::Zero(1));
+  mppi_core::QddotRolloutLimits limits;
+  limits.qdot_lower_bound = Eigen::VectorXd::Constant(1, -1.0);
+  limits.qdot_upper_bound = Eigen::VectorXd::Constant(1, 1.0);
+
+  const auto next = mppi_core::StepRobotStateWithQddotLimits(
+      robot, Eigen::VectorXd::Constant(1, 10.0), nullptr, 0.1, limits);
+
+  ASSERT_TRUE(mppi_core::IsValid(next));
+  EXPECT_NEAR(next.qdot[0], 1.0, kTolerance);
+  EXPECT_NEAR(next.q[0], 0.1, kTolerance);
+}
+
+TEST(ContinuousQddotMppiTest, StepRobotStateEnforcesPositionLimit) {
+  auto sensor_model = MakeSinglePrismaticZSensorModel();
+  sensor_model.model.lowerPositionLimit[0] = -0.05;
+  sensor_model.model.upperPositionLimit[0] = 0.05;
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  const auto robot = mppi_core::MakeRobotState(
+      Eigen::VectorXd::Constant(1, 0.04), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1));
+  mppi_core::QddotRolloutLimits limits;
+  limits.qdot_lower_bound = Eigen::VectorXd::Constant(1, -10.0);
+  limits.qdot_upper_bound = Eigen::VectorXd::Constant(1, 10.0);
+
+  const auto next = mppi_core::StepRobotStateWithQddotLimits(
+      robot, Eigen::VectorXd::Constant(1, 10.0), &robot_system, 0.1, limits);
+
+  ASSERT_TRUE(mppi_core::IsValid(next));
+  EXPECT_NEAR(next.qdot[0], 1.0, kTolerance);
+  EXPECT_NEAR(next.q[0], 0.05, kTolerance);
+}
+
+TEST(ObjectPriorGraspRolloutTest,
+     StepVirtualObjectBeliefAppliesLinearAndAngularDisturbance) {
+  const auto belief = MakeTestObjectBelief();
+
+  mppi_core::VirtualObjectDisturbance disturbance;
+  disturbance.linear_velocity_world_mps = Eigen::Vector3d{0.1, -0.2, 0.3};
+  disturbance.angular_velocity_world_radps = Eigen::Vector3d{0.0, 0.0, 1.0};
+
+  const auto next =
+      mppi_core::StepVirtualObjectBelief(belief, disturbance, 0.5);
+
+  ASSERT_TRUE(mppi_core::IsValidVirtualObjectBelief(next));
+  ASSERT_EQ(next.particles.size(), belief.particles.size());
+  EXPECT_TRUE(next.particles[0].pose_world.translation().isApprox(
+      belief.particles[0].pose_world.translation() +
+          Eigen::Vector3d{0.05, -0.1, 0.15},
+      kTolerance));
+  EXPECT_GT((next.particles[0].pose_world.linear() -
+             belief.particles[0].pose_world.linear()).norm(), 1.0e-6);
+  EXPECT_NEAR(next.particles[0].weight, belief.particles[0].weight,
+              kTolerance);
+
+  const auto unchanged = mppi_core::StepVirtualObjectBelief(
+      belief, mppi_core::VirtualObjectDisturbance{}, 0.5);
+  ASSERT_TRUE(mppi_core::IsValidVirtualObjectBelief(unchanged));
+  EXPECT_TRUE(unchanged.particles[0].pose_world.matrix().isApprox(
+      belief.particles[0].pose_world.matrix(), kTolerance));
+}
+
+TEST(ObjectPriorGraspRolloutTest,
+     MainObjectPriorRolloutUpdatesRobotAndObjectWithoutTactileOnlyTransition) {
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+
+  const auto state = mppi_core::MakeGraspState(
+      Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1),
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      MakeTestObjectBelief());
+
+  mppi_core::GraspDisturbanceStep disturbance;
+  disturbance.object_disturbance.linear_velocity_world_mps =
+      Eigen::Vector3d{0.2, 0.0, 0.0};
+  disturbance.tactile_sensor_disturbances.resize(1);
+
+  mppi_core::RolloutContext context;
+  const auto result = mppi_core::StepObjectPriorGraspState(
+      state, Eigen::VectorXd::Constant(1, 0.4), disturbance, context, 0.1);
+
+  ASSERT_TRUE(result.valid);
+  EXPECT_NEAR(result.next_state.robot.qdot[0], 0.04, kTolerance);
+  EXPECT_NEAR(result.next_state.robot.q[0], 0.004, kTolerance);
+  EXPECT_TRUE(result.next_state.object_belief.particles[0]
+                  .pose_world.translation()
+                  .isApprox(state.object_belief.particles[0]
+                                .pose_world.translation() +
+                            Eigen::Vector3d{0.02, 0.0, 0.0},
+                            kTolerance));
+  EXPECT_EQ(result.next_state.tactile_sensors[0].activeHemisphereCount(), 1U);
+}
+
+TEST(RobustGraspPolicyTest, StableCenteredObjectContactKeepsContinuousMppiNearZero) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data first_data(sensor_model.model);
+  pinocchio::Data second_data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext first_kinematics;
+  first_kinematics.model = &sensor_model.model;
+  first_kinematics.data = &first_data;
+  first_kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  first_kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::PinocchioContactKinematicsContext second_kinematics;
+  second_kinematics.model = &sensor_model.model;
+  second_kinematics.data = &second_data;
+  second_kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  second_kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState thumb;
+  thumb.valid = true;
+  thumb.sensor_index = 0;
+  thumb.contact_state = mppi_core::TactileState::kEnoughContacts;
+  thumb.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  thumb.total_force_n.z() = thumb.activeHemisphereNormalForceN();
+
+  mppi_core::TactileState index = thumb;
+  index.sensor_index = 1;
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief belief;
+  belief.geometry = prior.geometry;
+  belief.particles.push_back(mppi_core::VirtualObjectState{});
+  belief.particles[0].pose_world.setIdentity();
+  belief.particles[0].weight = 1.0;
+  belief.particles[0].valid = true;
+  belief.valid = true;
+
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  mppi_core::GraspObservation observation;
+  observation.q_ref_current = Eigen::VectorXd::Constant(1, 0.05);
+  observation.qdot_ref_current = Eigen::VectorXd::Zero(1);
+  observation.q_meas = observation.q_ref_current;
+  observation.qdot_meas = observation.qdot_ref_current;
+  observation.tau_meas = Eigen::VectorXd::Zero(1);
+  observation.tactile_meas = MakeTactileSensors(thumb, index);
+  observation.object_prior = prior;
+  observation.object_belief = belief;
+  observation.robot_system = &robot_system;
+  observation.tactile_contexts = MakeTactileContextsForStates(
+      &first_kinematics, thumb, &second_kinematics, index);
+
+  mppi_core::RobustGraspPolicyConfig config;
+  config.control_mode = mppi_core::RobustGraspControlMode::kContinuousQddotMppi;
+  config.rollout.horizon_steps = 2;
+  config.rollout.num_rollouts = 4;
+  config.rollout.dt = 0.01;
+  config.rollout.action_dim = 1;
+  config.rollout.temperature = 1.0;
+  config.rollout.action_lower_bound = Eigen::VectorXd::Constant(1, -10.0);
+  config.rollout.action_upper_bound = Eigen::VectorXd::Constant(1, 10.0);
+  config.rollout.action_noise_std = Eigen::VectorXd::Zero(1);
+  config.rollout.action_noise_clip = Eigen::VectorXd::Zero(1);
+  config.rollout.qdot_lower_bound = Eigen::VectorXd::Constant(1, -10.0);
+  config.rollout.qdot_upper_bound = Eigen::VectorXd::Constant(1, 10.0);
+  config.disturbance_sampler.num_disturbance_rollouts = 1;
+  config.disturbance_sampler.horizon_steps = 2;
+  config.disturbance_sampler.tactile_sensor_count = 2;
+  config.disturbance_sampler.tangent_velocity_std_mps = 0.0;
+  config.disturbance_sampler.tangent_velocity_max_mps = 0.0;
+  config.disturbance_sampler.rotational_velocity_std_radps = 0.0;
+  config.disturbance_sampler.rotational_velocity_max_radps = 0.0;
+  config.disturbance_sampler.normal_force_rate_std_nps = 0.0;
+  config.disturbance_sampler.normal_force_rate_max_nps = 0.0;
+  config.disturbance_sampler.cop_drift_velocity_std_mps = 0.0;
+  config.disturbance_sampler.cop_drift_velocity_max_mps = 0.0;
+  config.disturbance_sampler.sensor_local_noise_scale = 0.0;
+  config.disturbance_sampler.friction_scale_std = 0.0;
+  config.disturbance_sampler.friction_scale_min = 1.0;
+  config.disturbance_sampler.friction_scale_max = 1.0;
+  config.start.min_enough_contact_sensors = 2;
+  config.start.min_active_hemispheres_total = 2;
+  config.cost.min_active_tactile_sensors = 2;
+  config.cost.min_active_hemisphere_total = 2;
+  config.cost.target_normal_force_n = 1.0;
+  config.cost.min_normal_force_per_sensor_n = 0.1;
+  config.cost.max_normal_force_per_sensor_n = 5.0;
+  config.cost.qddot_weight = 1.0;
+  config.cost.object_support.max_object_samples = 1;
+  config.cost.object_support.min_active_tactile_sensors = 2;
+  config.cost.object_support.min_active_hemisphere_total = 2;
+  config.cost.object_support.contact_birth_margin_m = 0.002;
+  config.cost.object_support.contact_loss_margin_m = 0.004;
+  config.cost.object_support.target_predicted_normal_force_n = 1.0;
+  config.cost.object_support.min_predicted_contact_force_n = 0.001;
+  config.cost.object_support.target_edge_margin_m = 0.0;
+  config.action_library.num_action_samples = 1;
+  config.action_library.include_basis_probe_actions = true;
+  config.action_library.target_min_normal_force_n = 1.0;
+  config.action_library.max_safe_normal_force_n = 5.0;
+  config.safe_hold_score_threshold = 0.0;
+  config.min_required_score_improvement = 0.0;
+  config.action_rate_weight = 0.0;
+  config.continuous_control_rate_cost_weight = 0.0;
+  config.continuous_smoothing_alpha = 1.0;
+
+  mppi_core::RobustGraspPolicy policy;
+  policy.Initialize(config);
+  const auto command = policy.Update(observation);
+  const auto& status = policy.status();
+
+  EXPECT_TRUE(command.IsUsable());
+  EXPECT_TRUE(status.used_continuous_qddot_mppi);
+  EXPECT_EQ(status.best_action_name, "continuous_qddot_mppi_weighted");
+  EXPECT_EQ(status.candidate_count, 4U);
+  EXPECT_EQ(status.horizon_steps, 2U);
+  EXPECT_NEAR(status.effective_sample_size, 4.0, kTolerance);
+  EXPECT_EQ(status.selected_qddot.size(), 1);
+  EXPECT_NEAR(status.selected_qddot[0], 0.0, kTolerance);
+  EXPECT_EQ(status.qddot_cmd.size(), 1);
+  EXPECT_NEAR(status.qddot_cmd[0], 0.0, kTolerance);
+  EXPECT_EQ(status.qddot_best_first.size(), 1);
+  EXPECT_NEAR(status.qddot_best_first[0], 0.0, kTolerance);
+  EXPECT_GT(status.selected_object_geometry_query_count, 0U);
+  EXPECT_GT(status.selected_object_sample_count, 0U);
+  EXPECT_TRUE(status.selected_predicted_centroid_sensor_m.allFinite());
+  EXPECT_TRUE(status.selected_measured_centroid_sensor_m.allFinite());
+  EXPECT_GE(status.solve_time_ms, 0.0);
 }
 
 TEST(PlatoNariTouchUrdfTest, RobotSystemLoadsTactileFrames) {
@@ -2639,6 +3554,17 @@ task:
   tolerance:
     max_shear_m: 0.005
     max_rotation_rad: 0.06
+  object:
+    name: block
+    geometry_type: box
+    uri: package://mppi_core/object/jenga_block.urdf
+    primitive_size_m: [0.15, 0.05, 0.03]
+    initial_pose_world:
+      xyz: [0.1, -0.2, 0.3]
+      rpy: [0.0, 0.0, 1.57]
+    perturbation:
+      xyz_std_m: [0.01, 0.02, 0.03]
+      rpy_std_rad: [0.1, 0.2, 0.3]
   cost:
     contact_loss_weight: 51.0
     support_weight: 11.0
@@ -2664,6 +3590,157 @@ task:
   EXPECT_NEAR(task_config.cost.rotation_weight, 7.0, kTolerance);
   EXPECT_NEAR(task_config.cost.qddot_weight, 8.0, kTolerance);
   EXPECT_NEAR(task_config.cost.tau_weight, 0.09, kTolerance);
+  EXPECT_TRUE(mppi_core::IsValidObjectPrior(task_config.object_prior));
+  EXPECT_EQ(task_config.object_prior.name, "block");
+  EXPECT_EQ(task_config.object_prior.geometry.type,
+            mppi_core::ObjectGeometryType::kBox);
+  EXPECT_EQ(task_config.object_prior.geometry.uri,
+            "package://mppi_core/object/jenga_block.urdf");
+  EXPECT_NEAR(task_config.object_prior.geometry.primitive_size_m.x(), 0.15,
+              kTolerance);
+  EXPECT_NEAR(task_config.object_prior.initial_pose_world.translation().y(),
+              -0.2, kTolerance);
+  EXPECT_NEAR(task_config.object_prior.position_std_m.z(), 0.03,
+              kTolerance);
+  EXPECT_NEAR(task_config.object_prior.rpy_std_rad.y(), 0.2,
+              kTolerance);
+}
+
+TEST(RobustGraspPolicyConfigTest, ParsesObjectSupportCostConfig) {
+  const YAML::Node root = YAML::Load(R"(
+robust_grasp:
+  control_mode: continuous_qddot_mppi
+  continuous_control_rate_cost_weight: 0.123
+  continuous_smoothing_alpha: 0.4
+  rollout:
+    horizon_steps: 3
+    dt: 0.02
+    action_dim: 2
+    num_rollouts: 17
+    temperature: 0.9
+    action_noise_clip: 3.0
+    qdot_limit: 4.0
+  cost:
+    min_active_tactile_sensors: 1
+    min_active_hemisphere_total: 3
+    contact_loss_weight: 70.0
+    support_weight: 8.0
+    object_support:
+      enabled: true
+      object_pose_samples: 9
+      contact_birth_margin_m: 0.004
+      contact_loss_margin_m: 0.006
+      contact_stiffness_n_per_m: 700.0
+      hemisphere_radius_m: 0.0015
+      support_distance_scale_m: 0.0025
+      max_allowed_penetration_m: 0.0007
+      target_predicted_normal_force_n: 1.7
+      max_predicted_normal_force_n: 4.0
+      min_predicted_contact_force_n: 0.02
+      max_predicted_force_per_sensor_n: 3.0
+      edge_weight: 12.0
+      penetration_weight: 14.0
+      predicted_force_low_weight: 13.0
+      predicted_force_high_weight: 2.5
+      target_edge_margin_m: 0.002
+      use_particle_weights: false
+  disturbance:
+    object_disturbance:
+      linear_velocity_std_mps: 0.01
+      linear_velocity_max_mps: 0.02
+      angular_velocity_std_radps: 0.3
+      angular_velocity_max_radps: 0.4
+      pose_xyz_std_m: 0.001
+      pose_xyz_max_m: 0.002
+      pose_rpy_std_rad: 0.03
+      pose_rpy_max_rad: 0.04
+)");
+
+  const auto config =
+      mppi_core::ParseRobustGraspPolicyConfig(
+          root["robust_grasp"], 2, mppi_core::RobustGraspPolicyConfig{});
+
+  EXPECT_EQ(config.rollout.horizon_steps, 3U);
+  EXPECT_EQ(config.rollout.num_rollouts, 17U);
+  EXPECT_DOUBLE_EQ(config.rollout.dt, 0.02);
+  EXPECT_DOUBLE_EQ(config.rollout.temperature, 0.9);
+  ASSERT_EQ(config.rollout.action_noise_clip.size(), 2);
+  ASSERT_EQ(config.rollout.qdot_lower_bound.size(), 2);
+  EXPECT_NEAR(config.rollout.action_noise_clip[0], 3.0, kTolerance);
+  EXPECT_NEAR(config.rollout.qdot_lower_bound[0], -4.0, kTolerance);
+  EXPECT_EQ(config.control_mode,
+            mppi_core::RobustGraspControlMode::kContinuousQddotMppi);
+  EXPECT_NEAR(config.continuous_control_rate_cost_weight, 0.123,
+              kTolerance);
+  EXPECT_NEAR(config.continuous_smoothing_alpha, 0.4, kTolerance);
+  EXPECT_EQ(config.cost.object_support.min_active_tactile_sensors, 1U);
+  EXPECT_EQ(config.cost.object_support.min_active_hemisphere_total, 3U);
+  EXPECT_EQ(config.cost.object_support.max_object_samples, 9U);
+  EXPECT_NEAR(config.cost.object_support.contact_loss_weight, 70.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.support_weight, 8.0, kTolerance);
+  EXPECT_NEAR(config.cost.object_support.contact_birth_margin_m, 0.004,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.contact_loss_margin_m, 0.006,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.contact_stiffness_n_per_m, 700.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.hemisphere_radius_m, 0.0015,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.support_distance_scale_m, 0.0025,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.max_allowed_penetration_m, 0.0007,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.target_predicted_normal_force_n, 1.7,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.max_predicted_normal_force_n, 4.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.max_predicted_force_per_sensor_n, 3.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.edge_weight, 12.0, kTolerance);
+  EXPECT_NEAR(config.cost.object_support.penetration_weight, 14.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.predicted_force_low_weight, 13.0,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.predicted_force_high_weight, 2.5,
+              kTolerance);
+  EXPECT_NEAR(config.cost.object_support.target_edge_margin_m, 0.002,
+              kTolerance);
+  EXPECT_FALSE(config.cost.object_support.use_particle_weights);
+  EXPECT_NEAR(config.disturbance_sampler.object.linear_velocity_std_mps, 0.01,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.linear_velocity_max_mps, 0.02,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.angular_velocity_std_radps, 0.3,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.angular_velocity_max_radps, 0.4,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.pose_xyz_std_m, 0.001,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.pose_xyz_max_m, 0.002,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.pose_rpy_std_rad, 0.03,
+              kTolerance);
+  EXPECT_NEAR(config.disturbance_sampler.object.pose_rpy_max_rad, 0.04,
+              kTolerance);
+}
+
+TEST(RobustGraspPolicyConfigTest, ParsesDiscreteActionSelectorMode) {
+  const YAML::Node root = YAML::Load(R"(
+robust_grasp:
+  control_mode: discrete_action_selector
+  rollout:
+    horizon_steps: 1
+    action_dim: 2
+)");
+
+  const auto config =
+      mppi_core::ParseRobustGraspPolicyConfig(
+          root["robust_grasp"], 2, mppi_core::RobustGraspPolicyConfig{});
+
+  EXPECT_EQ(config.control_mode,
+            mppi_core::RobustGraspControlMode::kDiscreteActionSelector);
+  EXPECT_EQ(config.rollout.horizon_steps, 1U);
 }
 
 TEST(TaskConfigTest, AppliesTaskToleranceToTransitionConfig) {
@@ -2729,7 +3806,7 @@ TEST(ConfigFileLayoutTest, DefaultFilesUseSplitTaskAndRolloutSurface) {
   const std::filesystem::path rollout_path =
       MppiCorePackageRoot() / "config" / "rollout.yaml";
   const std::filesystem::path task_path =
-      MppiCorePackageRoot() / "task" / "jenga.yaml";
+      MppiCorePackageRoot() / "task" / "grasp_hold.yaml";
   const std::string rollout_contents = ReadTextFile(rollout_path);
   const std::string task_contents = ReadTextFile(task_path);
 
@@ -2825,6 +3902,9 @@ mppi:
     lower_bound: -0.003
     upper_bound: 0.004
     noise_std: 0.001
+    noise_clip: 0.002
+  state:
+    qdot_limit: 0.7
 )");
 
   const auto config =
@@ -2839,10 +3919,16 @@ mppi:
   ASSERT_EQ(config.action_lower_bound.size(), 3);
   ASSERT_EQ(config.action_upper_bound.size(), 3);
   ASSERT_EQ(config.action_noise_std.size(), 3);
+  ASSERT_EQ(config.action_noise_clip.size(), 3);
+  ASSERT_EQ(config.qdot_lower_bound.size(), 3);
+  ASSERT_EQ(config.qdot_upper_bound.size(), 3);
   for (Eigen::Index i = 0; i < 3; ++i) {
     EXPECT_NEAR(config.action_lower_bound[i], -0.003, kTolerance);
     EXPECT_NEAR(config.action_upper_bound[i], 0.004, kTolerance);
     EXPECT_NEAR(config.action_noise_std[i], 0.001, kTolerance);
+    EXPECT_NEAR(config.action_noise_clip[i], 0.002, kTolerance);
+    EXPECT_NEAR(config.qdot_lower_bound[i], -0.7, kTolerance);
+    EXPECT_NEAR(config.qdot_upper_bound[i], 0.7, kTolerance);
   }
 }
 
@@ -2920,10 +4006,11 @@ TEST(MPPIOptimizerTest, PredictRolloutRecordsActionsStatesAndStepCosts) {
   mppi_core::GraspObservation observation;
   observation.q_ref_current = Eigen::VectorXd::Constant(1, 0.5);
   observation.qdot_ref_current = Eigen::VectorXd::Zero(1);
-  observation.q_meas = observation.q_ref_current;
-  observation.qdot_meas = observation.qdot_ref_current;
+  observation.q_meas = Eigen::VectorXd::Constant(1, 0.25);
+  observation.qdot_meas = Eigen::VectorXd::Constant(1, 0.02);
   observation.tau_meas = Eigen::VectorXd::Zero(1);
   observation.tactile_meas = MakeTactileSensors(tactile, inactive_tactile);
+  observation.object_belief = MakeTestObjectBelief();
   observation.robot_system = &robot_system;
   observation.tactile_contexts = MakeTactileContextsForStates(
       &kinematics, tactile, &kinematics, inactive_tactile);
@@ -2940,15 +4027,17 @@ TEST(MPPIOptimizerTest, PredictRolloutRecordsActionsStatesAndStepCosts) {
   ASSERT_EQ(trace.step_costs.size(), 2U);
   ASSERT_EQ(trace.states.size(), 3U);
   EXPECT_NEAR(trace.total_cost, 0.0, kTolerance);
-  EXPECT_NEAR(trace.states[0].robot.q[0], 0.5, kTolerance);
-  EXPECT_NEAR(trace.states[1].robot.q[0], 0.501, kTolerance);
-  EXPECT_NEAR(trace.states[1].robot.qdot[0], 0.01, kTolerance);
-  EXPECT_NEAR(trace.states[2].robot.q[0], 0.5015, kTolerance);
-  EXPECT_NEAR(trace.states[2].robot.qdot[0], 0.005, kTolerance);
+  EXPECT_NEAR(trace.states[0].robot.q[0], 0.25, kTolerance);
+  EXPECT_NEAR(trace.states[0].robot.qdot[0], 0.02, kTolerance);
+  EXPECT_NEAR(trace.states[1].robot.q[0], 0.253, kTolerance);
+  EXPECT_NEAR(trace.states[1].robot.qdot[0], 0.03, kTolerance);
+  EXPECT_NEAR(trace.states[2].robot.q[0], 0.2555, kTolerance);
+  EXPECT_NEAR(trace.states[2].robot.qdot[0], 0.025, kTolerance);
   EXPECT_NEAR(trace.actions[0][0], 0.1, kTolerance);
   EXPECT_NEAR(trace.actions[1][0], -0.05, kTolerance);
   EXPECT_TRUE(trace.states[1].valid);
   EXPECT_TRUE(trace.states[1].tactile_sensors[0].valid);
+  EXPECT_TRUE(trace.states[1].hasObjectBelief());
 }
 
 TEST(MPPIOptimizerTest, InvalidRolloutStepGetsLargeCostAndStopsTrace) {

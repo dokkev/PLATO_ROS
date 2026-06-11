@@ -1,36 +1,55 @@
 robust_grasp:
+  control_mode: continuous_qddot_mppi
+  continuous_control_rate_cost_weight: 0.001
+  continuous_smoothing_alpha: 0.5
+
   rollout:
-    horizon_steps: 15
+    horizon_steps: 3
     dt: 0.01
     action_dim: 8
+    num_rollouts: 128
+    temperature: 1.0
+    random_seed: 7
     action_lower_bound: -20.0
     action_upper_bound: 20.0
+    action_noise_std: 1.0
+    action_noise_clip: 10.0
+    qdot_limit: 10.0
 
   start:
     min_enough_contact_sensors: 2
     min_active_hemisphere_total: 2
 
   disturbance:
-    num_disturbance_rollouts: 32
+    num_disturbance_rollouts: 128
     tactile_sensor_count: 2
     random_seed: 7
-    tangent_velocity_std_mps: 0.004
-    tangent_velocity_max_mps: 0.020
-    rotational_velocity_std_radps: 0.05
-    rotational_velocity_max_radps: 0.30
-    normal_force_rate_std_nps: 1.0
-    normal_force_rate_max_nps: 5.0
-    cop_drift_velocity_std_mps: 0.001
-    cop_drift_velocity_max_mps: 0.005
-    sensor_local_noise_scale: 0.25
+    object_disturbance:
+      linear_velocity_std_mps: 0.002
+      linear_velocity_max_mps: 0.010
+      angular_velocity_std_radps: 0.03
+      angular_velocity_max_radps: 0.15
+      pose_xyz_std_m: 0.0
+      pose_xyz_max_m: 0.0
+      pose_rpy_std_rad: 0.0
+      pose_rpy_max_rad: 0.0
+    tangent_velocity_std_mps: 0.0
+    tangent_velocity_max_mps: 0.0
+    rotational_velocity_std_radps: 0.0
+    rotational_velocity_max_radps: 0.0
+    normal_force_rate_std_nps: 0.0
+    normal_force_rate_max_nps: 0.0
+    cop_drift_velocity_std_mps: 0.0
+    cop_drift_velocity_max_mps: 0.0
+    sensor_local_noise_scale: 0.0
     friction_scale_mean: 1.0
-    friction_scale_std: 0.15
-    friction_scale_min: 0.4
-    friction_scale_max: 1.5
+    friction_scale_std: 0.0
+    friction_scale_min: 1.0
+    friction_scale_max: 1.0
     dropout_probability_per_step: 0.0
     use_antithetic_samples: true
 
-  tactile_transition:
+  tactile_only_transition:
     birth_approach_velocity_mps: 0.002
     loss_unloading_velocity_mps: 0.002
     max_shear_m: 0.003
@@ -69,9 +88,28 @@ robust_grasp:
     close_axis_base: [0.0, 0.0, 1.0]
     qddot_weight: 0.01
     tau_weight: 0.0
+    object_support:
+      enabled: true
+      object_pose_samples: 16
+      contact_birth_margin_m: 0.001
+      contact_loss_margin_m: 0.003
+      contact_stiffness_n_per_m: 500.0
+      hemisphere_radius_m: 0.0
+      support_distance_scale_m: 0.001
+      max_allowed_penetration_m: 0.001
+      target_predicted_normal_force_n: 1.0
+      max_predicted_normal_force_n: 10.0
+      min_predicted_contact_force_n: 0.01
+      max_predicted_force_per_sensor_n: 5.0
+      edge_weight: 10.0
+      penetration_weight: 100.0
+      predicted_force_low_weight: 30.0
+      predicted_force_high_weight: 5.0
+      target_edge_margin_m: 0.001
+      use_particle_weights: true
 
   action_library:
-    num_action_samples: 32
+    num_action_samples: 1
     random_seed: 11
     target_min_normal_force_n: 1.0
     max_safe_normal_force_n: 5.0

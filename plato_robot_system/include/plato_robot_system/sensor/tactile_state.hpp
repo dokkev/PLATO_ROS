@@ -65,4 +65,7 @@ struct TactileState
   bool HasSufficientActiveHemispheres(std::size_t min_active_hemispheres) const;
 };
 
+using TactileStateVector =
+  std::vector<TactileState, Eigen::aligned_allocator<TactileState>>;
+
 }  // namespace plato_robot_system::sensor

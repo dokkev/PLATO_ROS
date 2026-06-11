@@ -1250,13 +1250,13 @@
         kv: [
           ["mppi.yaml", "horizon_steps, dt, num_rollouts, temperature, action bounds, noise"],
           ["rollout.yaml", "tactile model constants and disturbance defaults"],
-          ["task/*.yaml", "start gates, support objective, tolerances, and task cost weights"],
+          ["task/*.yaml", "start gates, support objective, object prior, tolerances, and task cost weights"],
           ["Residual hooks", "Residual/contact-force rollout knobs stay out of task YAML files"]
         ],
         sources: [
           ["config/mppi.yaml", "../config/mppi.yaml"],
           ["config/rollout.yaml", "../config/rollout.yaml"],
-          ["task/jenga.yaml", "../task/jenga.yaml"],
+          ["task/grasp_hold.yaml", "../task/grasp_hold.yaml"],
           ["src/util/rollout_config.cpp", "../src/util/rollout_config.cpp"],
           ["src/util/task_config.cpp", "../src/util/task_config.cpp"]
         ],

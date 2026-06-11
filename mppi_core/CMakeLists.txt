@@ -20,16 +20,20 @@ set(${PROJECT_NAME}_SOURCES
   src/core/action_sequence.cpp
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
-  src/costs/motion_tracking_cost.cpp
   src/costs/robust_grasp_state_cost.cpp
   src/disturbance/grasp_disturbance_sampler.cpp
   src/logging/mppi_rollout_logger.cpp
+  src/object/object_belief_initializer.cpp
+  src/object/object_contact_prediction.cpp
+  src/object/object_contact_support_evaluator.cpp
+  src/object/object_geometry_query.cpp
+  src/policy/continuous_qddot_mppi.cpp
   src/policy/grasp_action_library.cpp
   src/policy/robust_grasp_policy.cpp
   src/robot/robot_command_builder.cpp
   src/rollout/disturbed_grasp_rollout.cpp
   src/rollout/grasp_state_rollout_model.cpp
-  src/rollout/motion_rollout_model.cpp
+  src/rollout/object_prior_grasp_rollout.cpp
   src/tactile/disturbed_tactile_transition.cpp
   src/util/mppi_config.cpp
   src/util/robust_grasp_policy_config.cpp
@@ -63,7 +67,7 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY config task
+install(DIRECTORY config task object
   DESTINATION share/${PROJECT_NAME}
 )
 

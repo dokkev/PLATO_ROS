@@ -8,8 +8,10 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
+#include "mppi_core/object/object_belief_initializer.hpp"
 #include "mppi_core/robot/robot_command_builder.hpp"
 
 namespace mppi_core {
@@ -33,6 +35,17 @@ void PrepareConfigVectors(MPPIConfig* config) {
   }
   if (config->action_noise_std.size() == 0) {
     config->action_noise_std = DefaultVector(dim, 1.0);
+  }
+  if (config->action_noise_clip.size() == 0) {
+    config->action_noise_clip = DefaultVector(dim, kLargeCost);
+  }
+  if (config->qdot_lower_bound.size() == 0) {
+    config->qdot_lower_bound =
+        DefaultVector(dim, -std::numeric_limits<double>::infinity());
+  }
+  if (config->qdot_upper_bound.size() == 0) {
+    config->qdot_upper_bound =
+        DefaultVector(dim, std::numeric_limits<double>::infinity());
   }
 }
 
@@ -90,6 +103,10 @@ bool AllRolloutsInvalid(const std::vector<double>& rollout_costs) {
                      [](double cost) { return cost >= kLargeCost; });
 }
 
+bool HasValue(const Eigen::VectorXd& value, const Eigen::Index size) {
+  return value.size() == size && value.allFinite();
+}
+
 Eigen::VectorXd ReferenceVelocityOrZero(const GraspObservation& observation,
                                         std::size_t action_dim) {
   if (observation.qdot_ref_current.size() ==
@@ -101,6 +118,47 @@ Eigen::VectorXd ReferenceVelocityOrZero(const GraspObservation& observation,
     return observation.qdot_ref_current;
   }
   return Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
+}
+
+Eigen::VectorXd InitialRolloutConfiguration(
+    const GraspObservation& observation) {
+  if (HasValue(observation.q_meas, observation.q_ref_current.size())) {
+    return observation.q_meas;
+  }
+  return observation.q_ref_current;
+}
+
+Eigen::VectorXd InitialRolloutVelocity(const GraspObservation& observation,
+                                       std::size_t action_dim) {
+  const Eigen::Index velocity_dim = static_cast<Eigen::Index>(action_dim);
+  if (HasValue(observation.qdot_meas, velocity_dim)) {
+    return observation.qdot_meas;
+  }
+  return ReferenceVelocityOrZero(observation, action_dim);
+}
+
+void CheckObjectObservation(const GraspObservation& observation,
+                            const char* caller) {
+  if (!IsValidObjectPrior(observation.object_prior)) {
+    throw std::invalid_argument(std::string(caller) +
+                                ": object_prior is invalid");
+  }
+  if (!IsValidVirtualObjectBelief(observation.object_belief)) {
+    throw std::invalid_argument(std::string(caller) +
+                                ": object_belief is invalid");
+  }
+}
+
+GraspState MakeInitialRolloutState(const GraspObservation& observation,
+                                   std::size_t action_dim) {
+  const Eigen::Index command_dim = static_cast<Eigen::Index>(action_dim);
+  const Eigen::VectorXd q = InitialRolloutConfiguration(observation);
+  return MakeGraspState(
+      MakeRobotState(q, InitialRolloutVelocity(observation, action_dim),
+                     Eigen::VectorXd::Zero(command_dim),
+                     observation.time_s),
+      observation.tactile_meas,
+      ResolveObjectBeliefForObservation(observation, q));
 }
 
 RolloutContext MakeRolloutContext(const GraspObservation& observation,
@@ -144,19 +202,33 @@ void CheckConfig(const MPPIConfig& config) {
                  "action_upper_bound");
   CheckVectorDim(config.action_noise_std, config.action_dim,
                  "action_noise_std");
+  CheckVectorDim(config.action_noise_clip, config.action_dim,
+                 "action_noise_clip");
+  CheckVectorDim(config.qdot_lower_bound, config.action_dim,
+                 "qdot_lower_bound");
+  CheckVectorDim(config.qdot_upper_bound, config.action_dim,
+                 "qdot_upper_bound");
 
   if (!IsFiniteOrInfinite(config.action_lower_bound) ||
-      !IsFiniteOrInfinite(config.action_upper_bound)) {
-    throw std::invalid_argument("MPPIConfig: action bounds cannot contain NaN");
-  }
-  if (!IsFiniteAndNonnegative(config.action_noise_std)) {
+      !IsFiniteOrInfinite(config.action_upper_bound) ||
+      !IsFiniteOrInfinite(config.qdot_lower_bound) ||
+      !IsFiniteOrInfinite(config.qdot_upper_bound)) {
     throw std::invalid_argument(
-        "MPPIConfig: action_noise_std must be finite and nonnegative");
+        "MPPIConfig: action/qdot bounds cannot contain NaN");
+  }
+  if (!IsFiniteAndNonnegative(config.action_noise_std) ||
+      !IsFiniteAndNonnegative(config.action_noise_clip)) {
+    throw std::invalid_argument(
+        "MPPIConfig: action noise fields must be finite and nonnegative");
   }
   for (Eigen::Index i = 0; i < config.action_lower_bound.size(); ++i) {
     if (config.action_lower_bound[i] > config.action_upper_bound[i]) {
       throw std::invalid_argument(
           "MPPIConfig: action_lower_bound must be <= action_upper_bound");
+    }
+    if (config.qdot_lower_bound[i] > config.qdot_upper_bound[i]) {
+      throw std::invalid_argument(
+          "MPPIConfig: qdot_lower_bound must be <= qdot_upper_bound");
     }
   }
 }
@@ -284,15 +356,9 @@ RolloutTrace MPPIOptimizer::PredictRollout(
         "MPPIOptimizer::PredictRollout: tau_meas dimension mismatch or "
         "nonfinite");
   }
+  CheckObjectObservation(observation, "MPPIOptimizer::PredictRollout");
 
-  Eigen::VectorXd dq_ref_current =
-      ReferenceVelocityOrZero(observation, config_.action_dim);
-  GraspState state = MakeGraspState(
-      MakeRobotState(
-          observation.q_ref_current, dq_ref_current,
-          Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
-          observation.time_s),
-      observation.tactile_meas);
+  GraspState state = MakeInitialRolloutState(observation, config_.action_dim);
 
   const GraspState initial_reference_state = state;
   RolloutContext rollout_context =
@@ -369,8 +435,11 @@ void MPPIOptimizer::SampleActionSequences() {
     for (Eigen::Index step = 0; step < sampled.cols(); ++step) {
       auto action = sampled.col(step);
       for (Eigen::Index dim = 0; dim < action.size(); ++dim) {
-        action[dim] +=
-            normal(rng_) * config_.action_noise_std[static_cast<int>(dim)];
+        const double noise = std::clamp(
+            normal(rng_) * config_.action_noise_std[static_cast<int>(dim)],
+            -config_.action_noise_clip[static_cast<int>(dim)],
+            config_.action_noise_clip[static_cast<int>(dim)]);
+        action[dim] += noise;
       }
       for (Eigen::Index dim = 0; dim < action.size(); ++dim) {
         action[dim] = std::min(
@@ -397,15 +466,9 @@ double MPPIOptimizer::EvaluateRollout(const GraspObservation& observation,
         "MPPIOptimizer::EvaluateRollout: tau_meas dimension mismatch or "
         "nonfinite");
   }
+  CheckObjectObservation(observation, "MPPIOptimizer::EvaluateRollout");
 
-  Eigen::VectorXd dq_ref_current =
-      ReferenceVelocityOrZero(observation, config_.action_dim);
-  GraspState state = MakeGraspState(
-      MakeRobotState(
-          observation.q_ref_current, dq_ref_current,
-          Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
-          observation.time_s),
-      observation.tactile_meas);
+  GraspState state = MakeInitialRolloutState(observation, config_.action_dim);
 
   const GraspState initial_reference_state = state;
   GraspState next_state = state;

@@ -30,7 +30,6 @@ add_library(${PROJECT_NAME} SHARED
   src/state_machines/idle.cpp
   src/state_machines/initialize.cpp
   src/state_machines/joint_teleop.cpp
-  src/state_machines/mppi_motion_grasp.cpp
   src/state_machines/poke.cpp
   src/state_machines/robust_grasp_mpc.cpp
 )

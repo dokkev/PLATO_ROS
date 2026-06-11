@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "mppi_core/contact/contact_kinematics.hpp"
+#include "mppi_core/object/object_prior.hpp"
 #include "mppi_core/policy/robust_grasp_policy.hpp"
 #include "mppi_core/tactile/tactile_sensor_context.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
@@ -39,6 +40,7 @@ struct RobustGraspMpcTactileConfig
 struct RobustGraspMpcStateConfig
 {
   mppi_core::RobustGraspPolicyConfig policy;
+  mppi_core::ObjectPrior object_prior;
   RobustGraspMpcSafetyConfig safety;
   RobustGraspMpcTactileConfig tactile;
   RobustGraspMpcDebugConfig debug;
@@ -56,6 +58,8 @@ public:
   bool ConfigureTask(const RobustGraspMpcStateConfig & config);
   void OnEnter() override;
   bool PopulateCommand(plato_robot_system::RobotCommand * command) const override;
+  const RobustGraspMpcStateConfig & config() const { return config_; }
+  const mppi_core::RobustGraspPolicyStatus & policy_status() const;
 
 private:
   using TactileStateVector =

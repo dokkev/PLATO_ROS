@@ -4,6 +4,9 @@
 
 #include "mppi_core/task/task_config.hpp"
 
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -22,6 +25,121 @@ void CheckMap(const YAML::Node& params, const char* function_name) {
     throw std::invalid_argument(std::string(function_name) +
                                 ": params must be a map");
   }
+}
+
+Eigen::Vector3d ReadVector3(const YAML::Node& node, const char* key,
+                            const Eigen::Vector3d& default_value) {
+  const YAML::Node value = yaml_utils::HasValue(node) ? node[key] : YAML::Node();
+  if (!yaml_utils::HasValue(value)) {
+    return default_value;
+  }
+  if (!value.IsSequence() || value.size() != 3U) {
+    throw std::invalid_argument(std::string("Field '") + key +
+                                "' must be a 3-vector");
+  }
+  return Eigen::Vector3d{value[0].as<double>(), value[1].as<double>(),
+                         value[2].as<double>()};
+}
+
+Eigen::Matrix3d RpyToRotation(const Eigen::Vector3d& rpy_rad) {
+  const Eigen::AngleAxisd roll(rpy_rad.x(), Eigen::Vector3d::UnitX());
+  const Eigen::AngleAxisd pitch(rpy_rad.y(), Eigen::Vector3d::UnitY());
+  const Eigen::AngleAxisd yaw(rpy_rad.z(), Eigen::Vector3d::UnitZ());
+  return (yaw * pitch * roll).toRotationMatrix();
+}
+
+std::string Lowercase(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(),
+                 [](unsigned char c) {
+                   return static_cast<char>(std::tolower(c));
+                 });
+  return value;
+}
+
+ObjectGeometryType ParseObjectGeometryType(const std::string& value,
+                                           ObjectGeometryType default_type) {
+  if (value.empty()) {
+    return default_type;
+  }
+  const std::string lower = Lowercase(value);
+  if (lower == "box") {
+    return ObjectGeometryType::kBox;
+  }
+  if (lower == "sphere") {
+    return ObjectGeometryType::kSphere;
+  }
+  if (lower == "cylinder") {
+    return ObjectGeometryType::kCylinder;
+  }
+  if (lower == "mesh") {
+    return ObjectGeometryType::kMesh;
+  }
+  if (lower == "urdf") {
+    return ObjectGeometryType::kUrdf;
+  }
+  if (lower == "unknown") {
+    return ObjectGeometryType::kUnknown;
+  }
+  throw std::invalid_argument("ParseTaskConfig: unknown object geometry_type '" +
+                              value + "'");
+}
+
+ObjectPrior ParseObjectPrior(const YAML::Node& object,
+                             ObjectPrior defaults) {
+  if (!yaml_utils::HasValue(object)) {
+    return defaults;
+  }
+  CheckMap(object, "ParseObjectPrior");
+  if (!yaml_utils::ReadBool(object, "enabled", true)) {
+    return ObjectPrior{};
+  }
+
+  defaults.name = yaml_utils::ReadString(object, "name", defaults.name);
+  defaults.geometry.name = yaml_utils::ReadString(
+      object, "geometry_name",
+      defaults.geometry.name.empty() ? defaults.name : defaults.geometry.name);
+
+  std::string geometry_type = yaml_utils::ReadString(object, "geometry_type", "");
+  geometry_type = yaml_utils::ReadString(object, "type", geometry_type);
+  defaults.geometry.type =
+      ParseObjectGeometryType(geometry_type, defaults.geometry.type);
+
+  defaults.geometry.uri =
+      yaml_utils::ReadString(object, "uri", defaults.geometry.uri);
+  defaults.geometry.uri =
+      yaml_utils::ReadString(object, "mesh_path", defaults.geometry.uri);
+  defaults.geometry.primitive_size_m = ReadVector3(
+      object, "primitive_size_m", defaults.geometry.primitive_size_m);
+  defaults.geometry.primitive_size_m =
+      ReadVector3(object, "size_m", defaults.geometry.primitive_size_m);
+  defaults.geometry.primitive_size_m =
+      ReadVector3(object, "box_size_m", defaults.geometry.primitive_size_m);
+
+  const YAML::Node initial_pose =
+      yaml_utils::ReadSection(object, "initial_pose_world");
+  const Eigen::Vector3d xyz = ReadVector3(
+      initial_pose, "xyz", defaults.initial_pose_world.translation());
+  const Eigen::Vector3d rpy = ReadVector3(
+      initial_pose, "rpy", Eigen::Vector3d::Zero());
+  defaults.initial_pose_world = Eigen::Isometry3d::Identity();
+  defaults.initial_pose_world.translation() = xyz;
+  defaults.initial_pose_world.linear() = RpyToRotation(rpy);
+
+  const YAML::Node pose_noise =
+      yaml_utils::HasValue(object["perturbation"])
+          ? yaml_utils::ReadSection(object, "perturbation")
+          : yaml_utils::ReadSection(object, "pose_noise");
+  defaults.position_std_m =
+      ReadVector3(pose_noise, "xyz_std_m", defaults.position_std_m);
+  defaults.rpy_std_rad =
+      ReadVector3(pose_noise, "rpy_std_rad", defaults.rpy_std_rad);
+
+  defaults.geometry.valid = true;
+  defaults.valid = true;
+  if (!IsValidObjectPrior(defaults)) {
+    throw std::invalid_argument("ParseTaskConfig: invalid object prior");
+  }
+  return defaults;
 }
 
 }  // namespace
@@ -82,6 +200,10 @@ TaskConfig ParseTaskConfig(const YAML::Node& params, TaskConfig defaults) {
                              defaults.cost.qddot_weight);
   defaults.cost.tau_weight =
       yaml_utils::ReadDouble(cost, "tau_weight", defaults.cost.tau_weight);
+
+  defaults.object_prior =
+      ParseObjectPrior(yaml_utils::ReadSection(safe_params, "object"),
+                       defaults.object_prior);
   return defaults;
 }
 

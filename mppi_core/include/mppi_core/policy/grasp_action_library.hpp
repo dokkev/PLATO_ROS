@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <random>
+#include <string>
 #include <vector>
 
 #include "mppi_core/core/action_sequence.hpp"
@@ -86,7 +87,8 @@ class GraspActionLibrary {
   struct GraspActionBasis;
 
   ActionSequence BuildDecayedSequence(
-      const Eigen::Ref<const Eigen::VectorXd>& first_action) const;
+      const Eigen::Ref<const Eigen::VectorXd>& first_action,
+      std::string name) const;
   Eigen::VectorXd ClampAction(const Eigen::VectorXd& action) const;
   bool BuildActionBasis(const GraspState& state,
                         const RolloutContext& context,

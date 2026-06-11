@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -9,8 +10,8 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <yaml-cpp/yaml.h>
 
-#include "mppi_core/config/mppi_config.hpp"
 #include "mppi_core/config/robust_grasp_policy_config.hpp"
+#include "mppi_core/task/task_config.hpp"
 
 namespace aristo_controller::config
 {
@@ -106,18 +107,6 @@ Eigen::VectorXd parse_optional_vector_or_scalar(
   return parse_vector_or_scalar(node, key, size, 0.0);
 }
 
-Eigen::Vector3d parse_optional_vector3_or_scalar(
-  const YAML::Node & node,
-  const std::string & key,
-  const Eigen::Vector3d & fallback)
-{
-  if (!node || !node[key]) {
-    return fallback;
-  }
-  const auto vector = parse_vector_or_scalar(node, key, 3, 0.0);
-  return Eigen::Vector3d{vector[0], vector[1], vector[2]};
-}
-
 Eigen::VectorXd parse_required_vector_or_scalar(
   const YAML::Node & node,
   const std::string & key,
@@ -165,6 +154,62 @@ StateConfig parse_state_config(const YAML::Node & states, const std::string & na
 std::string state_name(const YAML::Node & state)
 {
   return required_scalar<std::string>(state, "name");
+}
+
+std::string resolve_relative_yaml_path(
+  const std::string & base_yaml_path,
+  const std::string & include_path)
+{
+  if (include_path.empty()) {
+    throw std::runtime_error("params_file must not be empty");
+  }
+
+  const std::filesystem::path path(include_path);
+  if (path.is_absolute()) {
+    return path.string();
+  }
+
+  const std::filesystem::path base_dir =
+    std::filesystem::path(base_yaml_path).parent_path();
+  return (base_dir / path).lexically_normal().string();
+}
+
+YAML::Node load_state_params_file(
+  const std::string & base_yaml_path,
+  const std::string & state_name,
+  const std::string & params_file)
+{
+  const auto resolved_path = resolve_relative_yaml_path(base_yaml_path, params_file);
+  try {
+    const auto params = YAML::LoadFile(resolved_path);
+    if (!params || !params.IsMap()) {
+      throw std::runtime_error(
+        state_name + ".params_file must load a YAML map: " + resolved_path);
+    }
+    return params;
+  } catch (const YAML::Exception & e) {
+    throw std::runtime_error(
+      state_name + ".params_file failed to load '" + resolved_path + "': " + e.what());
+  }
+}
+
+YAML::Node state_params(
+  const YAML::Node & state,
+  const std::string & state_name,
+  const std::string & base_yaml_path)
+{
+  const bool has_inline_params = static_cast<bool>(state["params"]);
+  const bool has_params_file = static_cast<bool>(state["params_file"]);
+  if (has_inline_params && has_params_file) {
+    throw std::runtime_error(state_name + " must not set both params and params_file");
+  }
+  if (has_params_file) {
+    return load_state_params_file(
+      base_yaml_path,
+      state_name,
+      required_scalar<std::string>(state, "params_file"));
+  }
+  return state["params"];
 }
 
 JointPositionConfig parse_joint_position_config(
@@ -290,10 +335,6 @@ aristo_controller::state_machines::GraspTeleopStateConfig parse_grasp_teleop_sta
 {
   aristo_controller::state_machines::GraspTeleopStateConfig config;
 
-  config.default_u =
-    optional_scalar<double>(params, "default_u", config.default_u);
-  config.default_phi =
-    optional_scalar<double>(params, "default_phi", config.default_phi);
   config.default_desired_force_n =
     optional_scalar<double>(
       params, "default_desired_force_n", config.default_desired_force_n);
@@ -315,26 +356,11 @@ aristo_controller::state_machines::GraspTeleopStateConfig parse_grasp_teleop_sta
   const auto grasp_task = required_node(params, "grasp_task");
   config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
   config.grasp_task.force_feedback_enabled = false;
-  config.shared_control_min_contact_sensors =
-    optional_scalar<int>(
-      params,
-      "shared_control_min_contact_sensors",
-      config.shared_control_min_contact_sensors);
-  config.shared_control_enter_debounce_ticks =
-    optional_scalar<int>(
-      params,
-      "shared_control_enter_debounce_ticks",
-      config.grasp_task.force_enter_debounce_ticks);
   config.shared_control_requires_u_below_threshold =
     optional_scalar<bool>(
       params,
       "shared_control_requires_u_below_threshold",
       config.shared_control_requires_u_below_threshold);
-  config.shared_control_requires_enough_contact =
-    optional_scalar<bool>(
-      params,
-      "shared_control_requires_enough_contact",
-      config.shared_control_requires_enough_contact);
 
   return config;
 }
@@ -388,160 +414,6 @@ aristo_controller::state_machines::JointTeleopStateConfig parse_joint_teleop_sta
   return config;
 }
 
-mppi_core::logging::MppiRolloutLoggerConfig parse_mppi_logging_config(
-  const YAML::Node & params,
-  const mppi_core::logging::MppiRolloutLoggerConfig & fallback)
-{
-  auto config = fallback;
-  config.enabled =
-    optional_scalar<bool>(params, "enabled", config.enabled);
-  config.output_directory =
-    optional_scalar<std::string>(params, "output_directory", config.output_directory);
-  config.file_prefix =
-    optional_scalar<std::string>(params, "file_prefix", config.file_prefix);
-  config.rollout_log_stride =
-    optional_scalar<int>(params, "rollout_log_stride", config.rollout_log_stride);
-  config.max_logged_horizon_steps =
-    optional_scalar<int>(params, "max_logged_horizon_steps", config.max_logged_horizon_steps);
-  config.flush_every_n_ticks =
-    optional_scalar<int>(params, "flush_every_n_ticks", config.flush_every_n_ticks);
-  return config;
-}
-
-aristo_controller::state_machines::MPPIMotionGraspStateConfig
-parse_mppi_motion_grasp_state_config(
-  const YAML::Node & params,
-  const int num_joints)
-{
-  if (params && !params.IsMap()) {
-    throw std::runtime_error("mppi_motion_grasp.params must be a map when provided");
-  }
-
-  aristo_controller::state_machines::MPPIMotionGraspStateConfig config;
-  config.enabled = optional_scalar<bool>(params, "enabled", config.enabled);
-
-  const auto command_params = params ? params["command"] : YAML::Node();
-  config.default_u =
-    optional_scalar<double>(command_params, "u_open", config.default_u);
-  config.default_phi =
-    optional_scalar<double>(command_params, "phi", config.default_phi);
-  config.default_desired_force_n =
-    optional_scalar<double>(
-      command_params,
-      "desired_force_n",
-      config.default_desired_force_n);
-
-  const auto initiation_params = params ? params["initiation"] : YAML::Node();
-  config.initiation.contact_enter_debounce_ticks =
-    optional_scalar<int>(
-      initiation_params,
-      "contact_enter_debounce_ticks",
-      config.initiation.contact_enter_debounce_ticks);
-  config.initiation.contact_exit_debounce_ticks =
-    optional_scalar<int>(
-      initiation_params,
-      "contact_exit_debounce_ticks",
-      config.initiation.contact_exit_debounce_ticks);
-  config.initiation.min_contact_force_n =
-    optional_scalar<double>(
-      initiation_params,
-      "min_contact_force_n",
-      config.initiation.min_contact_force_n);
-  config.initiation.use_tactile_presence_for_contact =
-    optional_scalar<bool>(
-      initiation_params,
-      "use_tactile_presence_for_contact",
-      config.initiation.use_tactile_presence_for_contact);
-  config.initiation.contacted_finger_hold_weight =
-    optional_scalar<double>(
-      initiation_params,
-      "contacted_finger_hold_weight",
-      config.initiation.contacted_finger_hold_weight);
-  config.initiation.moving_finger_target_weight =
-    optional_scalar<double>(
-      initiation_params,
-      "moving_finger_target_weight",
-      config.initiation.moving_finger_target_weight);
-  config.initiation.posture_weight =
-    optional_scalar<double>(
-      initiation_params,
-      "posture_weight",
-      config.initiation.posture_weight);
-  config.initiation.max_reference_tracking_error_rad =
-    optional_scalar<double>(
-      initiation_params,
-      "max_reference_tracking_error_rad",
-      config.initiation.max_reference_tracking_error_rad);
-
-  const auto safety_params = params ? params["safety"] : YAML::Node();
-  config.safety.max_velocity_rad_s =
-    optional_scalar<double>(
-      safety_params,
-      "max_velocity_rad_s",
-      config.safety.max_velocity_rad_s);
-  config.safety.max_torque_nm =
-    optional_scalar<double>(
-      safety_params,
-      "max_torque_nm",
-      config.safety.max_torque_nm);
-  config.safety.max_torque_rate_nm_per_s =
-    optional_scalar<double>(
-      safety_params,
-      "max_torque_rate_nm_per_s",
-      config.safety.max_torque_rate_nm_per_s);
-
-  const auto mppi_params = params ? params["mppi"] : YAML::Node();
-  config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
-  const auto logging_params = params ? params["logging"] : YAML::Node();
-  config.logging = parse_mppi_logging_config(logging_params, config.logging);
-
-  const auto cost_params = params ? params["cost"] : YAML::Node();
-  config.cost.q_target_weight =
-    optional_scalar<double>(
-      cost_params, "q_target_weight", config.cost.q_target_weight);
-  config.cost.qdot_target_weight =
-    optional_scalar<double>(
-      cost_params, "qdot_target_weight", config.cost.qdot_target_weight);
-  config.cost.qddot_weight =
-    optional_scalar<double>(
-      cost_params, "qddot_weight", config.cost.qddot_weight);
-  config.cost.tau_weight =
-    optional_scalar<double>(
-      cost_params, "tau_weight", config.cost.tau_weight);
-  config.cost.joint_limit_weight =
-    optional_scalar<double>(
-      cost_params, "joint_limit_weight", config.cost.joint_limit_weight);
-  config.cost.joint_limit_margin_rad =
-    optional_scalar<double>(
-      cost_params, "joint_limit_margin_rad", config.cost.joint_limit_margin_rad);
-  config.cost.enable_line_of_action_cost =
-    optional_scalar<bool>(
-      cost_params,
-      "enable_line_of_action_cost",
-      config.cost.enable_line_of_action_cost);
-  config.cost.line_of_action_weight =
-    optional_scalar<double>(
-      cost_params, "line_of_action_weight", config.cost.line_of_action_weight);
-  config.cost.frame_a_name =
-    optional_scalar<std::string>(
-      cost_params, "frame_a_name", config.cost.frame_a_name);
-  config.cost.frame_b_name =
-    optional_scalar<std::string>(
-      cost_params, "frame_b_name", config.cost.frame_b_name);
-  config.cost.close_axis_base =
-    parse_optional_vector3_or_scalar(
-      cost_params,
-      "close_axis_base",
-      config.cost.close_axis_base);
-
-  const auto grasp_task = params ? params["grasp_task"] : YAML::Node();
-  if (grasp_task) {
-    config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
-  }
-  config.grasp_task.force_feedback_enabled = false;
-  return config;
-}
-
 aristo_controller::state_machines::RobustGraspMpcStateConfig
 parse_robust_grasp_mpc_state_config(
   const YAML::Node & params,
@@ -555,6 +427,10 @@ parse_robust_grasp_mpc_state_config(
   const auto policy_params = params ? params["robust_grasp"] : YAML::Node();
   config.policy =
     mppi_core::ParseRobustGraspPolicyConfig(policy_params, num_joints, config.policy);
+
+  const auto task_params = params ? params["task"] : YAML::Node();
+  const auto task_config = mppi_core::ParseTaskConfig(task_params);
+  config.object_prior = task_config.object_prior;
 
   const auto safety_params = params ? params["safety"] : YAML::Node();
   config.safety.max_reference_tracking_error_rad =
@@ -663,16 +539,13 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   const auto states = required_node(state_machine, "states");
   validate_distinct_state_names(states);
   config.idle = parse_state_config(states, "idle");
-  static_cast<StateConfig &>(config.mppi_motion_grasp) =
-    parse_state_config(states, "mppi_motion_grasp");
-  const auto mppi_motion_grasp = state_by_name(states, "mppi_motion_grasp");
-  config.mppi_motion_grasp.state =
-    parse_mppi_motion_grasp_state_config(mppi_motion_grasp["params"], config.num_joints);
   static_cast<StateConfig &>(config.robust_grasp_mpc) =
     parse_state_config(states, "robust_grasp_mpc");
   const auto robust_grasp_mpc = state_by_name(states, "robust_grasp_mpc");
   config.robust_grasp_mpc.state =
-    parse_robust_grasp_mpc_state_config(robust_grasp_mpc["params"], config.num_joints);
+    parse_robust_grasp_mpc_state_config(
+      state_params(robust_grasp_mpc, "robust_grasp_mpc", yaml_path),
+      config.num_joints);
   config.initialize = parse_joint_position_config(states, "initialize", config.num_joints);
   config.poke = parse_joint_position_config(states, "poke", config.num_joints);
   config.grasp_ready =
@@ -699,14 +572,10 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   if (config.grasp_force.state.grasp_task.q_ready.size() == 0) {
     config.grasp_force.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
   }
-  if (config.mppi_motion_grasp.state.grasp_task.q_ready.size() == 0) {
-    config.mppi_motion_grasp.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
-  }
-
   validate_distinct_state_ids(
     {config.idle.id, config.initialize.id, config.poke.id, config.grasp_ready.id,
       config.joint_teleop.id, config.grasp_teleop.id, config.grasp_force.id,
-      config.mppi_motion_grasp.id, config.robust_grasp_mpc.id});
+      config.robust_grasp_mpc.id});
 
   return config;
 }

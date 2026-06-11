@@ -261,7 +261,7 @@ std::vector<ActionSequence> GraspActionLibrary::BuildCandidates(
   std::vector<ActionSequence> candidates;
   const Eigen::VectorXd zero =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim));
-  candidates.push_back(BuildDecayedSequence(zero));
+  candidates.push_back(BuildDecayedSequence(zero, "hold"));
 
   GraspActionBasis basis;
   if (!BuildActionBasis(state, context, &basis)) {
@@ -269,25 +269,30 @@ std::vector<ActionSequence> GraspActionLibrary::BuildCandidates(
   }
 
   const GraspCorrectiveAction nominal = BuildNominalAction(basis);
-  candidates.push_back(BuildDecayedSequence(MapActionToQddot(nominal, basis)));
+  candidates.push_back(
+      BuildDecayedSequence(MapActionToQddot(nominal, basis), "nominal"));
   if (config_.include_basis_probe_actions) {
     AddBasisProbeActions(basis, &candidates);
   }
   for (std::size_t i = 0; i < config_.num_action_samples; ++i) {
     const GraspCorrectiveAction sample = SampleActionAround(nominal);
-    candidates.push_back(BuildDecayedSequence(MapActionToQddot(sample, basis)));
+    candidates.push_back(BuildDecayedSequence(
+        MapActionToQddot(sample, basis),
+        std::string("sample_") + std::to_string(i)));
   }
   return candidates;
 }
 
 ActionSequence GraspActionLibrary::BuildDecayedSequence(
-    const Eigen::Ref<const Eigen::VectorXd>& first_action) const {
+    const Eigen::Ref<const Eigen::VectorXd>& first_action,
+    std::string name) const {
   if (first_action.size() != static_cast<Eigen::Index>(config_.action_dim)) {
     throw std::invalid_argument(
         "GraspActionLibrary::BuildDecayedSequence: action dimension mismatch");
   }
 
   ActionSequence sequence(config_.action_dim, config_.horizon_steps);
+  sequence.setName(std::move(name));
   for (std::size_t step = 0; step < config_.horizon_steps; ++step) {
     const double decay =
         std::pow(config_.sequence_decay, static_cast<double>(step));
@@ -481,40 +486,42 @@ void GraspActionLibrary::AddBasisProbeActions(
   if (candidates == nullptr) {
     return;
   }
-  const auto add = [&](const GraspCorrectiveAction& action) {
-      candidates->push_back(BuildDecayedSequence(MapActionToQddot(action, basis)));
+  const auto add = [&](const GraspCorrectiveAction& action,
+                       const std::string& name) {
+      candidates->push_back(
+          BuildDecayedSequence(MapActionToQddot(action, basis), name));
     };
 
   GraspCorrectiveAction action;
   action.squeeze = config_.squeeze_light_accel_scale;
-  add(action);
+  add(action, "squeeze_symmetric_light");
   action.squeeze = config_.squeeze_medium_accel_scale;
-  add(action);
+  add(action, "squeeze_symmetric_medium");
   action.squeeze = config_.squeeze_strong_accel_scale;
-  add(action);
+  add(action, "squeeze_symmetric_strong");
   action = GraspCorrectiveAction{};
   action.release = config_.release_accel_scale;
-  add(action);
+  add(action, "release_slight");
 
   action = GraspCorrectiveAction{};
   action.thumb_bias = config_.squeeze_light_accel_scale;
-  add(action);
+  add(action, "thumb_squeeze_only");
   action = GraspCorrectiveAction{};
   action.index_bias = config_.squeeze_light_accel_scale;
-  add(action);
+  add(action, "index_squeeze_only");
 
   if (basis.has_align) {
     action = GraspCorrectiveAction{};
     action.align_lateral = config_.align_accel_scale;
-    add(action);
+    add(action, "align_contact_line_positive");
     action.align_lateral = -config_.align_accel_scale;
-    add(action);
+    add(action, "align_contact_line_negative");
     action = GraspCorrectiveAction{};
     action.squeeze = config_.squeeze_light_accel_scale;
     action.align_lateral = config_.align_accel_scale;
-    add(action);
+    add(action, "squeeze_align_positive");
     action.align_lateral = -config_.align_accel_scale;
-    add(action);
+    add(action, "squeeze_align_negative");
   }
 }
 

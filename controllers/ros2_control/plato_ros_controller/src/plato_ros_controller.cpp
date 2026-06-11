@@ -1,12 +1,19 @@
 #include "plato_ros_controller/plato_ros_controller.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "aristo_controller/state_machines/grasp_force.hpp"
@@ -15,14 +22,22 @@
 #include "aristo_controller/state_machines/idle.hpp"
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
-#include "aristo_controller/state_machines/mppi_motion_grasp.hpp"
 #include "aristo_controller/state_machines/poke.hpp"
 #include "aristo_controller/state_machines/robust_grasp_mpc.hpp"
+#include "geometry_msgs/msg/point.hpp"
+#include "geometry_msgs/msg/pose.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "mppi_core/object/object_prior.hpp"
+#include "pinocchio/algorithm/frames.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
+#include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "plato_robot_system/sensor/nari_touch_adapter.hpp"
+#include "plato_robot_system/task/thumb_index_grasp_constants.hpp"
 #include "rclcpp/qos.hpp"
+#include "std_msgs/msg/color_rgba.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 namespace plato_ros_controller
 {
@@ -33,6 +48,10 @@ namespace
 // RobotCommand use SI units internally.
 constexpr double kMNmToNm = 1.0e-3;
 constexpr double kNmToMNm = 1.0e3;
+constexpr double kDebugMarkerLifetimeS = 0.25;
+
+using MarkerMsg = visualization_msgs::msg::Marker;
+using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
 
 void set_command_interface_value(
   hardware_interface::LoanedCommandInterface & command_interface,
@@ -67,6 +86,165 @@ std::string resolve_package_url(const std::string & path)
   const auto package_name = package_and_path.substr(0, slash);
   const auto relative_path = package_and_path.substr(slash + 1);
   return ament_index_cpp::get_package_share_directory(package_name) + "/" + relative_path;
+}
+
+std_msgs::msg::ColorRGBA make_color(
+  const double red,
+  const double green,
+  const double blue,
+  const double alpha)
+{
+  std_msgs::msg::ColorRGBA color;
+  color.r = static_cast<float>(red);
+  color.g = static_cast<float>(green);
+  color.b = static_cast<float>(blue);
+  color.a = static_cast<float>(alpha);
+  return color;
+}
+
+geometry_msgs::msg::Point make_point(const Eigen::Vector3d & point_m)
+{
+  geometry_msgs::msg::Point point;
+  point.x = point_m.x();
+  point.y = point_m.y();
+  point.z = point_m.z();
+  return point;
+}
+
+geometry_msgs::msg::Pose make_pose(const Eigen::Isometry3d & pose)
+{
+  geometry_msgs::msg::Pose msg;
+  msg.position = make_point(pose.translation());
+  Eigen::Quaterniond orientation(pose.rotation());
+  orientation.normalize();
+  msg.orientation.x = orientation.x();
+  msg.orientation.y = orientation.y();
+  msg.orientation.z = orientation.z();
+  msg.orientation.w = orientation.w();
+  return msg;
+}
+
+void initialize_marker(
+  MarkerMsg * marker,
+  const rclcpp::Time & time,
+  const std::string & frame_id,
+  const std::string & marker_namespace,
+  const int id,
+  const int type)
+{
+  marker->header.frame_id = frame_id;
+  marker->header.stamp = time;
+  marker->ns = marker_namespace;
+  marker->id = id;
+  marker->type = type;
+  marker->action = MarkerMsg::ADD;
+  marker->pose.orientation.w = 1.0;
+  marker->lifetime.sec = 0;
+  marker->lifetime.nanosec =
+    static_cast<std::uint32_t>(kDebugMarkerLifetimeS * 1.0e9);
+}
+
+MarkerMsg make_delete_all_marker(const rclcpp::Time & time, const std::string & frame_id)
+{
+  MarkerMsg marker;
+  initialize_marker(&marker, time, frame_id, "robust_grasp_debug", 0, MarkerMsg::CUBE);
+  marker.action = MarkerMsg::DELETEALL;
+  return marker;
+}
+
+bool is_positive_finite_box_size(const Eigen::Vector3d & size_m)
+{
+  return size_m.allFinite() && size_m.x() > 0.0 && size_m.y() > 0.0 && size_m.z() > 0.0;
+}
+
+void append_box_edges(
+  const Eigen::Isometry3d & box_pose,
+  const Eigen::Vector3d & box_size_m,
+  MarkerMsg * marker)
+{
+  const Eigen::Vector3d half_size = 0.5 * box_size_m;
+  const std::array<Eigen::Vector3d, 8> local_corners{
+    Eigen::Vector3d{-half_size.x(), -half_size.y(), -half_size.z()},
+    Eigen::Vector3d{half_size.x(), -half_size.y(), -half_size.z()},
+    Eigen::Vector3d{half_size.x(), half_size.y(), -half_size.z()},
+    Eigen::Vector3d{-half_size.x(), half_size.y(), -half_size.z()},
+    Eigen::Vector3d{-half_size.x(), -half_size.y(), half_size.z()},
+    Eigen::Vector3d{half_size.x(), -half_size.y(), half_size.z()},
+    Eigen::Vector3d{half_size.x(), half_size.y(), half_size.z()},
+    Eigen::Vector3d{-half_size.x(), half_size.y(), half_size.z()}};
+  const std::array<std::array<int, 2>, 12> edges{{
+    {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}},
+    {{4, 5}}, {{5, 6}}, {{6, 7}}, {{7, 4}},
+    {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}}}};
+
+  marker->points.reserve(marker->points.size() + edges.size() * 2U);
+  for (const auto & edge : edges) {
+    marker->points.push_back(make_point(box_pose * local_corners[edge[0]]));
+    marker->points.push_back(make_point(box_pose * local_corners[edge[1]]));
+  }
+}
+
+bool get_frame_placement(
+  const pinocchio::Model & model,
+  const pinocchio::Data & data,
+  const std::string & frame_name,
+  pinocchio::SE3 * placement)
+{
+  if (placement == nullptr) {
+    return false;
+  }
+  const auto frame_id = model.getFrameId(frame_name);
+  if (frame_id >= static_cast<pinocchio::FrameIndex>(model.nframes)) {
+    return false;
+  }
+  *placement = data.oMf[frame_id];
+  return true;
+}
+
+void append_sphere_marker(
+  MarkerArrayMsg * markers,
+  const rclcpp::Time & time,
+  const std::string & frame_id,
+  const std::string & marker_namespace,
+  const int id,
+  const Eigen::Vector3d & point_m,
+  const double diameter_m,
+  const std_msgs::msg::ColorRGBA & color)
+{
+  MarkerMsg marker;
+  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::SPHERE);
+  marker.pose.position = make_point(point_m);
+  marker.scale.x = diameter_m;
+  marker.scale.y = diameter_m;
+  marker.scale.z = diameter_m;
+  marker.color = color;
+  markers->markers.push_back(marker);
+}
+
+void append_arrow_marker(
+  MarkerArrayMsg * markers,
+  const rclcpp::Time & time,
+  const std::string & frame_id,
+  const std::string & marker_namespace,
+  const int id,
+  const Eigen::Vector3d & start_m,
+  const Eigen::Vector3d & end_m,
+  const double shaft_diameter_m,
+  const double head_diameter_m,
+  const std_msgs::msg::ColorRGBA & color)
+{
+  if ((end_m - start_m).norm() < 1.0e-6) {
+    return;
+  }
+  MarkerMsg marker;
+  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::ARROW);
+  marker.points.push_back(make_point(start_m));
+  marker.points.push_back(make_point(end_m));
+  marker.scale.x = shaft_diameter_m;
+  marker.scale.y = head_diameter_m;
+  marker.scale.z = head_diameter_m;
+  marker.color = color;
+  markers->markers.push_back(marker);
 }
 
 std::string load_robot_model_from_config(
@@ -104,6 +282,11 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
     "grasp_force_reference_valid_topic",
     "/grasp_force_reference/reference_valid");
   auto_declare<std::string>("control_config_yaml_path", "");
+  auto_declare<bool>("publish_robust_grasp_debug_markers", true);
+  auto_declare<std::string>(
+    "robust_grasp_debug_marker_topic",
+    "~/robust_grasp_debug_markers");
+  auto_declare<std::string>("robust_grasp_debug_frame_id", "base_link");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -121,10 +304,16 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   grasp_force_reference_valid_topic_ =
     get_node()->get_parameter("grasp_force_reference_valid_topic").as_string();
   control_config_yaml_path_ = get_node()->get_parameter("control_config_yaml_path").as_string();
+  publish_robust_grasp_debug_markers_ =
+    get_node()->get_parameter("publish_robust_grasp_debug_markers").as_bool();
+  robust_grasp_debug_marker_topic_ =
+    get_node()->get_parameter("robust_grasp_debug_marker_topic").as_string();
+  robust_grasp_debug_frame_id_ =
+    get_node()->get_parameter("robust_grasp_debug_frame_id").as_string();
   joint_teleop_state_ = nullptr;
   grasp_teleop_state_ = nullptr;
   grasp_force_state_ = nullptr;
-  mppi_motion_grasp_state_ = nullptr;
+  robust_grasp_mpc_state_ = nullptr;
   grasp_force_reference_n_.store(0.0);
   grasp_force_reference_valid_.store(false);
 
@@ -226,6 +415,15 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   controller_state_pub_ =
     get_node()->create_publisher<plato_interfaces::msg::ImpedanceControllerState>(
       "~/controller_state", rclcpp::SystemDefaultsQoS());
+  robust_grasp_debug_marker_pub_.reset();
+  if (
+    publish_robust_grasp_debug_markers_ &&
+    !robust_grasp_debug_marker_topic_.empty())
+  {
+    robust_grasp_debug_marker_pub_ = get_node()->create_publisher<MarkerArrayMsg>(
+      robust_grasp_debug_marker_topic_,
+      rclcpp::SystemDefaultsQoS());
+  }
   request_state_srv_ = get_node()->create_service<RequestStateSrv>(
     "~/request_state",
     [this](
@@ -237,13 +435,14 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', and grasp force reference topics '%s'/'%s'",
+    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', grasp force reference topics '%s'/'%s', robust grasp debug marker topic '%s'",
     num_joints,
     tactile_topics_.size(),
     joint_teleop_command_topic_.c_str(),
     grasp_teleop_command_topic_.c_str(),
     grasp_force_reference_topic_.c_str(),
-    grasp_force_reference_valid_topic_.c_str());
+    grasp_force_reference_valid_topic_.c_str(),
+    robust_grasp_debug_marker_pub_ ? robust_grasp_debug_marker_topic_.c_str() : "<disabled>");
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -358,6 +557,7 @@ controller_interface::return_type PlatoRosController::update(
     return controller_interface::return_type::ERROR;
   }
   publish_controller_state(time, filtered_command_);
+  publish_robust_grasp_debug_markers(time);
   write_command(filtered_command_);
 
   return controller_interface::return_type::OK;
@@ -737,10 +937,7 @@ void PlatoRosController::grasp_force_reference_valid_callback(
 
 void PlatoRosController::sync_grasp_teleop_input()
 {
-  if (
-    grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr &&
-    mppi_motion_grasp_state_ == nullptr)
-  {
+  if (grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr) {
     return;
   }
 
@@ -767,8 +964,6 @@ void PlatoRosController::sync_grasp_teleop_input()
       default_desired_force_n = grasp_teleop_state_->default_desired_force_n();
     } else if (grasp_force_state_ != nullptr) {
       default_desired_force_n = grasp_force_state_->default_desired_force_n();
-    } else if (mppi_motion_grasp_state_ != nullptr) {
-      default_desired_force_n = mppi_motion_grasp_state_->default_desired_force_n();
     }
     input.desired_force_n = grasp_force_reference_valid_.load() ?
       grasp_force_reference_n_.load() :
@@ -784,13 +979,6 @@ void PlatoRosController::sync_grasp_teleop_input()
     force_input.phi = input.phi;
     force_input.desired_force_n = input.desired_force_n;
     grasp_force_state_->SetInput(force_input);
-  }
-  if (mppi_motion_grasp_state_ != nullptr) {
-    aristo_controller::state_machines::MPPIMotionGraspInput motion_input;
-    motion_input.u = input.u;
-    motion_input.phi = input.phi;
-    motion_input.desired_force_n = input.desired_force_n;
-    mppi_motion_grasp_state_->SetInput(motion_input);
   }
 }
 
@@ -889,6 +1077,242 @@ void PlatoRosController::publish_controller_state(
     msg.effort_fb[i] = 0.0;
   }
   controller_state_pub_->publish(msg);
+}
+
+void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time & time) const
+{
+  if (
+    !robust_grasp_debug_marker_pub_ ||
+    !robot_ ||
+    !robot_->hasModel() ||
+    !robot_->hasState())
+  {
+    return;
+  }
+
+  const auto & model = robot_->model();
+  const auto & state = robot_->state();
+  if (
+    state.q.size() != static_cast<Eigen::Index>(model.nq) ||
+    state.qdot.size() != static_cast<Eigen::Index>(model.nv) ||
+    !state.q.allFinite() ||
+    !state.qdot.allFinite())
+  {
+    return;
+  }
+
+  const std::string frame_id =
+    robust_grasp_debug_frame_id_.empty() ? "base_link" : robust_grasp_debug_frame_id_;
+  MarkerArrayMsg markers;
+  markers.markers.reserve(96);
+  markers.markers.push_back(make_delete_all_marker(time, frame_id));
+
+  Eigen::Vector3d label_position_m{0.0, 0.0, 0.12};
+  if (robust_grasp_mpc_state_ != nullptr) {
+    const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
+    if (
+      mppi_core::IsValidObjectPrior(object_prior) &&
+      mppi_core::HasObjectPrior(object_prior) &&
+      is_positive_finite_box_size(object_prior.geometry.primitive_size_m))
+    {
+      MarkerMsg object_marker;
+      initialize_marker(
+        &object_marker,
+        time,
+        frame_id,
+        "jenga_object_prior",
+        1,
+        MarkerMsg::CUBE);
+      object_marker.pose = make_pose(object_prior.initial_pose_world);
+      object_marker.scale.x = object_prior.geometry.primitive_size_m.x();
+      object_marker.scale.y = object_prior.geometry.primitive_size_m.y();
+      object_marker.scale.z = object_prior.geometry.primitive_size_m.z();
+      object_marker.color = make_color(0.78, 0.58, 0.32, 0.72);
+      markers.markers.push_back(object_marker);
+
+      MarkerMsg uncertainty_marker;
+      initialize_marker(
+        &uncertainty_marker,
+        time,
+        frame_id,
+        "jenga_pose_prior_bounds",
+        2,
+        MarkerMsg::LINE_LIST);
+      const Eigen::Vector3d uncertainty_size_m =
+        object_prior.geometry.primitive_size_m +
+        2.0 * object_prior.position_std_m.cwiseAbs();
+      uncertainty_marker.scale.x = 0.002;
+      uncertainty_marker.color = make_color(1.0, 0.86, 0.22, 0.8);
+      append_box_edges(
+        object_prior.initial_pose_world,
+        uncertainty_size_m,
+        &uncertainty_marker);
+      markers.markers.push_back(uncertainty_marker);
+
+      label_position_m = object_prior.initial_pose_world.translation();
+      label_position_m.z() += 0.08;
+    }
+  }
+
+  pinocchio::Data current_data(model);
+  bool have_current_fk = false;
+  try {
+    pinocchio::forwardKinematics(model, current_data, state.q);
+    pinocchio::updateFramePlacements(model, current_data);
+    have_current_fk = true;
+  } catch (const std::exception &) {
+    // Debug markers must not turn a valid control update into a failed tick.
+    have_current_fk = false;
+  }
+
+  if (have_current_fk) {
+    int grid_marker_id = 0;
+    int contact_marker_id = 0;
+    int force_marker_id = 0;
+    const auto & tactile_sensors = state.tactile_sensors;
+    for (std::size_t sensor_index = 0; sensor_index < tactile_sensors.size(); ++sensor_index) {
+      const auto & tactile = tactile_sensors[sensor_index];
+      std::string tactile_frame = tactile.frame_name;
+      if (tactile_frame.empty() && sensor_index < kTactileFrameNames.size()) {
+        tactile_frame = tactile_frame_name(sensor_index);
+      }
+      pinocchio::SE3 sensor_pose_world;
+      if (!get_frame_placement(model, current_data, tactile_frame, &sensor_pose_world)) {
+        continue;
+      }
+      const Eigen::Vector3d normal_world =
+        sensor_pose_world.rotation() * Eigen::Vector3d::UnitZ();
+
+      for (const auto & hemisphere : tactile.hemispheres) {
+        const Eigen::Vector3d point_sensor_m{
+          hemisphere.cop_sensor_m.x(),
+          hemisphere.cop_sensor_m.y(),
+          0.0};
+        const Eigen::Vector3d point_world_m = sensor_pose_world.act(point_sensor_m);
+        append_sphere_marker(
+          &markers,
+          time,
+          frame_id,
+          "tactile_hemisphere_centers",
+          grid_marker_id++,
+          point_world_m,
+          0.0035,
+          make_color(0.72, 0.76, 0.80, 0.34));
+
+        if (!hemisphere.contact) {
+          continue;
+        }
+        const double force_n =
+          std::isfinite(hemisphere.normal_force_n) ? std::max(0.0, hemisphere.normal_force_n) : 0.0;
+        const double contact_diameter_m = 0.007 + std::min(force_n, 5.0) * 0.0015;
+        append_sphere_marker(
+          &markers,
+          time,
+          frame_id,
+          "measured_tactile_contacts",
+          contact_marker_id++,
+          point_world_m,
+          contact_diameter_m,
+          make_color(0.12, 0.95, 0.26, 0.92));
+
+        const double arrow_length_m = 0.012 + std::min(force_n, 5.0) * 0.004;
+        append_arrow_marker(
+          &markers,
+          time,
+          frame_id,
+          "measured_contact_force",
+          force_marker_id++,
+          point_world_m,
+          point_world_m + arrow_length_m * normal_world,
+          0.0022,
+          0.006,
+          make_color(1.0, 0.24, 0.08, 0.9));
+      }
+    }
+  }
+
+  if (robust_grasp_mpc_state_ != nullptr && have_current_fk) {
+    const auto & status = robust_grasp_mpc_state_->policy_status();
+    const double rollout_dt = robust_grasp_mpc_state_->config().policy.rollout.dt;
+    if (
+      std::isfinite(rollout_dt) &&
+      rollout_dt > 0.0 &&
+      status.selected_qddot.size() == static_cast<Eigen::Index>(model.nv) &&
+      status.selected_qddot.allFinite())
+    {
+      Eigen::VectorXd tangent = state.qdot * rollout_dt;
+      tangent.noalias() += 0.5 * rollout_dt * rollout_dt * status.selected_qddot;
+
+      try {
+        const Eigen::VectorXd q_next = pinocchio::integrate(model, state.q, tangent);
+        if (q_next.size() == static_cast<Eigen::Index>(model.nq) && q_next.allFinite()) {
+          pinocchio::Data next_data(model);
+          pinocchio::forwardKinematics(model, next_data, q_next);
+          pinocchio::updateFramePlacements(model, next_data);
+
+          const std::array<std::string, 2> rollout_frames{
+            std::string(
+              plato_robot_system::task::kThumbIndexFrameB.data(),
+              plato_robot_system::task::kThumbIndexFrameB.size()),
+            std::string(
+              plato_robot_system::task::kThumbIndexFrameA.data(),
+              plato_robot_system::task::kThumbIndexFrameA.size())};
+          const std::array<std_msgs::msg::ColorRGBA, 2> rollout_colors{
+            make_color(0.12, 0.60, 1.0, 0.9),
+            make_color(0.0, 0.95, 0.95, 0.9)};
+
+          for (std::size_t i = 0; i < rollout_frames.size(); ++i) {
+            pinocchio::SE3 current_pose;
+            pinocchio::SE3 next_pose;
+            if (
+              !get_frame_placement(model, current_data, rollout_frames[i], &current_pose) ||
+              !get_frame_placement(model, next_data, rollout_frames[i], &next_pose))
+            {
+              continue;
+            }
+            append_arrow_marker(
+              &markers,
+              time,
+              frame_id,
+              "selected_rollout_tactile_frame_motion",
+              static_cast<int>(i),
+              current_pose.translation(),
+              next_pose.translation(),
+              0.0028,
+              0.007,
+              rollout_colors[i]);
+          }
+        }
+      } catch (const std::exception &) {
+        // Skip rollout arrows if Pinocchio cannot integrate this debug candidate.
+      }
+    }
+
+    MarkerMsg label_marker;
+    initialize_marker(
+      &label_marker,
+      time,
+      frame_id,
+      "robust_grasp_rollout_status",
+      0,
+      MarkerMsg::TEXT_VIEW_FACING);
+    label_marker.pose.position = make_point(label_position_m);
+    label_marker.scale.z = 0.025;
+    label_marker.color = make_color(0.96, 0.98, 1.0, 0.92);
+
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(3)
+         << "action="
+         << (status.best_action_name.empty() ? "none" : status.best_action_name)
+         << " score=" << status.best_score
+         << "\nhold=" << (status.selected_hold_by_margin ? "true" : "false")
+         << " pred_hemi=" << status.selected_predicted_active_hemisphere_total
+         << " edge=" << status.selected_object_edge_margin_m << "m";
+    label_marker.text = text.str();
+    markers.markers.push_back(label_marker);
+  }
+
+  robust_grasp_debug_marker_pub_->publish(markers);
 }
 
 void PlatoRosController::request_state_callback(
@@ -1074,25 +1498,8 @@ bool PlatoRosController::configure_from_control_config(
       return false;
     }
     robust_grasp_mpc->ConfigureLifecycle(aristo_config.robust_grasp_mpc.lifecycle);
+    robust_grasp_mpc_state_ = robust_grasp_mpc.get();
     architecture.RegisterState(std::move(robust_grasp_mpc));
-
-    auto mppi_motion_grasp_config = aristo_config.mppi_motion_grasp.state;
-    if (mppi_motion_grasp_config.grasp_task.q_ready.size() > 0) {
-      mppi_motion_grasp_config.grasp_task.q_ready =
-        map_joint_positions_to_model_q(mppi_motion_grasp_config.grasp_task.q_ready, robot);
-    }
-
-    auto mppi_motion_grasp =
-      std::make_unique<aristo_controller::state_machines::MPPIMotionGraspState>(
-        aristo_config.mppi_motion_grasp.id,
-        &robot);
-    if (!mppi_motion_grasp->ConfigureTask(mppi_motion_grasp_config)) {
-      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure mppi_motion_grasp task");
-      return false;
-    }
-    mppi_motion_grasp->ConfigureLifecycle(aristo_config.mppi_motion_grasp.lifecycle);
-    mppi_motion_grasp_state_ = mppi_motion_grasp.get();
-    architecture.RegisterState(std::move(mppi_motion_grasp));
 
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,

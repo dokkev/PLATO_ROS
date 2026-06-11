@@ -1,0 +1,610 @@
+#include "plato_robot_system/task/grasp_idqp.hpp"
+
+#include "grasp_idqp_parallel_solver.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <string>
+
+namespace plato_robot_system::task
+{
+namespace
+{
+
+constexpr double kMinDt = 1.0e-9;
+constexpr double kMinAxisNorm = 1.0e-12;
+
+bool IsFinite(const double value)
+{
+  return std::isfinite(value);
+}
+
+bool IsNonnegativeFinite(const double value)
+{
+  return IsFinite(value) && value >= 0.0;
+}
+
+bool IsPositiveFinite(const double value)
+{
+  return IsFinite(value) && value > 0.0;
+}
+
+bool IsUnitIntervalFinite(const double value)
+{
+  return IsFinite(value) && value >= 0.0 && value <= 1.0;
+}
+
+double Clamp(const double value, const double lower, const double upper)
+{
+  return std::clamp(value, lower, upper);
+}
+
+double Clamp01(const double value)
+{
+  return Clamp(value, 0.0, 1.0);
+}
+
+int NonnegativeTicks(const int ticks)
+{
+  return std::max(0, ticks);
+}
+
+bool HasValidParallelGeometry(const GraspIDQPConfig & config)
+{
+  return IsFinite(config.parallel_tip_radius_m) &&
+         config.parallel_tip_radius_m > 0.0 &&
+         IsFinite(config.parallel_lateral_offset_m) &&
+         std::abs(config.parallel_lateral_offset_m) <= 2.0 * config.parallel_tip_radius_m &&
+         IsFinite(config.parallel_qmin_rad) &&
+         IsFinite(config.parallel_qmax_rad) &&
+         config.parallel_qmin_rad < config.parallel_qmax_rad &&
+         IsFinite(config.parallel_q5_min_rad) &&
+         config.parallel_q5_min_rad >= 0.0 &&
+         IsFinite(config.parallel_midpoint_u) &&
+         config.parallel_midpoint_u > 0.0 &&
+         config.parallel_midpoint_u < 1.0 &&
+         IsNonnegativeFinite(config.parallel_max_flexion_rad);
+}
+
+bool HasValidBaseConfig(const GraspIDQPConfig & config)
+{
+  return (config.q_ready.size() == 0 || config.q_ready.allFinite()) &&
+         config.force_enter_debounce_ticks >= 0 &&
+         config.force_exit_contact_lost_ticks >= 0 &&
+         IsFinite(config.force_exit_u_threshold) &&
+         IsNonnegativeFinite(config.min_contact_force_n) &&
+         IsUnitIntervalFinite(config.lpf_alpha) &&
+         IsFinite(config.kp_tactile_u_fb) &&
+         IsFinite(config.kd_tactile_u_fb) &&
+         IsFinite(config.kp_tactile_phi_fb) &&
+         IsFinite(config.kd_tactile_phi_fb) &&
+         IsNonnegativeFinite(config.debug_print_contact_interval_s) &&
+         HasValidParallelGeometry(config);
+}
+
+bool HasValidSolverConfig(const GraspIDQPConfig & config)
+{
+  if (!HasValidBaseConfig(config)) {
+    return false;
+  }
+  if (!config.index_contact_normal_axis_frame.allFinite() ||
+    !config.thumb_contact_normal_axis_frame.allFinite())
+  {
+    return false;
+  }
+  if (config.use_pinocchio_parallel_solver) {
+    if (config.index_contact_point_frame.empty() || config.thumb_contact_point_frame.empty()) {
+      return false;
+    }
+    if (
+      config.index_contact_normal_axis_frame.norm() <= kMinAxisNorm ||
+      config.thumb_contact_normal_axis_frame.norm() <= kMinAxisNorm)
+    {
+      return false;
+    }
+  }
+
+  return IsNonnegativeFinite(config.parallel_solver_w_aperture) &&
+         IsNonnegativeFinite(config.parallel_solver_w_parallel) &&
+         IsNonnegativeFinite(config.parallel_solver_w_moment) &&
+         IsNonnegativeFinite(config.parallel_solver_w_posture) &&
+         IsNonnegativeFinite(config.parallel_solver_w_smooth) &&
+         IsPositiveFinite(config.parallel_solver_damping) &&
+         IsPositiveFinite(config.parallel_solver_fd_eps_rad) &&
+         IsPositiveFinite(config.parallel_solver_max_step_rad) &&
+         config.parallel_solver_max_iters >= 0;
+}
+
+sensor::TactileGripObservationConfig BuildGripObservationConfig(
+  const GraspIDQPConfig & config)
+{
+  sensor::TactileGripObservationConfig observation_config;
+  observation_config.frame_a_name =
+    std::string(kThumbIndexFrameA.data(), kThumbIndexFrameA.size());
+  observation_config.frame_b_name =
+    std::string(kThumbIndexFrameB.data(), kThumbIndexFrameB.size());
+  observation_config.min_contact_force_n = config.min_contact_force_n;
+  observation_config.use_tactile_presence_for_contact =
+    config.use_tactile_presence_for_contact;
+  observation_config.force_aggregation = config.force_aggregation;
+  return observation_config;
+}
+
+}  // namespace
+
+bool GraspIDQP::Configure(
+  const pinocchio::Model & model,
+  const GraspIDQPConfig & config)
+{
+  configured_ = false;
+  has_reference_posture_ = false;
+  q_reference_.resize(0);
+  q_target_lpf_.resize(0);
+  has_q_target_lpf_ = false;
+  has_pinocchio_parallel_frames_ = false;
+  Reset();
+
+  if (model.nq <= 0 || model.nv <= 0 || !HasValidSolverConfig(config)) {
+    return false;
+  }
+  if (
+    config.q_ready.size() > 0 &&
+    (config.q_ready.size() != model.nq || !config.q_ready.allFinite()))
+  {
+    return false;
+  }
+
+  active_dof_ = static_cast<int>(kThumbIndexActiveJoints.size());
+  for (std::size_t i = 0; i < kThumbIndexActiveJoints.size(); ++i) {
+    const auto joint_id = model.getJointId(std::string(kThumbIndexActiveJoints[i]));
+    if (joint_id >= static_cast<pinocchio::JointIndex>(model.njoints)) {
+      return false;
+    }
+    if (model.nqs[joint_id] != 1 || model.nvs[joint_id] != 1) {
+      return false;
+    }
+    const int q_index = model.idx_qs[joint_id];
+    if (q_index < 0 || q_index >= model.nq) {
+      return false;
+    }
+    active_q_indices_[i] = q_index;
+  }
+
+  if (config.use_pinocchio_parallel_solver) {
+    if (
+      !ResolveGraspIDQPParallelFrames(
+        model,
+        config,
+        &index_contact_point_frame_id_,
+        &thumb_contact_point_frame_id_))
+    {
+      return false;
+    }
+    has_pinocchio_parallel_frames_ = true;
+  }
+
+  config_ = config;
+  configured_ = true;
+  Reset();
+  return true;
+}
+
+void GraspIDQP::Reset()
+{
+  mode_ = GraspIDQPMode::kMotionTeleop;
+  force_enter_counter_ = 0;
+  force_exit_contact_lost_counter_ = 0;
+  last_force_error_n_ = 0.0;
+  has_last_force_error_ = false;
+  last_contact_debug_print_time_s_ = -1.0e100;
+  status_ = GraspIDQPStatus{};
+  status_.q_target = Eigen::VectorXd::Zero(0);
+  q_target_lpf_.resize(0);
+  has_q_target_lpf_ = false;
+}
+
+bool GraspIDQP::OnEnter(RobotSystem & robot, const RobotState & state)
+{
+  if (!HasCompatibleState(robot, state)) {
+    return false;
+  }
+
+  Reset();
+  return CaptureReferencePosture(state);
+}
+
+bool GraspIDQP::PopulateCommand(
+  RobotSystem & robot,
+  const RobotState & state,
+  const GraspIDQPCommand & input,
+  const double dt_sec,
+  RobotCommand * command)
+{
+  if (command == nullptr) {
+    return false;
+  }
+
+  Eigen::VectorXd q_target;
+  if (!BuildMotionTarget(robot, state, input, dt_sec, &q_target)) {
+    return false;
+  }
+
+  command->Resize(robot.nq(), robot.nv());
+  command->q_cmd = q_target;
+  command->qdot_cmd.setZero();
+  command->tau_cmd.setZero();
+  command->stamp_sec = state.time_s;
+  command->valid = command->HasValidDimensions() && command->AllFinite();
+  return command->valid;
+}
+
+bool GraspIDQP::BuildMotionTarget(
+  RobotSystem & robot,
+  const RobotState & state,
+  const GraspIDQPCommand & input,
+  const double dt_sec,
+  Eigen::VectorXd * q_target,
+  GraspIDQPStatus * status)
+{
+  if (q_target == nullptr || !HasCompatibleState(robot, state) ||
+    !IsFinite(dt_sec) || dt_sec <= kMinDt ||
+    !IsFinite(input.u) || !IsFinite(input.phi) ||
+    !IsFinite(input.desired_force_n))
+  {
+    return false;
+  }
+  if (!has_reference_posture_ && !CaptureReferencePosture(state)) {
+    return false;
+  }
+
+  const double u_open = Clamp01(input.u);
+  const double phi = Clamp01(input.phi);
+  const double desired_force_n = std::max(0.0, input.desired_force_n);
+
+  const sensor::TactileGripObservation estimate = EstimateGripForceFromTactile(state);
+  PrintContactStatesIfNeeded(state, estimate);
+  UpdateMode(estimate, u_open);
+  if (mode_ == GraspIDQPMode::kForceTracking && !estimate.valid_force) {
+    mode_ = GraspIDQPMode::kMotionTeleop;
+    force_enter_counter_ = 0;
+    force_exit_contact_lost_counter_ = 0;
+    last_force_error_n_ = 0.0;
+    has_last_force_error_ = false;
+  }
+
+  status_.mode = mode_;
+  status_.u = u_open;
+  status_.phi = phi;
+  status_.desired_force_n = desired_force_n;
+  status_.measured_force_n = estimate.measured_force_n;
+  status_.force_a_n = estimate.force_a_n;
+  status_.force_b_n = estimate.force_b_n;
+  status_.contact_a = estimate.contact_a;
+  status_.contact_b = estimate.contact_b;
+  status_.enough_contact_a = estimate.enough_contact_a;
+  status_.enough_contact_b = estimate.enough_contact_b;
+  status_.lost_contact_a = estimate.lost_contact_a;
+  status_.lost_contact_b = estimate.lost_contact_b;
+  status_.valid_force = estimate.valid_force;
+  status_.contact_count = estimate.ContactCount();
+  status_.enough_contact_count = estimate.EnoughContactCount();
+  status_.force_enter_counter = force_enter_counter_;
+  status_.force_exit_contact_lost_counter = force_exit_contact_lost_counter_;
+
+  GraspIDQPCommand clamped_input;
+  clamped_input.u = u_open;
+  clamped_input.phi = phi;
+  clamped_input.desired_force_n = desired_force_n;
+
+  const bool built = BuildParallelJointPositionTarget(
+    robot,
+    state,
+    clamped_input,
+    estimate,
+    dt_sec,
+    q_target);
+  if (status != nullptr) {
+    *status = status_;
+  }
+  return built;
+}
+
+bool GraspIDQP::HasCompatibleState(
+  const RobotSystem & robot,
+  const RobotState & state) const
+{
+  return configured_ && robot.hasModel() && robot.hasState() && IsValid(state) &&
+         state.q.size() == robot.nq() && state.qdot.size() == robot.nv() &&
+         state.tau.size() == robot.nv();
+}
+
+bool GraspIDQP::CaptureReferencePosture(const RobotState & state)
+{
+  if (config_.q_ready.size() == state.q.size()) {
+    q_reference_ = config_.q_ready;
+  } else {
+    q_reference_ = state.q;
+  }
+
+  has_reference_posture_ =
+    q_reference_.size() == state.q.size() && q_reference_.allFinite();
+  return has_reference_posture_;
+}
+
+sensor::TactileGripObservation GraspIDQP::EstimateGripForceFromTactile(
+  const RobotState & state) const
+{
+  return sensor::ObserveTactileGrip(
+    state.tactile_sensors,
+    BuildGripObservationConfig(config_));
+}
+
+void GraspIDQP::PrintContactStatesIfNeeded(
+  const RobotState & state,
+  const sensor::TactileGripObservation & estimate)
+{
+  if (!config_.debug_print_contact_states || !std::isfinite(state.time_s)) {
+    return;
+  }
+
+  const double interval_s = config_.debug_print_contact_interval_s;
+  if (
+    interval_s > 0.0 &&
+    state.time_s - last_contact_debug_print_time_s_ < interval_s)
+  {
+    return;
+  }
+  last_contact_debug_print_time_s_ = state.time_s;
+
+  std::ostringstream message;
+  message << std::fixed << std::setprecision(4)
+          << "[grasp_idqp] tactile contact states t=" << state.time_s
+          << " sensors=" << state.tactile_sensors.size()
+          << " contact_count=" << estimate.ContactCount()
+          << " enough_count=" << estimate.EnoughContactCount();
+
+  for (const auto & tactile : state.tactile_sensors) {
+    message << " | idx=" << tactile.sensor_index
+            << " frame=" << tactile.frame_name
+            << " valid=" << (tactile.valid ? "true" : "false")
+            << " state=" << sensor::TactileContactStateName(tactile.contact_state)
+            << " active_hemi=" << tactile.ActiveHemisphereCount()
+            << " force_n=" << tactile.ActiveHemisphereNormalForceN();
+  }
+
+  std::cout << message.str() << std::endl;
+}
+
+void GraspIDQP::UpdateMode(
+  const sensor::TactileGripObservation & estimate,
+  const double u)
+{
+  if (mode_ == GraspIDQPMode::kMotionTeleop) {
+    const bool should_enter_force_tracking =
+      estimate.enough_contact_a && estimate.enough_contact_b &&
+      u <= config_.force_exit_u_threshold;
+    if (should_enter_force_tracking) {
+      ++force_enter_counter_;
+    } else {
+      force_enter_counter_ = 0;
+    }
+
+    if (should_enter_force_tracking &&
+      force_enter_counter_ >= std::max(1, NonnegativeTicks(config_.force_enter_debounce_ticks)))
+    {
+      mode_ = GraspIDQPMode::kForceTracking;
+      last_force_error_n_ = 0.0;
+      has_last_force_error_ = false;
+      force_exit_contact_lost_counter_ = 0;
+    }
+    return;
+  }
+
+  if (mode_ == GraspIDQPMode::kForceTracking) {
+    if (u > config_.force_exit_u_threshold) {
+      mode_ = GraspIDQPMode::kMotionTeleop;
+      force_enter_counter_ = 0;
+      force_exit_contact_lost_counter_ = 0;
+      last_force_error_n_ = 0.0;
+      has_last_force_error_ = false;
+      return;
+    }
+
+    const bool should_exit_for_contact_loss =
+      estimate.lost_contact_a && estimate.lost_contact_b;
+    if (should_exit_for_contact_loss) {
+      ++force_exit_contact_lost_counter_;
+    } else {
+      force_exit_contact_lost_counter_ = 0;
+    }
+
+    if (should_exit_for_contact_loss &&
+      force_exit_contact_lost_counter_ >=
+      std::max(1, NonnegativeTicks(config_.force_exit_contact_lost_ticks)))
+    {
+      mode_ = GraspIDQPMode::kMotionTeleop;
+      force_enter_counter_ = 0;
+      force_exit_contact_lost_counter_ = 0;
+      last_force_error_n_ = 0.0;
+      has_last_force_error_ = false;
+    }
+  }
+}
+
+double GraspIDQP::ParallelQ5Geometry(const double q3) const
+{
+  const double cos_q5 = Clamp(
+    std::cos(q3) - config_.parallel_lateral_offset_m / config_.parallel_tip_radius_m,
+    -1.0,
+    1.0);
+  return std::max(config_.parallel_q5_min_rad, std::acos(cos_q5));
+}
+
+bool GraspIDQP::BuildTeleopSeedTarget(
+  const RobotSystem & robot,
+  const RobotState & state,
+  const GraspIDQPCommand & input,
+  const sensor::TactileGripObservation & estimate,
+  const double dt_sec,
+  Eigen::VectorXd * q_seed)
+{
+  if (q_seed == nullptr || !HasCompatibleState(robot, state) ||
+    !IsFinite(dt_sec) || dt_sec <= kMinDt ||
+    q_reference_.size() != robot.nq() || !q_reference_.allFinite())
+  {
+    return false;
+  }
+
+  double effective_u = input.u;
+  double effective_phi = input.phi;
+  status_.force_error_n = 0.0;
+  if (mode_ == GraspIDQPMode::kForceTracking && estimate.valid_force) {
+    const double force_error = input.desired_force_n - estimate.measured_force_n;
+    const double force_error_dot =
+      has_last_force_error_ ? (force_error - last_force_error_n_) / dt_sec : 0.0;
+    last_force_error_n_ = force_error;
+    has_last_force_error_ = true;
+    if (config_.force_feedback_enabled) {
+      effective_u = Clamp01(
+        effective_u -
+        config_.kp_tactile_u_fb * force_error -
+        config_.kd_tactile_u_fb * force_error_dot);
+      effective_phi = Clamp01(
+        effective_phi +
+        config_.kp_tactile_phi_fb * force_error +
+        config_.kd_tactile_phi_fb * force_error_dot);
+    }
+    status_.force_error_n = force_error;
+  }
+
+  const double u_open = Clamp01(effective_u);
+
+  double q3_target = 0.0;
+  double q5_target = 0.0;
+  if (u_open > config_.parallel_midpoint_u) {
+    const double ratio =
+      (u_open - config_.parallel_midpoint_u) /
+      (1.0 - config_.parallel_midpoint_u);
+    const double q5_neutral = ParallelQ5Geometry(0.0);
+    q3_target = 0.0;
+    q5_target = std::max(
+      config_.parallel_q5_min_rad,
+      q5_neutral - ratio * (q5_neutral - config_.parallel_q5_min_rad));
+  } else {
+    const double ratio =
+      (config_.parallel_midpoint_u - u_open) / config_.parallel_midpoint_u;
+    q3_target = Clamp(
+      config_.parallel_qmax_rad -
+      ratio * (config_.parallel_qmax_rad - config_.parallel_qmin_rad),
+      config_.parallel_qmin_rad,
+      config_.parallel_qmax_rad);
+    q5_target = ParallelQ5Geometry(q3_target);
+  }
+
+  const double phi = Clamp01(effective_phi);
+  const double q4_target = -q3_target - phi * config_.parallel_max_flexion_rad;
+  const double q6_target = -q5_target + phi * config_.parallel_max_flexion_rad;
+
+  Eigen::VectorXd q_target = q_reference_;
+  q_target[active_q_indices_[2]] = q3_target;
+  q_target[active_q_indices_[3]] = q4_target;
+  q_target[active_q_indices_[0]] = q5_target;
+  q_target[active_q_indices_[1]] = q6_target;
+  if (!q_target.allFinite()) {
+    return false;
+  }
+
+  status_.effective_u = effective_u;
+  status_.effective_phi = effective_phi;
+  status_.u_parallel = u_open;
+  *q_seed = q_target;
+  return true;
+}
+
+bool GraspIDQP::BuildParallelJointPositionTarget(
+  const RobotSystem & robot,
+  const RobotState & state,
+  const GraspIDQPCommand & input,
+  const sensor::TactileGripObservation & estimate,
+  const double dt_sec,
+  Eigen::VectorXd * q_target_out)
+{
+  if (q_target_out == nullptr) {
+    return false;
+  }
+
+  Eigen::VectorXd q_seed;
+  if (!BuildTeleopSeedTarget(robot, state, input, estimate, dt_sec, &q_seed)) {
+    return false;
+  }
+
+  Eigen::VectorXd q_target = q_seed;
+  status_.aperture_des_m = 0.0;
+  status_.aperture_m = 0.0;
+  status_.parallel_axis_error = 0.0;
+  status_.moment_arm_m = 0.0;
+  status_.solver_cost = 0.0;
+  status_.solver_iters = 0;
+  status_.used_pinocchio_parallel_solver = false;
+
+  if (config_.use_pinocchio_parallel_solver) {
+    const bool has_smooth_reference =
+      has_q_target_lpf_ &&
+      q_target_lpf_.size() == q_seed.size() &&
+      q_target_lpf_.allFinite();
+    if (
+      !configured_ ||
+      !robot.hasModel() ||
+      !has_pinocchio_parallel_frames_ ||
+      !RefineGraspIDQPParallelTarget(
+        robot.model(),
+        config_,
+        active_q_indices_,
+        active_dof_,
+        index_contact_point_frame_id_,
+        thumb_contact_point_frame_id_,
+        q_seed,
+        q_target_lpf_,
+        has_smooth_reference,
+        &q_target,
+        &status_))
+    {
+      return false;
+    }
+  }
+
+  Eigen::VectorXd q_command = q_target;
+  if (config_.lpf_alpha < 1.0) {
+    if (
+      !has_q_target_lpf_ ||
+      q_target_lpf_.size() != q_target.size() ||
+      !q_target_lpf_.allFinite())
+    {
+      q_target_lpf_ = state.q;
+      has_q_target_lpf_ =
+        q_target_lpf_.size() == q_target.size() && q_target_lpf_.allFinite();
+    }
+    if (!has_q_target_lpf_) {
+      return false;
+    }
+    q_target_lpf_ =
+      (1.0 - config_.lpf_alpha) * q_target_lpf_ +
+      config_.lpf_alpha * q_target;
+    q_command = q_target_lpf_;
+  } else {
+    q_target_lpf_ = q_target;
+    has_q_target_lpf_ = true;
+  }
+  if (!q_command.allFinite()) {
+    return false;
+  }
+
+  status_.q_target = q_command;
+  *q_target_out = q_command;
+  return true;
+}
+
+}  // namespace plato_robot_system::task

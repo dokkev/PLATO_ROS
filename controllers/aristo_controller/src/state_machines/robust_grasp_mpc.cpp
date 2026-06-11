@@ -204,6 +204,11 @@ void RobustGraspMpcState::OnEnter()
   last_command_.stamp_sec = state.time_s;
 }
 
+const mppi_core::RobustGraspPolicyStatus & RobustGraspMpcState::policy_status() const
+{
+  return policy_.status();
+}
+
 bool RobustGraspMpcState::PopulateCommand(plato_robot_system::RobotCommand * command) const
 {
   if (command == nullptr || !configured_ || robot_ == nullptr || !robot_->hasState()) {
@@ -283,10 +288,11 @@ bool RobustGraspMpcState::BuildObservation(mppi_core::GraspObservation * observa
     observation->qdot_ref_current = last_command_.qdot_cmd;
   }
   observation->tactile_meas = std::move(tactile_meas);
+  observation->object_prior = config_.object_prior;
   observation->robot_system = robot_;
   observation->tactile_contexts = std::move(tactile_contexts);
   observation->tactile_transition_config =
-    &config_.policy.disturbed_rollout.tactile_transition.base;
+    &config_.policy.tactile_only_transition.tactile_transition.base;
   observation->time_s = state.time_s;
   return true;
 }
@@ -433,10 +439,19 @@ void RobustGraspMpcState::PrintStatus(
          << "[robust_grasp_mpc] tick=" << tick_index_
          << " ready=" << (status.ready ? "true" : "false")
          << " fallback=" << (status.used_hold_fallback ? "true" : "false")
+         << " mode="
+         << (status.used_continuous_qddot_mppi ? "continuous_qddot_mppi" :
+             "discrete_action_selector")
          << " candidate_count=" << status.candidate_count
          << " disturbance_count=" << status.disturbance_count
+         << " horizon=" << status.horizon_steps
+         << " lambda=" << status.lambda
          << " best_idx=" << status.best_candidate_index
+         << " best_action=" << status.best_action_name
          << " raw_best_idx=" << status.raw_best_candidate_index
+         << " raw_best_action=" << status.raw_best_action_name
+         << " second_best_action=" << status.second_best_action_name
+         << " second_best_score=" << status.second_best_score
          << " hold_selected=" << (status.selected_hold_by_margin ? "true" : "false")
          << " score=" << status.best_score
          << " raw_best_score=" << status.raw_best_score
@@ -444,10 +459,38 @@ void RobustGraspMpcState::PrintStatus(
          << " hold_improvement=" << status.hold_score_improvement
          << " mean=" << status.best_mean_cost
          << " cvar=" << status.best_cvar_cost
+         << " best_sample_cost=" << status.best_sample_cost
+         << " weighted_cost=" << status.weighted_cost_estimate
+         << " cost_min=" << status.cost_min
+         << " cost_mean=" << status.cost_mean
+         << " cost_max=" << status.cost_max
+         << " ess=" << status.effective_sample_size
          << " qddot_norm=" << status.selected_qddot.norm()
+         << " qddot_best_norm=" << status.qddot_best_first.norm()
+         << " qddot_nominal_norm=" << status.qddot_nominal_first.norm()
          << " qdot_cmd_norm=" << command.qdot_cmd.norm()
          << " active_sensors=" << ActiveTactileSensorCount(observation.tactile_meas)
-         << " active_hemispheres=" << ActiveHemisphereCountTotal(observation.tactile_meas);
+         << " active_hemispheres=" << ActiveHemisphereCountTotal(observation.tactile_meas)
+         << " object_samples=" << status.selected_object_sample_count
+         << " object_queries=" << status.selected_object_geometry_query_count
+         << " object_support_cost=" << status.selected_object_support_cost
+         << " contact_loss_cost=" << status.selected_contact_loss_cost
+         << " support_cost=" << status.selected_support_cost
+         << " edge_cost=" << status.selected_edge_cost
+         << " penetration_cost=" << status.selected_penetration_cost
+         << " preload_cost=" << status.selected_preload_cost
+         << " balance_cost=" << status.selected_balance_cost
+         << " control_cost=" << status.selected_control_cost
+         << " rate_cost=" << status.selected_rate_cost
+         << " pred_hemi=" << status.selected_predicted_active_hemisphere_total
+         << " meas_hemi=" << status.selected_measured_active_hemisphere_total
+         << " lost_object_contacts=" << status.selected_object_contact_loss_count
+         << " object_edge_margin_m=" << status.selected_object_edge_margin_m
+         << " pred_centroid=[" << status.selected_predicted_centroid_sensor_m.transpose()
+         << "] meas_centroid=[" << status.selected_measured_centroid_sensor_m.transpose()
+         << "] object_disturbance_speed=" << status.selected_object_linear_disturbance_speed_mps
+         << " object_disturbance_omega=" << status.selected_object_angular_disturbance_speed_radps
+         << " solve_ms=" << status.solve_time_ms;
   std::cout << stream.str() << std::endl;
 }
 

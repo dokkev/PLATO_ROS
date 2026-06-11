@@ -8,28 +8,42 @@
 #include <Eigen/StdVector>
 
 #include <cstddef>
+#include <limits>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "mppi_core/core/mppi_config.hpp"
 #include "mppi_core/costs/robust_grasp_state_cost.hpp"
 #include "mppi_core/disturbance/grasp_disturbance_sampler.hpp"
+#include "mppi_core/policy/continuous_qddot_mppi.hpp"
 #include "mppi_core/policy/grasp_action_library.hpp"
 #include "mppi_core/rollout/disturbed_grasp_rollout.hpp"
+#include "mppi_core/rollout/object_prior_grasp_rollout.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/state/grasp_observation.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 
 namespace mppi_core {
 
+enum class RobustGraspControlMode {
+  kContinuousQddotMppi,
+  kDiscreteActionSelector,
+};
+
 struct RobustGraspPolicyConfig {
   MPPIConfig rollout;
   GraspStartConfig start;
 
-  DisturbedGraspRolloutConfig disturbed_rollout;
+  TactileOnlyContactTransitionConfig tactile_only_transition;
   GraspDisturbanceSamplerConfig disturbance_sampler;
   RobustGraspStateCostConfig cost;
   GraspActionLibraryConfig action_library;
+
+  RobustGraspControlMode control_mode{
+      RobustGraspControlMode::kContinuousQddotMppi};
+  double continuous_control_rate_cost_weight{1.0e-3};
+  double continuous_smoothing_alpha{0.5};
 
   double risk_weight{1.0};
   double cvar_tail_fraction{0.25};
@@ -46,26 +60,71 @@ struct RobustGraspPolicyStatus {
 
   bool ready{false};
   bool used_hold_fallback{false};
+  RobustGraspControlMode control_mode{
+      RobustGraspControlMode::kContinuousQddotMppi};
+  bool used_continuous_qddot_mppi{false};
 
   std::size_t candidate_count{0};
   std::size_t disturbance_count{0};
+  std::size_t horizon_steps{0};
+  double lambda{0.0};
 
   double best_score{0.0};
   double best_mean_cost{0.0};
   double best_cvar_cost{0.0};
   std::size_t best_candidate_index{0};
+  std::string best_action_name;
   bool selected_hold_by_margin{false};
 
   double raw_best_score{0.0};
   double raw_best_mean_cost{0.0};
   double raw_best_cvar_cost{0.0};
   std::size_t raw_best_candidate_index{0};
+  std::string raw_best_action_name;
   double hold_score_improvement{0.0};
 
   double hold_score{0.0};
   double hold_mean_cost{0.0};
   double hold_cvar_cost{0.0};
+  std::string hold_action_name{"hold"};
 
+  double second_best_score{0.0};
+  std::size_t second_best_candidate_index{0};
+  std::string second_best_action_name;
+
+  double selected_object_support_cost{0.0};
+  double selected_contact_loss_cost{0.0};
+  double selected_support_cost{0.0};
+  double selected_edge_cost{0.0};
+  double selected_penetration_cost{0.0};
+  double selected_preload_cost{0.0};
+  double selected_balance_cost{0.0};
+  double selected_action_cost{0.0};
+  double selected_control_cost{0.0};
+  double selected_rate_cost{0.0};
+  double best_sample_cost{0.0};
+  double weighted_cost_estimate{0.0};
+  double cost_min{0.0};
+  double cost_mean{0.0};
+  double cost_max{0.0};
+  double effective_sample_size{0.0};
+  std::size_t selected_object_sample_count{0};
+  std::size_t selected_object_geometry_query_count{0};
+  double selected_predicted_active_hemisphere_total{0.0};
+  double selected_measured_active_hemisphere_total{0.0};
+  double selected_object_contact_loss_count{0.0};
+  double selected_object_edge_margin_m{0.0};
+  Eigen::Vector2d selected_predicted_centroid_sensor_m{
+      Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
+  Eigen::Vector2d selected_measured_centroid_sensor_m{
+      Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
+  double selected_object_linear_disturbance_speed_mps{0.0};
+  double selected_object_angular_disturbance_speed_radps{0.0};
+  double solve_time_ms{0.0};
+
+  Eigen::VectorXd qddot_cmd;
+  Eigen::VectorXd qddot_nominal_first;
+  Eigen::VectorXd qddot_best_first;
   Eigen::VectorXd selected_qddot;
 };
 
@@ -80,6 +139,8 @@ class RobustGraspPolicy {
   const RobustGraspPolicyStatus& status() const { return status_; }
 
  private:
+  struct CandidateEvaluationStats;
+
   GraspState MakeInitialState(const GraspObservation& observation) const;
 
   double EvaluateCandidate(
@@ -90,7 +151,19 @@ class RobustGraspPolicy {
           disturbances,
       const RolloutContext& context,
       double* mean_cost,
-      double* cvar_cost) const;
+      double* cvar_cost,
+      CandidateEvaluationStats* stats) const;
+
+  RobotCommand UpdateContinuousQddotMppi(
+      const GraspObservation& observation,
+      const GraspState& initial_state,
+      const RolloutContext& context);
+  RobotCommand UpdateDiscreteActionSelector(
+      const GraspObservation& observation,
+      const GraspState& initial_state,
+      const RolloutContext& context);
+  void CopyContinuousStatus(
+      const ContinuousQddotMppiStatus& continuous_status);
 
   RobotCommand MakeHoldCommand(const GraspObservation& observation) const;
   bool IsReady(const GraspState& state) const;
@@ -100,6 +173,7 @@ class RobustGraspPolicy {
   std::unique_ptr<GraspDisturbanceSampler> disturbance_sampler_;
   std::unique_ptr<GraspActionLibrary> action_library_;
   std::unique_ptr<RobustGraspStateCost> cost_;
+  std::unique_ptr<ContinuousQddotMppiController> continuous_mppi_;
   Eigen::VectorXd last_selected_qddot_;
   bool initialized_{false};
 };

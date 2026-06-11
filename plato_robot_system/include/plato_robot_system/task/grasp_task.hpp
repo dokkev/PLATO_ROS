@@ -8,6 +8,7 @@
 #include <pinocchio/multibody/model.hpp>
 
 #include "plato_robot_system/robot/robot_system.hpp"
+#include "plato_robot_system/sensor/tactile_grip_observation.hpp"
 #include "plato_robot_system/task/thumb_index_grasp_constants.hpp"
 
 namespace plato_robot_system::task
@@ -72,20 +73,6 @@ struct GraspTaskCommand
   double u{0.0};
   double phi{0.0};
   double desired_force_n{1.0};
-};
-
-struct GraspTaskGripForceEstimate
-{
-  double measured_force_n{0.0};
-  double force_a_n{0.0};
-  double force_b_n{0.0};
-  bool contact_a{false};
-  bool contact_b{false};
-  bool enough_contact_a{false};
-  bool enough_contact_b{false};
-  bool lost_contact_a{true};
-  bool lost_contact_b{true};
-  bool valid_force{false};
 };
 
 struct GraspTaskStatus
@@ -154,20 +141,20 @@ public:
 private:
   bool HasCompatibleState(const RobotSystem & robot, const RobotState & state) const;
   bool CaptureReferencePosture(const RobotState & state);
-  GraspTaskGripForceEstimate EstimateGripForceFromTactile(
+  sensor::TactileGripObservation EstimateGripForceFromTactile(
     const RobotState & state) const;
   void PrintContactStatesIfNeeded(
     const RobotState & state,
-    const GraspTaskGripForceEstimate & estimate);
+    const sensor::TactileGripObservation & estimate);
   void UpdateMode(
-    const GraspTaskGripForceEstimate & estimate,
+    const sensor::TactileGripObservation & estimate,
     double u);
   double ParallelQ5Geometry(double q3) const;
   bool BuildParallelJointPositionTarget(
     const RobotSystem & robot,
     const RobotState & state,
     const GraspTaskCommand & input,
-    const GraspTaskGripForceEstimate & estimate,
+    const sensor::TactileGripObservation & estimate,
     double dt_sec,
     Eigen::VectorXd * q_target);
 

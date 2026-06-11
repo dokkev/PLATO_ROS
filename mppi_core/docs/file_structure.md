@@ -10,6 +10,7 @@ include/mppi_core/
   robot/
   tactile/
   contact/
+  object/
   costs/
   config/
   task/
@@ -50,6 +51,13 @@ Contact kinematics, hemisphere motion, force projection, and force correction
 helpers. Contact kinematics uses one Pinocchio frame per tactile sensor and
 derives hemisphere point Jacobians from local offsets.
 
+## object/
+
+Object prior, geometry handle, primitive surface queries, contact-consistent
+object belief initialization, object-distance contact prediction, and Jenga
+pose-scenario contact support evaluation.
+Installable object assets live under the package-level `object/` directory.
+
 ## costs/
 
 Cost terms that evaluate predicted `GraspState` rollouts.
@@ -75,9 +83,8 @@ task-specific disturbance or object priors.
 
 Default files live under `task/`:
 
-- `jenga.yaml`
-- `peg_in_hole.yaml`
 - `grasp_hold.yaml`
+- `robust_grasp_hold.yaml`
 
 ## util/
 

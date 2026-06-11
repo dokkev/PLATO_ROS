@@ -6,6 +6,8 @@
 
 #include <Eigen/Core>
 #include <cstddef>
+#include <string>
+#include <utility>
 
 namespace mppi_core {
 
@@ -29,6 +31,8 @@ class ActionSequence {
 
   const Eigen::MatrixXd& values() const { return values_; }
   Eigen::MatrixXd& values() { return values_; }
+  const std::string& name() const { return name_; }
+  void setName(std::string name) { name_ = std::move(name); }
 
   Eigen::VectorXd action(std::size_t step) const;
   Eigen::VectorXd firstAction() const;
@@ -36,6 +40,7 @@ class ActionSequence {
 
  private:
   Eigen::MatrixXd values_;
+  std::string name_;
 };
 
 }  // namespace mppi_core

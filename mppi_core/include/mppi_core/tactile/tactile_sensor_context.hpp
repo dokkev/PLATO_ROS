@@ -19,6 +19,7 @@ struct HemisphereGeometry {
 
   Eigen::Vector3d center_sensor_m{Eigen::Vector3d::Zero()};
   Eigen::Vector3d normal_sensor{Eigen::Vector3d::UnitZ()};
+  double radius_m{0.0};
 
   std::vector<std::size_t> neighbors;
 };

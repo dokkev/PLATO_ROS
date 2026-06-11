@@ -8,6 +8,7 @@
 
 #include <cstddef>
 
+#include "mppi_core/object/object_contact_support_evaluator.hpp"
 #include "mppi_core/rollout/rollout_model.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 #include "mppi_core/tactile/tactile_sensor_context.hpp"
@@ -45,6 +46,28 @@ struct RobustGraspStateCostConfig {
 
   double qddot_weight{0.01};
   double tau_weight{0.0};
+
+  ObjectContactSupportEvaluatorConfig object_support;
+};
+
+struct RobustGraspStateCostBreakdown {
+  double tactile_contact_support_cost{0.0};
+  double force_cost{0.0};
+  double preload_cost{0.0};
+  double force_balance_cost{0.0};
+  double shear_cost{0.0};
+  double contact_line_alignment_cost{0.0};
+  double action_cost{0.0};
+  double torque_cost{0.0};
+  double object_support_cost{0.0};
+
+  ObjectContactSupportEvaluation object_support;
+
+  double totalCost() const {
+    return tactile_contact_support_cost + force_cost + shear_cost +
+           contact_line_alignment_cost + action_cost + torque_cost +
+           object_support_cost;
+  }
 };
 
 bool ComputeActiveTactileContactCentroidWorld(
@@ -59,6 +82,10 @@ class RobustGraspStateCost {
   double Evaluate(const GraspState& state,
                   const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
                   const RolloutContext& context) const;
+  double Evaluate(const GraspState& state,
+                  const Eigen::Ref<const Eigen::VectorXd>& qddot_sol,
+                  const RolloutContext& context,
+                  RobustGraspStateCostBreakdown* breakdown) const;
 
  private:
   RobustGraspStateCostConfig config_;

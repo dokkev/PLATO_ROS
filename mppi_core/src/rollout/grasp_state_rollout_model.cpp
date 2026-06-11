@@ -175,6 +175,7 @@ void GraspStateRolloutModel::Step(
   next_state->robot =
       StepRobotState(state.robot, action, context.robot_system, dt);
   next_state->tactile_sensors = state.tactile_sensors;
+  next_state->object_belief = state.object_belief;
   if (!IsValid(next_state->robot)) {
     next_state->valid = false;
     return;
@@ -205,7 +206,8 @@ void GraspStateRolloutModel::Step(
     }
   }
 
-  next_state->valid = HasValidStateVectors(*next_state);
+  next_state->valid = HasValidStateVectors(*next_state) &&
+                      IsValidVirtualObjectBelief(next_state->object_belief);
 }
 
 }  // namespace mppi_core

@@ -22,7 +22,10 @@ add_library(${PROJECT_NAME} SHARED
   src/robot/robot_system.cpp
   src/sensor/nari_touch.cpp
   src/sensor/nari_touch_adapter.cpp
+  src/sensor/tactile_grip_observation.cpp
   src/sensor/tactile_state.cpp
+  src/task/grasp_idqp.cpp
+  src/task/grasp_idqp_parallel_solver.cpp
   src/task/grasp_task.cpp
   src/task/joint_teleop_task.cpp
   src/task/joint_task.cpp
@@ -78,6 +81,15 @@ if(BUILD_TESTING)
   if(TARGET grasp_task_test)
     target_link_libraries(grasp_task_test ${PROJECT_NAME})
     target_compile_definitions(grasp_task_test PRIVATE
+      PLATO_ROBOT_SYSTEM_ARISTO_URDF_PATH=\"${ARISTO_GENERATED_URDF}\")
+  endif()
+
+  ament_add_gtest(grasp_idqp_test
+    test/grasp_idqp_test.cpp
+  )
+  if(TARGET grasp_idqp_test)
+    target_link_libraries(grasp_idqp_test ${PROJECT_NAME})
+    target_compile_definitions(grasp_idqp_test PRIVATE
       PLATO_ROBOT_SYSTEM_ARISTO_URDF_PATH=\"${ARISTO_GENERATED_URDF}\")
   endif()
 

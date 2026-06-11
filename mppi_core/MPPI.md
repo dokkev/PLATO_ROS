@@ -55,20 +55,21 @@ because this tells us whether an action moves tactile hemispheres toward contact
 The top-level rollout state is `GraspState`.
 
 ```txt
-GraspState = RobotState + vector<TactileState>
+GraspState = RobotState + vector<TactileState> + optional VirtualObjectBelief
 ```
 
 Mathematically:
 
 ```txt
-G_k = (R_k, T^0_k, T^1_k, ..., T^{N-1}_k)
+G_k = (R_k, T^0_k, T^1_k, ..., T^{N-1}_k, B^obj_k)
 ```
 
 where:
 
 ```txt
-R_k   = RobotState
-T^s_k = TactileState for tactile sensor s
+R_k     = RobotState
+T^s_k   = TactileState for tactile sensor s
+B^obj_k = optional virtual object belief
 ```
 
 The rollout predicts:
@@ -81,7 +82,7 @@ where:
 
 ```txt
 u_k = qddot_sol,k
-w_k = sampled tactile/contact disturbance
+w_k = sampled tactile/contact/object disturbance
 ```
 
 So the rollout is not a single deterministic future.
@@ -311,9 +312,16 @@ normal force proxy change
 
 The current implementation uses a deterministic contact-kinematic transition.
 It does not use measured-torque residual projection inside MPPI horizon
-dynamics.
+dynamics. Object belief particles are carried through `GraspState` and are
+used as sampled Jenga pose scenarios for primitive signed-distance contact
+support cost. They are not integrated as rigid-body object dynamics.
 
-The next step is to add explicit disturbance sampling.
+At touch time, object belief can be initialized from measured joint state,
+active tactile contact locations, and an object pose prior by sampling particles
+around the prior and weighting them by primitive surface distance, normal
+alignment, and prior pose distance. The rollout cost can then evaluate
+candidate hand actions against those sampled object poses using geometric
+hemisphere-object queries.
 
 ---
 
@@ -663,9 +671,8 @@ config:
   rollout.yaml = rollout/tactile model constants and disturbance defaults
 
 task:
-  jenga.yaml       = task start/objective/tolerance/cost
-  peg_in_hole.yaml = task start/objective/tolerance/cost
-  grasp_hold.yaml  = task start/objective/tolerance/cost
+  grasp_hold.yaml        = task start/objective/tolerance/object prior/cost
+  robust_grasp_hold.yaml = robust policy rollout/disturbance/cost/action config
 ```
 
 Example rollout config:
@@ -737,14 +744,15 @@ normal forces, not exact future force prediction.
 The current priority is to stabilize the architecture:
 
 ```txt
-1. GraspState = RobotState + vector<TactileState>
+1. GraspState = RobotState + vector<TactileState> + optional VirtualObjectBelief
 2. TactileState = sensor aggregate + vector<HemisphereState>
 3. MPPI action = qddot_sol
 4. Robot rollout = ideal q/qdot integration + RNEA tau
 5. Contact kinematics = per-hemisphere motion/Jacobian from sensor frame
 6. Tactile rollout = hemisphere contact topology transition
-7. Residual projection = disabled in rollout
-8. Command builder = separate from rollout
+7. Object support = primitive Jenga signed-distance scenario cost
+8. Residual projection = disabled in rollout
+9. Command builder = separate from rollout
 ```
 
 After this architecture is stable, add:
@@ -753,10 +761,11 @@ After this architecture is stable, add:
 1. disturbance sampling in tactile transition
 2. robust cost aggregation across disturbance samples
 3. optional observation-time residual correction
-4. optional object-prior-based contact birth
+4. richer object disturbance sampling, visualization, and hardware tuning
 ```
 
-Do not add object pose tracking or multi-sensor residual force solving until the above architecture is stable.
+Do not turn the controller into an object pose tracker or multi-sensor residual
+force solver while adding the object-aware rollout pieces.
 
 ---
 

@@ -9,6 +9,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "mppi_core/costs/grasp_stability_cost.hpp"
+#include "mppi_core/object/object_prior.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 #include "mppi_core/tactile/tactile_transition.hpp"
 
@@ -24,6 +25,7 @@ struct TaskConfig {
   GraspStartConfig start{};
   GraspStabilityCostConfig cost{};
   TaskToleranceConfig tolerance{};
+  ObjectPrior object_prior;
 };
 
 TactileTransitionConfig ApplyTaskToleranceToTransitionConfig(

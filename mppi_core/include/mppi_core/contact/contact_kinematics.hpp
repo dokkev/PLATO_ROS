@@ -175,7 +175,7 @@ inline bool HasMatchingTactileSensorContext(
 
 inline Eigen::Vector3d HemisphereLocalPointSensorM(
     const HemisphereState& hemisphere, const HemisphereGeometry& geometry) {
-  if (hemisphere.cop_sensor_m.allFinite()) {
+  if (hemisphere.contact && hemisphere.cop_sensor_m.allFinite()) {
     return Eigen::Vector3d{hemisphere.cop_sensor_m.x(),
                            hemisphere.cop_sensor_m.y(), 0.0};
   }

@@ -184,13 +184,22 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
     }
   }
 
+  const double raw_best_score = best_score;
+  const double raw_best_mean = best_mean;
+  const double raw_best_cvar = best_cvar;
+  const std::size_t raw_best_index = best_index;
+  const double hold_improvement =
+      std::isfinite(hold_score) && std::isfinite(raw_best_score)
+          ? hold_score - raw_best_score
+          : 0.0;
+
   bool select_hold = false;
   if (std::isfinite(hold_score)) {
     const bool hold_is_safe =
         config_.safe_hold_score_threshold >= 0.0 &&
         hold_score <= config_.safe_hold_score_threshold;
     const bool correction_not_meaningfully_better =
-        hold_score - best_score < config_.min_required_score_improvement;
+        hold_improvement < config_.min_required_score_improvement;
     select_hold = hold_is_safe || correction_not_meaningfully_better;
   }
   if (select_hold) {
@@ -205,6 +214,11 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   status_.best_cvar_cost = best_cvar;
   status_.best_candidate_index = best_index;
   status_.selected_hold_by_margin = select_hold;
+  status_.raw_best_score = raw_best_score;
+  status_.raw_best_mean_cost = raw_best_mean;
+  status_.raw_best_cvar_cost = raw_best_cvar;
+  status_.raw_best_candidate_index = raw_best_index;
+  status_.hold_score_improvement = hold_improvement;
   status_.hold_score = hold_score;
   status_.hold_mean_cost = hold_mean;
   status_.hold_cvar_cost = hold_cvar;

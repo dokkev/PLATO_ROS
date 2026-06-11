@@ -56,6 +56,12 @@ struct RobustGraspPolicyStatus {
   std::size_t best_candidate_index{0};
   bool selected_hold_by_margin{false};
 
+  double raw_best_score{0.0};
+  double raw_best_mean_cost{0.0};
+  double raw_best_cvar_cost{0.0};
+  std::size_t raw_best_candidate_index{0};
+  double hold_score_improvement{0.0};
+
   double hold_score{0.0};
   double hold_mean_cost{0.0};
   double hold_cvar_cost{0.0};

@@ -436,9 +436,12 @@ void RobustGraspMpcState::PrintStatus(
          << " candidate_count=" << status.candidate_count
          << " disturbance_count=" << status.disturbance_count
          << " best_idx=" << status.best_candidate_index
+         << " raw_best_idx=" << status.raw_best_candidate_index
          << " hold_selected=" << (status.selected_hold_by_margin ? "true" : "false")
          << " score=" << status.best_score
+         << " raw_best_score=" << status.raw_best_score
          << " hold_score=" << status.hold_score
+         << " hold_improvement=" << status.hold_score_improvement
          << " mean=" << status.best_mean_cost
          << " cvar=" << status.best_cvar_cost
          << " qddot_norm=" << status.selected_qddot.norm()

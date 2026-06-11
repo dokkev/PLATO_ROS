@@ -17,6 +17,7 @@
 #include "mppi_core/tactile/tactile_sensor_context.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/robot/robot_system.hpp"
+#include "plato_robot_system/task/thumb_index_grasp_constants.hpp"
 
 namespace aristo_controller::state_machines
 {
@@ -48,6 +49,15 @@ struct MPPIGraspContinuationConfig
   std::size_t min_active_hemisphere_total{1};
 };
 
+struct MPPIGraspMaintenanceConfig
+{
+  bool enabled{true};
+  double target_total_force_n{1.0};
+  double min_sensor_force_n{0.05};
+  double closing_qddot_rad_s2{1.0};
+  double one_sided_closing_qddot_rad_s2{1.0};
+};
+
 struct MPPIGraspStateConfig
 {
   mppi_core::MPPIConfig mppi;
@@ -59,6 +69,7 @@ struct MPPIGraspStateConfig
   mppi_core::logging::MppiRolloutLoggerConfig logging;
   MPPIGraspDebugConfig debug;
   MPPIGraspContinuationConfig continuation;
+  MPPIGraspMaintenanceConfig maintenance;
   bool exit_on_contact_lost{true};
 };
 
@@ -82,6 +93,7 @@ private:
     std::vector<mppi_core::TactileState, Eigen::aligned_allocator<mppi_core::TactileState>>;
 
   bool ConfigureContactKinematics();
+  bool ConfigureActiveJointIndices();
   bool BuildObservation(mppi_core::GraspObservation * observation) const;
   bool BuildTactileContexts(
     const TactileStateVector & tactile_meas,
@@ -92,6 +104,12 @@ private:
   bool CanUseLastCommandReference(const plato_robot_system::RobotState & state) const;
   bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
+  void ApplyMaintenanceHeuristic(
+    const mppi_core::GraspObservation & observation,
+    const mppi_core::GraspState & state,
+    plato_robot_system::RobotCommand * command,
+    Eigen::VectorXd * applied_action,
+    std::string * detail) const;
   bool HasContinuationContact(const mppi_core::GraspState & state) const;
   void RequestExitOnContactLoss(
     uint64_t tick_index,
@@ -132,6 +150,8 @@ private:
   bool configured_{false};
 
   std::array<mppi_core::PinocchioContactKinematicsContext, 2> contact_kinematics_{};
+  std::array<int, plato_robot_system::task::kThumbIndexActiveJoints.size()> active_q_indices_{};
+  std::array<int, plato_robot_system::task::kThumbIndexActiveJoints.size()> active_v_indices_{};
   mutable plato_robot_system::RobotCommand last_command_;
   mutable mppi_core::logging::MppiRolloutLogger logger_;
   mutable uint64_t tick_index_{0};

@@ -23,9 +23,26 @@ namespace
 
 constexpr std::size_t kThumbContextIndex = 0;
 constexpr std::size_t kIndexContextIndex = 1;
+constexpr std::size_t kIndexMcpSlot = 0;
+constexpr std::size_t kIndexPipSlot = 1;
+constexpr std::size_t kThumbMcpSlot = 2;
+constexpr std::size_t kThumbIpSlot = 3;
 
 using MppiTactileStateVector =
   std::vector<mppi_core::TactileState, Eigen::aligned_allocator<mppi_core::TactileState>>;
+
+struct MaintenanceContactSummary
+{
+  bool thumb_active{false};
+  bool index_active{false};
+  double thumb_force_n{0.0};
+  double index_force_n{0.0};
+
+  double totalForceN() const
+  {
+    return thumb_force_n + index_force_n;
+  }
+};
 
 bool SameFrame(const std::string & frame_name, const std::string_view expected)
 {
@@ -153,6 +170,28 @@ bool HasValidSafetyConfig(const MPPIGraspSafetyConfig & config)
          IsNonnegativeFinite(config.max_tau_rate_nm_s);
 }
 
+bool HasValidMaintenanceConfig(const MPPIGraspMaintenanceConfig & config)
+{
+  return IsNonnegativeFinite(config.target_total_force_n) &&
+         IsNonnegativeFinite(config.min_sensor_force_n) &&
+         IsNonnegativeFinite(config.closing_qddot_rad_s2) &&
+         IsNonnegativeFinite(config.one_sided_closing_qddot_rad_s2);
+}
+
+double TactileForceN(const mppi_core::TactileState & tactile)
+{
+  double sensor_force = tactile.activeHemisphereNormalForceN();
+  if ((!std::isfinite(sensor_force) || sensor_force <= 0.0) &&
+    tactile.total_force_n.allFinite())
+  {
+    sensor_force = tactile.total_force_n.norm();
+  }
+  if (!std::isfinite(sensor_force)) {
+    return 0.0;
+  }
+  return std::max(0.0, sensor_force);
+}
+
 int ActiveTactileSensorCount(const MppiTactileStateVector & tactile)
 {
   int count = 0;
@@ -188,15 +227,7 @@ double TotalTactileForceN(const MppiTactileStateVector & tactile)
 {
   double total = 0.0;
   for (const auto & sensor : tactile) {
-    double sensor_force = sensor.activeHemisphereNormalForceN();
-    if ((!std::isfinite(sensor_force) || sensor_force <= 0.0) &&
-      sensor.total_force_n.allFinite())
-    {
-      sensor_force = sensor.total_force_n.norm();
-    }
-    if (std::isfinite(sensor_force)) {
-      total += std::max(0.0, sensor_force);
-    }
+    total += TactileForceN(sensor);
   }
   return total;
 }
@@ -238,6 +269,7 @@ bool MPPIGraspState::ConfigureTask(const MPPIGraspStateConfig & config)
   }
   if (
     !HasValidSafetyConfig(config.safety) ||
+    !HasValidMaintenanceConfig(config.maintenance) ||
     !IsValidNormalAxisSign(config.tactile.thumb_normal_axis_sign) ||
     !IsValidNormalAxisSign(config.tactile.index_normal_axis_sign))
   {
@@ -245,7 +277,7 @@ bool MPPIGraspState::ConfigureTask(const MPPIGraspStateConfig & config)
   }
 
   config_ = config;
-  if (!ConfigureContactKinematics()) {
+  if (!ConfigureContactKinematics() || !ConfigureActiveJointIndices()) {
     return false;
   }
 
@@ -362,6 +394,11 @@ bool MPPIGraspState::PopulateCommand(plato_robot_system::RobotCommand * command)
         "fallback", "MPPI update returned unusable command");
       return populated;
     }
+    Eigen::VectorXd applied_action = optimizer_.hasLastSelectedAction() ?
+      optimizer_.lastSelectedAction() :
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(robot_->nv()));
+    ApplyMaintenanceHeuristic(
+      observation, current_grasp_state, &next_command, &applied_action, &action_debug_detail);
     if (!ApplyCommandSafety(&next_command)) {
       const bool populated = PopulateHoldCommand(command);
       const plato_robot_system::RobotCommand log_command =
@@ -388,15 +425,12 @@ bool MPPIGraspState::PopulateCommand(plato_robot_system::RobotCommand * command)
         logger_.LogEvent(tick_index, observation.time_s, "invalid_rollout", error.what());
       }
     }
-    const Eigen::VectorXd selected_action = optimizer_.hasLastSelectedAction() ?
-      optimizer_.lastSelectedAction() :
-      Eigen::VectorXd{};
     logger_.LogTick(
       BuildTickLogRecord(
-        tick_index, &observation, *command, selected_action,
+        tick_index, &observation, *command, applied_action,
         nominal_total_cost, false, last_phase_));
     PrintActionDebug(
-      tick_index, observation.time_s, &observation, *command, selected_action,
+      tick_index, observation.time_s, &observation, *command, applied_action,
       nominal_total_cost, false, action_debug_detail);
     return true;
   } catch (const std::exception & error) {
@@ -436,6 +470,31 @@ bool MPPIGraspState::ConfigureContactKinematics()
 
   return mppi_core::IsValidContactKinematicsContext(contact_kinematics_[kThumbContextIndex]) &&
          mppi_core::IsValidContactKinematicsContext(contact_kinematics_[kIndexContextIndex]);
+}
+
+bool MPPIGraspState::ConfigureActiveJointIndices()
+{
+  if (robot_ == nullptr || !robot_->hasModel()) {
+    return false;
+  }
+
+  for (std::size_t i = 0; i < plato_robot_system::task::kThumbIndexActiveJoints.size(); ++i) {
+    const auto joint_id =
+      robot_->model().getJointId(std::string(plato_robot_system::task::kThumbIndexActiveJoints[i]));
+    if (
+      joint_id >= static_cast<pinocchio::JointIndex>(robot_->model().njoints) ||
+      robot_->model().nqs[joint_id] != 1 ||
+      robot_->model().nvs[joint_id] != 1)
+    {
+      return false;
+    }
+    active_q_indices_[i] = robot_->model().idx_qs[joint_id];
+    active_v_indices_[i] = robot_->model().idx_vs[joint_id];
+    if (active_q_indices_[i] < 0 || active_v_indices_[i] < 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool MPPIGraspState::BuildObservation(mppi_core::GraspObservation * observation) const

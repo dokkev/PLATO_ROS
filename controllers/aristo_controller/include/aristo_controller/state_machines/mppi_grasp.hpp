@@ -2,6 +2,7 @@
 #define ARISTO_CONTROLLER__STATE_MACHINES__MPPI_GRASP_HPP_
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -35,6 +36,18 @@ struct MPPIGraspTactileConfig
   double index_normal_axis_sign{1.0};
 };
 
+struct MPPIGraspDebugConfig
+{
+  bool print_action{false};
+  double print_action_interval_s{0.25};
+};
+
+struct MPPIGraspContinuationConfig
+{
+  std::size_t min_active_tactile_sensors{1};
+  std::size_t min_active_hemisphere_total{1};
+};
+
 struct MPPIGraspStateConfig
 {
   mppi_core::MPPIConfig mppi;
@@ -44,6 +57,8 @@ struct MPPIGraspStateConfig
   MPPIGraspSafetyConfig safety;
   MPPIGraspTactileConfig tactile;
   mppi_core::logging::MppiRolloutLoggerConfig logging;
+  MPPIGraspDebugConfig debug;
+  MPPIGraspContinuationConfig continuation;
   bool exit_on_contact_lost{true};
 };
 
@@ -77,6 +92,7 @@ private:
   bool CanUseLastCommandReference(const plato_robot_system::RobotState & state) const;
   bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
+  bool HasContinuationContact(const mppi_core::GraspState & state) const;
   void RequestExitOnContactLoss(
     uint64_t tick_index,
     double time_s,
@@ -98,6 +114,16 @@ private:
     const std::string & event,
     const std::string & detail) const;
   bool ShouldLogRollout(uint64_t tick_index) const;
+  void PrintActionDebug(
+    uint64_t tick_index,
+    double time_s,
+    const mppi_core::GraspObservation * observation,
+    const plato_robot_system::RobotCommand & command,
+    const Eigen::VectorXd & selected_action,
+    double nominal_total_cost,
+    bool used_fallback,
+    const std::string & detail) const;
+  bool ShouldPrintActionDebug(double time_s) const;
 
   plato_robot_system::RobotSystem * robot_{nullptr};
   MPPIGraspStateConfig config_;
@@ -112,6 +138,7 @@ private:
   mutable std::string last_phase_{"mppi_grasp"};
   mutable bool has_entered_mppi_ready_{false};
   mutable bool exit_requested_{false};
+  mutable double last_action_debug_print_time_s_{-1.0e100};
 };
 
 }  // namespace aristo_controller::state_machines

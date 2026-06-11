@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,15 @@ bool MppiRolloutLogger::Configure(const MppiRolloutLoggerConfig& config) {
     WriteRolloutHeader();
     WriteEventHeader();
     headers_written_ = true;
+    std::cout << "[mppi_logger] writing CSV logs to "
+              << std::filesystem::path(config_.output_directory).string()
+              << " prefix=" << config_.file_prefix
+              << std::endl;
+  } else {
+    std::cerr << "[mppi_logger] failed to open CSV logs in "
+              << std::filesystem::path(config_.output_directory).string()
+              << " prefix=" << config_.file_prefix
+              << std::endl;
   }
   return enabled_;
 }

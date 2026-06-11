@@ -426,6 +426,8 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
   const auto safety_params = params ? params["safety"] : YAML::Node();
   const auto tactile_params = params ? params["tactile"] : YAML::Node();
   const auto logging_params = params ? params["logging"] : YAML::Node();
+  const auto debug_params = params ? params["debug"] : YAML::Node();
+  const auto continuation_params = params ? params["continuation"] : YAML::Node();
   config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
   config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
   config.tactile_transition =
@@ -469,6 +471,26 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
       "index_normal_axis_sign",
       config.tactile.index_normal_axis_sign);
   config.logging = parse_mppi_logging_config(logging_params, config.logging);
+  config.debug.print_action =
+    optional_scalar<bool>(
+      debug_params,
+      "print_action",
+      config.debug.print_action);
+  config.debug.print_action_interval_s =
+    optional_scalar<double>(
+      debug_params,
+      "print_action_interval_s",
+      config.debug.print_action_interval_s);
+  config.continuation.min_active_tactile_sensors =
+    optional_scalar<std::size_t>(
+      continuation_params,
+      "min_active_tactile_sensors",
+      config.continuation.min_active_tactile_sensors);
+  config.continuation.min_active_hemisphere_total =
+    optional_scalar<std::size_t>(
+      continuation_params,
+      "min_active_hemisphere_total",
+      config.continuation.min_active_hemisphere_total);
   return config;
 }
 

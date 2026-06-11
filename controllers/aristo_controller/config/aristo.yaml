@@ -75,7 +75,7 @@ state_machine:
       name: grasp_teleop
       stay_here: true
       # Change this to grasp_force to use tactile force feedback instead of MPPI.
-      next_state: grasp_force
+      next_state: mppi_grasp
       params:
         # Command: [u], [u, phi], or [u, phi, f]
         # u: 0 closed, 0.5 ready/parallel, 1 open
@@ -135,12 +135,23 @@ state_machine:
           index_normal_axis_sign: 1.0
 
         logging:
-          enabled: false
-          output_directory: "/output/mppi_eval"
+          enabled: true
+          output_directory: "/tmp/mppi_eval"
           file_prefix: "mppi_grasp"
           rollout_log_stride: 1
           max_logged_horizon_steps: 0
           flush_every_n_ticks: 10
+
+        debug:
+          print_action: true
+          print_action_interval_s: 1.0
+
+        # Start is strict: both sensors need EnoughContacts.
+        # After MPPI starts, keep rolling out while at least one tactile
+        # sensor still has active hemisphere contact.
+        continuation:
+          min_active_tactile_sensors: 1
+          min_active_hemisphere_total: 1
 
         rollout:
           disturbance:

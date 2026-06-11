@@ -4,8 +4,10 @@
 #include <cstddef>
 #include <cmath>
 #include <exception>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -199,6 +201,25 @@ double TotalTactileForceN(const MppiTactileStateVector & tactile)
   return total;
 }
 
+std::string VectorSummary(const Eigen::VectorXd & vector, const int max_entries = 8)
+{
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(4) << "[";
+  const Eigen::Index count =
+    std::min<Eigen::Index>(vector.size(), static_cast<Eigen::Index>(max_entries));
+  for (Eigen::Index i = 0; i < count; ++i) {
+    if (i > 0) {
+      stream << ", ";
+    }
+    stream << vector[i];
+  }
+  if (vector.size() > count) {
+    stream << ", ...";
+  }
+  stream << "]";
+  return stream.str();
+}
+
 }  // namespace
 
 MPPIGraspState::MPPIGraspState(
@@ -250,6 +271,7 @@ bool MPPIGraspState::ConfigureTask(const MPPIGraspStateConfig & config)
   last_phase_ = kName;
   has_entered_mppi_ready_ = false;
   exit_requested_ = false;
+  last_action_debug_print_time_s_ = -1.0e100;
   configured_ = true;
   return true;
 }
@@ -260,6 +282,7 @@ void MPPIGraspState::OnEnter()
   last_phase_ = kName;
   has_entered_mppi_ready_ = false;
   exit_requested_ = false;
+  last_action_debug_print_time_s_ = -1.0e100;
   logger_.LogEvent(0, robot_ != nullptr && robot_->hasState() ? robot_->state().time_s : 0.0,
     "enter", "MPPIGraspState entered");
 
@@ -311,16 +334,20 @@ bool MPPIGraspState::PopulateCommand(plato_robot_system::RobotCommand * command)
     observation.qdot_meas,
     observation.tau_meas,
     observation.tactile_meas);
+  std::string action_debug_detail{"ok"};
   if (!mppi_core::ReadyForMppiStart(current_grasp_state, config_.task.start)) {
-    optimizer_.ResetNominalActions();
-    RequestExitOnContactLoss(tick_index, observation.time_s, current_grasp_state);
-    const bool populated = PopulateHoldCommand(command);
-    const plato_robot_system::RobotCommand log_command =
-      populated ? *command : plato_robot_system::RobotCommand{};
-    LogTickAndEvent(
-      tick_index, observation.time_s, &observation, log_command, true,
-      "not_ready", "ReadyForMppiStart false");
-    return populated;
+    if (!has_entered_mppi_ready_ || !HasContinuationContact(current_grasp_state)) {
+      optimizer_.ResetNominalActions();
+      RequestExitOnContactLoss(tick_index, observation.time_s, current_grasp_state);
+      const bool populated = PopulateHoldCommand(command);
+      const plato_robot_system::RobotCommand log_command =
+        populated ? *command : plato_robot_system::RobotCommand{};
+      LogTickAndEvent(
+        tick_index, observation.time_s, &observation, log_command, true,
+        "not_ready", "ReadyForMppiStart false");
+      return populated;
+    }
+    action_debug_detail = "partial_contact_continue";
   }
   has_entered_mppi_ready_ = true;
 
@@ -368,6 +395,9 @@ bool MPPIGraspState::PopulateCommand(plato_robot_system::RobotCommand * command)
       BuildTickLogRecord(
         tick_index, &observation, *command, selected_action,
         nominal_total_cost, false, last_phase_));
+    PrintActionDebug(
+      tick_index, observation.time_s, &observation, *command, selected_action,
+      nominal_total_cost, false, action_debug_detail);
     return true;
   } catch (const std::exception & error) {
     const bool populated = PopulateHoldCommand(command);
@@ -604,6 +634,17 @@ bool MPPIGraspState::PopulateHoldCommand(plato_robot_system::RobotCommand * comm
   return command->IsUsable();
 }
 
+bool MPPIGraspState::HasContinuationContact(const mppi_core::GraspState & state) const
+{
+  if (!state.valid) {
+    return false;
+  }
+  return state.activeTactileSensorCount() >=
+           config_.continuation.min_active_tactile_sensors &&
+         state.activeHemisphereCountTotal() >=
+           config_.continuation.min_active_hemisphere_total;
+}
+
 void MPPIGraspState::RequestExitOnContactLoss(
   const uint64_t tick_index,
   const double time_s,
@@ -618,21 +659,24 @@ void MPPIGraspState::RequestExitOnContactLoss(
   }
 
   const std::size_t enough_contact_sensors = EnoughContactSensorCount(state);
+  const std::size_t active_tactile_sensors = state.activeTactileSensorCount();
   const std::size_t active_hemispheres = state.activeHemisphereCountTotal();
   const bool contact_lost =
-    enough_contact_sensors < config_.task.start.min_enough_contact_sensors ||
-    active_hemispheres < config_.task.start.min_active_hemispheres_total;
+    active_tactile_sensors < config_.continuation.min_active_tactile_sensors ||
+    active_hemispheres < config_.continuation.min_active_hemisphere_total;
   if (!contact_lost) {
     return;
   }
 
   if (!exit_requested_) {
     const std::string detail =
-      "ReadyForMppiStart false after MPPI ready: enough_contact_sensors=" +
+      "continuation contact lost after MPPI ready: enough_contact_sensors=" +
       std::to_string(enough_contact_sensors) +
       "/" + std::to_string(config_.task.start.min_enough_contact_sensors) +
+      " active_tactile_sensors=" + std::to_string(active_tactile_sensors) +
+      "/" + std::to_string(config_.continuation.min_active_tactile_sensors) +
       " active_hemispheres=" + std::to_string(active_hemispheres) +
-      "/" + std::to_string(config_.task.start.min_active_hemispheres_total);
+      "/" + std::to_string(config_.continuation.min_active_hemisphere_total);
     std::cout << "[mppi_grasp] exiting on contact loss "
               << detail
               << std::endl;
@@ -709,12 +753,86 @@ void MPPIGraspState::LogTickAndEvent(
       tick_index, observation, command, selected_action,
       optimizer_.lastNominalTotalCost(), used_fallback, last_phase_));
   logger_.LogEvent(tick_index, time_s, event, detail);
+  PrintActionDebug(
+    tick_index, time_s, observation, command, selected_action,
+    optimizer_.lastNominalTotalCost(), used_fallback, event + ": " + detail);
 }
 
 bool MPPIGraspState::ShouldLogRollout(const uint64_t tick_index) const
 {
   const int stride = std::max(1, config_.logging.rollout_log_stride);
   return tick_index % static_cast<uint64_t>(stride) == 0;
+}
+
+void MPPIGraspState::PrintActionDebug(
+  const uint64_t tick_index,
+  const double time_s,
+  const mppi_core::GraspObservation * observation,
+  const plato_robot_system::RobotCommand & command,
+  const Eigen::VectorXd & selected_action,
+  const double nominal_total_cost,
+  const bool used_fallback,
+  const std::string & detail) const
+{
+  if (!ShouldPrintActionDebug(time_s)) {
+    return;
+  }
+
+  double q_delta_norm = 0.0;
+  if (
+    observation != nullptr &&
+    command.q_cmd.size() == observation->q_meas.size() &&
+    command.q_cmd.size() > 0)
+  {
+    q_delta_norm = (command.q_cmd - observation->q_meas).norm();
+  }
+
+  int active_sensors = 0;
+  int active_hemispheres = 0;
+  double tactile_force_n = 0.0;
+  if (observation != nullptr) {
+    active_sensors = ActiveTactileSensorCount(observation->tactile_meas);
+    active_hemispheres = ActiveHemisphereCountTotal(observation->tactile_meas);
+    tactile_force_n = TotalTactileForceN(observation->tactile_meas);
+  }
+
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(4)
+         << "[mppi_grasp] action"
+         << " tick=" << tick_index
+         << " fallback=" << (used_fallback ? "true" : "false")
+         << " reason=" << detail
+         << " qddot_norm=" << selected_action.norm()
+         << " qddot=" << VectorSummary(selected_action)
+         << " q_delta_norm=" << q_delta_norm
+         << " qdot_cmd_norm=" << command.qdot_cmd.norm()
+         << " tau_cmd_norm=" << command.tau_cmd.norm()
+         << " cost=" << nominal_total_cost
+         << " active_sensors=" << active_sensors
+         << " active_hemispheres=" << active_hemispheres
+         << " tactile_force_n=" << tactile_force_n;
+  std::cout << stream.str() << std::endl;
+}
+
+bool MPPIGraspState::ShouldPrintActionDebug(const double time_s) const
+{
+  if (!config_.debug.print_action) {
+    return false;
+  }
+  if (
+    !std::isfinite(config_.debug.print_action_interval_s) ||
+    config_.debug.print_action_interval_s <= 0.0)
+  {
+    return true;
+  }
+  if (
+    !std::isfinite(time_s) ||
+    time_s - last_action_debug_print_time_s_ >= config_.debug.print_action_interval_s)
+  {
+    last_action_debug_print_time_s_ = time_s;
+    return true;
+  }
+  return false;
 }
 
 }  // namespace aristo_controller::state_machines

@@ -152,12 +152,16 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_TRUE(mppi_grasp.safety.clamp_q_cmd_to_model_limits);
   EXPECT_DOUBLE_EQ(mppi_grasp.tactile.thumb_normal_axis_sign, 1.0);
   EXPECT_DOUBLE_EQ(mppi_grasp.tactile.index_normal_axis_sign, 1.0);
-  EXPECT_FALSE(mppi_grasp.logging.enabled);
+  EXPECT_TRUE(mppi_grasp.logging.enabled);
   EXPECT_EQ(mppi_grasp.logging.output_directory, "/tmp/mppi_eval");
   EXPECT_EQ(mppi_grasp.logging.file_prefix, "mppi_grasp");
   EXPECT_EQ(mppi_grasp.logging.rollout_log_stride, 1);
   EXPECT_EQ(mppi_grasp.logging.max_logged_horizon_steps, 0);
   EXPECT_EQ(mppi_grasp.logging.flush_every_n_ticks, 10);
+  EXPECT_TRUE(mppi_grasp.debug.print_action);
+  EXPECT_DOUBLE_EQ(mppi_grasp.debug.print_action_interval_s, 1.0);
+  EXPECT_EQ(mppi_grasp.continuation.min_active_tactile_sensors, 1U);
+  EXPECT_EQ(mppi_grasp.continuation.min_active_hemisphere_total, 1U);
   EXPECT_EQ(mppi_grasp.task.start.min_enough_contact_sensors, 2U);
   EXPECT_EQ(mppi_grasp.task.start.min_active_hemispheres_total, 2U);
   EXPECT_EQ(mppi_grasp.task.cost.target_active_hemisphere_total, 4U);

@@ -34,6 +34,8 @@ struct GraspDisturbanceSamplerConfig {
   double cop_drift_velocity_std_mps{0.001};
   double cop_drift_velocity_max_mps{0.005};
 
+  double sensor_local_noise_scale{0.25};
+
   double friction_scale_mean{1.0};
   double friction_scale_std{0.15};
   double friction_scale_min{0.4};

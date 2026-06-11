@@ -15,9 +15,9 @@
 #include "aristo_controller/state_machines/idle.hpp"
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
-#include "aristo_controller/state_machines/mppi_grasp.hpp"
 #include "aristo_controller/state_machines/mppi_motion_grasp.hpp"
 #include "aristo_controller/state_machines/poke.hpp"
+#include "aristo_controller/state_machines/robust_grasp_mpc.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -1065,15 +1065,16 @@ bool PlatoRosController::configure_from_control_config(
     grasp_force_state_ = grasp_force.get();
     architecture.RegisterState(std::move(grasp_force));
 
-    auto mppi_grasp = std::make_unique<aristo_controller::state_machines::MPPIGraspState>(
-      aristo_config.mppi_grasp.id,
-      &robot);
-    if (!mppi_grasp->ConfigureTask(aristo_config.mppi_grasp.state)) {
-      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure mppi_grasp task");
+    auto robust_grasp_mpc =
+      std::make_unique<aristo_controller::state_machines::RobustGraspMpcState>(
+        aristo_config.robust_grasp_mpc.id,
+        &robot);
+    if (!robust_grasp_mpc->ConfigureTask(aristo_config.robust_grasp_mpc.state)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure robust_grasp_mpc task");
       return false;
     }
-    mppi_grasp->ConfigureLifecycle(aristo_config.mppi_grasp.lifecycle);
-    architecture.RegisterState(std::move(mppi_grasp));
+    robust_grasp_mpc->ConfigureLifecycle(aristo_config.robust_grasp_mpc.lifecycle);
+    architecture.RegisterState(std::move(robust_grasp_mpc));
 
     auto mppi_motion_grasp_config = aristo_config.mppi_motion_grasp.state;
     if (mppi_motion_grasp_config.grasp_task.q_ready.size() > 0) {

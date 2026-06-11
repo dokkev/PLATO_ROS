@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -32,6 +33,7 @@ void ValidateConfig(const RobustGraspStateCostConfig& config) {
       !IsFiniteAndNonnegative(config.max_normal_force_per_sensor_n) ||
       !IsFiniteAndNonnegative(config.force_low_weight) ||
       !IsFiniteAndNonnegative(config.force_high_weight) ||
+      !IsFiniteAndNonnegative(config.force_balance_weight) ||
       !IsFiniteAndNonnegative(config.shear_weight) ||
       !IsFiniteAndNonnegative(config.rotation_weight) ||
       !IsFiniteAndNonnegative(config.slip_score_weight) ||
@@ -69,7 +71,8 @@ double ContactSupportCost(const GraspState& state,
 
 double ForceCost(const GraspState& state,
                  const RobustGraspStateCostConfig& config) {
-  double total_force_n = 0.0;
+  std::vector<double> active_forces_n;
+  active_forces_n.reserve(state.tactile_sensors.size());
   double cost = 0.0;
   for (const auto& tactile : state.tactile_sensors) {
     if (!tactile.hasActiveHemisphereContact()) {
@@ -77,7 +80,7 @@ double ForceCost(const GraspState& state,
     }
     const double force_n =
         std::max(0.0, tactile.activeHemisphereNormalForceN());
-    total_force_n += force_n;
+    active_forces_n.push_back(force_n);
     if (force_n < config.min_normal_force_per_sensor_n) {
       cost += config.force_low_weight *
               Square(config.min_normal_force_per_sensor_n - force_n);
@@ -87,9 +90,25 @@ double ForceCost(const GraspState& state,
               Square(force_n - config.max_normal_force_per_sensor_n);
     }
   }
-  if (std::isfinite(total_force_n)) {
+
+  if (!active_forces_n.empty()) {
+    const double weakest_force_n =
+        *std::min_element(active_forces_n.begin(), active_forces_n.end());
+    const double force_deficit_n =
+        std::max(0.0, config.target_normal_force_n - weakest_force_n);
     cost += config.force_low_weight *
-            Square(total_force_n - config.target_normal_force_n);
+            Square(force_deficit_n);
+  }
+
+  if (active_forces_n.size() >= 2U) {
+    const double mean_force_n =
+        std::accumulate(
+            active_forces_n.begin(), active_forces_n.end(), 0.0) /
+        static_cast<double>(active_forces_n.size());
+    for (const double force_n : active_forces_n) {
+      cost += config.force_balance_weight *
+              Square(force_n - mean_force_n);
+    }
   }
   return cost;
 }

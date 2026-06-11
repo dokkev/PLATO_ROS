@@ -10,6 +10,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "mppi_core/config/mppi_config.hpp"
+#include "mppi_core/config/robust_grasp_policy_config.hpp"
 #include "mppi_core/config/rollout_config.hpp"
 #include "mppi_core/task/task_config.hpp"
 
@@ -409,127 +410,6 @@ mppi_core::logging::MppiRolloutLoggerConfig parse_mppi_logging_config(
   return config;
 }
 
-aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_config(
-  const YAML::Node & params,
-  const int num_joints)
-{
-  if (params && !params.IsMap()) {
-    throw std::runtime_error("mppi_grasp.params must be a map when provided");
-  }
-
-  aristo_controller::state_machines::MPPIGraspStateConfig config;
-  config.exit_on_contact_lost =
-    optional_scalar<bool>(params, "exit_on_contact_lost", config.exit_on_contact_lost);
-  const auto mppi_params = params ? params["mppi"] : YAML::Node();
-  const auto rollout_params = params ? params["rollout"] : YAML::Node();
-  const auto task_params = params ? params["task"] : YAML::Node();
-  const auto safety_params = params ? params["safety"] : YAML::Node();
-  const auto tactile_params = params ? params["tactile"] : YAML::Node();
-  const auto logging_params = params ? params["logging"] : YAML::Node();
-  const auto debug_params = params ? params["debug"] : YAML::Node();
-  const auto continuation_params = params ? params["continuation"] : YAML::Node();
-  const auto maintenance_params = params ? params["maintenance"] : YAML::Node();
-  config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
-  config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
-  config.tactile_transition =
-    mppi_core::ParseTactileTransitionConfig(rollout_params, config.tactile_transition);
-  config.task = mppi_core::ParseTaskConfig(task_params, config.task);
-  config.tactile_transition =
-    mppi_core::ApplyTaskToleranceToTransitionConfig(config.task, config.tactile_transition);
-  config.safety.max_reference_tracking_error_rad =
-    optional_scalar<double>(
-      safety_params,
-      "max_reference_tracking_error_rad",
-      config.safety.max_reference_tracking_error_rad);
-  config.safety.max_qdot_cmd_rad_s =
-    optional_scalar<double>(
-      safety_params,
-      "max_qdot_cmd_rad_s",
-      config.safety.max_qdot_cmd_rad_s);
-  config.safety.max_tau_cmd_nm =
-    optional_scalar<double>(
-      safety_params,
-      "max_tau_cmd_nm",
-      config.safety.max_tau_cmd_nm);
-  config.safety.max_tau_rate_nm_s =
-    optional_scalar<double>(
-      safety_params,
-      "max_tau_rate_nm_s",
-      config.safety.max_tau_rate_nm_s);
-  config.safety.clamp_q_cmd_to_model_limits =
-    optional_scalar<bool>(
-      safety_params,
-      "clamp_q_cmd_to_model_limits",
-      config.safety.clamp_q_cmd_to_model_limits);
-  config.tactile.thumb_normal_axis_sign =
-    optional_scalar<double>(
-      tactile_params,
-      "thumb_normal_axis_sign",
-      config.tactile.thumb_normal_axis_sign);
-  config.tactile.index_normal_axis_sign =
-    optional_scalar<double>(
-      tactile_params,
-      "index_normal_axis_sign",
-      config.tactile.index_normal_axis_sign);
-  config.logging = parse_mppi_logging_config(logging_params, config.logging);
-  config.debug.print_action =
-    optional_scalar<bool>(
-      debug_params,
-      "print_action",
-      config.debug.print_action);
-  config.debug.print_action_interval_s =
-    optional_scalar<double>(
-      debug_params,
-      "print_action_interval_s",
-      config.debug.print_action_interval_s);
-  config.continuation.min_active_tactile_sensors =
-    optional_scalar<std::size_t>(
-      continuation_params,
-      "min_active_tactile_sensors",
-      config.continuation.min_active_tactile_sensors);
-  config.continuation.min_active_hemisphere_total =
-    optional_scalar<std::size_t>(
-      continuation_params,
-      "min_active_hemisphere_total",
-      config.continuation.min_active_hemisphere_total);
-  config.maintenance.enabled =
-    optional_scalar<bool>(
-      maintenance_params,
-      "enabled",
-      config.maintenance.enabled);
-  config.maintenance.target_active_hemisphere_total =
-    optional_scalar<std::size_t>(
-      maintenance_params,
-      "target_active_hemisphere_total",
-      config.maintenance.target_active_hemisphere_total);
-  config.maintenance.target_total_force_n =
-    optional_scalar<double>(
-      maintenance_params,
-      "target_total_force_n",
-      config.maintenance.target_total_force_n);
-  config.maintenance.min_sensor_force_n =
-    optional_scalar<double>(
-      maintenance_params,
-      "min_sensor_force_n",
-      config.maintenance.min_sensor_force_n);
-  config.maintenance.closing_qddot_rad_s2 =
-    optional_scalar<double>(
-      maintenance_params,
-      "closing_qddot_rad_s2",
-      config.maintenance.closing_qddot_rad_s2);
-  config.maintenance.hemisphere_deficit_qddot_rad_s2 =
-    optional_scalar<double>(
-      maintenance_params,
-      "hemisphere_deficit_qddot_rad_s2",
-      config.maintenance.hemisphere_deficit_qddot_rad_s2);
-  config.maintenance.one_sided_closing_qddot_rad_s2 =
-    optional_scalar<double>(
-      maintenance_params,
-      "one_sided_closing_qddot_rad_s2",
-      config.maintenance.one_sided_closing_qddot_rad_s2);
-  return config;
-}
-
 aristo_controller::state_machines::MPPIMotionGraspStateConfig
 parse_mppi_motion_grasp_state_config(
   const YAML::Node & params,
@@ -664,6 +544,73 @@ parse_mppi_motion_grasp_state_config(
   return config;
 }
 
+aristo_controller::state_machines::RobustGraspMpcStateConfig
+parse_robust_grasp_mpc_state_config(
+  const YAML::Node & params,
+  const int num_joints)
+{
+  if (params && !params.IsMap()) {
+    throw std::runtime_error("robust_grasp_mpc.params must be a map when provided");
+  }
+
+  aristo_controller::state_machines::RobustGraspMpcStateConfig config;
+  const auto policy_params = params ? params["robust_grasp"] : YAML::Node();
+  config.policy =
+    mppi_core::ParseRobustGraspPolicyConfig(policy_params, num_joints, config.policy);
+
+  const auto safety_params = params ? params["safety"] : YAML::Node();
+  config.safety.max_reference_tracking_error_rad =
+    optional_scalar<double>(
+      safety_params,
+      "max_reference_tracking_error_rad",
+      config.safety.max_reference_tracking_error_rad);
+  config.safety.max_qdot_cmd_rad_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_qdot_cmd_rad_s",
+      config.safety.max_qdot_cmd_rad_s);
+  config.safety.max_tau_cmd_nm =
+    optional_scalar<double>(
+      safety_params,
+      "max_tau_cmd_nm",
+      config.safety.max_tau_cmd_nm);
+  config.safety.max_tau_rate_nm_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_tau_rate_nm_s",
+      config.safety.max_tau_rate_nm_s);
+  config.safety.clamp_q_cmd_to_model_limits =
+    optional_scalar<bool>(
+      safety_params,
+      "clamp_q_cmd_to_model_limits",
+      config.safety.clamp_q_cmd_to_model_limits);
+
+  const auto tactile_params = params ? params["tactile"] : YAML::Node();
+  config.tactile.thumb_normal_axis_sign =
+    optional_scalar<double>(
+      tactile_params,
+      "thumb_normal_axis_sign",
+      config.tactile.thumb_normal_axis_sign);
+  config.tactile.index_normal_axis_sign =
+    optional_scalar<double>(
+      tactile_params,
+      "index_normal_axis_sign",
+      config.tactile.index_normal_axis_sign);
+
+  const auto debug_params = params ? params["debug"] : YAML::Node();
+  config.debug.print_status =
+    optional_scalar<bool>(
+      debug_params,
+      "print_status",
+      config.debug.print_status);
+  config.debug.print_status_interval_s =
+    optional_scalar<double>(
+      debug_params,
+      "print_status_interval_s",
+      config.debug.print_status_interval_s);
+  return config;
+}
+
 void validate_distinct_state_ids(std::vector<plato_robot_system::StateId> ids)
 {
   std::sort(ids.begin(), ids.end());
@@ -718,15 +665,16 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   const auto states = required_node(state_machine, "states");
   validate_distinct_state_names(states);
   config.idle = parse_state_config(states, "idle");
-  static_cast<StateConfig &>(config.mppi_grasp) = parse_state_config(states, "mppi_grasp");
-  const auto mppi_grasp = state_by_name(states, "mppi_grasp");
-  config.mppi_grasp.state =
-    parse_mppi_grasp_state_config(mppi_grasp["params"], config.num_joints);
   static_cast<StateConfig &>(config.mppi_motion_grasp) =
     parse_state_config(states, "mppi_motion_grasp");
   const auto mppi_motion_grasp = state_by_name(states, "mppi_motion_grasp");
   config.mppi_motion_grasp.state =
     parse_mppi_motion_grasp_state_config(mppi_motion_grasp["params"], config.num_joints);
+  static_cast<StateConfig &>(config.robust_grasp_mpc) =
+    parse_state_config(states, "robust_grasp_mpc");
+  const auto robust_grasp_mpc = state_by_name(states, "robust_grasp_mpc");
+  config.robust_grasp_mpc.state =
+    parse_robust_grasp_mpc_state_config(robust_grasp_mpc["params"], config.num_joints);
   config.initialize = parse_joint_position_config(states, "initialize", config.num_joints);
   config.poke = parse_joint_position_config(states, "poke", config.num_joints);
   config.grasp_ready =
@@ -760,7 +708,7 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   validate_distinct_state_ids(
     {config.idle.id, config.initialize.id, config.poke.id, config.grasp_ready.id,
       config.joint_teleop.id, config.grasp_teleop.id, config.grasp_force.id,
-      config.mppi_grasp.id, config.mppi_motion_grasp.id});
+      config.mppi_motion_grasp.id, config.robust_grasp_mpc.id});
 
   return config;
 }

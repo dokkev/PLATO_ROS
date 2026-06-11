@@ -49,6 +49,7 @@ void ValidateConfig(const GraspDisturbanceSamplerConfig& config) {
       !IsNonnegativeFinite(config.normal_force_rate_max_nps) ||
       !IsNonnegativeFinite(config.cop_drift_velocity_std_mps) ||
       !IsNonnegativeFinite(config.cop_drift_velocity_max_mps) ||
+      !IsNonnegativeFinite(config.sensor_local_noise_scale) ||
       !IsNonnegativeFinite(config.friction_scale_std) ||
       !IsNonnegativeFinite(config.dropout_probability_per_step) ||
       !std::isfinite(config.friction_scale_mean) ||
@@ -60,6 +61,16 @@ void ValidateConfig(const GraspDisturbanceSamplerConfig& config) {
     throw std::invalid_argument(
         "GraspDisturbanceSamplerConfig: invalid numeric field");
   }
+}
+
+CommonGraspDisturbance Antithetic(
+    const CommonGraspDisturbance& disturbance) {
+  CommonGraspDisturbance out = disturbance;
+  out.tangent_velocity_grasp_mps = -out.tangent_velocity_grasp_mps;
+  out.rotational_velocity_radps = -out.rotational_velocity_radps;
+  out.normal_force_rate_nps = -out.normal_force_rate_nps;
+  out.cop_drift_velocity_grasp_mps = -out.cop_drift_velocity_grasp_mps;
+  return out;
 }
 
 TactileSensorDisturbance Antithetic(
@@ -74,6 +85,89 @@ TactileSensorDisturbance Antithetic(
       2.0 * config.friction_scale_mean - out.friction_scale,
       config.friction_scale_min, config.friction_scale_max);
   return out;
+}
+
+CommonGraspDisturbance SampleCommonDisturbance(
+    std::mt19937* rng, const GraspDisturbanceSamplerConfig& config,
+    std::bernoulli_distribution* dropout_dist) {
+  CommonGraspDisturbance disturbance;
+  disturbance.tangent_velocity_grasp_mps =
+      Eigen::Vector2d{
+          SampleClampedNormal(
+              rng, config.tangent_velocity_std_mps,
+              config.tangent_velocity_max_mps),
+          SampleClampedNormal(
+              rng, config.tangent_velocity_std_mps,
+              config.tangent_velocity_max_mps)};
+  disturbance.rotational_velocity_radps =
+      SampleClampedNormal(
+          rng, config.rotational_velocity_std_radps,
+          config.rotational_velocity_max_radps);
+  disturbance.normal_force_rate_nps =
+      SampleClampedNormal(
+          rng, config.normal_force_rate_std_nps,
+          config.normal_force_rate_max_nps);
+  disturbance.cop_drift_velocity_grasp_mps =
+      Eigen::Vector2d{
+          SampleClampedNormal(
+              rng, config.cop_drift_velocity_std_mps,
+              config.cop_drift_velocity_max_mps),
+          SampleClampedNormal(
+              rng, config.cop_drift_velocity_std_mps,
+              config.cop_drift_velocity_max_mps)};
+  disturbance.dropout = dropout_dist != nullptr && (*dropout_dist)(*rng);
+  disturbance.valid = true;
+  return disturbance;
+}
+
+TactileSensorDisturbance SampleSensorDisturbance(
+    std::mt19937* rng, const GraspDisturbanceSamplerConfig& config,
+    const CommonGraspDisturbance& common,
+    std::bernoulli_distribution* dropout_dist) {
+  const double local_scale = config.sensor_local_noise_scale;
+  TactileSensorDisturbance disturbance;
+  disturbance.tangent_velocity_sensor_mps =
+      common.tangent_velocity_grasp_mps +
+      Eigen::Vector2d{
+          SampleClampedNormal(
+              rng, config.tangent_velocity_std_mps * local_scale,
+              config.tangent_velocity_max_mps * local_scale),
+          SampleClampedNormal(
+              rng, config.tangent_velocity_std_mps * local_scale,
+              config.tangent_velocity_max_mps * local_scale)};
+  disturbance.rotational_velocity_radps =
+      ClampSymmetric(
+          common.rotational_velocity_radps +
+              SampleClampedNormal(
+                  rng, config.rotational_velocity_std_radps * local_scale,
+                  config.rotational_velocity_max_radps * local_scale),
+          config.rotational_velocity_max_radps);
+  disturbance.normal_force_rate_nps =
+      ClampSymmetric(
+          common.normal_force_rate_nps +
+              SampleClampedNormal(
+                  rng, config.normal_force_rate_std_nps * local_scale,
+                  config.normal_force_rate_max_nps * local_scale),
+          config.normal_force_rate_max_nps);
+  disturbance.cop_drift_velocity_sensor_mps =
+      common.cop_drift_velocity_grasp_mps +
+      Eigen::Vector2d{
+          SampleClampedNormal(
+              rng, config.cop_drift_velocity_std_mps * local_scale,
+              config.cop_drift_velocity_max_mps * local_scale),
+          SampleClampedNormal(
+              rng, config.cop_drift_velocity_std_mps * local_scale,
+              config.cop_drift_velocity_max_mps * local_scale)};
+
+  std::normal_distribution<double> friction_dist(
+      config.friction_scale_mean, config.friction_scale_std);
+  disturbance.friction_scale = std::clamp(
+      friction_dist(*rng), config.friction_scale_min,
+      config.friction_scale_max);
+  disturbance.dropout =
+      common.dropout || (dropout_dist != nullptr && (*dropout_dist)(*rng));
+  disturbance.valid = true;
+  return disturbance;
 }
 
 }  // namespace
@@ -107,6 +201,13 @@ GraspDisturbanceSampler::SampleBatch() {
       disturbance_step.tactile_sensor_disturbances.resize(
           config_.tactile_sensor_count);
       disturbance_step.valid = true;
+      if (pair_source != nullptr && step < pair_source->steps.size()) {
+        disturbance_step.common_grasp_disturbance = Antithetic(
+            pair_source->steps[step].common_grasp_disturbance);
+      } else {
+        disturbance_step.common_grasp_disturbance =
+            SampleCommonDisturbance(&rng_, config_, &dropout_dist);
+      }
 
       for (std::size_t sensor = 0; sensor < config_.tactile_sensor_count;
            ++sensor) {
@@ -120,40 +221,10 @@ GraspDisturbanceSampler::SampleBatch() {
           continue;
         }
 
-        auto& tactile_disturbance =
-            disturbance_step.tactile_sensor_disturbances[sensor];
-        tactile_disturbance.tangent_velocity_sensor_mps =
-            Eigen::Vector2d{
-                SampleClampedNormal(
-                    &rng_, config_.tangent_velocity_std_mps,
-                    config_.tangent_velocity_max_mps),
-                SampleClampedNormal(
-                    &rng_, config_.tangent_velocity_std_mps,
-                    config_.tangent_velocity_max_mps)};
-        tactile_disturbance.rotational_velocity_radps =
-            SampleClampedNormal(
-                &rng_, config_.rotational_velocity_std_radps,
-                config_.rotational_velocity_max_radps);
-        tactile_disturbance.normal_force_rate_nps =
-            SampleClampedNormal(
-                &rng_, config_.normal_force_rate_std_nps,
-                config_.normal_force_rate_max_nps);
-        tactile_disturbance.cop_drift_velocity_sensor_mps =
-            Eigen::Vector2d{
-                SampleClampedNormal(
-                    &rng_, config_.cop_drift_velocity_std_mps,
-                    config_.cop_drift_velocity_max_mps),
-                SampleClampedNormal(
-                    &rng_, config_.cop_drift_velocity_std_mps,
-                    config_.cop_drift_velocity_max_mps)};
-
-        std::normal_distribution<double> friction_dist(
-            config_.friction_scale_mean, config_.friction_scale_std);
-        tactile_disturbance.friction_scale = std::clamp(
-            friction_dist(rng_), config_.friction_scale_min,
-            config_.friction_scale_max);
-        tactile_disturbance.dropout = dropout_dist(rng_);
-        tactile_disturbance.valid = true;
+        disturbance_step.tactile_sensor_disturbances[sensor] =
+            SampleSensorDisturbance(
+                &rng_, config_, disturbance_step.common_grasp_disturbance,
+                &dropout_dist);
       }
     }
   }

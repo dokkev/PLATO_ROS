@@ -75,7 +75,7 @@ state_machine:
       name: grasp_teleop
       stay_here: true
       # Change this to grasp_force to use tactile force feedback instead of MPPI.
-      next_state: grasp_force
+      next_state: robust_grasp_mpc
       params:
         # Command: [u], [u, phi], or [u, phi, f]
         # u: 0 closed, 0.5 ready/parallel, 1 open
@@ -88,7 +88,7 @@ state_machine:
         shared_control_min_contact_sensors: 2
         shared_control_enter_debounce_ticks: 3
         shared_control_requires_u_below_threshold: true
-        # Match mppi_grasp start: both tactile sensors must report EnoughContacts.
+        # Match shared-control start: both tactile sensors must report EnoughContacts.
         shared_control_requires_enough_contact: true
 
         grasp_task:
@@ -99,99 +99,126 @@ state_machine:
           debug_print_contact_states: false
           debug_print_contact_interval_s: 0.25
 
-    - id: 5
-      name: mppi_grasp
+    - id: 8
+      name: robust_grasp_mpc
       stay_here: true
       next_state: grasp_teleop
       params:
-        exit_on_contact_lost: true
-
-        mppi:
-          horizon_steps: 10
-          num_rollouts: 32
-          dt: 0.01
-          temperature: 1.0
-          random_seed: 1
-          action:
-            # MPPI action is qddot_sol in model tangent space [rad/s^2].
-            lower_bound: -1.0
-            upper_bound: 1.0
-            noise_std: 0.5
-
         safety:
-          # If the driver is not tracking the MPPI reference, fall back to
-          # measured q/qdot and reset the nominal action sequence.
           max_reference_tracking_error_rad: 0.25
-          # Post-MPPI command envelope for hardware bring-up.
           max_qdot_cmd_rad_s: 0.5
           max_tau_cmd_nm: 0.05
           max_tau_rate_nm_s: 1.0
           clamp_q_cmd_to_model_limits: true
 
         tactile:
-          # Sign maps each sensor frame normal to the rollout convention:
-          # positive normal velocity means closing / contact approach.
           thumb_normal_axis_sign: 1.0
           index_normal_axis_sign: 1.0
 
-        logging:
-          enabled: true
-          output_directory: "/tmp/mppi_eval"
-          file_prefix: "mppi_grasp"
-          rollout_log_stride: 1
-          max_logged_horizon_steps: 0
-          flush_every_n_ticks: 10
-
         debug:
-          print_action: true
-          print_action_interval_s: 1.0
+          print_status: true
+          print_status_interval_s: 0.5
 
-        # Start is strict: both sensors need EnoughContacts.
-        # After MPPI starts, keep rolling out while at least one tactile
-        # sensor still has active hemisphere contact.
-        continuation:
-          min_active_tactile_sensors: 1
-          min_active_hemisphere_total: 1
+        robust_grasp:
+          rollout:
+            horizon_steps: 30
+            dt: 0.01
+            action_dim: 8
+            action_lower_bound: -10.0
+            action_upper_bound: 10.0
 
-        # Conservative post-MPPI grasp maintenance. This only biases the
-        # thumb/index active joints and still passes through command safety.
-        maintenance:
-          enabled: true
-          target_active_hemisphere_total: 4
-          target_total_force_n: 1.0
-          min_sensor_force_n: 0.05
-          closing_qddot_rad_s2: 1.0
-          hemisphere_deficit_qddot_rad_s2: 1.0
-          one_sided_closing_qddot_rad_s2: 1.0
+          start:
+            min_enough_contact_sensors: 1
+            min_active_hemisphere_total: 2
 
-        rollout:
           disturbance:
-            enabled: false
-          tactile_model:
+            num_disturbance_rollouts: 32
+            tactile_sensor_count: 2
+            random_seed: 7
+            tangent_velocity_std_mps: 0.004
+            tangent_velocity_max_mps: 0.020
+            rotational_velocity_std_radps: 0.05
+            rotational_velocity_max_radps: 0.30
+            normal_force_rate_std_nps: 1.0
+            normal_force_rate_max_nps: 5.0
+            cop_drift_velocity_std_mps: 0.001
+            cop_drift_velocity_max_mps: 0.005
+            sensor_local_noise_scale: 0.25
+            friction_scale_mean: 1.0
+            friction_scale_std: 0.15
+            friction_scale_min: 0.4
+            friction_scale_max: 1.5
+            dropout_probability_per_step: 0.0
+            use_antithetic_samples: true
+
+          tactile_transition:
             birth_approach_velocity_mps: 0.002
             loss_unloading_velocity_mps: 0.002
+            max_shear_m: 0.003
+            max_rotation_rad: 0.05
+            max_abs_shear_m: 0.010
+            max_abs_rotation_rad: 0.30
             born_normal_force_n: 0.05
             born_confidence: 0.5
             contact_confidence_decay: 1.0
+            normal_stiffness_n_per_m: 500.0
+            max_normal_force_n: 10.0
+            min_contact_force_n: 0.02
+            lose_contact_below_min_force: true
 
-        task:
-          name: grasp_hold
-          start:
-            min_enough_contact_sensors: 2
-            min_active_hemisphere_total: 2
-          objective:
-            min_active_tactile_sensors: 1
-            target_active_hemisphere_total: 4
-          tolerance:
-            max_shear_m: 0.003
-            max_rotation_rad: 0.05
           cost:
-            contact_loss_weight: 50.0
-            support_weight: 10.0
-            shear_weight: 5.0
-            rotation_weight: 5.0
-            qddot_weight: 1.0
-            tau_weight: 0.01
+            min_active_tactile_sensors: 2
+            min_active_hemisphere_total: 2
+            contact_loss_weight: 200.0
+            support_weight: 20.0
+            target_normal_force_n: 1.0
+            min_normal_force_per_sensor_n: 0.1
+            max_normal_force_per_sensor_n: 5.0
+            force_low_weight: 30.0
+            force_high_weight: 5.0
+            force_balance_weight: 10.0
+            shear_weight: 20.0
+            rotation_weight: 20.0
+            slip_score_weight: 10.0
+            enable_contact_line_alignment: true
+            contact_line_alignment_weight: 50.0
+            close_axis_base: [0.0, 0.0, 1.0]
+            qddot_weight: 0.01
+            tau_weight: 0.0
+
+          action_library:
+            num_action_samples: 32
+            random_seed: 11
+            target_min_normal_force_n: 1.0
+            force_to_squeeze_gain: 4.0
+            force_balance_gain: 2.0
+            contact_line_align_gain: 20.0
+            squeeze_std: 2.0
+            align_std: 2.0
+            force_balance_std: 2.0
+            thumb_bias_std: 1.0
+            index_bias_std: 1.0
+            max_squeeze: 10.0
+            max_align: 10.0
+            max_force_balance: 10.0
+            max_thumb_bias: 10.0
+            max_index_bias: 10.0
+            include_basis_probe_actions: true
+            squeeze_light_accel_scale: 2.0
+            squeeze_medium_accel_scale: 5.0
+            squeeze_strong_accel_scale: 10.0
+            release_accel_scale: 2.0
+            align_accel_scale: 5.0
+            sequence_decay: 0.95
+            close_axis_base: [0.0, 0.0, 1.0]
+
+          robust_score:
+            risk_weight: 1.0
+            cvar_tail_fraction: 0.25
+
+          behavior:
+            require_both_contact_for_update: true
+            return_hold_when_not_ready: true
 
     - id: 7
       name: mppi_motion_grasp

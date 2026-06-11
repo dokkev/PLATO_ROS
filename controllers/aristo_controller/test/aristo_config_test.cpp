@@ -26,9 +26,9 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_EQ(config.joint_teleop.id, 2);
   EXPECT_EQ(config.grasp_ready.id, 3);
   EXPECT_EQ(config.grasp_teleop.id, 4);
-  EXPECT_EQ(config.mppi_grasp.id, 5);
   EXPECT_EQ(config.grasp_force.id, 6);
   EXPECT_EQ(config.mppi_motion_grasp.id, 7);
+  EXPECT_EQ(config.robust_grasp_mpc.id, 8);
   EXPECT_EQ(config.poke.id, 1);
   EXPECT_TRUE(config.initialize.lifecycle.stay_here);
   EXPECT_FALSE(config.grasp_ready.lifecycle.stay_here);
@@ -36,7 +36,6 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_EQ(config.grasp_ready.lifecycle.next_state_id, config.grasp_teleop.id);
   EXPECT_EQ(config.grasp_teleop.lifecycle.next_state_id, config.grasp_force.id);
   EXPECT_EQ(config.grasp_force.lifecycle.next_state_id, config.grasp_teleop.id);
-  EXPECT_EQ(config.mppi_grasp.lifecycle.next_state_id, config.grasp_teleop.id);
 
   EXPECT_EQ(config.driver_gains.kp.size(), config.num_joints);
   EXPECT_EQ(config.driver_gains.kd.size(), config.num_joints);
@@ -127,54 +126,6 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(grasp_force_task.force_exit_u_threshold, 0.75);
   EXPECT_DOUBLE_EQ(grasp_force_task.kp_tactile_u_fb, 0.02);
 
-  const auto & mppi_grasp = config.mppi_grasp.state;
-  EXPECT_TRUE(mppi_grasp.exit_on_contact_lost);
-  EXPECT_EQ(mppi_grasp.mppi.horizon_steps, 10U);
-  EXPECT_EQ(mppi_grasp.mppi.num_rollouts, 32U);
-  EXPECT_EQ(mppi_grasp.mppi.action_dim, static_cast<std::size_t>(config.num_joints));
-  EXPECT_DOUBLE_EQ(mppi_grasp.mppi.dt, 0.01);
-  ASSERT_EQ(mppi_grasp.mppi.action_lower_bound.size(), config.num_joints);
-  ASSERT_EQ(mppi_grasp.mppi.action_upper_bound.size(), config.num_joints);
-  ASSERT_EQ(mppi_grasp.mppi.action_noise_std.size(), config.num_joints);
-  EXPECT_TRUE(
-    mppi_grasp.mppi.action_lower_bound.isApprox(
-      Eigen::VectorXd::Constant(config.num_joints, -1.0)));
-  EXPECT_TRUE(
-    mppi_grasp.mppi.action_upper_bound.isApprox(
-      Eigen::VectorXd::Constant(config.num_joints, 1.0)));
-  EXPECT_TRUE(
-    mppi_grasp.mppi.action_noise_std.isApprox(
-      Eigen::VectorXd::Constant(config.num_joints, 0.5)));
-  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_reference_tracking_error_rad, 0.25);
-  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_qdot_cmd_rad_s, 0.5);
-  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_tau_cmd_nm, 0.05);
-  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_tau_rate_nm_s, 1.0);
-  EXPECT_TRUE(mppi_grasp.safety.clamp_q_cmd_to_model_limits);
-  EXPECT_DOUBLE_EQ(mppi_grasp.tactile.thumb_normal_axis_sign, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_grasp.tactile.index_normal_axis_sign, 1.0);
-  EXPECT_TRUE(mppi_grasp.logging.enabled);
-  EXPECT_EQ(mppi_grasp.logging.output_directory, "/tmp/mppi_eval");
-  EXPECT_EQ(mppi_grasp.logging.file_prefix, "mppi_grasp");
-  EXPECT_EQ(mppi_grasp.logging.rollout_log_stride, 1);
-  EXPECT_EQ(mppi_grasp.logging.max_logged_horizon_steps, 0);
-  EXPECT_EQ(mppi_grasp.logging.flush_every_n_ticks, 10);
-  EXPECT_TRUE(mppi_grasp.debug.print_action);
-  EXPECT_DOUBLE_EQ(mppi_grasp.debug.print_action_interval_s, 1.0);
-  EXPECT_EQ(mppi_grasp.continuation.min_active_tactile_sensors, 1U);
-  EXPECT_EQ(mppi_grasp.continuation.min_active_hemisphere_total, 1U);
-  EXPECT_TRUE(mppi_grasp.maintenance.enabled);
-  EXPECT_EQ(mppi_grasp.maintenance.target_active_hemisphere_total, 4U);
-  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.target_total_force_n, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.min_sensor_force_n, 0.05);
-  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.closing_qddot_rad_s2, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.hemisphere_deficit_qddot_rad_s2, 1.0);
-  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.one_sided_closing_qddot_rad_s2, 1.0);
-  EXPECT_EQ(mppi_grasp.task.start.min_enough_contact_sensors, 2U);
-  EXPECT_EQ(mppi_grasp.task.start.min_active_hemispheres_total, 2U);
-  EXPECT_EQ(mppi_grasp.task.cost.target_active_hemisphere_total, 4U);
-  EXPECT_DOUBLE_EQ(mppi_grasp.task.tolerance.max_shear_m, 0.003);
-  EXPECT_DOUBLE_EQ(mppi_grasp.tactile_transition.max_shear_m, 0.003);
-
   const auto & mppi_motion_grasp = config.mppi_motion_grasp.state;
   EXPECT_TRUE(mppi_motion_grasp.enabled);
   EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_u, 1.0);
@@ -206,4 +157,15 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   ASSERT_EQ(mppi_motion_grasp.grasp_task.q_ready.size(), config.num_joints);
   EXPECT_TRUE(mppi_motion_grasp.grasp_task.q_ready.isApprox(expected_grasp_ready_target));
   EXPECT_FALSE(mppi_motion_grasp.grasp_task.force_feedback_enabled);
+
+  const auto & robust_grasp = config.robust_grasp_mpc.state;
+  EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 15U);
+  EXPECT_EQ(robust_grasp.policy.rollout.action_dim, static_cast<std::size_t>(config.num_joints));
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.rollout.dt, 0.01);
+  EXPECT_EQ(robust_grasp.policy.disturbance_sampler.num_disturbance_rollouts, 32U);
+  EXPECT_EQ(robust_grasp.policy.disturbance_sampler.tactile_sensor_count, 2U);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 200.0);
+  EXPECT_TRUE(robust_grasp.policy.require_both_contact_for_update);
+  EXPECT_TRUE(robust_grasp.policy.return_hold_when_not_ready);
+  EXPECT_TRUE(robust_grasp.debug.print_status);
 }

@@ -18,6 +18,22 @@ u_k = qddot_sol,k
 The rollout predicts an ideal/reference robot state and compact tactile/contact
 state. It does not predict exact future contact force.
 
+The newer robust grasp policy uses the same `GraspState`, but samples
+low-dimensional grasp corrective action coefficients under pre-sampled
+tactile/contact disturbances:
+
+```text
+G_{k+1} = f_G(G_k, u_k, w_k)
+```
+
+The coefficient action is mapped to `u_k = qddot_sol,k` through a state-derived
+grasp basis made from contact normal Jacobians and active contact centroids.
+
+`w_k` is not object pose. It is a hidden common grasp/contact disturbance plus
+sensor-local noise, covering tangential drift, rotational shear, normal-force
+rate, friction scale, CoP drift, and dropout. See
+`docs/robust_grasp_policy.md`.
+
 ## RobotState
 
 `RobotState` is the robot state container used inside `GraspState` and

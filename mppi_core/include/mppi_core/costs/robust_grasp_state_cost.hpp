@@ -28,6 +28,7 @@ struct RobustGraspStateCostConfig {
   double max_normal_force_per_sensor_n{5.0};
   double force_low_weight{30.0};
   double force_high_weight{5.0};
+  double force_balance_weight{10.0};
 
   double shear_weight{20.0};
   double rotation_weight{20.0};

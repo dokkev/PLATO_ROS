@@ -30,9 +30,9 @@ add_library(${PROJECT_NAME} SHARED
   src/state_machines/idle.cpp
   src/state_machines/initialize.cpp
   src/state_machines/joint_teleop.cpp
-  src/state_machines/mppi_grasp.cpp
   src/state_machines/mppi_motion_grasp.cpp
   src/state_machines/poke.cpp
+  src/state_machines/robust_grasp_mpc.cpp
 )
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC

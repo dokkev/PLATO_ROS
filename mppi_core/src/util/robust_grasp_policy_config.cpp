@@ -124,6 +124,9 @@ GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
   defaults.cop_drift_velocity_max_mps =
       yaml_utils::ReadDouble(safe_params, "cop_drift_velocity_max_mps",
                              defaults.cop_drift_velocity_max_mps);
+  defaults.sensor_local_noise_scale =
+      yaml_utils::ReadDouble(safe_params, "sensor_local_noise_scale",
+                             defaults.sensor_local_noise_scale);
   defaults.friction_scale_mean =
       yaml_utils::ReadDouble(safe_params, "friction_scale_mean",
                              defaults.friction_scale_mean);
@@ -181,6 +184,12 @@ DisturbedTactileTransitionConfig ParseDisturbedTactileTransitionConfig(
   defaults.min_contact_force_n =
       yaml_utils::ReadDouble(safe_params, "min_contact_force_n",
                              defaults.min_contact_force_n);
+  defaults.max_abs_shear_m =
+      yaml_utils::ReadDouble(safe_params, "max_abs_shear_m",
+                             defaults.max_abs_shear_m);
+  defaults.max_abs_rotation_rad =
+      yaml_utils::ReadDouble(safe_params, "max_abs_rotation_rad",
+                             defaults.max_abs_rotation_rad);
   defaults.lose_contact_below_min_force =
       yaml_utils::ReadBool(safe_params, "lose_contact_below_min_force",
                            defaults.lose_contact_below_min_force);
@@ -220,6 +229,9 @@ RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
   defaults.force_high_weight =
       yaml_utils::ReadDouble(safe_params, "force_high_weight",
                              defaults.force_high_weight);
+  defaults.force_balance_weight =
+      yaml_utils::ReadDouble(safe_params, "force_balance_weight",
+                             defaults.force_balance_weight);
   defaults.shear_weight =
       yaml_utils::ReadDouble(safe_params, "shear_weight",
                              defaults.shear_weight);
@@ -262,8 +274,59 @@ GraspActionLibraryConfig ParseGraspActionLibraryConfig(
   defaults.horizon_steps =
       yaml_utils::ReadSize(safe_params, "horizon_steps",
                            defaults.horizon_steps);
+  defaults.num_action_samples =
+      yaml_utils::ReadSize(safe_params, "num_action_samples",
+                           defaults.num_action_samples);
+  defaults.random_seed = static_cast<std::uint32_t>(
+      yaml_utils::ReadSize(safe_params, "random_seed",
+                           defaults.random_seed));
   defaults.dt =
       yaml_utils::ReadDouble(safe_params, "dt", defaults.dt);
+  defaults.target_min_normal_force_n =
+      yaml_utils::ReadDouble(safe_params, "target_min_normal_force_n",
+                             defaults.target_min_normal_force_n);
+  defaults.force_to_squeeze_gain =
+      yaml_utils::ReadDouble(safe_params, "force_to_squeeze_gain",
+                             defaults.force_to_squeeze_gain);
+  defaults.force_balance_gain =
+      yaml_utils::ReadDouble(safe_params, "force_balance_gain",
+                             defaults.force_balance_gain);
+  defaults.contact_line_align_gain =
+      yaml_utils::ReadDouble(safe_params, "contact_line_align_gain",
+                             defaults.contact_line_align_gain);
+  defaults.squeeze_std =
+      yaml_utils::ReadDouble(safe_params, "squeeze_std",
+                             defaults.squeeze_std);
+  defaults.align_std =
+      yaml_utils::ReadDouble(safe_params, "align_std",
+                             defaults.align_std);
+  defaults.force_balance_std =
+      yaml_utils::ReadDouble(safe_params, "force_balance_std",
+                             defaults.force_balance_std);
+  defaults.thumb_bias_std =
+      yaml_utils::ReadDouble(safe_params, "thumb_bias_std",
+                             defaults.thumb_bias_std);
+  defaults.index_bias_std =
+      yaml_utils::ReadDouble(safe_params, "index_bias_std",
+                             defaults.index_bias_std);
+  defaults.max_squeeze =
+      yaml_utils::ReadDouble(safe_params, "max_squeeze",
+                             defaults.max_squeeze);
+  defaults.max_align =
+      yaml_utils::ReadDouble(safe_params, "max_align",
+                             defaults.max_align);
+  defaults.max_force_balance =
+      yaml_utils::ReadDouble(safe_params, "max_force_balance",
+                             defaults.max_force_balance);
+  defaults.max_thumb_bias =
+      yaml_utils::ReadDouble(safe_params, "max_thumb_bias",
+                             defaults.max_thumb_bias);
+  defaults.max_index_bias =
+      yaml_utils::ReadDouble(safe_params, "max_index_bias",
+                             defaults.max_index_bias);
+  defaults.include_basis_probe_actions =
+      yaml_utils::ReadBool(safe_params, "include_basis_probe_actions",
+                           defaults.include_basis_probe_actions);
   defaults.squeeze_light_accel_scale =
       yaml_utils::ReadDouble(safe_params, "squeeze_light_accel_scale",
                              defaults.squeeze_light_accel_scale);
@@ -282,6 +345,9 @@ GraspActionLibraryConfig ParseGraspActionLibraryConfig(
   defaults.sequence_decay =
       yaml_utils::ReadDouble(safe_params, "sequence_decay",
                              defaults.sequence_decay);
+  defaults.close_axis_base =
+      ReadVector3OrScalar(safe_params, "close_axis_base",
+                          defaults.close_axis_base);
   defaults.qddot_lower_bound =
       ReadVectorXdOrScalar(safe_params, "qddot_lower_bound", action_dim,
                            defaults.qddot_lower_bound);

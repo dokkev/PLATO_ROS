@@ -22,6 +22,7 @@ robust_grasp:
     normal_force_rate_max_nps: 5.0
     cop_drift_velocity_std_mps: 0.001
     cop_drift_velocity_max_mps: 0.005
+    sensor_local_noise_scale: 0.25
     friction_scale_mean: 1.0
     friction_scale_std: 0.15
     friction_scale_min: 0.4
@@ -34,6 +35,8 @@ robust_grasp:
     loss_unloading_velocity_mps: 0.002
     max_shear_m: 0.003
     max_rotation_rad: 0.05
+    max_abs_shear_m: 0.010
+    max_abs_rotation_rad: 0.30
     born_normal_force_n: 0.05
     born_confidence: 0.5
     contact_confidence_decay: 1.0
@@ -52,6 +55,7 @@ robust_grasp:
     max_normal_force_per_sensor_n: 5.0
     force_low_weight: 30.0
     force_high_weight: 5.0
+    force_balance_weight: 10.0
     shear_weight: 20.0
     rotation_weight: 20.0
     slip_score_weight: 10.0
@@ -62,12 +66,30 @@ robust_grasp:
     tau_weight: 0.0
 
   action_library:
+    num_action_samples: 32
+    random_seed: 11
+    target_min_normal_force_n: 1.0
+    force_to_squeeze_gain: 4.0
+    force_balance_gain: 2.0
+    contact_line_align_gain: 20.0
+    squeeze_std: 2.0
+    align_std: 2.0
+    force_balance_std: 2.0
+    thumb_bias_std: 1.0
+    index_bias_std: 1.0
+    max_squeeze: 10.0
+    max_align: 10.0
+    max_force_balance: 10.0
+    max_thumb_bias: 10.0
+    max_index_bias: 10.0
+    include_basis_probe_actions: true
     squeeze_light_accel_scale: 2.0
     squeeze_medium_accel_scale: 5.0
     squeeze_strong_accel_scale: 10.0
     release_accel_scale: 2.0
     align_accel_scale: 5.0
     sequence_decay: 0.95
+    close_axis_base: [0.0, 0.0, 1.0]
 
   robust_score:
     risk_weight: 1.0

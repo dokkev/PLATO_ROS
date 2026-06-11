@@ -4,11 +4,13 @@
 #include <Eigen/Core>
 
 #include <array>
+#include <cstdint>
 #include <string>
 
 #include "mppi_core/core/mppi_config.hpp"
 #include "mppi_core/core/mppi_optimizer.hpp"
 #include "mppi_core/costs/motion_tracking_cost.hpp"
+#include "mppi_core/logging/mppi_rollout_logger.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/robot/robot_system.hpp"
 #include "plato_robot_system/task/grasp_task.hpp"
@@ -68,6 +70,7 @@ struct MPPIMotionGraspStateConfig
   MPPIMotionGraspInitiationConfig initiation;
   MPPIMotionGraspSafetyConfig safety;
   mppi_core::MPPIConfig mppi;
+  mppi_core::logging::MppiRolloutLoggerConfig logging;
   mppi_core::MotionTrackingCostConfig cost;
   plato_robot_system::task::GraspTaskConfig grasp_task;
 };
@@ -127,6 +130,23 @@ private:
   bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
   void ResetPhaseState() const;
+  mppi_core::logging::MppiTickLogRecord BuildTickLogRecord(
+    uint64_t tick_index,
+    const mppi_core::GraspObservation * observation,
+    const plato_robot_system::RobotCommand & command,
+    const Eigen::VectorXd & selected_action,
+    double nominal_total_cost,
+    bool used_fallback,
+    const std::string & phase) const;
+  void LogTickAndEvent(
+    uint64_t tick_index,
+    double time_s,
+    const mppi_core::GraspObservation * observation,
+    const plato_robot_system::RobotCommand & command,
+    bool used_fallback,
+    const std::string & event,
+    const std::string & detail) const;
+  bool ShouldLogRollout(uint64_t tick_index) const;
 
   plato_robot_system::RobotSystem * robot_{nullptr};
   MPPIMotionGraspStateConfig config_;
@@ -152,6 +172,8 @@ private:
   mutable Eigen::VectorXd full_latched_q_;
   mutable bool used_hold_fallback_{false};
   mutable double reference_tracking_error_rad_{0.0};
+  mutable mppi_core::logging::MppiRolloutLogger logger_;
+  mutable uint64_t tick_index_{0};
 };
 
 }  // namespace aristo_controller::state_machines

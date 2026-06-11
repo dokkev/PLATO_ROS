@@ -42,6 +42,8 @@ struct GraspTaskConfig
   bool use_tactile_presence_for_contact{true};
   bool force_feedback_enabled{true};
   double lpf_alpha{1.0};
+  bool debug_print_contact_states{false};
+  double debug_print_contact_interval_s{0.5};
 
   // Current proportional/derivative force feedback directly offsets the
   // normalized grasp command. This will be replaced by admittance state next.
@@ -154,6 +156,9 @@ private:
   bool CaptureReferencePosture(const RobotState & state);
   GraspTaskGripForceEstimate EstimateGripForceFromTactile(
     const RobotState & state) const;
+  void PrintContactStatesIfNeeded(
+    const RobotState & state,
+    const GraspTaskGripForceEstimate & estimate);
   void UpdateMode(
     const GraspTaskGripForceEstimate & estimate,
     double u);
@@ -181,6 +186,7 @@ private:
   int force_exit_contact_lost_counter_{0};
   double last_force_error_n_{0.0};
   bool has_last_force_error_{false};
+  double last_contact_debug_print_time_s_{-1.0e100};
 
   GraspTaskStatus status_;
 };

@@ -21,6 +21,7 @@ struct GraspForceStateConfig
   double default_u{0.0};
   double default_phi{0.0};
   double default_desired_force_n{1.0};
+  bool exit_on_contact_lost{true};
 
   plato_robot_system::task::GraspTaskConfig grasp_task;
 };
@@ -39,6 +40,7 @@ public:
 
   void OnEnter() override;
   void OnExit() override;
+  bool IsFinished() const override;
   bool PopulateCommand(plato_robot_system::RobotCommand * command) const override;
 
   plato_robot_system::task::GraspTaskMode mode() const { return grasp_task_.mode(); }
@@ -49,14 +51,19 @@ public:
   const GraspForceInput & input() const { return input_; }
   double default_desired_force_n() const { return config_.default_desired_force_n; }
   bool task_entered() const { return task_entered_; }
+  bool exit_requested() const { return exit_requested_; }
 
 private:
+  void UpdateExitCondition() const;
+
   plato_robot_system::RobotSystem * robot_{nullptr};
   mutable plato_robot_system::task::GraspTask grasp_task_;
   GraspForceStateConfig config_;
   GraspForceInput input_;
   bool task_configured_{false};
   mutable bool task_entered_{false};
+  mutable bool has_entered_force_tracking_{false};
+  mutable bool exit_requested_{false};
 };
 
 }  // namespace aristo_controller::state_machines

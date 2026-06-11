@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace aristo_controller::state_machines
 {
@@ -49,6 +50,8 @@ bool GraspForceState::ConfigureTask(const GraspForceStateConfig & config)
   input_.desired_force_n = std::max(0.0, config_.default_desired_force_n);
   task_configured_ = true;
   task_entered_ = false;
+  has_entered_force_tracking_ = false;
+  exit_requested_ = false;
   return task_configured_;
 }
 
@@ -68,6 +71,8 @@ void GraspForceState::SetInput(const GraspForceInput & input)
 void GraspForceState::OnEnter()
 {
   task_entered_ = false;
+  has_entered_force_tracking_ = false;
+  exit_requested_ = false;
   if (!task_configured_ || robot_ == nullptr || !robot_->hasState()) {
     return;
   }
@@ -81,6 +86,14 @@ void GraspForceState::OnExit()
 {
   grasp_task_.Reset();
   task_entered_ = false;
+  has_entered_force_tracking_ = false;
+  exit_requested_ = false;
+}
+
+bool GraspForceState::IsFinished() const
+{
+  return (exit_requested_ && lifecycle_.next_state_id >= 0) ||
+         plato_robot_system::State::IsFinished();
 }
 
 bool GraspForceState::PopulateCommand(plato_robot_system::RobotCommand * command) const
@@ -102,12 +115,40 @@ bool GraspForceState::PopulateCommand(plato_robot_system::RobotCommand * command
   task_command.u = input.u;
   task_command.phi = input.phi;
   task_command.desired_force_n = input.desired_force_n;
-  return grasp_task_.PopulateCommand(
+  const bool populated = grasp_task_.PopulateCommand(
     *robot_,
     state,
     task_command,
     dt(),
     command);
+  if (populated) {
+    UpdateExitCondition();
+  }
+  return populated;
+}
+
+void GraspForceState::UpdateExitCondition() const
+{
+  const auto & status = grasp_task_.status();
+  if (grasp_task_.mode() == plato_robot_system::task::GraspTaskMode::kForceTracking) {
+    has_entered_force_tracking_ = true;
+  }
+
+  const bool required_contact_lost =
+    status.lost_contact_a || status.lost_contact_b;
+  if (
+    config_.exit_on_contact_lost &&
+    has_entered_force_tracking_ &&
+    required_contact_lost)
+  {
+    if (!exit_requested_) {
+      std::cout << "[grasp_force] exiting on contact loss"
+                << " lost_a=" << (status.lost_contact_a ? "true" : "false")
+                << " lost_b=" << (status.lost_contact_b ? "true" : "false")
+                << std::endl;
+    }
+    exit_requested_ = true;
+  }
 }
 
 }  // namespace aristo_controller::state_machines

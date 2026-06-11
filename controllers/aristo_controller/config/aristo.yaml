@@ -75,7 +75,7 @@ state_machine:
       name: grasp_teleop
       stay_here: true
       # Change this to grasp_force to use tactile force feedback instead of MPPI.
-      next_state: mppi_grasp
+      next_state: grasp_force
       params:
         # Command: [u], [u, phi], or [u, phi, f]
         # u: 0 closed, 0.5 ready/parallel, 1 open
@@ -96,11 +96,16 @@ state_machine:
           # grasp_teleop uses this task for motion and contact-gated handoff only.
           lpf_alpha: 0.2
           force_exit_u_threshold: 0.75
+          debug_print_contact_states: false
+          debug_print_contact_interval_s: 0.25
 
     - id: 5
       name: mppi_grasp
       stay_here: true
+      next_state: grasp_teleop
       params:
+        exit_on_contact_lost: true
+
         mppi:
           horizon_steps: 10
           num_rollouts: 32
@@ -128,6 +133,14 @@ state_machine:
           # positive normal velocity means closing / contact approach.
           thumb_normal_axis_sign: 1.0
           index_normal_axis_sign: 1.0
+
+        logging:
+          enabled: false
+          output_directory: "/output/mppi_eval"
+          file_prefix: "mppi_grasp"
+          rollout_log_stride: 1
+          max_logged_horizon_steps: 0
+          flush_every_n_ticks: 10
 
         rollout:
           disturbance:
@@ -198,6 +211,14 @@ state_machine:
             upper_bound: 4.0
             noise_std: 1.0
 
+        logging:
+          enabled: false
+          output_directory: "/tmp/mppi_eval"
+          file_prefix: "mppi_motion_grasp"
+          rollout_log_stride: 1
+          max_logged_horizon_steps: 0
+          flush_every_n_ticks: 10
+
         cost:
           q_target_weight: 20.0
           qdot_target_weight: 1.0
@@ -215,10 +236,12 @@ state_machine:
     - id: 6
       name: grasp_force
       stay_here: true
+      next_state: grasp_teleop
       params:
         default_u: 0.7
         default_phi: 0.0
         default_desired_force_n: 5.0
+        exit_on_contact_lost: true
 
         grasp_task:
           # q_ready is copied from grasp_ready.target_jpos.

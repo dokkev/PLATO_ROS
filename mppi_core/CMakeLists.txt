@@ -21,6 +21,7 @@ set(${PROJECT_NAME}_SOURCES
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
   src/costs/motion_tracking_cost.cpp
+  src/logging/mppi_rollout_logger.cpp
   src/rollout/grasp_state_rollout_model.cpp
   src/rollout/motion_rollout_model.cpp
   src/util/mppi_config.cpp
@@ -56,6 +57,11 @@ install(DIRECTORY include/
 
 install(DIRECTORY config task
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/evaluate_rollout_log.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(EXPORT ${PROJECT_NAME}Targets

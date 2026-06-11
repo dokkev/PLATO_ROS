@@ -237,6 +237,14 @@ plato_robot_system::task::GraspTaskConfig parse_grasp_task_config(
   config.force_feedback_enabled =
     optional_scalar<bool>(
       params, "force_feedback_enabled", config.force_feedback_enabled);
+  config.debug_print_contact_states =
+    optional_scalar<bool>(
+      params, "debug_print_contact_states", config.debug_print_contact_states);
+  config.debug_print_contact_interval_s =
+    optional_scalar<double>(
+      params,
+      "debug_print_contact_interval_s",
+      config.debug_print_contact_interval_s);
   config.lpf_alpha =
     optional_scalar<double>(
       params, "lpf_alpha", config.lpf_alpha);
@@ -345,6 +353,9 @@ aristo_controller::state_machines::GraspForceStateConfig parse_grasp_force_state
   config.default_desired_force_n =
     optional_scalar<double>(
       params, "default_desired_force_n", config.default_desired_force_n);
+  config.exit_on_contact_lost =
+    optional_scalar<bool>(
+      params, "exit_on_contact_lost", config.exit_on_contact_lost);
   const auto grasp_task = required_node(params, "grasp_task");
   config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
 
@@ -378,6 +389,26 @@ aristo_controller::state_machines::JointTeleopStateConfig parse_joint_teleop_sta
   return config;
 }
 
+mppi_core::logging::MppiRolloutLoggerConfig parse_mppi_logging_config(
+  const YAML::Node & params,
+  const mppi_core::logging::MppiRolloutLoggerConfig & fallback)
+{
+  auto config = fallback;
+  config.enabled =
+    optional_scalar<bool>(params, "enabled", config.enabled);
+  config.output_directory =
+    optional_scalar<std::string>(params, "output_directory", config.output_directory);
+  config.file_prefix =
+    optional_scalar<std::string>(params, "file_prefix", config.file_prefix);
+  config.rollout_log_stride =
+    optional_scalar<int>(params, "rollout_log_stride", config.rollout_log_stride);
+  config.max_logged_horizon_steps =
+    optional_scalar<int>(params, "max_logged_horizon_steps", config.max_logged_horizon_steps);
+  config.flush_every_n_ticks =
+    optional_scalar<int>(params, "flush_every_n_ticks", config.flush_every_n_ticks);
+  return config;
+}
+
 aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_config(
   const YAML::Node & params,
   const int num_joints)
@@ -387,11 +418,14 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
   }
 
   aristo_controller::state_machines::MPPIGraspStateConfig config;
+  config.exit_on_contact_lost =
+    optional_scalar<bool>(params, "exit_on_contact_lost", config.exit_on_contact_lost);
   const auto mppi_params = params ? params["mppi"] : YAML::Node();
   const auto rollout_params = params ? params["rollout"] : YAML::Node();
   const auto task_params = params ? params["task"] : YAML::Node();
   const auto safety_params = params ? params["safety"] : YAML::Node();
   const auto tactile_params = params ? params["tactile"] : YAML::Node();
+  const auto logging_params = params ? params["logging"] : YAML::Node();
   config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
   config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
   config.tactile_transition =
@@ -434,6 +468,7 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
       tactile_params,
       "index_normal_axis_sign",
       config.tactile.index_normal_axis_sign);
+  config.logging = parse_mppi_logging_config(logging_params, config.logging);
   return config;
 }
 
@@ -521,6 +556,8 @@ parse_mppi_motion_grasp_state_config(
 
   const auto mppi_params = params ? params["mppi"] : YAML::Node();
   config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
+  const auto logging_params = params ? params["logging"] : YAML::Node();
+  config.logging = parse_mppi_logging_config(logging_params, config.logging);
 
   const auto cost_params = params ? params["cost"] : YAML::Node();
   config.cost.q_target_weight =

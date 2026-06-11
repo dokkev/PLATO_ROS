@@ -7,6 +7,7 @@
 
 #include <Eigen/Core>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +35,8 @@
 #include "mppi_core/contact/contact_kinematics.hpp"
 #include "mppi_core/core/mppi_optimizer.hpp"
 #include "mppi_core/costs/grasp_stability_cost.hpp"
+#include "mppi_core/logging/mppi_rollout_logger.hpp"
+#include "mppi_core/logging/vector_csv.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/rollout/contact_force_rollout.hpp"
 #include "mppi_core/rollout/grasp_state_rollout_model.hpp"
@@ -238,6 +241,12 @@ std::filesystem::path MppiCorePackageRoot() {
   return std::filesystem::path(__FILE__).parent_path().parent_path();
 }
 
+std::filesystem::path UniqueTempDirectory(const std::string& prefix) {
+  const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+  return std::filesystem::temp_directory_path() /
+         (prefix + "_" + std::to_string(now));
+}
+
 std::filesystem::path PlatoNariTouchUrdfPath() {
   return std::filesystem::path(MPPI_CORE_PLATO_NARITOUCH_URDF_PATH);
 }
@@ -392,6 +401,109 @@ TEST(RobotCommandTest, ZeroHoldAndInvalidHelpersSetUsability) {
   EXPECT_TRUE(invalid.HasValidDimensions());
   EXPECT_TRUE(invalid.AllFinite());
   EXPECT_FALSE(invalid.IsUsable());
+}
+
+TEST(VectorCsvTest, SerializesVectorsAndEscapesCells) {
+  EXPECT_EQ(mppi_core::logging::VectorToCsvCell(Eigen::VectorXd{}), "");
+
+  Eigen::VectorXd normal(3);
+  normal << 0.1, 0.2, -3.0;
+  EXPECT_EQ(mppi_core::logging::VectorToCsvCell(normal), "\"0.1;0.2;-3\"");
+
+  Eigen::VectorXd nonfinite(3);
+  nonfinite << std::numeric_limits<double>::quiet_NaN(),
+      std::numeric_limits<double>::infinity(),
+      -std::numeric_limits<double>::infinity();
+  EXPECT_EQ(
+      mppi_core::logging::VectorToCsvCell(nonfinite),
+      "\"nan;inf;-inf\"");
+
+  EXPECT_EQ(mppi_core::logging::BoolToString(true), "true");
+  EXPECT_EQ(mppi_core::logging::BoolToString(false), "false");
+  EXPECT_EQ(
+      mppi_core::logging::EscapeCsvCell("a,\"b\""),
+      "\"a,\"\"b\"\"\"");
+}
+
+TEST(MppiRolloutLoggerTest, DisabledLoggerMethodsDoNotThrow) {
+  mppi_core::logging::MppiRolloutLogger logger;
+  mppi_core::logging::MppiRolloutLoggerConfig config;
+  config.enabled = false;
+
+  EXPECT_TRUE(logger.Configure(config));
+  EXPECT_FALSE(logger.enabled());
+  EXPECT_NO_THROW(logger.LogTick(mppi_core::logging::MppiTickLogRecord{}));
+  EXPECT_NO_THROW(logger.LogRollout(0, 0.0, mppi_core::RolloutTrace{}));
+  EXPECT_NO_THROW(logger.LogEvent(0, 0.0, "event", "detail"));
+  EXPECT_NO_THROW(logger.Flush());
+}
+
+TEST(MppiRolloutLoggerTest, EnabledLoggerWritesTickRolloutAndEventFiles) {
+  const std::filesystem::path output_dir =
+      UniqueTempDirectory("mppi_rollout_logger_test");
+
+  mppi_core::logging::MppiRolloutLoggerConfig config;
+  config.enabled = true;
+  config.output_directory = output_dir.string();
+  config.file_prefix = "unit";
+  config.flush_every_n_ticks = 1;
+
+  mppi_core::logging::MppiRolloutLogger logger;
+  ASSERT_TRUE(logger.Configure(config));
+  ASSERT_TRUE(logger.enabled());
+
+  mppi_core::logging::MppiTickLogRecord record;
+  record.tick_index = 7;
+  record.time_s = 1.25;
+  record.controller_state = "mppi_grasp";
+  record.phase = "hold";
+  record.q_meas = Eigen::VectorXd::Constant(1, 0.1);
+  record.qdot_meas = Eigen::VectorXd::Constant(1, 0.2);
+  record.tau_meas = Eigen::VectorXd::Constant(1, 0.3);
+  record.q_cmd = Eigen::VectorXd::Constant(1, 0.4);
+  record.qdot_cmd = Eigen::VectorXd::Constant(1, 0.5);
+  record.tau_cmd = Eigen::VectorXd::Constant(1, 0.6);
+  record.selected_action_qddot = Eigen::VectorXd::Constant(1, 0.7);
+  record.command_valid = true;
+  logger.LogTick(record);
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  SetActiveHemispheresAroundCentroid(&tactile, 1, Eigen::Vector2d::Zero(), 2.0);
+
+  mppi_core::RolloutTrace trace;
+  trace.states.push_back(mppi_core::MakeGraspState(
+      Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1),
+      Eigen::VectorXd::Zero(1), tactile, tactile));
+  trace.states.push_back(mppi_core::MakeGraspState(
+      Eigen::VectorXd::Constant(1, 0.11), Eigen::VectorXd::Constant(1, 0.1),
+      Eigen::VectorXd::Constant(1, 0.2), tactile, tactile));
+  trace.actions.push_back(Eigen::VectorXd::Constant(1, 1.0));
+  trace.step_costs.push_back(0.5);
+  trace.total_cost = 0.5;
+  logger.LogRollout(7, 1.25, trace);
+  logger.LogEvent(7, 1.25, "event", "detail");
+  logger.Flush();
+
+  const auto ticks_path = output_dir / "unit_ticks.csv";
+  const auto rollouts_path = output_dir / "unit_rollouts.csv";
+  const auto events_path = output_dir / "unit_events.csv";
+  ASSERT_TRUE(std::filesystem::exists(ticks_path));
+  ASSERT_TRUE(std::filesystem::exists(rollouts_path));
+  ASSERT_TRUE(std::filesystem::exists(events_path));
+
+  const std::string ticks = ReadTextFile(ticks_path);
+  const std::string rollouts = ReadTextFile(rollouts_path);
+  const std::string events = ReadTextFile(events_path);
+  EXPECT_NE(ticks.find("tick_index,time_s,controller_state"), std::string::npos);
+  EXPECT_NE(ticks.find("7,1.25,mppi_grasp"), std::string::npos);
+  EXPECT_NE(rollouts.find("horizon_index,pred_time_s"), std::string::npos);
+  EXPECT_NE(rollouts.find("7,1.25,1"), std::string::npos);
+  EXPECT_NE(events.find("tick_index,time_s,event,detail"), std::string::npos);
+  EXPECT_NE(events.find("7,1.25,event,detail"), std::string::npos);
+
+  std::filesystem::remove_all(output_dir);
 }
 
 TEST(RobotSystemTest, StoresAndReturnsRobotStateForPinocchioModel) {
@@ -2961,6 +3073,41 @@ TEST(MPPIOptimizerTest, AllInvalidRolloutsReturnHoldCommand) {
   EXPECT_NEAR(command.kp[0], 0.0, kTolerance);
   EXPECT_NEAR(command.kd[0], 0.0, kTolerance);
   EXPECT_NEAR(command.stamp_sec, 12.34, kTolerance);
+}
+
+TEST(MPPIOptimizerTest, UpdateExposesSelectedActionMetadata) {
+  mppi_core::MPPIConfig config;
+  config.horizon_steps = 2;
+  config.num_rollouts = 1;
+  config.action_dim = 1;
+  config.dt = 0.1;
+  config.temperature = 1.0;
+  config.action_lower_bound = Eigen::VectorXd::Constant(1, -1.0);
+  config.action_upper_bound = Eigen::VectorXd::Constant(1, 1.0);
+  config.action_noise_std = Eigen::VectorXd::Zero(1);
+
+  auto model = std::make_shared<mppi_core::GraspStateRolloutModel>(1);
+  mppi_core::MPPIOptimizer optimizer;
+  optimizer.Initialize(config, model, nullptr);
+
+  mppi_core::GraspObservation observation;
+  observation.q_ref_current = Eigen::VectorXd::Constant(1, 0.25);
+  observation.qdot_ref_current = Eigen::VectorXd::Zero(1);
+  observation.q_meas = observation.q_ref_current;
+  observation.qdot_meas = observation.qdot_ref_current;
+  observation.tau_meas = Eigen::VectorXd::Zero(1);
+  observation.time_s = 2.0;
+
+  const auto command = optimizer.Update(observation);
+
+  EXPECT_TRUE(command.IsUsable());
+  EXPECT_TRUE(optimizer.hasLastSelectedAction());
+  EXPECT_EQ(optimizer.lastSelectedAction().size(), 1);
+  EXPECT_TRUE(optimizer.lastSelectedAction().isApprox(Eigen::VectorXd::Zero(1)));
+  EXPECT_TRUE(optimizer.hasLastSelectedActionSequence());
+  EXPECT_EQ(optimizer.lastSelectedActionSequence().actionDim(), 1U);
+  EXPECT_EQ(optimizer.lastSelectedActionSequence().horizonSteps(), 2U);
+  EXPECT_DOUBLE_EQ(optimizer.lastNominalTotalCost(), 0.0);
 }
 
 TEST(MPPIOptimizerTest, PredictRolloutAllowsPinocchioNqDifferentFromNv) {

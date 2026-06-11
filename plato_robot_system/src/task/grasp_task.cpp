@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 namespace plato_robot_system::task
@@ -93,7 +96,22 @@ bool IsValidConfig(const GraspTaskConfig & config)
          IsFinite(config.kd_tactile_u_fb) &&
          IsFinite(config.kp_tactile_phi_fb) &&
          IsFinite(config.kd_tactile_phi_fb) &&
+         IsNonnegativeFinite(config.debug_print_contact_interval_s) &&
          HasValidParallelGeometry(config);
+}
+
+const char * ContactStateName(const int contact_state)
+{
+  switch (contact_state) {
+    case sensor::TactileState::kNoContact:
+      return "no_contact";
+    case sensor::TactileState::kFewContacts:
+      return "few_contacts";
+    case sensor::TactileState::kEnoughContacts:
+      return "enough_contacts";
+    default:
+      return "unknown";
+  }
 }
 
 }  // namespace
@@ -148,6 +166,7 @@ void GraspTask::Reset()
   force_exit_contact_lost_counter_ = 0;
   last_force_error_n_ = 0.0;
   has_last_force_error_ = false;
+  last_contact_debug_print_time_s_ = -1.0e100;
   status_ = GraspTaskStatus{};
   status_.q_target = Eigen::VectorXd::Zero(0);
   q_target_lpf_.resize(0);
@@ -213,6 +232,7 @@ bool GraspTask::BuildMotionTarget(
   const double desired_force_n = std::max(0.0, input.desired_force_n);
 
   const GraspTaskGripForceEstimate estimate = EstimateGripForceFromTactile(state);
+  PrintContactStatesIfNeeded(state, estimate);
   UpdateMode(estimate, u_open);
   if (mode_ == GraspTaskMode::kForceTracking && !estimate.valid_force) {
     mode_ = GraspTaskMode::kMotionTeleop;
@@ -345,6 +365,44 @@ GraspTaskGripForceEstimate GraspTask::EstimateGripForceFromTactile(
   }
   estimate.valid_force = IsFinite(estimate.measured_force_n);
   return estimate;
+}
+
+void GraspTask::PrintContactStatesIfNeeded(
+  const RobotState & state,
+  const GraspTaskGripForceEstimate & estimate)
+{
+  if (!config_.debug_print_contact_states || !std::isfinite(state.time_s)) {
+    return;
+  }
+
+  const double interval_s = config_.debug_print_contact_interval_s;
+  if (
+    interval_s > 0.0 &&
+    state.time_s - last_contact_debug_print_time_s_ < interval_s)
+  {
+    return;
+  }
+  last_contact_debug_print_time_s_ = state.time_s;
+
+  std::ostringstream message;
+  message << std::fixed << std::setprecision(4)
+          << "[grasp_task] tactile contact states t=" << state.time_s
+          << " sensors=" << state.tactile_sensors.size()
+          << " contact_count="
+          << ((estimate.contact_a ? 1 : 0) + (estimate.contact_b ? 1 : 0))
+          << " enough_count="
+          << ((estimate.enough_contact_a ? 1 : 0) + (estimate.enough_contact_b ? 1 : 0));
+
+  for (const auto & tactile : state.tactile_sensors) {
+    message << " | idx=" << tactile.sensor_index
+            << " frame=" << tactile.frame_name
+            << " valid=" << (tactile.valid ? "true" : "false")
+            << " state=" << ContactStateName(tactile.contact_state)
+            << " active_hemi=" << tactile.ActiveHemisphereCount()
+            << " force_n=" << tactile.ActiveHemisphereNormalForceN();
+  }
+
+  std::cout << message.str() << std::endl;
 }
 
 void GraspTask::UpdateMode(

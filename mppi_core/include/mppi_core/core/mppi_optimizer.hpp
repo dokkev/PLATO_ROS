@@ -46,6 +46,17 @@ class MPPIOptimizer {
   const ActionSequence& nominalActionSequence() const {
     return nominal_actions_;
   }
+  const Eigen::VectorXd& lastSelectedAction() const {
+    return last_selected_action_;
+  }
+  bool hasLastSelectedAction() const { return has_last_selected_action_; }
+  double lastNominalTotalCost() const { return last_nominal_total_cost_; }
+  const ActionSequence& lastSelectedActionSequence() const {
+    return last_selected_sequence_;
+  }
+  bool hasLastSelectedActionSequence() const {
+    return has_last_selected_sequence_;
+  }
 
  private:
   void SampleActionSequences();
@@ -60,6 +71,11 @@ class MPPIOptimizer {
   std::shared_ptr<const RolloutModelBase> model_;
   std::shared_ptr<const CostTermBase> cost_term_;
   ActionSequence nominal_actions_;
+  Eigen::VectorXd last_selected_action_;
+  bool has_last_selected_action_{false};
+  double last_nominal_total_cost_{0.0};
+  ActionSequence last_selected_sequence_;
+  bool has_last_selected_sequence_{false};
   std::vector<ActionSequence> sampled_actions_;
   std::vector<double> rollout_costs_;
   std::mt19937 rng_;

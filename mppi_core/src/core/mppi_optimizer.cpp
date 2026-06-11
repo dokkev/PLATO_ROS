@@ -259,6 +259,12 @@ void MPPIOptimizer::Initialize(MPPIConfig config,
   rng_.seed(config_.random_seed);
 
   nominal_actions_.Resize(config_.action_dim, config_.horizon_steps);
+  last_selected_action_.resize(0);
+  has_last_selected_action_ = false;
+  last_nominal_total_cost_ = 0.0;
+  last_selected_sequence_.Resize(config_.action_dim, config_.horizon_steps);
+  last_selected_sequence_.SetZero();
+  has_last_selected_sequence_ = false;
   sampled_actions_.assign(
       config_.num_rollouts,
       ActionSequence(config_.action_dim, config_.horizon_steps));
@@ -273,8 +279,12 @@ RobotCommand MPPIOptimizer::Update(const GraspObservation& observation) {
   }
 
   if (!cost_term_) {
-    RobotCommand command =
-        MakeCommand(observation, nominal_actions_.firstAction());
+    last_selected_sequence_ = nominal_actions_;
+    last_selected_action_ = last_selected_sequence_.firstAction();
+    has_last_selected_sequence_ = true;
+    has_last_selected_action_ = true;
+    last_nominal_total_cost_ = 0.0;
+    RobotCommand command = MakeCommand(observation, last_selected_action_);
     ShiftNominalTrajectory();
     return command;
   }
@@ -290,14 +300,28 @@ RobotCommand MPPIOptimizer::Update(const GraspObservation& observation) {
   }
   if (AllRolloutsInvalid(rollout_costs_)) {
     ResetNominalActions();
+    last_selected_sequence_ = nominal_actions_;
+    last_selected_action_ =
+        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim));
+    has_last_selected_sequence_ = true;
+    has_last_selected_action_ = true;
+    last_nominal_total_cost_ = kLargeCost;
     return MakeCommand(
         observation,
-        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)));
+        last_selected_action_);
   }
+  const auto best_cost_it =
+      std::min_element(rollout_costs_.begin(), rollout_costs_.end());
+  const double best_sample_cost =
+      best_cost_it == rollout_costs_.end() ? kLargeCost : *best_cost_it;
   UpdateNominalActionSequence();
 
-  RobotCommand command =
-      MakeCommand(observation, nominal_actions_.firstAction());
+  last_selected_sequence_ = nominal_actions_;
+  last_selected_action_ = last_selected_sequence_.firstAction();
+  has_last_selected_sequence_ = true;
+  has_last_selected_action_ = true;
+  last_nominal_total_cost_ = best_sample_cost;
+  RobotCommand command = MakeCommand(observation, last_selected_action_);
   ShiftNominalTrajectory();
   return command;
 }
@@ -333,8 +357,10 @@ RolloutTrace MPPIOptimizer::PredictRollout(
   Eigen::VectorXd dq_ref_current =
       ReferenceVelocityOrZero(observation, config_.action_dim);
   GraspState state = MakeGraspState(
-      observation.q_ref_current, dq_ref_current,
-      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
+      MakeRobotState(
+          observation.q_ref_current, dq_ref_current,
+          Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
+          observation.time_s),
       observation.tactile_meas);
 
   const GraspState initial_reference_state = state;
@@ -382,7 +408,17 @@ RolloutTrace MPPIOptimizer::PredictNominalRollout(
   return PredictRollout(observation, nominal_actions_);
 }
 
-void MPPIOptimizer::ResetNominalActions() { nominal_actions_.SetZero(); }
+void MPPIOptimizer::ResetNominalActions() {
+  nominal_actions_.SetZero();
+  last_selected_action_.resize(0);
+  has_last_selected_action_ = false;
+  last_nominal_total_cost_ = 0.0;
+  if (last_selected_sequence_.actionDim() == config_.action_dim &&
+      last_selected_sequence_.horizonSteps() == config_.horizon_steps) {
+    last_selected_sequence_.SetZero();
+  }
+  has_last_selected_sequence_ = false;
+}
 
 void MPPIOptimizer::ShiftNominalTrajectory() {
   nominal_actions_.ShiftAndRepeatLast();
@@ -434,8 +470,10 @@ double MPPIOptimizer::EvaluateRollout(const GraspObservation& observation,
   Eigen::VectorXd dq_ref_current =
       ReferenceVelocityOrZero(observation, config_.action_dim);
   GraspState state = MakeGraspState(
-      observation.q_ref_current, dq_ref_current,
-      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
+      MakeRobotState(
+          observation.q_ref_current, dq_ref_current,
+          Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.action_dim)),
+          observation.time_s),
       observation.tactile_meas);
 
   const GraspState initial_reference_state = state;

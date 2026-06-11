@@ -21,7 +21,7 @@ task:
     initial_pose_world:
       xyz: [0.0, 0.0, 0.0]
       rpy: [0.0, 0.0, 0.0]
-    perturbation:
+    initial_pose_uncertainty:
       xyz_std_m: [0.01, 0.01, 0.02]
       rpy_std_rad: [0.1, 0.1, 0.2]
 

@@ -47,6 +47,8 @@ struct RobustGraspPolicyConfig {
       RobustGraspControlMode::kContinuousQddotMppi};
   double continuous_control_rate_cost_weight{1.0e-3};
   double continuous_smoothing_alpha{0.5};
+  BaseGraspControllerConfig base_grasp_controller;
+  RneaFeedforwardConfig rnea_feedforward;
 
   double risk_weight{1.0};
   double cvar_tail_fraction{0.25};
@@ -107,6 +109,7 @@ struct RobustGraspPolicyStatus {
   double selected_action_cost{0.0};
   double selected_control_cost{0.0};
   double selected_rate_cost{0.0};
+  double selected_base_deviation_cost{0.0};
   double best_sample_cost{0.0};
   double weighted_cost_estimate{0.0};
   double nominal_cost{0.0};
@@ -139,8 +142,16 @@ struct RobustGraspPolicyStatus {
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
   Eigen::Vector2d selected_measured_centroid_sensor_m{
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
+  Eigen::Vector3d selected_object_linear_disturbance_world_mps{
+      Eigen::Vector3d::Zero()};
+  Eigen::Vector3d selected_object_angular_disturbance_world_radps{
+      Eigen::Vector3d::Zero()};
   double selected_object_linear_disturbance_speed_mps{0.0};
   double selected_object_angular_disturbance_speed_radps{0.0};
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      sampled_object_linear_disturbances_world_mps;
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      sampled_object_angular_disturbances_world_radps;
   double solve_time_ms{0.0};
 
   std::vector<Eigen::Isometry3d,
@@ -151,6 +162,22 @@ struct RobustGraspPolicyStatus {
   Eigen::VectorXd qddot_nominal_first;
   Eigen::VectorXd qddot_best_first;
   Eigen::VectorXd selected_qddot;
+  Eigen::VectorXd qddot_base;
+  Eigen::VectorXd qddot_residual_cmd;
+  BaseGraspControllerStatus base_grasp;
+
+  bool use_rnea_feedforward{false};
+  double tau_ff_scale{1.0};
+  Eigen::VectorXd tau_ff_raw;
+  Eigen::VectorXd tau_ff_scaled;
+  Eigen::VectorXd tau_ff_cmd;
+  double tau_ff_raw_norm{0.0};
+  double tau_ff_cmd_norm{0.0};
+  double tau_ff_max_abs{0.0};
+  bool tau_ff_clamped{false};
+  bool tau_ff_rate_limited{false};
+  bool tau_ff_zeroed_not_ready{false};
+  bool tau_ff_zeroed_contact_loss{false};
 };
 
 class RobustGraspPolicy {

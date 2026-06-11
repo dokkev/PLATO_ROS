@@ -41,6 +41,8 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
   Eigen::Vector2d measured_centroid_sum{Eigen::Vector2d::Zero()};
   std::size_t predicted_centroid_count{0};
   std::size_t measured_centroid_count{0};
+  Eigen::Vector3d object_linear_disturbance_world_mps{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d object_angular_disturbance_world_radps{Eigen::Vector3d::Zero()};
   double object_linear_disturbance_speed_sum{0.0};
   double object_angular_disturbance_speed_sum{0.0};
   std::size_t object_support_step_count{0};
@@ -157,6 +159,22 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
     }
     return measured_centroid_sum /
            static_cast<double>(measured_centroid_count);
+  }
+
+  Eigen::Vector3d objectLinearDisturbanceAverage() const {
+    if (disturbance_step_count == 0U) {
+      return Eigen::Vector3d::Zero();
+    }
+    return object_linear_disturbance_world_mps /
+           static_cast<double>(disturbance_step_count);
+  }
+
+  Eigen::Vector3d objectAngularDisturbanceAverage() const {
+    if (disturbance_step_count == 0U) {
+      return Eigen::Vector3d::Zero();
+    }
+    return object_angular_disturbance_world_radps /
+           static_cast<double>(disturbance_step_count);
   }
 
   double objectLinearDisturbanceSpeedAverage() const {
@@ -279,6 +297,15 @@ void FillMeasuredForceStatus(const GraspState& state,
       std::isfinite(index_force_n) ? std::max(0.0, index_force_n) : 0.0;
 }
 
+bool ShouldRunBaseGraspBeforeMppiReady(
+    const RobustGraspPolicyConfig& config,
+    const GraspState& state) {
+  return config.control_mode == RobustGraspControlMode::kContinuousQddotMppi &&
+         config.base_grasp_controller.enabled &&
+         state.valid &&
+         state.hasAnyTactileContact();
+}
+
 }  // namespace
 
 void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
@@ -298,8 +325,39 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
       config.continuous_control_rate_cost_weight < 0.0 ||
       !std::isfinite(config.continuous_smoothing_alpha) ||
       config.continuous_smoothing_alpha < 0.0 ||
-      config.continuous_smoothing_alpha > 1.0) {
+      config.continuous_smoothing_alpha > 1.0 ||
+      !std::isfinite(config.base_grasp_controller.target_normal_force_n) ||
+      config.base_grasp_controller.target_normal_force_n < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.min_normal_force_per_sensor_n) ||
+      config.base_grasp_controller.min_normal_force_per_sensor_n < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.max_normal_force_per_sensor_n) ||
+      config.base_grasp_controller.max_normal_force_per_sensor_n < 0.0 ||
+      config.base_grasp_controller.min_normal_force_per_sensor_n >
+          config.base_grasp_controller.max_normal_force_per_sensor_n ||
+      !std::isfinite(config.base_grasp_controller.force_gain) ||
+      config.base_grasp_controller.force_gain < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.force_balance_gain) ||
+      config.base_grasp_controller.force_balance_gain < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.contact_loss_gain) ||
+      config.base_grasp_controller.contact_loss_gain < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.high_force_release_gain) ||
+      config.base_grasp_controller.high_force_release_gain < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.max_qddot_base) ||
+      config.base_grasp_controller.max_qddot_base < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.max_qddot_residual) ||
+      config.base_grasp_controller.max_qddot_residual < 0.0 ||
+      !std::isfinite(config.base_grasp_controller.base_deviation_weight) ||
+      config.base_grasp_controller.base_deviation_weight < 0.0 ||
+      !std::isfinite(config.rnea_feedforward.tau_ff_scale) ||
+      config.rnea_feedforward.max_tau_ff_nm < 0.0 ||
+      !std::isfinite(config.rnea_feedforward.max_tau_ff_nm) ||
+      config.rnea_feedforward.max_tau_ff_rate_nm_s < 0.0 ||
+      !std::isfinite(config.rnea_feedforward.max_tau_ff_rate_nm_s)) {
     throw std::invalid_argument("RobustGraspPolicyConfig: invalid rollout or scoring field");
+  }
+  if (config.rnea_feedforward.subtract_contact_torque) {
+    throw std::invalid_argument(
+        "RobustGraspPolicyConfig: subtract_contact_torque is not supported");
   }
 
   config_ = std::move(config);
@@ -332,6 +390,9 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
   continuous_config.control_rate_cost_weight =
       config_.continuous_control_rate_cost_weight;
   continuous_config.smoothing_alpha = config_.continuous_smoothing_alpha;
+  continuous_config.base_grasp_controller =
+      config_.base_grasp_controller;
+  continuous_config.rnea_feedforward = config_.rnea_feedforward;
   continuous_config.limits.qdot_lower_bound =
       config_.rollout.qdot_lower_bound;
   continuous_config.limits.qdot_upper_bound =
@@ -352,6 +413,8 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   }
   status_ = RobustGraspPolicyStatus{};
   status_.control_mode = config_.control_mode;
+  status_.use_rnea_feedforward = config_.rnea_feedforward.enabled;
+  status_.tau_ff_scale = config_.rnea_feedforward.tau_ff_scale;
   const auto solve_start = std::chrono::steady_clock::now();
   const auto stamp_solve_time = [this, solve_start]() {
     const auto elapsed = std::chrono::steady_clock::now() - solve_start;
@@ -372,7 +435,9 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   GraspState initial_state = MakeInitialState(observation);
   FillMeasuredForceStatus(initial_state, &status_);
   status_.ready = IsReady(initial_state);
-  if (!status_.ready) {
+  const bool run_base_before_ready =
+      ShouldRunBaseGraspBeforeMppiReady(config_, initial_state);
+  if (!status_.ready && !run_base_before_ready) {
     if (config_.return_hold_when_not_ready) {
       status_.used_hold_fallback = true;
       RobotCommand command = MakeHoldCommand(observation);
@@ -565,6 +630,10 @@ RobotCommand RobustGraspPolicy::UpdateDiscreteActionSelector(
       best_stats.predictedCentroidAverage();
   status_.selected_measured_centroid_sensor_m =
       best_stats.measuredCentroidAverage();
+  status_.selected_object_linear_disturbance_world_mps =
+      best_stats.objectLinearDisturbanceAverage();
+  status_.selected_object_angular_disturbance_world_radps =
+      best_stats.objectAngularDisturbanceAverage();
   status_.selected_object_linear_disturbance_speed_mps =
       best_stats.objectLinearDisturbanceSpeedAverage();
   status_.selected_object_angular_disturbance_speed_radps =
@@ -649,6 +718,8 @@ void RobustGraspPolicy::CopyContinuousStatus(
   status_.selected_action_cost = continuous_status.selected_control_cost;
   status_.selected_control_cost = continuous_status.selected_control_cost;
   status_.selected_rate_cost = continuous_status.selected_rate_cost;
+  status_.selected_base_deviation_cost =
+      continuous_status.selected_base_deviation_cost;
   status_.selected_object_sample_count =
       continuous_status.object_sample_count;
   status_.selected_object_geometry_query_count =
@@ -667,10 +738,18 @@ void RobustGraspPolicy::CopyContinuousStatus(
       continuous_status.predicted_centroid_sensor_m;
   status_.selected_measured_centroid_sensor_m =
       continuous_status.measured_centroid_sensor_m;
+  status_.selected_object_linear_disturbance_world_mps =
+      continuous_status.object_linear_disturbance_world_mps;
+  status_.selected_object_angular_disturbance_world_radps =
+      continuous_status.object_angular_disturbance_world_radps;
   status_.selected_object_linear_disturbance_speed_mps =
       continuous_status.object_linear_disturbance_speed_mps;
   status_.selected_object_angular_disturbance_speed_radps =
       continuous_status.object_angular_disturbance_speed_radps;
+  status_.sampled_object_linear_disturbances_world_mps =
+      continuous_status.sampled_object_linear_disturbances_world_mps;
+  status_.sampled_object_angular_disturbances_world_radps =
+      continuous_status.sampled_object_angular_disturbances_world_radps;
   status_.selected_object_pose_rollout =
       continuous_status.object_pose_rollout;
 
@@ -678,6 +757,25 @@ void RobustGraspPolicy::CopyContinuousStatus(
   status_.qddot_nominal_first = continuous_status.qddot_nominal_first;
   status_.qddot_best_first = continuous_status.qddot_best_first;
   status_.selected_qddot = continuous_status.qddot_cmd;
+  status_.qddot_base = continuous_status.qddot_base;
+  status_.qddot_residual_cmd = continuous_status.qddot_residual_cmd;
+  status_.base_grasp = continuous_status.base_grasp;
+
+  status_.use_rnea_feedforward =
+      continuous_status.use_rnea_feedforward;
+  status_.tau_ff_scale = continuous_status.tau_ff_scale;
+  status_.tau_ff_raw = continuous_status.tau_ff_raw;
+  status_.tau_ff_scaled = continuous_status.tau_ff_scaled;
+  status_.tau_ff_cmd = continuous_status.tau_ff_cmd;
+  status_.tau_ff_raw_norm = continuous_status.tau_ff_raw_norm;
+  status_.tau_ff_cmd_norm = continuous_status.tau_ff_cmd_norm;
+  status_.tau_ff_max_abs = continuous_status.tau_ff_max_abs;
+  status_.tau_ff_clamped = continuous_status.tau_ff_clamped;
+  status_.tau_ff_rate_limited = continuous_status.tau_ff_rate_limited;
+  status_.tau_ff_zeroed_not_ready =
+      continuous_status.tau_ff_zeroed_not_ready;
+  status_.tau_ff_zeroed_contact_loss =
+      continuous_status.tau_ff_zeroed_contact_loss;
 }
 
 GraspState RobustGraspPolicy::MakeInitialState(
@@ -727,6 +825,10 @@ double RobustGraspPolicy::EvaluateCandidate(
     for (std::size_t step = 0; valid && step < candidate.horizonSteps(); ++step) {
       const Eigen::VectorXd action = candidate.action(step);
       const auto& disturbance_step = disturbance_sequence.steps[step];
+      local_stats.object_linear_disturbance_world_mps +=
+          disturbance_step.object_disturbance.linear_velocity_world_mps;
+      local_stats.object_angular_disturbance_world_radps +=
+          disturbance_step.object_disturbance.angular_velocity_world_radps;
       local_stats.object_linear_disturbance_speed_sum +=
           disturbance_step.object_disturbance.linear_velocity_world_mps.norm();
       local_stats.object_angular_disturbance_speed_sum +=

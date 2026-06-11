@@ -17,6 +17,8 @@ struct VirtualObjectDisturbance {
 
   Eigen::Vector3d linear_velocity_world_mps{Eigen::Vector3d::Zero()};
   Eigen::Vector3d angular_velocity_world_radps{Eigen::Vector3d::Zero()};
+  // Deprecated compatibility fields. Initial object pose uncertainty belongs
+  // to ObjectPrior particles; rollout updates intentionally ignore these.
   Eigen::Vector3d position_offset_world_m{Eigen::Vector3d::Zero()};
   Eigen::Vector3d rpy_offset_world_rad{Eigen::Vector3d::Zero()};
   Eigen::Vector3d external_force_world_n{Eigen::Vector3d::Zero()};

@@ -12,7 +12,7 @@ safety:
   clamp_q_cmd_to_model_limits: true
   exit_on_all_contacts_lost: true
   exit_on_u_above_threshold: true
-  rollout_only: true
+  rollout_only: false
 
 tactile:
   thumb_normal_axis_sign: 1.0
@@ -32,14 +32,41 @@ task:
     initial_pose_world:
       xyz: [0.26, 0.04, -0.05]
       rpy: [0.0, 0.0, 0.0]
-    perturbation:
-      xyz_std_m: [0.01, 0.01, 0.02]
+    initial_pose_uncertainty:
+      xyz_std_m: [0.02, 0.01, 0.02]
       rpy_std_rad: [0.1, 0.1, 0.2]
 
 robust_grasp:
   control_mode: continuous_qddot_mppi
   continuous_control_rate_cost_weight: 0.005
   continuous_smoothing_alpha: 0.7
+  use_base_grasp_controller: true
+  use_rnea_feedforward: true
+
+  base_grasp_controller:
+    target_normal_force_n: 10.0
+    min_normal_force_per_sensor_n: 5.0
+    max_normal_force_per_sensor_n: 30.0
+    force_gain: 0.2
+    force_balance_gain: 0.1
+    contact_loss_gain: 0.2
+    high_force_release_gain: 0.2
+    max_qddot_base: 2.0
+    max_qddot_residual: 1.0
+    base_deviation_weight: 0.01
+    use_force_balance: true
+    use_contact_loss_reflex: true
+    use_high_force_guard: true
+
+  rnea:
+    use_measured_state: true
+    subtract_contact_torque: false
+    tau_ff_scale: 0.2
+    max_tau_ff_nm: 0.1
+    max_tau_ff_rate_nm_s: 1.0
+    zero_tau_when_not_ready: true
+    zero_tau_on_contact_loss: true
+    gravity_only_when_qddot_zero: false
 
   rollout:
     horizon_steps: 3
@@ -57,15 +84,11 @@ robust_grasp:
     num_disturbance_rollouts: 128
     tactile_sensor_count: 2
     random_seed: 7
-    object_disturbance:
+    object_motion:
       linear_velocity_std_mps: 0.002
       linear_velocity_max_mps: 0.010
       angular_velocity_std_radps: 0.03
       angular_velocity_max_radps: 0.15
-      pose_xyz_std_m: 0.0
-      pose_xyz_max_m: 0.0
-      pose_rpy_std_rad: 0.0
-      pose_rpy_max_rad: 0.0
     use_antithetic_samples: true
 
   start:
@@ -73,14 +96,14 @@ robust_grasp:
     min_active_hemisphere_total: 2
 
   cost:
-    min_active_tactile_sensors: 2
+    min_active_tactile_sensors: 1
     min_active_hemisphere_total: 2
     contact_loss_weight: 200.0
     support_weight: 20.0
 
-    target_normal_force_n: 1.0
-    min_normal_force_per_sensor_n: 0.1
-    max_normal_force_per_sensor_n: 5.0
+    target_normal_force_n: 10.0
+    min_normal_force_per_sensor_n: 5.0
+    max_normal_force_per_sensor_n: 30.0
     force_low_weight: 30.0
     force_high_weight: 0.0
     force_balance_weight: 10.0
@@ -89,7 +112,7 @@ robust_grasp:
     qddot_weight: 0.05
     object_support:
       enabled: true
-      object_pose_samples: 8
+      object_pose_samples: 12
       hemisphere_radius_m: 0.003
       support_distance_scale_m: 0.001
       good_contact_gap_min_m: -0.001

@@ -1,7 +1,7 @@
 #ifndef PLATO_ROS_CONTROLLER__PLATO_ROS_CONTROLLER_HPP_
 #define PLATO_ROS_CONTROLLER__PLATO_ROS_CONTROLLER_HPP_
 
-#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include <array>
 #include <atomic>
@@ -192,6 +192,8 @@ private:
   rclcpp::Publisher<plato_interfaces::msg::ImpedanceControllerState>::SharedPtr
     controller_state_pub_;
   rclcpp::Publisher<MarkerArrayMsg>::SharedPtr robust_grasp_debug_marker_pub_;
+  mutable double last_robust_grasp_debug_marker_pub_time_s_{-1.0e100};
+  mutable bool last_debug_publish_had_live_disturbance_markers_{false};
   rclcpp::Service<RequestStateSrv>::SharedPtr request_state_srv_;
   std::vector<rclcpp::Subscription<TactileMsg>::SharedPtr> tactile_subs_;
   rclcpp::Subscription<JointTeleopMsg>::SharedPtr joint_teleop_command_sub_;

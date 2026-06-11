@@ -21,6 +21,7 @@
 #include <pinocchio/multibody/joint/joint-revolute-unbounded.hpp>
 #include <pinocchio/multibody/joint/joint-revolute.hpp>
 #include <pinocchio/multibody/model.hpp>
+#include <pinocchio/spatial/inertia.hpp>
 #include <pinocchio/spatial/se3.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -94,6 +95,17 @@ TestPinocchioSensorModel MakeSinglePrismaticZSensorModel() {
   out.sensor_frame_id = out.model.addFrame(
       pinocchio::Frame("tactile_sensor", joint_id, 0,
                        pinocchio::SE3::Identity(), pinocchio::OP_FRAME));
+  return out;
+}
+
+TestPinocchioSensorModel MakeSinglePrismaticZSensorModelWithInertia() {
+  TestPinocchioSensorModel out = MakeSinglePrismaticZSensorModel();
+  const pinocchio::JointIndex joint_id = out.model.getJointId("finger_pz");
+  out.model.appendBodyToJoint(
+      joint_id,
+      pinocchio::Inertia(
+          1.0, Eigen::Vector3d::Zero(), Eigen::Matrix3d::Identity()),
+      pinocchio::SE3::Identity());
   return out;
 }
 
@@ -1707,6 +1719,181 @@ TEST(ContinuousQddotMppiTest, StepRobotStateEnforcesPositionLimit) {
   EXPECT_NEAR(next.q[0], 0.05, kTolerance);
 }
 
+TEST(ContinuousQddotMppiTest, RneaFeedforwardDisabledReturnsZeroTorque) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModelWithInertia();
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  mppi_core::GraspObservation observation;
+  observation.q_meas = Eigen::VectorXd::Zero(sensor_model.model.nq);
+  observation.qdot_meas = Eigen::VectorXd::Zero(sensor_model.model.nv);
+  observation.q_ref_current = observation.q_meas;
+  observation.qdot_ref_current = observation.qdot_meas;
+  observation.robot_system = &robot_system;
+  const auto state = mppi_core::MakeGraspState(
+      observation.q_meas, observation.qdot_meas,
+      Eigen::VectorXd::Zero(sensor_model.model.nv), tactile, tactile);
+  mppi_core::RolloutContext context;
+  context.robot_system = &robot_system;
+  const Eigen::VectorXd qddot =
+      Eigen::VectorXd::Constant(sensor_model.model.nv, 0.25);
+  const Eigen::VectorXd previous;
+
+  mppi_core::RneaFeedforwardConfig config;
+  config.enabled = false;
+  const auto result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, state, context, qddot, previous, false, 0.01);
+
+  EXPECT_TRUE(result.raw.isZero(kTolerance));
+  EXPECT_TRUE(result.scaled.isZero(kTolerance));
+  EXPECT_TRUE(result.command.isZero(kTolerance));
+}
+
+TEST(ContinuousQddotMppiTest, RneaFeedforwardScalesAndClampsTorque) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModelWithInertia();
+  pinocchio::Data expected_data(sensor_model.model);
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  mppi_core::GraspObservation observation;
+  observation.q_meas = Eigen::VectorXd::Zero(sensor_model.model.nq);
+  observation.qdot_meas = Eigen::VectorXd::Zero(sensor_model.model.nv);
+  observation.q_ref_current = observation.q_meas;
+  observation.qdot_ref_current = observation.qdot_meas;
+  observation.robot_system = &robot_system;
+  const auto state = mppi_core::MakeGraspState(
+      observation.q_meas, observation.qdot_meas,
+      Eigen::VectorXd::Zero(sensor_model.model.nv), tactile, tactile);
+  mppi_core::RolloutContext context;
+  context.robot_system = &robot_system;
+  const Eigen::VectorXd qddot =
+      Eigen::VectorXd::Constant(sensor_model.model.nv, 0.25);
+  const Eigen::VectorXd previous;
+
+  mppi_core::RneaFeedforwardConfig config;
+  config.enabled = true;
+  config.tau_ff_scale = 0.5;
+  config.max_tau_ff_nm = 100.0;
+  config.max_tau_ff_rate_nm_s = 1000.0;
+  auto result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, state, context, qddot, previous, false, 0.01);
+  const Eigen::VectorXd expected_raw =
+      pinocchio::rnea(sensor_model.model, expected_data,
+                      observation.q_meas, observation.qdot_meas, qddot);
+
+  ASSERT_EQ(result.raw.size(), expected_raw.size());
+  EXPECT_TRUE(result.raw.isApprox(expected_raw, kTolerance));
+  EXPECT_TRUE(result.scaled.isApprox(0.5 * expected_raw, kTolerance));
+  EXPECT_TRUE(result.command.isApprox(result.scaled, kTolerance));
+  EXPECT_FALSE(result.clamped);
+
+  config.max_tau_ff_nm = 0.05;
+  result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, state, context, qddot, previous, false, 0.01);
+  EXPECT_TRUE(result.clamped);
+  EXPECT_LE(result.command.cwiseAbs().maxCoeff(), 0.05 + kTolerance);
+}
+
+TEST(ContinuousQddotMppiTest, RneaFeedforwardRateLimitsTorque) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModelWithInertia();
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  mppi_core::GraspObservation observation;
+  observation.q_meas = Eigen::VectorXd::Zero(sensor_model.model.nq);
+  observation.qdot_meas = Eigen::VectorXd::Zero(sensor_model.model.nv);
+  observation.q_ref_current = observation.q_meas;
+  observation.qdot_ref_current = observation.qdot_meas;
+  observation.robot_system = &robot_system;
+  const auto state = mppi_core::MakeGraspState(
+      observation.q_meas, observation.qdot_meas,
+      Eigen::VectorXd::Zero(sensor_model.model.nv), tactile, tactile);
+  mppi_core::RolloutContext context;
+  context.robot_system = &robot_system;
+
+  mppi_core::RneaFeedforwardConfig config;
+  config.enabled = true;
+  config.tau_ff_scale = 1.0;
+  config.max_tau_ff_nm = 100.0;
+  config.max_tau_ff_rate_nm_s = 1.0;
+  const Eigen::VectorXd qddot =
+      Eigen::VectorXd::Constant(sensor_model.model.nv, 1.0);
+  const Eigen::VectorXd previous =
+      Eigen::VectorXd::Zero(sensor_model.model.nv);
+
+  const auto result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, state, context, qddot, previous, true, 0.01);
+
+  EXPECT_TRUE(result.rate_limited);
+  EXPECT_LE(result.command.cwiseAbs().maxCoeff(), 0.01 + kTolerance);
+}
+
+TEST(ContinuousQddotMppiTest, RneaFeedforwardZerosForSafetyConditions) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModelWithInertia();
+  mppi_core::RobotSystem robot_system(sensor_model.model);
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0, true));
+  tactile.total_force_n.z() = tactile.activeHemisphereNormalForceN();
+
+  mppi_core::TactileState no_contact = tactile;
+  for (auto& hemisphere : no_contact.hemispheres) {
+    hemisphere.contact = false;
+    hemisphere.normal_force_n = 0.0;
+  }
+  no_contact.contact_state = mppi_core::TactileState::kNoContact;
+  no_contact.total_force_n.setZero();
+
+  mppi_core::GraspObservation observation;
+  observation.q_meas = Eigen::VectorXd::Zero(sensor_model.model.nq);
+  observation.qdot_meas = Eigen::VectorXd::Zero(sensor_model.model.nv);
+  observation.q_ref_current = observation.q_meas;
+  observation.qdot_ref_current = observation.qdot_meas;
+  observation.robot_system = &robot_system;
+  mppi_core::RolloutContext context;
+  context.robot_system = &robot_system;
+  mppi_core::RneaFeedforwardConfig config;
+  config.enabled = true;
+
+  auto not_ready = mppi_core::MakeGraspState(
+      observation.q_meas, observation.qdot_meas,
+      Eigen::VectorXd::Zero(sensor_model.model.nv), tactile, tactile);
+  not_ready.valid = false;
+  const Eigen::VectorXd qddot =
+      Eigen::VectorXd::Constant(sensor_model.model.nv, 1.0);
+  const Eigen::VectorXd previous;
+  auto result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, not_ready, context, qddot, previous, false, 0.01);
+  EXPECT_TRUE(result.zeroed_not_ready);
+  EXPECT_TRUE(result.command.isZero(kTolerance));
+
+  const auto contact_lost = mppi_core::MakeGraspState(
+      observation.q_meas, observation.qdot_meas,
+      Eigen::VectorXd::Zero(sensor_model.model.nv), no_contact, no_contact);
+  result = mppi_core::ComputeRneaFeedforwardCommand(
+      config, observation, contact_lost, context, qddot, previous, false,
+      0.01);
+  EXPECT_TRUE(result.zeroed_contact_loss);
+  EXPECT_TRUE(result.command.isZero(kTolerance));
+}
+
 TEST(ObjectPriorGraspRolloutTest,
      StepVirtualObjectBeliefAppliesLinearAndAngularDisturbance) {
   const auto belief = MakeTestObjectBelief();
@@ -1733,6 +1920,23 @@ TEST(ObjectPriorGraspRolloutTest,
       belief, mppi_core::VirtualObjectDisturbance{}, 0.5);
   ASSERT_TRUE(mppi_core::IsValidVirtualObjectBelief(unchanged));
   EXPECT_TRUE(unchanged.particles[0].pose_world.matrix().isApprox(
+      belief.particles[0].pose_world.matrix(), kTolerance));
+}
+
+TEST(ObjectPriorGraspRolloutTest,
+     StepVirtualObjectBeliefIgnoresDeprecatedPoseOffsets) {
+  const auto belief = MakeTestObjectBelief();
+
+  mppi_core::VirtualObjectDisturbance disturbance;
+  disturbance.position_offset_world_m = Eigen::Vector3d{1.0, 2.0, 3.0};
+  disturbance.rpy_offset_world_rad = Eigen::Vector3d{0.5, 0.4, 0.3};
+
+  const auto next =
+      mppi_core::StepVirtualObjectBelief(belief, disturbance, 0.5);
+
+  ASSERT_TRUE(mppi_core::IsValidVirtualObjectBelief(next));
+  ASSERT_EQ(next.particles.size(), belief.particles.size());
+  EXPECT_TRUE(next.particles[0].pose_world.matrix().isApprox(
       belief.particles[0].pose_world.matrix(), kTolerance));
 }
 
@@ -3913,7 +4117,7 @@ task:
     initial_pose_world:
       xyz: [0.1, -0.2, 0.3]
       rpy: [0.0, 0.0, 1.57]
-    perturbation:
+    initial_pose_uncertainty:
       xyz_std_m: [0.01, 0.02, 0.03]
       rpy_std_rad: [0.1, 0.2, 0.3]
   cost:
@@ -3963,6 +4167,16 @@ robust_grasp:
   control_mode: continuous_qddot_mppi
   continuous_control_rate_cost_weight: 0.123
   continuous_smoothing_alpha: 0.4
+  use_rnea_feedforward: true
+  rnea:
+    use_measured_state: true
+    subtract_contact_torque: false
+    tau_ff_scale: 0.2
+    max_tau_ff_nm: 0.05
+    max_tau_ff_rate_nm_s: 1.5
+    zero_tau_when_not_ready: true
+    zero_tau_on_contact_loss: false
+    gravity_only_when_qddot_zero: true
   rollout:
     horizon_steps: 3
     dt: 0.02
@@ -3989,15 +4203,11 @@ robust_grasp:
       target_edge_margin_m: 0.002
       use_particle_weights: false
   disturbance:
-    object_disturbance:
+    object_motion:
       linear_velocity_std_mps: 0.01
       linear_velocity_max_mps: 0.02
       angular_velocity_std_radps: 0.3
       angular_velocity_max_radps: 0.4
-      pose_xyz_std_m: 0.001
-      pose_xyz_max_m: 0.002
-      pose_rpy_std_rad: 0.03
-      pose_rpy_max_rad: 0.04
 )");
 
   const auto config =
@@ -4017,6 +4227,16 @@ robust_grasp:
   EXPECT_NEAR(config.continuous_control_rate_cost_weight, 0.123,
               kTolerance);
   EXPECT_NEAR(config.continuous_smoothing_alpha, 0.4, kTolerance);
+  EXPECT_TRUE(config.rnea_feedforward.enabled);
+  EXPECT_TRUE(config.rnea_feedforward.use_measured_state);
+  EXPECT_FALSE(config.rnea_feedforward.subtract_contact_torque);
+  EXPECT_NEAR(config.rnea_feedforward.tau_ff_scale, 0.2, kTolerance);
+  EXPECT_NEAR(config.rnea_feedforward.max_tau_ff_nm, 0.05, kTolerance);
+  EXPECT_NEAR(config.rnea_feedforward.max_tau_ff_rate_nm_s, 1.5,
+              kTolerance);
+  EXPECT_TRUE(config.rnea_feedforward.zero_tau_when_not_ready);
+  EXPECT_FALSE(config.rnea_feedforward.zero_tau_on_contact_loss);
+  EXPECT_TRUE(config.rnea_feedforward.gravity_only_when_qddot_zero);
   EXPECT_EQ(config.cost.object_support.min_active_tactile_sensors, 1U);
   EXPECT_EQ(config.cost.object_support.min_active_hemisphere_total, 3U);
   EXPECT_EQ(config.cost.object_support.max_object_samples, 9U);
@@ -4061,14 +4281,25 @@ robust_grasp:
               kTolerance);
   EXPECT_NEAR(config.disturbance_sampler.object.angular_velocity_max_radps, 0.4,
               kTolerance);
-  EXPECT_NEAR(config.disturbance_sampler.object.pose_xyz_std_m, 0.001,
-              kTolerance);
-  EXPECT_NEAR(config.disturbance_sampler.object.pose_xyz_max_m, 0.002,
-              kTolerance);
-  EXPECT_NEAR(config.disturbance_sampler.object.pose_rpy_std_rad, 0.03,
-              kTolerance);
-  EXPECT_NEAR(config.disturbance_sampler.object.pose_rpy_max_rad, 0.04,
-              kTolerance);
+}
+
+TEST(RobustGraspPolicyConfigTest,
+     DeprecatedObjectPoseDisturbanceFieldsThrow) {
+  const YAML::Node root = YAML::Load(R"(
+robust_grasp:
+  rollout:
+    horizon_steps: 3
+    action_dim: 2
+  disturbance:
+    object_disturbance:
+      linear_velocity_std_mps: 0.01
+      pose_xyz_std_m: 0.001
+)");
+
+  EXPECT_THROW(
+      (void)mppi_core::ParseRobustGraspPolicyConfig(
+          root["robust_grasp"], 2, mppi_core::RobustGraspPolicyConfig{}),
+      std::invalid_argument);
 }
 
 TEST(RobustGraspPolicyConfigTest, ParsesDiscreteActionSelectorMode) {

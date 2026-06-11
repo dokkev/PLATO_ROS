@@ -169,6 +169,18 @@ std::string FormatVector(
   return stream.str();
 }
 
+double MaxVectorNorm(
+  const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> & values)
+{
+  double max_norm = 0.0;
+  for (const auto & value : values) {
+    if (value.allFinite()) {
+      max_norm = std::max(max_norm, value.norm());
+    }
+  }
+  return max_norm;
+}
+
 bool RepresentativeObjectBeliefPose(
   const mppi_core::VirtualObjectBelief & belief,
   Eigen::Isometry3d * pose_world)
@@ -253,6 +265,25 @@ bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config
   } catch (const std::exception &) {
     return false;
   }
+
+  const auto & base = config_.policy.base_grasp_controller;
+  std::cout << "[robust_grasp_mpc] configured"
+            << " control_mode=" << ControlModeName(config_.policy.control_mode)
+            << " base_grasp_enabled=" << (base.enabled ? "true" : "false")
+            << " base_target_normal_force_n=" << base.target_normal_force_n
+            << " base_min_normal_force_per_sensor_n="
+            << base.min_normal_force_per_sensor_n
+            << " base_max_normal_force_per_sensor_n="
+            << base.max_normal_force_per_sensor_n
+            << " base_force_gain=" << base.force_gain
+            << " base_force_balance_gain=" << base.force_balance_gain
+            << " base_contact_loss_gain=" << base.contact_loss_gain
+            << " base_high_force_release_gain="
+            << base.high_force_release_gain
+            << " base_max_qddot_base=" << base.max_qddot_base
+            << " base_max_qddot_residual=" << base.max_qddot_residual
+            << " base_deviation_weight=" << base.base_deviation_weight
+            << std::endl;
 
   last_command_ = plato_robot_system::RobotCommand{};
   object_belief_ = mppi_core::VirtualObjectBelief{};
@@ -667,9 +698,33 @@ void RobustGraspMpcState::PrintStatus(
          << status.cost_mean << "," << status.cost_max << "]"
          << " ess=" << status.effective_sample_size
          << " qddot_norm=" << status.selected_qddot.norm()
+         << " qddot_base_norm=" << status.qddot_base.norm()
+         << " qddot_residual_norm=" << status.qddot_residual_cmd.norm()
          << " qddot_best_norm=" << status.qddot_best_first.norm()
          << " qddot_nominal_norm=" << status.qddot_nominal_first.norm()
          << " qdot_cmd_norm=" << command.qdot_cmd.norm()
+         << " base_grasp_enabled=" << (status.base_grasp.enabled ? "true" : "false")
+         << " base_grasp_active=" << (status.base_grasp.active ? "true" : "false")
+         << " base_force_avg_n=" << status.base_grasp.average_force_n
+         << " base_force_min_n=" << status.base_grasp.min_force_n
+         << " base_force_max_n=" << status.base_grasp.max_force_n
+         << " base_force_error_n=" << status.base_grasp.force_error_n
+         << " base_balance_error_n=" << status.base_grasp.force_balance_error_n
+         << " base_contact_loss_reflex="
+         << (status.base_grasp.contact_loss_reflex_active ? "true" : "false")
+         << " base_high_force_guard="
+         << (status.base_grasp.high_force_guard_active ? "true" : "false")
+         << " base_deviation_cost=" << status.selected_base_deviation_cost
+         << " rnea_ff=" << (status.use_rnea_feedforward ? "true" : "false")
+         << " tau_ff_scale=" << status.tau_ff_scale
+         << " tau_ff_raw_norm=" << status.tau_ff_raw_norm
+         << " tau_ff_cmd_norm=" << status.tau_ff_cmd_norm
+         << " tau_ff_max_abs=" << status.tau_ff_max_abs
+         << " tau_ff_clamped=" << (status.tau_ff_clamped ? "true" : "false")
+         << " tau_ff_rate_limited=" << (status.tau_ff_rate_limited ? "true" : "false")
+         << " tau_ff_zero_not_ready=" << (status.tau_ff_zeroed_not_ready ? "true" : "false")
+         << " tau_ff_zero_contact_loss="
+         << (status.tau_ff_zeroed_contact_loss ? "true" : "false")
          << " active_sensors=" << ActiveTactileSensorCount(observation.tactile_meas)
          << " active_hemispheres=" << ActiveHemisphereCountTotal(observation.tactile_meas)
          << " measured_thumb_force_n=" << status.measured_thumb_force_n
@@ -713,14 +768,29 @@ void RobustGraspMpcState::PrintStatus(
          << " object_edge_margin_m=" << status.selected_object_edge_margin_m
          << " pred_centroid=[" << status.selected_predicted_centroid_sensor_m.transpose()
          << "] meas_centroid=[" << status.selected_measured_centroid_sensor_m.transpose()
-         << "] object_disturbance_speed=" << status.selected_object_linear_disturbance_speed_mps
-         << " object_disturbance_omega=" << status.selected_object_angular_disturbance_speed_radps
+         << "] sampled_object_disturbances="
+         << status.sampled_object_linear_disturbances_world_mps.size()
+         << " sampled_object_disturbance_max_speed="
+         << MaxVectorNorm(status.sampled_object_linear_disturbances_world_mps)
+         << " sampled_object_disturbance_max_omega="
+         << MaxVectorNorm(status.sampled_object_angular_disturbances_world_radps)
+         << " selected_object_disturbance_speed="
+         << status.selected_object_linear_disturbance_speed_mps
+         << " selected_object_disturbance_omega="
+         << status.selected_object_angular_disturbance_speed_radps
          << " solve_ms=" << status.solve_time_ms;
   if (config_.debug.print_action_vectors) {
     stream << " qddot_cmd=" << FormatVector(status.qddot_cmd)
+           << " qddot_base=" << FormatVector(status.qddot_base)
+           << " qddot_residual=" << FormatVector(status.qddot_residual_cmd)
            << " qddot_best=" << FormatVector(status.qddot_best_first)
            << " qddot_nominal=" << FormatVector(status.qddot_nominal_first)
            << " qdot_cmd=" << FormatVector(command.qdot_cmd);
+    if (status.tau_ff_cmd.size() > 0) {
+      stream << " tau_ff_raw=" << FormatVector(status.tau_ff_raw)
+             << " tau_ff_scaled=" << FormatVector(status.tau_ff_scaled)
+             << " tau_ff_cmd=" << FormatVector(status.tau_ff_cmd);
+    }
     if (command.q_cmd.size() == observation.q_meas.size()) {
       stream << " dq_cmd=" << FormatVector(command.q_cmd - observation.q_meas);
     }

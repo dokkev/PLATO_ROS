@@ -21,12 +21,6 @@ struct ObjectDisturbanceSamplerConfig {
 
   double angular_velocity_std_radps{0.0};
   double angular_velocity_max_radps{0.0};
-
-  double pose_xyz_std_m{0.0};
-  double pose_xyz_max_m{0.0};
-
-  double pose_rpy_std_rad{0.0};
-  double pose_rpy_max_rad{0.0};
 };
 
 struct GraspDisturbanceSamplerConfig {

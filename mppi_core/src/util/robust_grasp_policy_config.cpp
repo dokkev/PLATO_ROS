@@ -96,6 +96,121 @@ RobustGraspControlMode ParseControlMode(
       "ParseRobustGraspPolicyConfig: unknown control_mode '" + value + "'");
 }
 
+RneaFeedforwardConfig ParseRneaFeedforwardConfig(
+    const YAML::Node& robust_params,
+    RneaFeedforwardConfig defaults) {
+  const YAML::Node safe_params =
+      yaml_utils::HasValue(robust_params) ? robust_params : YAML::Node();
+  defaults.enabled =
+      yaml_utils::ReadBool(safe_params, "use_rnea_feedforward",
+                           defaults.enabled);
+
+  const YAML::Node rnea = yaml_utils::ReadSection(safe_params, "rnea");
+  defaults.enabled =
+      yaml_utils::ReadBool(rnea, "use_rnea_feedforward", defaults.enabled);
+  defaults.use_measured_state =
+      yaml_utils::ReadBool(rnea, "use_measured_state",
+                           defaults.use_measured_state);
+  defaults.subtract_contact_torque =
+      yaml_utils::ReadBool(rnea, "subtract_contact_torque",
+                           defaults.subtract_contact_torque);
+  defaults.tau_ff_scale =
+      yaml_utils::ReadDouble(rnea, "tau_ff_scale", defaults.tau_ff_scale);
+  defaults.max_tau_ff_nm =
+      yaml_utils::ReadDouble(rnea, "max_tau_ff_nm", defaults.max_tau_ff_nm);
+  defaults.max_tau_ff_rate_nm_s =
+      yaml_utils::ReadDouble(rnea, "max_tau_ff_rate_nm_s",
+                             defaults.max_tau_ff_rate_nm_s);
+  defaults.zero_tau_when_not_ready =
+      yaml_utils::ReadBool(rnea, "zero_tau_when_not_ready",
+                           defaults.zero_tau_when_not_ready);
+  defaults.zero_tau_on_contact_loss =
+      yaml_utils::ReadBool(rnea, "zero_tau_on_contact_loss",
+                           defaults.zero_tau_on_contact_loss);
+  defaults.gravity_only_when_qddot_zero =
+      yaml_utils::ReadBool(rnea, "gravity_only_when_qddot_zero",
+                           defaults.gravity_only_when_qddot_zero);
+  return defaults;
+}
+
+BaseGraspControllerConfig ParseBaseGraspControllerConfig(
+    const YAML::Node& robust_params,
+    BaseGraspControllerConfig defaults) {
+  const YAML::Node safe_params =
+      yaml_utils::HasValue(robust_params) ? robust_params : YAML::Node();
+  CheckMap(safe_params, "ParseBaseGraspControllerConfig");
+
+  defaults.enabled =
+      yaml_utils::ReadBool(safe_params, "use_base_grasp_controller",
+                           defaults.enabled);
+
+  const YAML::Node base =
+      yaml_utils::ReadSection(safe_params, "base_grasp_controller");
+  defaults.enabled =
+      yaml_utils::ReadBool(base, "enabled", defaults.enabled);
+  defaults.target_normal_force_n =
+      yaml_utils::ReadDouble(base, "target_normal_force_n",
+                             defaults.target_normal_force_n);
+  defaults.min_normal_force_per_sensor_n =
+      yaml_utils::ReadDouble(base, "min_normal_force_per_sensor_n",
+                             defaults.min_normal_force_per_sensor_n);
+  defaults.max_normal_force_per_sensor_n =
+      yaml_utils::ReadDouble(base, "max_normal_force_per_sensor_n",
+                             defaults.max_normal_force_per_sensor_n);
+  defaults.force_gain =
+      yaml_utils::ReadDouble(base, "force_gain", defaults.force_gain);
+  defaults.force_balance_gain =
+      yaml_utils::ReadDouble(base, "force_balance_gain",
+                             defaults.force_balance_gain);
+  defaults.contact_loss_gain =
+      yaml_utils::ReadDouble(base, "contact_loss_gain",
+                             defaults.contact_loss_gain);
+  defaults.high_force_release_gain =
+      yaml_utils::ReadDouble(base, "high_force_release_gain",
+                             defaults.high_force_release_gain);
+  defaults.max_qddot_base =
+      yaml_utils::ReadDouble(base, "max_qddot_base",
+                             defaults.max_qddot_base);
+  defaults.max_qddot_residual =
+      yaml_utils::ReadDouble(base, "max_qddot_residual",
+                             defaults.max_qddot_residual);
+  defaults.base_deviation_weight =
+      yaml_utils::ReadDouble(base, "base_deviation_weight",
+                             defaults.base_deviation_weight);
+  defaults.use_force_balance =
+      yaml_utils::ReadBool(base, "use_force_balance",
+                           defaults.use_force_balance);
+  defaults.use_contact_loss_reflex =
+      yaml_utils::ReadBool(base, "use_contact_loss_reflex",
+                           defaults.use_contact_loss_reflex);
+  defaults.use_high_force_guard =
+      yaml_utils::ReadBool(base, "use_high_force_guard",
+                           defaults.use_high_force_guard);
+  return defaults;
+}
+
+void RejectDeprecatedObjectPoseDisturbanceFields(
+    const YAML::Node& object_disturbance) {
+  if (!yaml_utils::HasValue(object_disturbance)) {
+    return;
+  }
+  constexpr const char* kDeprecatedFields[] = {
+      "pose_xyz_std_m",
+      "pose_xyz_max_m",
+      "pose_rpy_std_rad",
+      "pose_rpy_max_rad"};
+  for (const char* field : kDeprecatedFields) {
+    if (yaml_utils::HasValue(object_disturbance[field])) {
+      throw std::invalid_argument(
+          std::string("ParseGraspDisturbanceSamplerConfig: '") + field +
+          "' is deprecated under rollout disturbance. Use "
+          "task.object.initial_pose_uncertainty for static object pose "
+          "uncertainty, and robust_grasp.disturbance.object_motion "
+          "linear/angular velocity fields for rollout-time object motion.");
+    }
+  }
+}
+
 }  // namespace
 
 GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
@@ -117,7 +232,10 @@ GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
       yaml_utils::ReadSize(safe_params, "random_seed",
                            defaults.random_seed));
   const YAML::Node object_disturbance =
-      yaml_utils::ReadSection(safe_params, "object_disturbance");
+      yaml_utils::HasValue(safe_params["object_motion"])
+          ? yaml_utils::ReadSection(safe_params, "object_motion")
+          : yaml_utils::ReadSection(safe_params, "object_disturbance");
+  RejectDeprecatedObjectPoseDisturbanceFields(object_disturbance);
   defaults.object.linear_velocity_std_mps =
       yaml_utils::ReadDouble(
           object_disturbance, "linear_velocity_std_mps",
@@ -134,22 +252,6 @@ GraspDisturbanceSamplerConfig ParseGraspDisturbanceSamplerConfig(
       yaml_utils::ReadDouble(
           object_disturbance, "angular_velocity_max_radps",
           defaults.object.angular_velocity_max_radps);
-  defaults.object.pose_xyz_std_m =
-      yaml_utils::ReadDouble(
-          object_disturbance, "pose_xyz_std_m",
-          defaults.object.pose_xyz_std_m);
-  defaults.object.pose_xyz_max_m =
-      yaml_utils::ReadDouble(
-          object_disturbance, "pose_xyz_max_m",
-          defaults.object.pose_xyz_max_m);
-  defaults.object.pose_rpy_std_rad =
-      yaml_utils::ReadDouble(
-          object_disturbance, "pose_rpy_std_rad",
-          defaults.object.pose_rpy_std_rad);
-  defaults.object.pose_rpy_max_rad =
-      yaml_utils::ReadDouble(
-          object_disturbance, "pose_rpy_max_rad",
-          defaults.object.pose_rpy_max_rad);
   defaults.tangent_velocity_std_mps =
       yaml_utils::ReadDouble(safe_params, "tangent_velocity_std_mps",
                              defaults.tangent_velocity_std_mps);
@@ -641,6 +743,8 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
       yaml_utils::ReadDouble(
           safe_params, "continuous_smoothing_alpha",
           defaults.continuous_smoothing_alpha);
+  defaults.rnea_feedforward =
+      ParseRneaFeedforwardConfig(safe_params, defaults.rnea_feedforward);
 
   const YAML::Node start = yaml_utils::ReadSection(safe_params, "start");
   defaults.start.min_enough_contact_sensors =
@@ -676,6 +780,16 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
           defaults.object_belief_initialization);
   defaults.cost = ParseRobustGraspStateCostConfig(
       yaml_utils::ReadSection(safe_params, "cost"), defaults.cost);
+  BaseGraspControllerConfig base_defaults =
+      defaults.base_grasp_controller;
+  base_defaults.target_normal_force_n =
+      defaults.cost.target_normal_force_n;
+  base_defaults.min_normal_force_per_sensor_n =
+      defaults.cost.min_normal_force_per_sensor_n;
+  base_defaults.max_normal_force_per_sensor_n =
+      defaults.cost.max_normal_force_per_sensor_n;
+  defaults.base_grasp_controller =
+      ParseBaseGraspControllerConfig(safe_params, base_defaults);
   defaults.action_library = ParseGraspActionLibraryConfig(
       yaml_utils::ReadSection(safe_params, "action_library"),
       resolved_action_dim, defaults.action_library);

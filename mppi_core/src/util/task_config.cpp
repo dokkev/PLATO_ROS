@@ -125,10 +125,14 @@ ObjectPrior ParseObjectPrior(const YAML::Node& object,
   defaults.initial_pose_world.translation() = xyz;
   defaults.initial_pose_world.linear() = RpyToRotation(rpy);
 
-  const YAML::Node pose_noise =
-      yaml_utils::HasValue(object["perturbation"])
-          ? yaml_utils::ReadSection(object, "perturbation")
-          : yaml_utils::ReadSection(object, "pose_noise");
+  YAML::Node pose_noise;
+  if (yaml_utils::HasValue(object["initial_pose_uncertainty"])) {
+    pose_noise = yaml_utils::ReadSection(object, "initial_pose_uncertainty");
+  } else if (yaml_utils::HasValue(object["perturbation"])) {
+    pose_noise = yaml_utils::ReadSection(object, "perturbation");
+  } else {
+    pose_noise = yaml_utils::ReadSection(object, "pose_noise");
+  }
   defaults.position_std_m =
       ReadVector3(pose_noise, "xyz_std_m", defaults.position_std_m);
   defaults.rpy_std_rad =

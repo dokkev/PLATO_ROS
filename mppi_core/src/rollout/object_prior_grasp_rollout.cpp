@@ -11,16 +11,6 @@
 namespace mppi_core {
 namespace {
 
-Eigen::Matrix3d RpyToRotation(const Eigen::Vector3d& rpy_rad) {
-  if (!rpy_rad.allFinite() || rpy_rad.norm() <= 0.0) {
-    return Eigen::Matrix3d::Identity();
-  }
-  const Eigen::AngleAxisd roll(rpy_rad.x(), Eigen::Vector3d::UnitX());
-  const Eigen::AngleAxisd pitch(rpy_rad.y(), Eigen::Vector3d::UnitY());
-  const Eigen::AngleAxisd yaw(rpy_rad.z(), Eigen::Vector3d::UnitZ());
-  return (yaw * pitch * roll).toRotationMatrix();
-}
-
 Eigen::Matrix3d AngularVelocityToRotation(
     const Eigen::Vector3d& angular_velocity_world_radps, const double dt) {
   if (!angular_velocity_world_radps.allFinite() || !std::isfinite(dt) ||
@@ -38,9 +28,7 @@ Eigen::Matrix3d AngularVelocityToRotation(
 bool HasFiniteDisturbance(const VirtualObjectDisturbance& disturbance) {
   return disturbance.valid &&
          disturbance.linear_velocity_world_mps.allFinite() &&
-         disturbance.angular_velocity_world_radps.allFinite() &&
-         disturbance.position_offset_world_m.allFinite() &&
-         disturbance.rpy_offset_world_rad.allFinite();
+         disturbance.angular_velocity_world_radps.allFinite();
 }
 
 }  // namespace
@@ -60,10 +48,8 @@ VirtualObjectBelief StepVirtualObjectBelief(
 
   VirtualObjectBelief next = belief;
   const Eigen::Vector3d translation_step_m =
-      disturbance.linear_velocity_world_mps * dt +
-      disturbance.position_offset_world_m;
+      disturbance.linear_velocity_world_mps * dt;
   const Eigen::Matrix3d rotation_step =
-      RpyToRotation(disturbance.rpy_offset_world_rad) *
       AngularVelocityToRotation(disturbance.angular_velocity_world_radps, dt);
 
   for (auto& particle : next.particles) {

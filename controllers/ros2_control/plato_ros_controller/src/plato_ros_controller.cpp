@@ -6,11 +6,9 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <iomanip>
 #include <limits>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -49,8 +47,9 @@ namespace
 // RobotCommand use SI units internally.
 constexpr double kMNmToNm = 1.0e-3;
 constexpr double kNmToMNm = 1.0e3;
-constexpr double kDebugMarkerLifetimeS = 0.25;
-constexpr double kDisturbanceVelocityPreviewS = 0.5;
+constexpr double kDebugMarkerPublishPeriodS = 0.05;
+constexpr double kDebugMarkerLifetimeS = 0.50;
+constexpr double kDisturbancePosePreviewS = 0.5;
 
 using MarkerMsg = visualization_msgs::msg::Marker;
 using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
@@ -157,6 +156,82 @@ MarkerMsg make_delete_all_marker(const rclcpp::Time & time, const std::string & 
 bool is_positive_finite_box_size(const Eigen::Vector3d & size_m)
 {
   return size_m.allFinite() && size_m.x() > 0.0 && size_m.y() > 0.0 && size_m.z() > 0.0;
+}
+
+bool has_sampled_object_disturbances(
+  const mppi_core::RobustGraspPolicyStatus & status)
+{
+  return
+    !status.sampled_object_linear_disturbances_world_mps.empty() ||
+    !status.sampled_object_angular_disturbances_world_radps.empty() ||
+    !status.selected_object_pose_rollout.empty();
+}
+
+Eigen::Matrix3d rotation_from_angular_velocity_world(
+  const Eigen::Vector3d & angular_velocity_world_radps,
+  const double preview_time_s)
+{
+  if (
+    !angular_velocity_world_radps.allFinite() ||
+    !std::isfinite(preview_time_s) ||
+    preview_time_s <= 0.0)
+  {
+    return Eigen::Matrix3d::Identity();
+  }
+
+  const double angle_rad = angular_velocity_world_radps.norm() * preview_time_s;
+  if (angle_rad <= 1.0e-9) {
+    return Eigen::Matrix3d::Identity();
+  }
+  return Eigen::AngleAxisd(
+    angle_rad,
+    angular_velocity_world_radps.normalized()).toRotationMatrix();
+}
+
+Eigen::Isometry3d disturbed_object_pose_preview(
+  const Eigen::Isometry3d & base_pose_world,
+  const Eigen::Vector3d & linear_velocity_world_mps,
+  const Eigen::Vector3d & angular_velocity_world_radps,
+  const double preview_time_s)
+{
+  Eigen::Isometry3d pose_world = base_pose_world;
+  if (linear_velocity_world_mps.allFinite() && std::isfinite(preview_time_s)) {
+    pose_world.translation() += preview_time_s * linear_velocity_world_mps;
+  }
+  pose_world.linear() =
+    rotation_from_angular_velocity_world(
+      angular_velocity_world_radps,
+      preview_time_s) *
+    base_pose_world.linear();
+  return pose_world;
+}
+
+void append_box_marker(
+  MarkerArrayMsg * markers,
+  const rclcpp::Time & time,
+  const std::string & frame_id,
+  const std::string & marker_namespace,
+  const int id,
+  const Eigen::Isometry3d & pose_world,
+  const Eigen::Vector3d & size_m,
+  const std_msgs::msg::ColorRGBA & color)
+{
+  if (
+    markers == nullptr ||
+    !pose_world.matrix().allFinite() ||
+    !is_positive_finite_box_size(size_m))
+  {
+    return;
+  }
+
+  MarkerMsg marker;
+  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::CUBE);
+  marker.pose = make_pose(pose_world);
+  marker.scale.x = size_m.x();
+  marker.scale.y = size_m.y();
+  marker.scale.z = size_m.z();
+  marker.color = color;
+  markers->markers.push_back(marker);
 }
 
 bool representative_object_belief_pose(
@@ -1168,6 +1243,17 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
     return;
   }
 
+  const double now_s = time.seconds();
+  if (
+    std::isfinite(now_s) &&
+    std::isfinite(last_robust_grasp_debug_marker_pub_time_s_) &&
+    now_s >= last_robust_grasp_debug_marker_pub_time_s_ &&
+    now_s - last_robust_grasp_debug_marker_pub_time_s_ < kDebugMarkerPublishPeriodS)
+  {
+    return;
+  }
+  last_robust_grasp_debug_marker_pub_time_s_ = now_s;
+
   const auto & model = robot_->model();
   const auto & state = robot_->state();
   if (
@@ -1183,9 +1269,24 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
     robust_grasp_debug_frame_id_.empty() ? "base_link" : robust_grasp_debug_frame_id_;
   MarkerArrayMsg markers;
   markers.markers.reserve(160);
-  markers.markers.push_back(make_delete_all_marker(time, frame_id));
 
-  Eigen::Vector3d label_position_m{0.0, 0.0, 0.12};
+  const bool robust_mpc_active =
+    robust_grasp_mpc_state_ != nullptr &&
+    control_architecture_.current_state_id() == robust_grasp_mpc_state_->id();
+  const auto * robust_mpc_status =
+    robust_grasp_mpc_state_ != nullptr ? &robust_grasp_mpc_state_->policy_status() : nullptr;
+  const bool have_live_disturbance_markers =
+    robust_mpc_active &&
+    robust_mpc_status != nullptr &&
+    has_sampled_object_disturbances(*robust_mpc_status);
+  if (last_debug_publish_had_live_disturbance_markers_ && !have_live_disturbance_markers) {
+    markers.markers.push_back(make_delete_all_marker(time, frame_id));
+  }
+  last_debug_publish_had_live_disturbance_markers_ = have_live_disturbance_markers;
+
+  bool have_object_debug_pose = false;
+  Eigen::Isometry3d object_debug_pose_world = Eigen::Isometry3d::Identity();
+  Eigen::Vector3d object_debug_size_m = Eigen::Vector3d::Zero();
   if (robust_grasp_mpc_state_ != nullptr) {
     const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
     if (
@@ -1227,8 +1328,9 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
         &uncertainty_marker);
       markers.markers.push_back(uncertainty_marker);
 
-      label_position_m = object_prior.initial_pose_world.translation();
-      label_position_m.z() += 0.08;
+      object_debug_pose_world = object_prior.initial_pose_world;
+      object_debug_size_m = object_prior.geometry.primitive_size_m;
+      have_object_debug_pose = true;
 
       const auto & object_belief = robust_grasp_mpc_state_->object_belief();
       Eigen::Isometry3d object_belief_pose = Eigen::Isometry3d::Identity();
@@ -1255,8 +1357,9 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
         belief_marker.color = make_color(0.12, 0.86, 0.68, 0.58);
         markers.markers.push_back(belief_marker);
 
-        label_position_m = object_belief_pose.translation();
-        label_position_m.z() += 0.08;
+        object_debug_pose_world = object_belief_pose;
+        object_debug_size_m = belief_size_m;
+        have_object_debug_pose = true;
       }
     }
   }
@@ -1338,9 +1441,15 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
     }
   }
 
-  if (robust_grasp_mpc_state_ != nullptr && have_current_fk) {
-    const auto & status = robust_grasp_mpc_state_->policy_status();
+  if (robust_mpc_active && robust_mpc_status != nullptr && have_current_fk && have_live_disturbance_markers) {
+    const auto & status = *robust_mpc_status;
     const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
+    Eigen::Isometry3d disturbance_base_pose_world = object_debug_pose_world;
+    Eigen::Vector3d disturbance_block_size_m = object_debug_size_m;
+    bool have_disturbance_base_pose =
+      have_object_debug_pose &&
+      object_debug_pose_world.matrix().allFinite() &&
+      is_positive_finite_box_size(object_debug_size_m);
     if (
       mppi_core::IsValidObjectPrior(object_prior) &&
       mppi_core::HasObjectPrior(object_prior) &&
@@ -1364,51 +1473,87 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
         if (!pose.matrix().allFinite()) {
           continue;
         }
+        if (!have_disturbance_base_pose) {
+          disturbance_base_pose_world = pose;
+          disturbance_block_size_m = object_prior.geometry.primitive_size_m;
+          have_disturbance_base_pose = true;
+        }
         path_marker.points.push_back(make_point(pose.translation()));
 
-        MarkerMsg disturbed_object_marker;
-        initialize_marker(
-          &disturbed_object_marker,
+        append_box_marker(
+          &markers,
           time,
           frame_id,
           "jenga_disturbed_rollout",
           static_cast<int>(step),
-          MarkerMsg::CUBE);
-        disturbed_object_marker.pose = make_pose(pose);
-        disturbed_object_marker.scale.x = object_prior.geometry.primitive_size_m.x();
-        disturbed_object_marker.scale.y = object_prior.geometry.primitive_size_m.y();
-        disturbed_object_marker.scale.z = object_prior.geometry.primitive_size_m.z();
-        const double alpha =
-          step == 0 ? 0.22 :
-          std::min(0.68, 0.18 + 0.10 * static_cast<double>(step));
-        disturbed_object_marker.color = make_color(0.18, 0.56, 1.0, alpha);
-        markers.markers.push_back(disturbed_object_marker);
+          pose,
+          object_prior.geometry.primitive_size_m,
+          make_color(
+            0.18,
+            0.56,
+            1.0,
+            step == 0 ? 0.22 : std::min(0.68, 0.18 + 0.10 * static_cast<double>(step))));
       }
 
       if (path_marker.points.size() >= 2U) {
         markers.markers.push_back(path_marker);
-        const Eigen::Vector3d first_position_m =
-          status.selected_object_pose_rollout.front().translation();
-        const Eigen::Vector3d last_position_m =
-          status.selected_object_pose_rollout.back().translation();
-        const double rollout_dt = robust_grasp_mpc_state_->config().policy.rollout.dt;
-        const double rollout_time_s =
-          rollout_dt * static_cast<double>(status.selected_object_pose_rollout.size() - 1U);
-        if (std::isfinite(rollout_time_s) && rollout_time_s > 0.0) {
-          const Eigen::Vector3d velocity_mps =
-            (last_position_m - first_position_m) / rollout_time_s;
-          append_arrow_marker(
-            &markers,
-            time,
-            frame_id,
-            "jenga_disturbance_velocity_preview",
-            0,
-            first_position_m,
-            first_position_m + kDisturbanceVelocityPreviewS * velocity_mps,
-            0.003,
-            0.008,
-            make_color(0.15, 0.82, 1.0, 0.95));
+      }
+    }
+
+    if (have_disturbance_base_pose && is_positive_finite_box_size(disturbance_block_size_m)) {
+      const std::size_t sampled_disturbance_count = std::max(
+        status.sampled_object_linear_disturbances_world_mps.size(),
+        status.sampled_object_angular_disturbances_world_radps.size());
+      for (std::size_t i = 0; i < sampled_disturbance_count; ++i) {
+        Eigen::Vector3d linear_mps = Eigen::Vector3d::Zero();
+        Eigen::Vector3d angular_radps = Eigen::Vector3d::Zero();
+        if (i < status.sampled_object_linear_disturbances_world_mps.size()) {
+          linear_mps =
+            status.sampled_object_linear_disturbances_world_mps[i];
         }
+        if (i < status.sampled_object_angular_disturbances_world_radps.size()) {
+          angular_radps =
+            status.sampled_object_angular_disturbances_world_radps[i];
+        }
+        if (!linear_mps.allFinite() || !angular_radps.allFinite()) {
+          continue;
+        }
+        append_box_marker(
+          &markers,
+          time,
+          frame_id,
+          "jenga_sampled_disturbed_object",
+          static_cast<int>(i),
+          disturbed_object_pose_preview(
+            disturbance_base_pose_world,
+            linear_mps,
+            angular_radps,
+            kDisturbancePosePreviewS),
+          disturbance_block_size_m,
+          make_color(1.0, 0.56, 0.08, 0.08));
+      }
+
+      const Eigen::Vector3d current_linear_mps =
+        status.selected_object_linear_disturbance_world_mps;
+      const Eigen::Vector3d current_angular_radps =
+        status.selected_object_angular_disturbance_world_radps;
+      const bool have_current_disturbance =
+        (current_linear_mps.allFinite() && current_linear_mps.norm() > 1.0e-8) ||
+        (current_angular_radps.allFinite() && current_angular_radps.norm() > 1.0e-8);
+      if (have_current_disturbance) {
+        append_box_marker(
+          &markers,
+          time,
+          frame_id,
+          "jenga_selected_disturbed_object",
+          0,
+          disturbed_object_pose_preview(
+            disturbance_base_pose_world,
+            current_linear_mps.allFinite() ? current_linear_mps : Eigen::Vector3d::Zero(),
+            current_angular_radps.allFinite() ? current_angular_radps : Eigen::Vector3d::Zero(),
+            kDisturbancePosePreviewS),
+          disturbance_block_size_m,
+          make_color(0.92, 0.18, 1.0, 0.46));
       }
     }
 
@@ -1466,41 +1611,6 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
         // Skip rollout arrows if Pinocchio cannot integrate this debug candidate.
       }
     }
-
-    MarkerMsg label_marker;
-    initialize_marker(
-      &label_marker,
-      time,
-      frame_id,
-      "robust_grasp_rollout_status",
-      0,
-      MarkerMsg::TEXT_VIEW_FACING);
-    label_marker.pose.position = make_point(label_position_m);
-    label_marker.scale.z = 0.025;
-    label_marker.color = make_color(0.96, 0.98, 1.0, 0.92);
-
-    std::ostringstream text;
-    const auto & object_belief = robust_grasp_mpc_state_->object_belief();
-    text << std::fixed << std::setprecision(3)
-         << "action="
-         << (status.best_action_name.empty() ? "none" : status.best_action_name)
-         << " score=" << status.best_score
-         << "\nhold=" << (status.selected_hold_by_margin ? "true" : "false")
-         << " pred_hemi=" << status.selected_predicted_active_hemisphere_total
-         << " edge=" << status.selected_object_edge_margin_m << "m"
-         << "\ngap0=" << status.initial_object_min_gap_m
-         << "m gap=" << status.selected_object_min_gap_m
-         << "m pen=" << status.selected_penetration_cost
-         << "\nflow=" << status.selected_force_low_cost
-         << " fhigh=" << status.selected_force_high_cost
-         << "\nobject_steps=" << status.selected_object_pose_rollout.size()
-         << " v=" << status.selected_object_linear_disturbance_speed_mps
-         << "m/s w=" << status.selected_object_angular_disturbance_speed_radps
-         << "rad/s"
-         << "\nbelief=" << (robust_grasp_mpc_state_->has_object_belief() ? "true" : "false")
-         << " particles=" << object_belief.particleCount();
-    label_marker.text = text.str();
-    markers.markers.push_back(label_marker);
   }
 
   robust_grasp_debug_marker_pub_->publish(markers);

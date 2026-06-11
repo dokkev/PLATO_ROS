@@ -15,6 +15,7 @@
 #include <string>
 #include <utility>
 
+#include "mppi_core/contact/contact_kinematics.hpp"
 #include "mppi_core/rollout/object_prior_grasp_rollout.hpp"
 
 namespace mppi_core {
@@ -29,6 +30,14 @@ Eigen::VectorXd DefaultVector(const std::size_t dim, const double value) {
 
 bool IsFiniteAndNonnegative(const double value) {
   return std::isfinite(value) && value >= 0.0;
+}
+
+double MaxAbsCoeff(const Eigen::VectorXd& value) {
+  double max_abs = 0.0;
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    max_abs = std::max(max_abs, std::abs(value[i]));
+  }
+  return max_abs;
 }
 
 bool IsFiniteOrInfinite(const Eigen::VectorXd& value) {
@@ -92,6 +101,21 @@ void PrepareConfig(ContinuousQddotMppiConfig* config) {
   if (config->limits.qdot_upper_bound.size() == 0) {
     config->limits.qdot_upper_bound = DefaultVector(dim, 10.0);
   }
+  if (config->rnea_feedforward.max_tau_ff_nm < 0.0) {
+    config->rnea_feedforward.max_tau_ff_nm = 0.0;
+  }
+  if (config->rnea_feedforward.max_tau_ff_rate_nm_s < 0.0) {
+    config->rnea_feedforward.max_tau_ff_rate_nm_s = 0.0;
+  }
+  if (config->base_grasp_controller.max_qddot_base < 0.0) {
+    config->base_grasp_controller.max_qddot_base = 0.0;
+  }
+  if (config->base_grasp_controller.max_qddot_residual < 0.0) {
+    config->base_grasp_controller.max_qddot_residual = 0.0;
+  }
+  if (config->base_grasp_controller.base_deviation_weight < 0.0) {
+    config->base_grasp_controller.base_deviation_weight = 0.0;
+  }
 
   config->disturbance_sampler.horizon_steps = config->rollout.horizon_steps;
   config->disturbance_sampler.num_disturbance_rollouts =
@@ -110,6 +134,32 @@ void ValidateConfig(const ContinuousQddotMppiConfig& config) {
       config.smoothing_alpha < 0.0 || config.smoothing_alpha > 1.0) {
     throw std::invalid_argument(
         "ContinuousQddotMppiConfig: invalid scalar field");
+  }
+  const RneaFeedforwardConfig& rnea = config.rnea_feedforward;
+  if (!std::isfinite(rnea.tau_ff_scale) ||
+      !IsFiniteAndNonnegative(rnea.max_tau_ff_nm) ||
+      !IsFiniteAndNonnegative(rnea.max_tau_ff_rate_nm_s)) {
+    throw std::invalid_argument(
+        "ContinuousQddotMppiConfig: invalid RNEA feedforward scalar field");
+  }
+  if (rnea.subtract_contact_torque) {
+    throw std::invalid_argument(
+        "ContinuousQddotMppiConfig: subtract_contact_torque is not supported");
+  }
+  const BaseGraspControllerConfig& base = config.base_grasp_controller;
+  if (!IsFiniteAndNonnegative(base.target_normal_force_n) ||
+      !IsFiniteAndNonnegative(base.min_normal_force_per_sensor_n) ||
+      !IsFiniteAndNonnegative(base.max_normal_force_per_sensor_n) ||
+      base.min_normal_force_per_sensor_n > base.max_normal_force_per_sensor_n ||
+      !IsFiniteAndNonnegative(base.force_gain) ||
+      !IsFiniteAndNonnegative(base.force_balance_gain) ||
+      !IsFiniteAndNonnegative(base.contact_loss_gain) ||
+      !IsFiniteAndNonnegative(base.high_force_release_gain) ||
+      !IsFiniteAndNonnegative(base.max_qddot_base) ||
+      !IsFiniteAndNonnegative(base.max_qddot_residual) ||
+      !IsFiniteAndNonnegative(base.base_deviation_weight)) {
+    throw std::invalid_argument(
+        "ContinuousQddotMppiConfig: invalid base grasp controller field");
   }
 
   CheckVectorDim(config.rollout.action_lower_bound, dim,
@@ -167,6 +217,113 @@ Eigen::VectorXd ClampVector(const Eigen::Ref<const Eigen::VectorXd>& value,
     clamped[i] = std::clamp(clamped[i], lower[i], upper[i]);
   }
   return clamped;
+}
+
+Eigen::VectorXd ClampVectorNorm(const Eigen::Ref<const Eigen::VectorXd>& value,
+                                const double max_norm) {
+  Eigen::VectorXd clamped = value;
+  if (!clamped.allFinite()) {
+    clamped.setZero();
+    return clamped;
+  }
+  if (!std::isfinite(max_norm)) {
+    return clamped;
+  }
+  if (max_norm <= 0.0) {
+    clamped.setZero();
+    return clamped;
+  }
+  const double norm = clamped.norm();
+  if (std::isfinite(norm) && norm > max_norm) {
+    clamped *= max_norm / norm;
+  }
+  return clamped;
+}
+
+Eigen::VectorXd NormalizedOrZero(const Eigen::Ref<const Eigen::VectorXd>& value,
+                                 const std::size_t dim) {
+  Eigen::VectorXd normalized = value;
+  if (normalized.size() != static_cast<Eigen::Index>(dim) ||
+      !normalized.allFinite()) {
+    return Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  }
+  const double norm = normalized.norm();
+  if (!std::isfinite(norm) || norm <= kTiny) {
+    return Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  }
+  normalized /= norm;
+  return normalized;
+}
+
+bool LooksLikeRole(const TactileState& tactile, const char* role) {
+  return role != nullptr &&
+         tactile.frame_name.find(role) != std::string::npos;
+}
+
+struct BaseSensorBasis {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  bool valid{false};
+  bool is_thumb{false};
+  bool is_index{false};
+  double force_n{0.0};
+  Eigen::VectorXd close_direction;
+};
+
+BaseSensorBasis ComputeBaseSensorBasis(
+    const GraspState& state,
+    const TactileState& tactile,
+    const TactileSensorContext& tactile_context,
+    const std::size_t sensor_order,
+    const std::size_t action_dim) {
+  BaseSensorBasis basis;
+  basis.close_direction =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
+  if (!state.valid || !IsValid(state.robot) || !tactile.valid ||
+      !tactile.hasActiveHemisphereContact() ||
+      tactile_context.kinematics == nullptr ||
+      !IsValidContactKinematicsContext(*tactile_context.kinematics) ||
+      action_dim == 0U ||
+      state.robot.q.size() !=
+          static_cast<Eigen::Index>(tactile_context.kinematics->model->nq) ||
+      static_cast<Eigen::Index>(action_dim) !=
+          tactile_context.kinematics->model->nv) {
+    return basis;
+  }
+
+  const Eigen::VectorXd zero_tangent =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
+  const auto motions = ComputeHemisphereMotions(
+      state.robot, tactile, zero_tangent, *tactile_context.kinematics);
+  if (motions.empty()) {
+    return basis;
+  }
+
+  Eigen::VectorXd close_sum =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
+  std::size_t count = 0U;
+  for (const auto& motion : motions) {
+    if (motion.J_normal.size() != static_cast<Eigen::Index>(action_dim) ||
+        !motion.J_normal.allFinite()) {
+      continue;
+    }
+    close_sum += motion.J_normal.transpose();
+    ++count;
+  }
+  if (count == 0U) {
+    return basis;
+  }
+
+  basis.close_direction = NormalizedOrZero(close_sum, action_dim);
+  basis.valid = basis.close_direction.norm() > 0.0;
+  basis.force_n = tactile.activeHemisphereNormalForceN();
+  basis.is_thumb = LooksLikeRole(tactile, "thumb");
+  basis.is_index = LooksLikeRole(tactile, "index");
+  if (!basis.is_thumb && !basis.is_index) {
+    basis.is_thumb = sensor_order == 0U;
+    basis.is_index = sensor_order == 1U;
+  }
+  return basis;
 }
 
 bool HasPinocchioConfiguration(const Eigen::Ref<const Eigen::VectorXd>& q,
@@ -231,6 +388,88 @@ Eigen::VectorXd RneaOrZero(const Eigen::Ref<const Eigen::VectorXd>& q,
   return tau;
 }
 
+}  // namespace
+
+RneaFeedforwardCommandResult ComputeRneaFeedforwardCommand(
+    const RneaFeedforwardConfig& config,
+    const GraspObservation& observation,
+    const GraspState& initial_state,
+    const RolloutContext& context,
+    const Eigen::Ref<const Eigen::VectorXd>& qddot_cmd,
+    const Eigen::Ref<const Eigen::VectorXd>& previous_tau_ff_cmd,
+    const bool has_previous_tau_ff_cmd,
+    const double dt) {
+  RneaFeedforwardCommandResult result;
+  result.raw = Eigen::VectorXd::Zero(qddot_cmd.size());
+  result.scaled = Eigen::VectorXd::Zero(qddot_cmd.size());
+  result.command = Eigen::VectorXd::Zero(qddot_cmd.size());
+
+  if (!config.enabled) {
+    return result;
+  }
+  if (config.zero_tau_when_not_ready && !initial_state.valid) {
+    result.zeroed_not_ready = true;
+    return result;
+  }
+  if (config.zero_tau_on_contact_loss && !initial_state.hasAnyTactileContact()) {
+    result.zeroed_contact_loss = true;
+    return result;
+  }
+
+  RobotSystem* robot_system =
+      context.robot_system != nullptr ? context.robot_system
+                                      : observation.robot_system;
+  const Eigen::VectorXd& q =
+      config.use_measured_state ? observation.q_meas : observation.q_ref_current;
+  const Eigen::VectorXd& qdot =
+      config.use_measured_state ? observation.qdot_meas
+                                : observation.qdot_ref_current;
+  if (!HasPinocchioConfiguration(q, qdot, robot_system) ||
+      qddot_cmd.size() != static_cast<Eigen::Index>(robot_system->nv())) {
+    return result;
+  }
+
+  // RNEA feedforward maps desired joint acceleration to model torque.
+  // It does not estimate contact force; contact stability is handled by
+  // tactile feedback and object-support cost.
+  Eigen::VectorXd qddot_rnea = qddot_cmd;
+  if (config.gravity_only_when_qddot_zero && qddot_cmd.isZero(kTiny)) {
+    qddot_rnea.setZero();
+  }
+  result.raw = RneaOrZero(q, qdot, qddot_rnea, robot_system);
+  result.scaled = config.tau_ff_scale * result.raw;
+  result.command = result.scaled;
+
+  if (std::isfinite(config.max_tau_ff_nm)) {
+    for (Eigen::Index i = 0; i < result.command.size(); ++i) {
+      const double before = result.command[i];
+      result.command[i] =
+          std::clamp(before, -config.max_tau_ff_nm, config.max_tau_ff_nm);
+      result.clamped = result.clamped || result.command[i] != before;
+    }
+  }
+
+  if (has_previous_tau_ff_cmd &&
+      previous_tau_ff_cmd.size() == result.command.size() &&
+      previous_tau_ff_cmd.allFinite() &&
+      std::isfinite(config.max_tau_ff_rate_nm_s) &&
+      std::isfinite(dt) && dt > 0.0) {
+    const double max_delta = config.max_tau_ff_rate_nm_s * dt;
+    for (Eigen::Index i = 0; i < result.command.size(); ++i) {
+      const double before = result.command[i];
+      result.command[i] =
+          std::clamp(before,
+                     previous_tau_ff_cmd[i] - max_delta,
+                     previous_tau_ff_cmd[i] + max_delta);
+      result.rate_limited = result.rate_limited || result.command[i] != before;
+    }
+  }
+
+  return result;
+}
+
+namespace {
+
 struct CostAccumulation {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -244,6 +483,7 @@ struct CostAccumulation {
   double balance_cost{0.0};
   double control_cost{0.0};
   double rate_cost{0.0};
+  double base_deviation_cost{0.0};
 
   std::size_t geometry_query_count{0};
   std::size_t object_sample_count{0};
@@ -256,6 +496,8 @@ struct CostAccumulation {
   Eigen::Vector2d measured_centroid_sum{Eigen::Vector2d::Zero()};
   double predicted_centroid_weight{0.0};
   double measured_centroid_weight{0.0};
+  Eigen::Vector3d object_linear_disturbance_world_mps{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d object_angular_disturbance_world_radps{Eigen::Vector3d::Zero()};
   double object_linear_disturbance_speed_mps{0.0};
   double object_angular_disturbance_speed_radps{0.0};
   double normalization_count{0.0};
@@ -274,6 +516,32 @@ struct CostAccumulation {
           std::numeric_limits<double>::quiet_NaN());
     }
     return measured_centroid_sum / measured_centroid_weight;
+  }
+
+  Eigen::Vector3d objectLinearDisturbanceAverage() const {
+    if (normalization_count <= 0.0) {
+      return Eigen::Vector3d::Zero();
+    }
+    return object_linear_disturbance_world_mps / normalization_count;
+  }
+
+  Eigen::Vector3d objectAngularDisturbanceAverage() const {
+    if (normalization_count <= 0.0) {
+      return Eigen::Vector3d::Zero();
+    }
+    return object_angular_disturbance_world_radps / normalization_count;
+  }
+
+  double objectLinearDisturbanceSpeedAverage() const {
+    return normalization_count <= 0.0
+               ? 0.0
+               : object_linear_disturbance_speed_mps / normalization_count;
+  }
+
+  double objectAngularDisturbanceSpeedAverage() const {
+    return normalization_count <= 0.0
+               ? 0.0
+               : object_angular_disturbance_speed_radps / normalization_count;
   }
 };
 
@@ -369,10 +637,49 @@ ObjectPoseRollout WeightedObjectPoseRollout(
   return output;
 }
 
+Eigen::Vector3d AverageObjectLinearDisturbance(
+    const GraspDisturbanceSequence& sequence) {
+  if (sequence.steps.empty()) {
+    return Eigen::Vector3d::Zero();
+  }
+  Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+  double count = 0.0;
+  for (const auto& step : sequence.steps) {
+    if (step.object_disturbance.linear_velocity_world_mps.allFinite()) {
+      sum += step.object_disturbance.linear_velocity_world_mps;
+      count += 1.0;
+    }
+  }
+  if (count <= 0.0) {
+    return Eigen::Vector3d::Zero();
+  }
+  return sum / count;
+}
+
+Eigen::Vector3d AverageObjectAngularDisturbance(
+    const GraspDisturbanceSequence& sequence) {
+  if (sequence.steps.empty()) {
+    return Eigen::Vector3d::Zero();
+  }
+  Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+  double count = 0.0;
+  for (const auto& step : sequence.steps) {
+    if (step.object_disturbance.angular_velocity_world_radps.allFinite()) {
+      sum += step.object_disturbance.angular_velocity_world_radps;
+      count += 1.0;
+    }
+  }
+  if (count <= 0.0) {
+    return Eigen::Vector3d::Zero();
+  }
+  return sum / count;
+}
+
 void AccumulateStageBreakdown(
     const RobustGraspStateCostBreakdown& breakdown,
     const GraspDisturbanceStep& disturbance,
     const double rate_cost,
+    const double base_deviation_cost,
     CostAccumulation* total) {
   if (total == nullptr) {
     return;
@@ -383,6 +690,11 @@ void AccumulateStageBreakdown(
   total->balance_cost += breakdown.force_balance_cost;
   total->control_cost += breakdown.action_cost;
   total->rate_cost += rate_cost;
+  total->base_deviation_cost += base_deviation_cost;
+  total->object_linear_disturbance_world_mps +=
+      disturbance.object_disturbance.linear_velocity_world_mps;
+  total->object_angular_disturbance_world_radps +=
+      disturbance.object_disturbance.angular_velocity_world_radps;
   total->object_linear_disturbance_speed_mps +=
       disturbance.object_disturbance.linear_velocity_world_mps.norm();
   total->object_angular_disturbance_speed_radps +=
@@ -437,6 +749,8 @@ void AddWeightedStats(const CostAccumulation& sample,
   status->selected_balance_cost += weight * sample.balance_cost;
   status->selected_control_cost += weight * sample.control_cost;
   status->selected_rate_cost += weight * sample.rate_cost;
+  status->selected_base_deviation_cost +=
+      weight * sample.base_deviation_cost;
   const double average_scale =
       sample.normalization_count > kTiny ? 1.0 / sample.normalization_count
                                          : 1.0;
@@ -452,6 +766,10 @@ void AddWeightedStats(const CostAccumulation& sample,
       std::min(
           status->object_min_signed_distance_m,
           sample.object_min_signed_distance_m);
+  status->object_linear_disturbance_world_mps +=
+      weight * sample.object_linear_disturbance_world_mps * average_scale;
+  status->object_angular_disturbance_world_radps +=
+      weight * sample.object_angular_disturbance_world_radps * average_scale;
   status->object_linear_disturbance_speed_mps +=
       weight * sample.object_linear_disturbance_speed_mps * average_scale;
   status->object_angular_disturbance_speed_radps +=
@@ -574,7 +892,11 @@ void ContinuousQddotMppiController::Initialize(
                            config_.rollout.horizon_steps);
   nominal_sequence_.SetZero();
   previous_qddot_cmd_.resize(0);
+  previous_qddot_residual_cmd_.resize(0);
+  previous_tau_ff_cmd_.resize(0);
   has_previous_qddot_cmd_ = false;
+  has_previous_qddot_residual_cmd_ = false;
+  has_previous_tau_ff_cmd_ = false;
   status_ = ContinuousQddotMppiStatus{};
   initialized_ = true;
 }
@@ -585,7 +907,142 @@ void ContinuousQddotMppiController::ResetNominalSequence() {
     nominal_sequence_.SetZero();
   }
   previous_qddot_cmd_.resize(0);
+  previous_qddot_residual_cmd_.resize(0);
+  previous_tau_ff_cmd_.resize(0);
   has_previous_qddot_cmd_ = false;
+  has_previous_qddot_residual_cmd_ = false;
+  has_previous_tau_ff_cmd_ = false;
+}
+
+BaseGraspControllerStatus
+ContinuousQddotMppiController::ComputeBaseGraspCommand(
+    const GraspState& initial_state,
+    const RolloutContext& context) const {
+  BaseGraspControllerStatus status;
+  status.enabled = config_.base_grasp_controller.enabled;
+  const std::size_t dim = config_.rollout.action_dim;
+  status.qddot_base =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  status.qddot_residual =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  if (!status.enabled || !initial_state.valid ||
+      initial_state.tactile_sensors.size() != context.tactile_contexts.size()) {
+    return status;
+  }
+
+  std::vector<BaseSensorBasis> sensor_bases;
+  sensor_bases.reserve(initial_state.tactile_sensors.size());
+  for (std::size_t i = 0; i < initial_state.tactile_sensors.size(); ++i) {
+    BaseSensorBasis basis = ComputeBaseSensorBasis(
+        initial_state, initial_state.tactile_sensors[i],
+        context.tactile_contexts[i], i, dim);
+    if (basis.valid) {
+      sensor_bases.push_back(std::move(basis));
+    }
+  }
+  status.active_sensor_count = sensor_bases.size();
+  if (sensor_bases.empty()) {
+    return status;
+  }
+
+  Eigen::VectorXd squeeze_sum =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  double force_sum = 0.0;
+  status.min_force_n = std::numeric_limits<double>::infinity();
+  status.max_force_n = 0.0;
+  const BaseSensorBasis* thumb = nullptr;
+  const BaseSensorBasis* index = nullptr;
+  for (const auto& basis : sensor_bases) {
+    squeeze_sum += basis.close_direction;
+    force_sum += std::max(0.0, basis.force_n);
+    status.min_force_n =
+        std::min(status.min_force_n, std::max(0.0, basis.force_n));
+    status.max_force_n =
+        std::max(status.max_force_n, std::max(0.0, basis.force_n));
+    if (basis.is_thumb && thumb == nullptr) {
+      thumb = &basis;
+    }
+    if (basis.is_index && index == nullptr) {
+      index = &basis;
+    }
+  }
+  if (!std::isfinite(status.min_force_n)) {
+    status.min_force_n = 0.0;
+  }
+  status.average_force_n =
+      force_sum / static_cast<double>(sensor_bases.size());
+  status.has_thumb = thumb != nullptr;
+  status.has_index = index != nullptr;
+  status.thumb_force_n =
+      thumb != nullptr ? std::max(0.0, thumb->force_n) : 0.0;
+  status.index_force_n =
+      index != nullptr ? std::max(0.0, index->force_n) : 0.0;
+  if (thumb != nullptr && index != nullptr) {
+    status.average_force_n =
+        0.5 * (status.thumb_force_n + status.index_force_n);
+    status.min_force_n =
+        std::min(status.thumb_force_n, status.index_force_n);
+    status.max_force_n =
+        std::max(status.thumb_force_n, status.index_force_n);
+  }
+
+  const Eigen::VectorXd squeeze_dir = NormalizedOrZero(squeeze_sum, dim);
+  if (squeeze_dir.norm() <= 0.0) {
+    return status;
+  }
+
+  Eigen::VectorXd qddot_base =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  const auto& config = config_.base_grasp_controller;
+  status.force_error_n =
+      config.target_normal_force_n - status.average_force_n;
+  const double weakest_force_deficit_n =
+      std::max(0.0, config.min_normal_force_per_sensor_n -
+                        status.min_force_n);
+  qddot_base +=
+      config.force_gain *
+      (status.force_error_n + weakest_force_deficit_n) *
+      squeeze_dir;
+
+  if (config.use_force_balance && thumb != nullptr && index != nullptr) {
+    status.force_balance_error_n =
+        status.index_force_n - status.thumb_force_n;
+    const Eigen::VectorXd balance_dir =
+        NormalizedOrZero(thumb->close_direction - index->close_direction, dim);
+    qddot_base +=
+        config.force_balance_gain *
+        status.force_balance_error_n *
+        balance_dir;
+  }
+
+  if (
+      config.use_high_force_guard &&
+      status.max_force_n > config.max_normal_force_per_sensor_n) {
+    status.high_force_guard_active = true;
+    status.high_force_excess_n =
+        status.max_force_n - config.max_normal_force_per_sensor_n;
+    qddot_base -=
+        config.high_force_release_gain *
+        status.high_force_excess_n *
+        squeeze_dir;
+  }
+
+  if (
+      config.use_contact_loss_reflex &&
+      status.active_sensor_count < 2U) {
+    status.contact_loss_reflex_active = true;
+    qddot_base += config.contact_loss_gain * squeeze_dir;
+  }
+
+  qddot_base =
+      ClampVectorNorm(qddot_base, config.max_qddot_base);
+  qddot_base =
+      ClampVector(qddot_base, config_.rollout.action_lower_bound,
+                  config_.rollout.action_upper_bound);
+  status.qddot_base = qddot_base;
+  status.qddot_base_norm = qddot_base.norm();
+  status.active = status.qddot_base_norm > kTiny;
+  return status;
 }
 
 ActionSequence ContinuousQddotMppiController::SampleSequence(
@@ -610,9 +1067,15 @@ ActionSequence ContinuousQddotMppiController::SampleSequence(
           config_.rollout.action_noise_clip[dim]);
       action[dim] += noise;
     }
-    sequence.values().col(step) =
-        ClampVector(action, config_.rollout.action_lower_bound,
-                    config_.rollout.action_upper_bound);
+    if (config_.base_grasp_controller.enabled) {
+      sequence.values().col(step) =
+          ClampVectorNorm(
+              action, config_.base_grasp_controller.max_qddot_residual);
+    } else {
+      sequence.values().col(step) =
+          ClampVector(action, config_.rollout.action_lower_bound,
+                      config_.rollout.action_upper_bound);
+    }
   }
   return sequence;
 }
@@ -621,12 +1084,16 @@ ContinuousQddotMppiController::SampleEvaluation
 ContinuousQddotMppiController::EvaluateSequence(
     const GraspState& initial_state,
     const ActionSequence& sequence,
+    const Eigen::VectorXd& qddot_base,
     const GraspDisturbanceSequence& disturbance_sequence,
     const RolloutContext& context) const {
   SampleEvaluation evaluation;
   if (!initial_state.valid ||
       sequence.actionDim() != config_.rollout.action_dim ||
       sequence.horizonSteps() != config_.rollout.horizon_steps ||
+      qddot_base.size() !=
+          static_cast<Eigen::Index>(config_.rollout.action_dim) ||
+      !qddot_base.allFinite() ||
       disturbance_sequence.horizonSteps() < sequence.horizonSteps()) {
     return evaluation;
   }
@@ -644,7 +1111,10 @@ ContinuousQddotMppiController::EvaluateSequence(
   double total_cost = 0.0;
 
   for (std::size_t step = 0; step < sequence.horizonSteps(); ++step) {
-    const Eigen::VectorXd action = sequence.action(step);
+    const Eigen::VectorXd residual = sequence.action(step);
+    const Eigen::VectorXd action = ClampVector(
+        qddot_base + residual, config_.rollout.action_lower_bound,
+        config_.rollout.action_upper_bound);
     const auto& disturbance_step = disturbance_sequence.steps[step];
 
     ObjectPriorRolloutStepResult result;
@@ -670,10 +1140,17 @@ ContinuousQddotMppiController::EvaluateSequence(
     const double rate_cost =
         config_.control_rate_cost_weight *
         (action - previous_action).squaredNorm();
-    const double step_cost = SanitizeCost(stage_cost + rate_cost);
+    const double base_deviation_cost =
+        config_.base_grasp_controller.enabled
+            ? config_.base_grasp_controller.base_deviation_weight *
+                  (action - qddot_base).squaredNorm()
+            : 0.0;
+    const double step_cost =
+        SanitizeCost(stage_cost + rate_cost + base_deviation_cost);
     total_cost = SanitizeCost(total_cost + step_cost);
     AccumulateStageBreakdown(
-        breakdown, disturbance_step, rate_cost, &evaluation.stats.costs);
+        breakdown, disturbance_step, rate_cost, base_deviation_cost,
+        &evaluation.stats.costs);
 
     state = result.next_state;
     AppendRepresentativeObjectPose(
@@ -690,7 +1167,7 @@ RobotCommand ContinuousQddotMppiController::MakeCommand(
     const GraspObservation& observation,
     const GraspState& initial_state,
     const RolloutContext& context,
-    const Eigen::VectorXd& qddot_cmd) const {
+    const Eigen::VectorXd& qddot_cmd) {
   RobotState next = StepRobotStateWithQddotLimits(
       initial_state.robot, qddot_cmd, context.robot_system,
       config_.rollout.dt, config_.limits);
@@ -699,29 +1176,63 @@ RobotCommand ContinuousQddotMppiController::MakeCommand(
         MakeZeroHoldRobotCommand(initial_state.robot.q,
                                  initial_state.robot.qdot);
     hold.stamp_sec = observation.time_s;
+    previous_tau_ff_cmd_ = Eigen::VectorXd::Zero(qddot_cmd.size());
+    has_previous_tau_ff_cmd_ = previous_tau_ff_cmd_.size() > 0;
     return hold;
   }
+
+  const RneaFeedforwardCommandResult tau_ff = ComputeRneaFeedforwardCommand(
+      config_.rnea_feedforward, observation, initial_state, context,
+      qddot_cmd, previous_tau_ff_cmd_, has_previous_tau_ff_cmd_,
+      config_.rollout.dt);
 
   RobotCommand command;
   command.Resize(static_cast<int>(next.q.size()),
                  static_cast<int>(next.qdot.size()));
   command.q_cmd = next.q;
   command.qdot_cmd = next.qdot;
-  command.tau_cmd = next.tau;
+  command.tau_cmd = tau_ff.command;
   command.stamp_sec = observation.time_s;
   command.valid = command.HasValidDimensions() && command.AllFinite();
+  previous_tau_ff_cmd_ = command.tau_cmd;
+  has_previous_tau_ff_cmd_ =
+      previous_tau_ff_cmd_.size() == static_cast<Eigen::Index>(
+          config_.rollout.action_dim) &&
+      previous_tau_ff_cmd_.allFinite();
+
+  status_.use_rnea_feedforward = config_.rnea_feedforward.enabled;
+  status_.tau_ff_scale = config_.rnea_feedforward.tau_ff_scale;
+  status_.tau_ff_raw = tau_ff.raw;
+  status_.tau_ff_scaled = tau_ff.scaled;
+  status_.tau_ff_cmd = tau_ff.command;
+  status_.tau_ff_raw_norm = tau_ff.raw.norm();
+  status_.tau_ff_cmd_norm = tau_ff.command.norm();
+  status_.tau_ff_max_abs = MaxAbsCoeff(tau_ff.command);
+  status_.tau_ff_clamped = tau_ff.clamped;
+  status_.tau_ff_rate_limited = tau_ff.rate_limited;
+  status_.tau_ff_zeroed_not_ready = tau_ff.zeroed_not_ready;
+  status_.tau_ff_zeroed_contact_loss = tau_ff.zeroed_contact_loss;
   return command;
 }
 
 void ContinuousQddotMppiController::ShiftUpdatedSequence(
     const Eigen::MatrixXd& updated_values) {
-  nominal_sequence_.values() = updated_values;
+  Eigen::MatrixXd shifted_values = updated_values;
+  if (config_.base_grasp_controller.enabled) {
+    for (Eigen::Index step = 0; step < shifted_values.cols(); ++step) {
+      shifted_values.col(step) =
+          ClampVectorNorm(
+              shifted_values.col(step),
+              config_.base_grasp_controller.max_qddot_residual);
+    }
+  }
+  nominal_sequence_.values() = shifted_values;
   if (nominal_sequence_.horizonSteps() <= 1U) {
     nominal_sequence_.SetZero();
     return;
   }
   nominal_sequence_.values().leftCols(nominal_sequence_.values().cols() - 1) =
-      updated_values.rightCols(updated_values.cols() - 1).eval();
+      shifted_values.rightCols(shifted_values.cols() - 1).eval();
   nominal_sequence_.values().rightCols(1).setZero();
 }
 
@@ -738,10 +1249,33 @@ RobotCommand ContinuousQddotMppiController::Update(
   status_.num_samples = config_.rollout.num_rollouts;
   status_.horizon_steps = config_.rollout.horizon_steps;
   status_.lambda = config_.rollout.temperature;
+  status_.use_rnea_feedforward = config_.rnea_feedforward.enabled;
+  status_.tau_ff_scale = config_.rnea_feedforward.tau_ff_scale;
   status_.object_edge_margin_m = std::numeric_limits<double>::infinity();
   status_.object_min_signed_distance_m =
       std::numeric_limits<double>::infinity();
-  status_.qddot_nominal_first = nominal_sequence_.firstAction();
+  BaseGraspControllerStatus base_status =
+      ComputeBaseGraspCommand(initial_state, context);
+  Eigen::VectorXd qddot_base = base_status.qddot_base;
+  if (qddot_base.size() !=
+          static_cast<Eigen::Index>(config_.rollout.action_dim) ||
+      !qddot_base.allFinite()) {
+    qddot_base =
+        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+            config_.rollout.action_dim));
+    base_status.qddot_base = qddot_base;
+    base_status.qddot_base_norm = 0.0;
+    base_status.active = false;
+  }
+  status_.base_grasp = base_status;
+  status_.qddot_base = qddot_base;
+  status_.qddot_residual_cmd =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+          config_.rollout.action_dim));
+  status_.qddot_nominal_first =
+      ClampVector(qddot_base + nominal_sequence_.firstAction(),
+                  config_.rollout.action_lower_bound,
+                  config_.rollout.action_upper_bound);
 
   std::vector<ActionSequence> samples;
   samples.reserve(config_.rollout.num_rollouts);
@@ -750,6 +1284,18 @@ RobotCommand ContinuousQddotMppiController::Update(
   }
 
   const auto disturbances = disturbance_sampler_.SampleBatch();
+  status_.sampled_object_linear_disturbances_world_mps.clear();
+  status_.sampled_object_angular_disturbances_world_radps.clear();
+  status_.sampled_object_linear_disturbances_world_mps.reserve(
+      disturbances.size());
+  status_.sampled_object_angular_disturbances_world_radps.reserve(
+      disturbances.size());
+  for (const auto& disturbance_sequence : disturbances) {
+    status_.sampled_object_linear_disturbances_world_mps.push_back(
+        AverageObjectLinearDisturbance(disturbance_sequence));
+    status_.sampled_object_angular_disturbances_world_radps.push_back(
+        AverageObjectAngularDisturbance(disturbance_sequence));
+  }
   std::vector<double> costs(samples.size(), kLargeCost);
   std::vector<SampleEvaluation> evaluations(samples.size());
   double cost_sum = 0.0;
@@ -760,7 +1306,7 @@ RobotCommand ContinuousQddotMppiController::Update(
 
   for (std::size_t i = 0; i < samples.size(); ++i) {
     evaluations[i] = EvaluateSequence(
-        initial_state, samples[i], disturbances[i], context);
+        initial_state, samples[i], qddot_base, disturbances[i], context);
     costs[i] = SanitizeCost(evaluations[i].total_cost);
     total_geometry_queries +=
         evaluations[i].stats.costs.geometry_query_count;
@@ -777,6 +1323,14 @@ RobotCommand ContinuousQddotMppiController::Update(
         MakeZeroHoldRobotCommand(initial_state.robot.q,
                                  initial_state.robot.qdot);
     hold.stamp_sec = observation.time_s;
+    previous_tau_ff_cmd_ =
+        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+            config_.rollout.action_dim));
+    previous_qddot_residual_cmd_ =
+        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+            config_.rollout.action_dim));
+    has_previous_tau_ff_cmd_ = true;
+    has_previous_qddot_residual_cmd_ = true;
     return hold;
   }
 
@@ -801,14 +1355,39 @@ RobotCommand ContinuousQddotMppiController::Update(
     AddWeightedStats(evaluations[i].stats.costs, weight, &status_);
   }
 
-  Eigen::VectorXd qddot_cmd = updated.col(0);
-  if (has_previous_qddot_cmd_ &&
-      previous_qddot_cmd_.size() == qddot_cmd.size()) {
-    qddot_cmd = config_.smoothing_alpha * qddot_cmd +
-                (1.0 - config_.smoothing_alpha) * previous_qddot_cmd_;
+  Eigen::VectorXd qddot_residual_cmd = updated.col(0);
+  if (config_.base_grasp_controller.enabled) {
+    qddot_residual_cmd =
+        ClampVectorNorm(
+            qddot_residual_cmd,
+            config_.base_grasp_controller.max_qddot_residual);
   }
+  if (has_previous_qddot_residual_cmd_ &&
+      previous_qddot_residual_cmd_.size() == qddot_residual_cmd.size()) {
+    qddot_residual_cmd =
+        config_.smoothing_alpha * qddot_residual_cmd +
+        (1.0 - config_.smoothing_alpha) * previous_qddot_residual_cmd_;
+  } else if (!config_.base_grasp_controller.enabled &&
+             has_previous_qddot_cmd_ &&
+             previous_qddot_cmd_.size() == qddot_residual_cmd.size()) {
+    qddot_residual_cmd =
+        config_.smoothing_alpha * qddot_residual_cmd +
+        (1.0 - config_.smoothing_alpha) * previous_qddot_cmd_;
+  }
+  if (config_.base_grasp_controller.enabled) {
+    qddot_residual_cmd =
+        ClampVectorNorm(
+            qddot_residual_cmd,
+            config_.base_grasp_controller.max_qddot_residual);
+  } else {
+    qddot_residual_cmd =
+        ClampVector(qddot_residual_cmd, config_.rollout.action_lower_bound,
+                    config_.rollout.action_upper_bound);
+  }
+  Eigen::VectorXd qddot_cmd = qddot_base + qddot_residual_cmd;
   qddot_cmd = ClampVector(qddot_cmd, config_.rollout.action_lower_bound,
                           config_.rollout.action_upper_bound);
+  qddot_residual_cmd = qddot_cmd - qddot_base;
 
   status_.valid = true;
   status_.best_sample_index = best_index;
@@ -821,9 +1400,31 @@ RobotCommand ContinuousQddotMppiController::Update(
   status_.effective_sample_size =
       weight_square_sum > kTiny ? 1.0 / weight_square_sum : 0.0;
   status_.qddot_cmd = qddot_cmd;
-  status_.qddot_best_first = samples[best_index].firstAction();
+  status_.qddot_residual_cmd = qddot_residual_cmd;
+  status_.base_grasp.qddot_residual = qddot_residual_cmd;
+  status_.base_grasp.qddot_residual_norm = qddot_residual_cmd.norm();
+  status_.base_grasp.base_deviation_cost =
+      config_.base_grasp_controller.enabled
+          ? config_.base_grasp_controller.base_deviation_weight *
+                qddot_residual_cmd.squaredNorm()
+          : 0.0;
+  status_.qddot_best_first =
+      ClampVector(qddot_base + samples[best_index].firstAction(),
+                  config_.rollout.action_lower_bound,
+                  config_.rollout.action_upper_bound);
   status_.object_pose_rollout =
       WeightedObjectPoseRollout(evaluations, weights, best_index);
+  if (best_index < evaluations.size()) {
+    const auto& best_costs = evaluations[best_index].stats.costs;
+    status_.object_linear_disturbance_world_mps =
+        best_costs.objectLinearDisturbanceAverage();
+    status_.object_angular_disturbance_world_radps =
+        best_costs.objectAngularDisturbanceAverage();
+    status_.object_linear_disturbance_speed_mps =
+        best_costs.objectLinearDisturbanceSpeedAverage();
+    status_.object_angular_disturbance_speed_radps =
+        best_costs.objectAngularDisturbanceSpeedAverage();
+  }
   status_.geometry_query_count = total_geometry_queries;
   status_.object_sample_count = total_object_samples;
   if (!std::isfinite(status_.object_edge_margin_m)) {
@@ -836,7 +1437,12 @@ RobotCommand ContinuousQddotMppiController::Update(
   RobotCommand command =
       MakeCommand(observation, initial_state, context, qddot_cmd);
   previous_qddot_cmd_ = qddot_cmd;
+  previous_qddot_residual_cmd_ = qddot_residual_cmd;
   has_previous_qddot_cmd_ = true;
+  has_previous_qddot_residual_cmd_ =
+      previous_qddot_residual_cmd_.size() ==
+          static_cast<Eigen::Index>(config_.rollout.action_dim) &&
+      previous_qddot_residual_cmd_.allFinite();
   ShiftUpdatedSequence(updated);
   return command;
 }

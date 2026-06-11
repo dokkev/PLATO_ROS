@@ -30,6 +30,78 @@ struct QddotRolloutLimits {
   bool clamp_q_to_model_position_limits{true};
 };
 
+struct RneaFeedforwardConfig {
+  bool enabled{false};
+  bool use_measured_state{true};
+  bool subtract_contact_torque{false};
+  double tau_ff_scale{1.0};
+  double max_tau_ff_nm{0.05};
+  double max_tau_ff_rate_nm_s{1.0};
+  bool zero_tau_when_not_ready{true};
+  bool zero_tau_on_contact_loss{true};
+  bool gravity_only_when_qddot_zero{false};
+};
+
+struct RneaFeedforwardCommandResult {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  Eigen::VectorXd raw;
+  Eigen::VectorXd scaled;
+  Eigen::VectorXd command;
+  bool clamped{false};
+  bool rate_limited{false};
+  bool zeroed_not_ready{false};
+  bool zeroed_contact_loss{false};
+};
+
+struct BaseGraspControllerConfig {
+  bool enabled{false};
+
+  double target_normal_force_n{1.0};
+  double min_normal_force_per_sensor_n{0.1};
+  double max_normal_force_per_sensor_n{5.0};
+
+  double force_gain{0.2};
+  double force_balance_gain{0.1};
+  double contact_loss_gain{0.2};
+  double high_force_release_gain{0.2};
+
+  double max_qddot_base{2.0};
+  double max_qddot_residual{1.0};
+  double base_deviation_weight{0.01};
+
+  bool use_force_balance{true};
+  bool use_contact_loss_reflex{true};
+  bool use_high_force_guard{true};
+};
+
+struct BaseGraspControllerStatus {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  bool enabled{false};
+  bool active{false};
+  bool has_thumb{false};
+  bool has_index{false};
+  bool contact_loss_reflex_active{false};
+  bool high_force_guard_active{false};
+
+  double thumb_force_n{0.0};
+  double index_force_n{0.0};
+  double average_force_n{0.0};
+  double min_force_n{0.0};
+  double max_force_n{0.0};
+  double force_error_n{0.0};
+  double force_balance_error_n{0.0};
+  double high_force_excess_n{0.0};
+  std::size_t active_sensor_count{0};
+
+  Eigen::VectorXd qddot_base;
+  Eigen::VectorXd qddot_residual;
+  double qddot_base_norm{0.0};
+  double qddot_residual_norm{0.0};
+  double base_deviation_cost{0.0};
+};
+
 struct ContinuousQddotMppiConfig {
   MPPIConfig rollout;
   GraspDisturbanceSamplerConfig disturbance_sampler;
@@ -39,6 +111,8 @@ struct ContinuousQddotMppiConfig {
   double smoothing_alpha{0.5};
 
   QddotRolloutLimits limits;
+  BaseGraspControllerConfig base_grasp_controller;
+  RneaFeedforwardConfig rnea_feedforward;
 };
 
 struct ContinuousQddotMppiStatus {
@@ -62,6 +136,22 @@ struct ContinuousQddotMppiStatus {
   Eigen::VectorXd qddot_cmd;
   Eigen::VectorXd qddot_nominal_first;
   Eigen::VectorXd qddot_best_first;
+  Eigen::VectorXd qddot_base;
+  Eigen::VectorXd qddot_residual_cmd;
+  BaseGraspControllerStatus base_grasp;
+
+  bool use_rnea_feedforward{false};
+  double tau_ff_scale{1.0};
+  Eigen::VectorXd tau_ff_raw;
+  Eigen::VectorXd tau_ff_scaled;
+  Eigen::VectorXd tau_ff_cmd;
+  double tau_ff_raw_norm{0.0};
+  double tau_ff_cmd_norm{0.0};
+  double tau_ff_max_abs{0.0};
+  bool tau_ff_clamped{false};
+  bool tau_ff_rate_limited{false};
+  bool tau_ff_zeroed_not_ready{false};
+  bool tau_ff_zeroed_contact_loss{false};
 
   double selected_contact_loss_cost{0.0};
   double selected_support_cost{0.0};
@@ -73,6 +163,7 @@ struct ContinuousQddotMppiStatus {
   double selected_balance_cost{0.0};
   double selected_control_cost{0.0};
   double selected_rate_cost{0.0};
+  double selected_base_deviation_cost{0.0};
 
   std::size_t geometry_query_count{0};
   std::size_t object_sample_count{0};
@@ -85,8 +176,16 @@ struct ContinuousQddotMppiStatus {
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
   Eigen::Vector2d measured_centroid_sensor_m{
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
+  Eigen::Vector3d object_linear_disturbance_world_mps{
+      Eigen::Vector3d::Zero()};
+  Eigen::Vector3d object_angular_disturbance_world_radps{
+      Eigen::Vector3d::Zero()};
   double object_linear_disturbance_speed_mps{0.0};
   double object_angular_disturbance_speed_radps{0.0};
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      sampled_object_linear_disturbances_world_mps;
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      sampled_object_angular_disturbances_world_radps;
 
   std::vector<Eigen::Isometry3d,
               Eigen::aligned_allocator<Eigen::Isometry3d>>
@@ -102,6 +201,16 @@ RobotState StepRobotStateWithQddotLimits(
     RobotSystem* robot_system,
     double dt,
     const QddotRolloutLimits& limits);
+
+RneaFeedforwardCommandResult ComputeRneaFeedforwardCommand(
+    const RneaFeedforwardConfig& config,
+    const GraspObservation& observation,
+    const GraspState& initial_state,
+    const RolloutContext& context,
+    const Eigen::Ref<const Eigen::VectorXd>& qddot_cmd,
+    const Eigen::Ref<const Eigen::VectorXd>& previous_tau_ff_cmd,
+    bool has_previous_tau_ff_cmd,
+    double dt);
 
 class ContinuousQddotMppiController {
  public:
@@ -122,16 +231,20 @@ class ContinuousQddotMppiController {
   struct SampleStats;
   struct SampleEvaluation;
 
+  BaseGraspControllerStatus ComputeBaseGraspCommand(
+      const GraspState& initial_state,
+      const RolloutContext& context) const;
   ActionSequence SampleSequence(std::size_t sample_index);
   SampleEvaluation EvaluateSequence(
       const GraspState& initial_state,
       const ActionSequence& sequence,
+      const Eigen::VectorXd& qddot_base,
       const GraspDisturbanceSequence& disturbance_sequence,
       const RolloutContext& context) const;
   RobotCommand MakeCommand(const GraspObservation& observation,
                            const GraspState& initial_state,
                            const RolloutContext& context,
-                           const Eigen::VectorXd& qddot_cmd) const;
+                           const Eigen::VectorXd& qddot_cmd);
   void ShiftUpdatedSequence(const Eigen::MatrixXd& updated_values);
 
   ContinuousQddotMppiConfig config_;
@@ -140,7 +253,11 @@ class ContinuousQddotMppiController {
       GraspDisturbanceSamplerConfig{}};
   ActionSequence nominal_sequence_;
   Eigen::VectorXd previous_qddot_cmd_;
+  Eigen::VectorXd previous_qddot_residual_cmd_;
+  Eigen::VectorXd previous_tau_ff_cmd_;
   bool has_previous_qddot_cmd_{false};
+  bool has_previous_qddot_residual_cmd_{false};
+  bool has_previous_tau_ff_cmd_{false};
   std::mt19937 rng_;
   ContinuousQddotMppiStatus status_;
   bool initialized_{false};

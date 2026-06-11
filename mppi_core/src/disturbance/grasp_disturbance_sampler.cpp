@@ -46,10 +46,6 @@ void ValidateConfig(const GraspDisturbanceSamplerConfig& config) {
       !IsNonnegativeFinite(config.object.linear_velocity_max_mps) ||
       !IsNonnegativeFinite(config.object.angular_velocity_std_radps) ||
       !IsNonnegativeFinite(config.object.angular_velocity_max_radps) ||
-      !IsNonnegativeFinite(config.object.pose_xyz_std_m) ||
-      !IsNonnegativeFinite(config.object.pose_xyz_max_m) ||
-      !IsNonnegativeFinite(config.object.pose_rpy_std_rad) ||
-      !IsNonnegativeFinite(config.object.pose_rpy_max_rad) ||
       !IsNonnegativeFinite(config.tangent_velocity_max_mps) ||
       !IsNonnegativeFinite(config.rotational_velocity_std_radps) ||
       !IsNonnegativeFinite(config.rotational_velocity_max_radps) ||
@@ -86,8 +82,6 @@ VirtualObjectDisturbance Antithetic(
   VirtualObjectDisturbance out = disturbance;
   out.linear_velocity_world_mps = -out.linear_velocity_world_mps;
   out.angular_velocity_world_radps = -out.angular_velocity_world_radps;
-  out.position_offset_world_m = -out.position_offset_world_m;
-  out.rpy_offset_world_rad = -out.rpy_offset_world_rad;
   out.external_force_world_n = -out.external_force_world_n;
   out.external_torque_world_nm = -out.external_torque_world_nm;
   return out;
@@ -166,22 +160,6 @@ VirtualObjectDisturbance SampleObjectDisturbance(
           SampleClampedNormal(
               rng, config.angular_velocity_std_radps,
               config.angular_velocity_max_radps)};
-  disturbance.position_offset_world_m =
-      Eigen::Vector3d{
-          SampleClampedNormal(rng, config.pose_xyz_std_m,
-                              config.pose_xyz_max_m),
-          SampleClampedNormal(rng, config.pose_xyz_std_m,
-                              config.pose_xyz_max_m),
-          SampleClampedNormal(rng, config.pose_xyz_std_m,
-                              config.pose_xyz_max_m)};
-  disturbance.rpy_offset_world_rad =
-      Eigen::Vector3d{
-          SampleClampedNormal(rng, config.pose_rpy_std_rad,
-                              config.pose_rpy_max_rad),
-          SampleClampedNormal(rng, config.pose_rpy_std_rad,
-                              config.pose_rpy_max_rad),
-          SampleClampedNormal(rng, config.pose_rpy_std_rad,
-                              config.pose_rpy_max_rad)};
   disturbance.dropout = dropout_dist != nullptr && (*dropout_dist)(*rng);
   disturbance.valid = true;
   return disturbance;

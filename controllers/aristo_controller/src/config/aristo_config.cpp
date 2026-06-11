@@ -381,6 +381,9 @@ aristo_controller::state_machines::GraspForceStateConfig parse_grasp_force_state
   config.exit_on_contact_lost =
     optional_scalar<bool>(
       params, "exit_on_contact_lost", config.exit_on_contact_lost);
+  config.exit_on_u_above_threshold =
+    optional_scalar<bool>(
+      params, "exit_on_u_above_threshold", config.exit_on_u_above_threshold);
   const auto grasp_task = required_node(params, "grasp_task");
   config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
 
@@ -453,6 +456,11 @@ parse_robust_grasp_mpc_state_config(
       safety_params,
       "max_tau_rate_nm_s",
       config.safety.max_tau_rate_nm_s);
+  config.safety.exit_u_threshold =
+    optional_scalar<double>(
+      safety_params,
+      "exit_u_threshold",
+      config.safety.exit_u_threshold);
   config.safety.clamp_q_cmd_to_model_limits =
     optional_scalar<bool>(
       safety_params,
@@ -463,6 +471,11 @@ parse_robust_grasp_mpc_state_config(
       safety_params,
       "exit_on_all_contacts_lost",
       config.safety.exit_on_all_contacts_lost);
+  config.safety.exit_on_u_above_threshold =
+    optional_scalar<bool>(
+      safety_params,
+      "exit_on_u_above_threshold",
+      config.safety.exit_on_u_above_threshold);
   config.safety.rollout_only =
     optional_scalar<bool>(
       safety_params,

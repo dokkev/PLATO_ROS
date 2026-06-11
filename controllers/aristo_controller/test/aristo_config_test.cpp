@@ -119,16 +119,17 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
     plato_robot_system::task::GraspTaskConfig::ForceAggregation::kMin);
 
   const auto & grasp_force_task = config.grasp_force.state.grasp_task;
-  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_u, 0.7);
+  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_u, 0.5);
   EXPECT_DOUBLE_EQ(config.grasp_force.state.default_phi, 0.3);
   EXPECT_TRUE(config.grasp_force.state.exit_on_contact_lost);
+  EXPECT_TRUE(config.grasp_force.state.exit_on_u_above_threshold);
   ASSERT_EQ(grasp_force_task.q_ready.size(), config.num_joints);
   EXPECT_TRUE(grasp_force_task.q_ready.isApprox(expected_grasp_ready_target));
   EXPECT_TRUE(grasp_force_task.force_feedback_enabled);
   EXPECT_FALSE(grasp_force_task.debug_print_contact_states);
   EXPECT_DOUBLE_EQ(grasp_force_task.lpf_alpha, 0.2);
   EXPECT_EQ(grasp_force_task.force_enter_debounce_ticks, 0);
-  EXPECT_DOUBLE_EQ(grasp_force_task.force_exit_u_threshold, 0.75);
+  EXPECT_DOUBLE_EQ(grasp_force_task.force_exit_u_threshold, 0.6);
   EXPECT_DOUBLE_EQ(grasp_force_task.kp_tactile_u_fb, 2.0);
 
   const auto & robust_grasp = config.robust_grasp_mpc.state;
@@ -151,6 +152,9 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 200.0);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.force_balance_weight, 10.0);
   EXPECT_TRUE(robust_grasp.policy.cost.object_support.enabled);
+  EXPECT_DOUBLE_EQ(robust_grasp.safety.exit_u_threshold, 0.6);
+  EXPECT_TRUE(robust_grasp.safety.exit_on_u_above_threshold);
+  EXPECT_TRUE(robust_grasp.safety.exit_on_all_contacts_lost);
   EXPECT_EQ(robust_grasp.policy.cost.object_support.max_object_samples, 8U);
   EXPECT_DOUBLE_EQ(
     robust_grasp.policy.cost.object_support.contact_birth_margin_m,

@@ -32,7 +32,10 @@ bool GraspForceState::ConfigureTask(const GraspForceStateConfig & config)
   }
   if (
     !IsFinite(config.default_u) || !IsFinite(config.default_phi) ||
-    !IsFinite(config.default_desired_force_n))
+    !IsFinite(config.default_desired_force_n) ||
+    !IsFinite(config.grasp_task.force_exit_u_threshold) ||
+    config.grasp_task.force_exit_u_threshold < 0.0 ||
+    config.grasp_task.force_exit_u_threshold > 1.0)
   {
     task_configured_ = false;
     return false;
@@ -136,6 +139,18 @@ void GraspForceState::UpdateExitCondition() const
 
   const bool required_contact_lost =
     status.lost_contact_a || status.lost_contact_b;
+  const bool command_requests_motion_exit =
+    config_.exit_on_u_above_threshold &&
+    status.u > config_.grasp_task.force_exit_u_threshold;
+  if (command_requests_motion_exit) {
+    if (!exit_requested_) {
+      std::cout << "[grasp_force] exiting on grasp command u"
+                << " u=" << status.u
+                << " threshold=" << config_.grasp_task.force_exit_u_threshold
+                << std::endl;
+    }
+    exit_requested_ = true;
+  }
   if (
     config_.exit_on_contact_lost &&
     has_entered_force_tracking_ &&

@@ -33,8 +33,10 @@ struct RobustGraspMpcSafetyConfig
   double max_qdot_cmd_rad_s{0.5};
   double max_tau_cmd_nm{0.05};
   double max_tau_rate_nm_s{1.0};
+  double exit_u_threshold{0.6};
   bool clamp_q_cmd_to_model_limits{true};
   bool exit_on_all_contacts_lost{true};
+  bool exit_on_u_above_threshold{true};
   bool rollout_only{false};
 };
 
@@ -53,6 +55,11 @@ struct RobustGraspMpcStateConfig
   RobustGraspMpcDebugConfig debug;
 };
 
+struct RobustGraspMpcInput
+{
+  double u{std::numeric_limits<double>::quiet_NaN()};
+};
+
 class RobustGraspMpcState final : public plato_robot_system::State
 {
 public:
@@ -63,6 +70,7 @@ public:
     plato_robot_system::RobotSystem * robot);
 
   bool ConfigureTask(const RobustGraspMpcStateConfig & config);
+  void SetInput(const RobustGraspMpcInput & input);
   void OnEnter() override;
   void OnExit() override;
   bool IsFinished() const override;
@@ -96,6 +104,7 @@ private:
   bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
   bool AllContactsLost() const;
+  bool OpenCommandRequested() const;
   void UpdateExitCondition() const;
   void PrintStatus(
     double time_s,
@@ -108,6 +117,7 @@ private:
   mutable mppi_core::RobustGraspPolicy policy_;
   bool configured_{false};
   std::array<mppi_core::PinocchioContactKinematicsContext, 2> contact_kinematics_{};
+  RobustGraspMpcInput input_;
   mutable plato_robot_system::RobotCommand last_command_;
   mutable mppi_core::VirtualObjectBelief object_belief_;
   mutable std::size_t object_belief_contact_count_{0};

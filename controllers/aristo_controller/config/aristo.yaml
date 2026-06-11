@@ -104,17 +104,18 @@ state_machine:
       stay_here: true
       next_state: grasp_teleop
       params:
-        default_u: 0.7
+        default_u: 0.5
         default_phi: 0.3
         default_desired_force_n: 10.0
         exit_on_contact_lost: true
+        exit_on_u_above_threshold: true
 
         grasp_task:
           # q_ready is copied from grasp_ready.target_jpos.
           force_feedback_enabled: true
           lpf_alpha: 0.2
           force_enter_debounce_ticks: 0
-          force_exit_u_threshold: 0.75
+          force_exit_u_threshold: 0.6
           kp_tactile_u_fb: 2.0
           kd_tactile_u_fb: 0.0
           kp_tactile_phi_fb: 10.0

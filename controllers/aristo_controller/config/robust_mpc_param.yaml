@@ -9,8 +9,10 @@ safety:
   max_qdot_cmd_rad_s: 0.5
   max_tau_cmd_nm: 0.05
   max_tau_rate_nm_s: 1.0
+  exit_u_threshold: 0.6
   clamp_q_cmd_to_model_limits: true
   exit_on_all_contacts_lost: true
+  exit_on_u_above_threshold: true
   rollout_only: true
 
 tactile:

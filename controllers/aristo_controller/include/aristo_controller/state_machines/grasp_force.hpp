@@ -22,6 +22,7 @@ struct GraspForceStateConfig
   double default_phi{0.0};
   double default_desired_force_n{1.0};
   bool exit_on_contact_lost{true};
+  bool exit_on_u_above_threshold{true};
 
   plato_robot_system::task::GraspTaskConfig grasp_task;
 };

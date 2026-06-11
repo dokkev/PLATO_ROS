@@ -1006,7 +1006,11 @@ void PlatoRosController::grasp_force_reference_valid_callback(
 
 void PlatoRosController::sync_grasp_teleop_input()
 {
-  if (grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr) {
+  if (
+    grasp_teleop_state_ == nullptr &&
+    grasp_force_state_ == nullptr &&
+    robust_grasp_mpc_state_ == nullptr)
+  {
     return;
   }
 
@@ -1048,6 +1052,11 @@ void PlatoRosController::sync_grasp_teleop_input()
     force_input.phi = input.phi;
     force_input.desired_force_n = input.desired_force_n;
     grasp_force_state_->SetInput(force_input);
+  }
+  if (robust_grasp_mpc_state_ != nullptr) {
+    aristo_controller::state_machines::RobustGraspMpcInput mpc_input;
+    mpc_input.u = input.u;
+    robust_grasp_mpc_state_->SetInput(mpc_input);
   }
 }
 

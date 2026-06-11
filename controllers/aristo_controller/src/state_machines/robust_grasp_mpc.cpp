@@ -221,7 +221,12 @@ RobustGraspMpcState::RobustGraspMpcState(
 bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config)
 {
   configured_ = false;
-  if (robot_ == nullptr || !robot_->hasModel() || robot_->nv() <= 0) {
+  if (
+    robot_ == nullptr || !robot_->hasModel() || robot_->nv() <= 0 ||
+    !std::isfinite(config.safety.exit_u_threshold) ||
+    config.safety.exit_u_threshold < 0.0 ||
+    config.safety.exit_u_threshold > 1.0)
+  {
     return false;
   }
 
@@ -249,6 +254,13 @@ bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config
   last_status_print_time_s_ = -1.0e100;
   configured_ = true;
   return true;
+}
+
+void RobustGraspMpcState::SetInput(const RobustGraspMpcInput & input)
+{
+  if (std::isfinite(input.u)) {
+    input_.u = std::clamp(input.u, 0.0, 1.0);
+  }
 }
 
 void RobustGraspMpcState::OnEnter()
@@ -581,22 +593,32 @@ bool RobustGraspMpcState::AllContactsLost() const
   return true;
 }
 
+bool RobustGraspMpcState::OpenCommandRequested() const
+{
+  return config_.safety.exit_on_u_above_threshold &&
+         std::isfinite(input_.u) &&
+         input_.u > config_.safety.exit_u_threshold;
+}
+
 void RobustGraspMpcState::UpdateExitCondition() const
 {
-  if (
-    exit_requested_ ||
-    !config_.safety.exit_on_all_contacts_lost ||
-    lifecycle_.next_state_id < 0)
-  {
+  if (exit_requested_ || lifecycle_.next_state_id < 0) {
     return;
   }
 
-  if (!AllContactsLost()) {
+  if (OpenCommandRequested()) {
+    std::cout << "[robust_grasp_mpc] exiting on grasp command u"
+              << " u=" << input_.u
+              << " threshold=" << config_.safety.exit_u_threshold
+              << std::endl;
+    exit_requested_ = true;
     return;
   }
 
-  std::cout << "[robust_grasp_mpc] exiting on all contacts lost" << std::endl;
-  exit_requested_ = true;
+  if (config_.safety.exit_on_all_contacts_lost && AllContactsLost()) {
+    std::cout << "[robust_grasp_mpc] exiting on all contacts lost" << std::endl;
+    exit_requested_ = true;
+  }
 }
 
 void RobustGraspMpcState::PrintStatus(

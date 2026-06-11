@@ -33,6 +33,9 @@ struct RobustGraspPolicyConfig {
 
   double risk_weight{1.0};
   double cvar_tail_fraction{0.25};
+  double safe_hold_score_threshold{-1.0};
+  double min_required_score_improvement{1.0};
+  double action_rate_weight{0.01};
 
   bool require_both_contact_for_update{true};
   bool return_hold_when_not_ready{true};
@@ -51,6 +54,11 @@ struct RobustGraspPolicyStatus {
   double best_mean_cost{0.0};
   double best_cvar_cost{0.0};
   std::size_t best_candidate_index{0};
+  bool selected_hold_by_margin{false};
+
+  double hold_score{0.0};
+  double hold_mean_cost{0.0};
+  double hold_cvar_cost{0.0};
 
   Eigen::VectorXd selected_qddot;
 };
@@ -86,6 +94,7 @@ class RobustGraspPolicy {
   std::unique_ptr<GraspDisturbanceSampler> disturbance_sampler_;
   std::unique_ptr<GraspActionLibrary> action_library_;
   std::unique_ptr<RobustGraspStateCost> cost_;
+  Eigen::VectorXd last_selected_qddot_;
   bool initialized_{false};
 };
 

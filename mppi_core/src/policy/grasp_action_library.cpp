@@ -51,9 +51,14 @@ void ValidateConfig(GraspActionLibraryConfig* config) {
       config->action_dim == 0 || config->num_action_samples == 0 ||
       !std::isfinite(config->dt) || config->dt <= 0.0 ||
       !IsFiniteAndNonnegative(config->target_min_normal_force_n) ||
+      !IsFiniteAndNonnegative(config->max_safe_normal_force_n) ||
       !IsFiniteAndNonnegative(config->force_to_squeeze_gain) ||
+      !IsFiniteAndNonnegative(config->force_to_release_gain) ||
       !IsFiniteAndNonnegative(config->force_balance_gain) ||
       !IsFiniteAndNonnegative(config->contact_line_align_gain) ||
+      !IsFiniteAndNonnegative(config->force_deadband_n) ||
+      !IsFiniteAndNonnegative(config->force_balance_deadband_n) ||
+      !IsFiniteAndNonnegative(config->contact_line_align_deadband_m) ||
       !IsFiniteAndNonnegative(config->squeeze_std) ||
       !IsFiniteAndNonnegative(config->align_std) ||
       !IsFiniteAndNonnegative(config->force_balance_std) ||
@@ -71,7 +76,8 @@ void ValidateConfig(GraspActionLibraryConfig* config) {
       !IsFiniteAndNonnegative(config->align_accel_scale) ||
       !std::isfinite(config->sequence_decay) ||
       !config->close_axis_base.allFinite() ||
-      config->close_axis_base.norm() <= 1.0e-12) {
+      config->close_axis_base.norm() <= 1.0e-12 ||
+      config->target_min_normal_force_n > config->max_safe_normal_force_n) {
     throw std::invalid_argument(
         "GraspActionLibraryConfig: invalid numeric field");
   }
@@ -127,6 +133,14 @@ double ClampSymmetric(const double value, const double limit) {
     return value;
   }
   return std::clamp(value, -limit, limit);
+}
+
+double SignedHinge(const double value, const double deadband) {
+  const double magnitude = std::abs(value);
+  if (!std::isfinite(magnitude) || magnitude <= deadband) {
+    return 0.0;
+  }
+  return std::copysign(magnitude - deadband, value);
 }
 
 bool ComputeSensorActionBasis(const GraspState& state,
@@ -376,19 +390,38 @@ GraspCorrectiveAction GraspActionLibrary::BuildNominalAction(
       basis.has_thumb && basis.has_index
           ? std::min(basis.thumb_force_n, basis.index_force_n)
           : (basis.has_thumb ? basis.thumb_force_n : basis.index_force_n);
+  const double max_force =
+      basis.has_thumb && basis.has_index
+          ? std::max(basis.thumb_force_n, basis.index_force_n)
+          : min_force;
+  const double force_low_error =
+      config_.target_min_normal_force_n - min_force;
+  const double force_low_excess =
+      std::max(0.0, force_low_error - config_.force_deadband_n);
   action.squeeze = std::clamp(
-      config_.force_to_squeeze_gain *
-          std::max(0.0, config_.target_min_normal_force_n - min_force),
+      config_.force_to_squeeze_gain * force_low_excess,
+      0.0, config_.max_squeeze);
+  const double force_high_error =
+      max_force - config_.max_safe_normal_force_n;
+  const double force_high_excess =
+      std::max(0.0, force_high_error - config_.force_deadband_n);
+  action.release = std::clamp(
+      config_.force_to_release_gain * force_high_excess,
       0.0, config_.max_squeeze);
   if (basis.has_align) {
+    const double align_excess =
+        std::max(0.0, basis.align_error_m -
+                          config_.contact_line_align_deadband_m);
     action.align_lateral = std::clamp(
-        config_.contact_line_align_gain * basis.align_error_m,
+        config_.contact_line_align_gain * align_excess,
         0.0, config_.max_align);
   }
   if (basis.has_thumb && basis.has_index) {
+    const double balance_error =
+        SignedHinge(basis.index_force_n - basis.thumb_force_n,
+                    config_.force_balance_deadband_n);
     action.force_balance = ClampSymmetric(
-        config_.force_balance_gain *
-            (basis.index_force_n - basis.thumb_force_n),
+        config_.force_balance_gain * balance_error,
         config_.max_force_balance);
   }
   return action;

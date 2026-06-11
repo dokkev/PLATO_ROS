@@ -40,6 +40,18 @@ Each candidate action sequence is rolled out against many pre-sampled
 mean disturbance cost + risk_weight * worst-tail/CVaR cost
 ```
 
+Hold/zero corrective action is candidate 0 and is treated as the default
+optimal behavior. Nonzero actions must beat hold by
+`min_required_score_improvement`, unless hold is already above the configured
+risk margin. This makes the policy least-invasive: a secure grasp should hold
+still, while fragile grasps can still squeeze, align, balance, or release when
+disturbance rollouts predict meaningful risk.
+
+Most grasp-quality terms use hinge/deadband costs rather than exact tracking
+costs. Inside the safe force interval, force-balance deadband, alignment
+deadband, and low-shear region, the best action should be zero because action
+effort and action-rate costs make unnecessary motion worse.
+
 The disturbed transition updates:
 
 - tactile shear and shear velocity

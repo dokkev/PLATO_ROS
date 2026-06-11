@@ -38,9 +38,14 @@ struct GraspActionLibraryConfig {
   double dt{0.01};
 
   double target_min_normal_force_n{1.0};
+  double max_safe_normal_force_n{5.0};
   double force_to_squeeze_gain{4.0};
+  double force_to_release_gain{2.0};
   double force_balance_gain{2.0};
   double contact_line_align_gain{20.0};
+  double force_deadband_n{0.02};
+  double force_balance_deadband_n{0.05};
+  double contact_line_align_deadband_m{0.002};
 
   double squeeze_std{2.0};
   double align_std{2.0};

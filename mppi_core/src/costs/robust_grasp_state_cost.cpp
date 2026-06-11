@@ -21,6 +21,10 @@ namespace {
 
 double Square(const double value) { return value * value; }
 
+double HingeExcess(const double value, const double deadband) {
+  return std::max(0.0, value - deadband);
+}
+
 bool IsFiniteAndNonnegative(const double value) {
   return std::isfinite(value) && value >= 0.0;
 }
@@ -34,10 +38,15 @@ void ValidateConfig(const RobustGraspStateCostConfig& config) {
       !IsFiniteAndNonnegative(config.force_low_weight) ||
       !IsFiniteAndNonnegative(config.force_high_weight) ||
       !IsFiniteAndNonnegative(config.force_balance_weight) ||
+      !IsFiniteAndNonnegative(config.force_balance_deadband_n) ||
       !IsFiniteAndNonnegative(config.shear_weight) ||
       !IsFiniteAndNonnegative(config.rotation_weight) ||
       !IsFiniteAndNonnegative(config.slip_score_weight) ||
+      !IsFiniteAndNonnegative(config.shear_safe_limit_m) ||
+      !IsFiniteAndNonnegative(config.rotation_safe_limit_rad) ||
+      !IsFiniteAndNonnegative(config.slip_score_safe_limit) ||
       !IsFiniteAndNonnegative(config.contact_line_alignment_weight) ||
+      !IsFiniteAndNonnegative(config.contact_line_alignment_deadband_m) ||
       !IsFiniteAndNonnegative(config.qddot_weight) ||
       !IsFiniteAndNonnegative(config.tau_weight) ||
       !config.close_axis_base.allFinite() ||
@@ -101,14 +110,12 @@ double ForceCost(const GraspState& state,
   }
 
   if (active_forces_n.size() >= 2U) {
-    const double mean_force_n =
-        std::accumulate(
-            active_forces_n.begin(), active_forces_n.end(), 0.0) /
-        static_cast<double>(active_forces_n.size());
-    for (const double force_n : active_forces_n) {
-      cost += config.force_balance_weight *
-              Square(force_n - mean_force_n);
-    }
+    const auto [min_force_it, max_force_it] =
+        std::minmax_element(active_forces_n.begin(), active_forces_n.end());
+    const double imbalance_n = *max_force_it - *min_force_it;
+    const double excess_n =
+        HingeExcess(imbalance_n, config.force_balance_deadband_n);
+    cost += config.force_balance_weight * Square(excess_n);
   }
   return cost;
 }
@@ -118,15 +125,23 @@ double ShearCost(const GraspState& state,
   double cost = 0.0;
   for (const auto& tactile : state.tactile_sensors) {
     if (tactile.shear_displacement_m.allFinite()) {
+      const double excess_shear_m =
+          HingeExcess(tactile.shear_displacement_m.norm(),
+                      config.shear_safe_limit_m);
       cost += config.shear_weight *
-              tactile.shear_displacement_m.squaredNorm();
+              Square(excess_shear_m);
     }
     if (std::isfinite(tactile.rotational_shear_rad)) {
+      const double excess_rotation_rad =
+          HingeExcess(std::abs(tactile.rotational_shear_rad),
+                      config.rotation_safe_limit_rad);
       cost += config.rotation_weight *
-              Square(tactile.rotational_shear_rad);
+              Square(excess_rotation_rad);
     }
     if (std::isfinite(tactile.slip_score)) {
-      cost += config.slip_score_weight * Square(tactile.slip_score);
+      const double excess_slip =
+          HingeExcess(tactile.slip_score, config.slip_score_safe_limit);
+      cost += config.slip_score_weight * Square(excess_slip);
     }
   }
   return cost;
@@ -157,8 +172,11 @@ double ContactLineAlignmentCost(
   const Eigen::Vector3d axis = config.close_axis_base.normalized();
   const Eigen::Vector3d d = centroids[1] - centroids[0];
   const Eigen::Vector3d tangent_error = d - d.dot(axis) * axis;
+  const double excess_error_m =
+      HingeExcess(tangent_error.norm(),
+                  config.contact_line_alignment_deadband_m);
   return config.contact_line_alignment_weight *
-         tangent_error.squaredNorm();
+         Square(excess_error_m);
 }
 
 }  // namespace

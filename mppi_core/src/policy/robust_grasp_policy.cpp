@@ -87,7 +87,12 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
       !std::isfinite(config.risk_weight) || config.risk_weight < 0.0 ||
       !std::isfinite(config.cvar_tail_fraction) ||
       config.cvar_tail_fraction < 0.0 ||
-      config.cvar_tail_fraction > 1.0) {
+      config.cvar_tail_fraction > 1.0 ||
+      !std::isfinite(config.safe_hold_score_threshold) ||
+      !std::isfinite(config.min_required_score_improvement) ||
+      config.min_required_score_improvement < 0.0 ||
+      !std::isfinite(config.action_rate_weight) ||
+      config.action_rate_weight < 0.0) {
     throw std::invalid_argument("RobustGraspPolicyConfig: invalid rollout or scoring field");
   }
 
@@ -112,6 +117,8 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
       std::make_unique<GraspActionLibrary>(config_.action_library);
   cost_ = std::make_unique<RobustGraspStateCost>(config_.cost);
   status_ = RobustGraspPolicyStatus{};
+  last_selected_qddot_ =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(config_.rollout.action_dim));
   initialized_ = true;
 }
 
@@ -155,12 +162,20 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   std::size_t best_index = 0;
   double best_mean = kLargeCost;
   double best_cvar = kLargeCost;
+  double hold_score = kLargeCost;
+  double hold_mean = kLargeCost;
+  double hold_cvar = kLargeCost;
   for (std::size_t i = 0; i < candidates.size(); ++i) {
     double mean_cost = kLargeCost;
     double cvar_cost = kLargeCost;
     const double score = EvaluateCandidate(
         initial_state, candidates[i], disturbances, context, &mean_cost,
         &cvar_cost);
+    if (i == 0U) {
+      hold_score = score;
+      hold_mean = mean_cost;
+      hold_cvar = cvar_cost;
+    }
     if (score < best_score) {
       best_score = score;
       best_index = i;
@@ -169,11 +184,32 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
     }
   }
 
+  bool select_hold = false;
+  if (std::isfinite(hold_score)) {
+    const bool hold_is_safe =
+        config_.safe_hold_score_threshold >= 0.0 &&
+        hold_score <= config_.safe_hold_score_threshold;
+    const bool correction_not_meaningfully_better =
+        hold_score - best_score < config_.min_required_score_improvement;
+    select_hold = hold_is_safe || correction_not_meaningfully_better;
+  }
+  if (select_hold) {
+    best_index = 0U;
+    best_score = hold_score;
+    best_mean = hold_mean;
+    best_cvar = hold_cvar;
+  }
+
   status_.best_score = best_score;
   status_.best_mean_cost = best_mean;
   status_.best_cvar_cost = best_cvar;
   status_.best_candidate_index = best_index;
+  status_.selected_hold_by_margin = select_hold;
+  status_.hold_score = hold_score;
+  status_.hold_mean_cost = hold_mean;
+  status_.hold_cvar_cost = hold_cvar;
   status_.selected_qddot = candidates[best_index].firstAction();
+  last_selected_qddot_ = status_.selected_qddot;
   return MakeRobotCommandFromQddot(
       observation, status_.selected_qddot, config_.rollout.dt);
 }
@@ -247,7 +283,14 @@ double RobustGraspPolicy::EvaluateCandidate(
   if (cvar_cost != nullptr) {
     *cvar_cost = cvar;
   }
-  return mean + config_.risk_weight * cvar;
+  double score = mean + config_.risk_weight * cvar;
+  if (config_.action_rate_weight > 0.0 &&
+      last_selected_qddot_.size() == candidate.firstAction().size() &&
+      last_selected_qddot_.allFinite()) {
+    score += config_.action_rate_weight *
+             (candidate.firstAction() - last_selected_qddot_).squaredNorm();
+  }
+  return score;
 }
 
 RobotCommand RobustGraspPolicy::MakeHoldCommand(

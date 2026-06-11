@@ -232,6 +232,9 @@ RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
   defaults.force_balance_weight =
       yaml_utils::ReadDouble(safe_params, "force_balance_weight",
                              defaults.force_balance_weight);
+  defaults.force_balance_deadband_n =
+      yaml_utils::ReadDouble(safe_params, "force_balance_deadband_n",
+                             defaults.force_balance_deadband_n);
   defaults.shear_weight =
       yaml_utils::ReadDouble(safe_params, "shear_weight",
                              defaults.shear_weight);
@@ -241,12 +244,24 @@ RobustGraspStateCostConfig ParseRobustGraspStateCostConfig(
   defaults.slip_score_weight =
       yaml_utils::ReadDouble(safe_params, "slip_score_weight",
                              defaults.slip_score_weight);
+  defaults.shear_safe_limit_m =
+      yaml_utils::ReadDouble(safe_params, "shear_safe_limit_m",
+                             defaults.shear_safe_limit_m);
+  defaults.rotation_safe_limit_rad =
+      yaml_utils::ReadDouble(safe_params, "rotation_safe_limit_rad",
+                             defaults.rotation_safe_limit_rad);
+  defaults.slip_score_safe_limit =
+      yaml_utils::ReadDouble(safe_params, "slip_score_safe_limit",
+                             defaults.slip_score_safe_limit);
   defaults.enable_contact_line_alignment =
       yaml_utils::ReadBool(safe_params, "enable_contact_line_alignment",
                            defaults.enable_contact_line_alignment);
   defaults.contact_line_alignment_weight =
       yaml_utils::ReadDouble(safe_params, "contact_line_alignment_weight",
                              defaults.contact_line_alignment_weight);
+  defaults.contact_line_alignment_deadband_m =
+      yaml_utils::ReadDouble(safe_params, "contact_line_alignment_deadband_m",
+                             defaults.contact_line_alignment_deadband_m);
   defaults.close_axis_base =
       ReadVector3OrScalar(safe_params, "close_axis_base",
                           defaults.close_axis_base);
@@ -285,15 +300,30 @@ GraspActionLibraryConfig ParseGraspActionLibraryConfig(
   defaults.target_min_normal_force_n =
       yaml_utils::ReadDouble(safe_params, "target_min_normal_force_n",
                              defaults.target_min_normal_force_n);
+  defaults.max_safe_normal_force_n =
+      yaml_utils::ReadDouble(safe_params, "max_safe_normal_force_n",
+                             defaults.max_safe_normal_force_n);
   defaults.force_to_squeeze_gain =
       yaml_utils::ReadDouble(safe_params, "force_to_squeeze_gain",
                              defaults.force_to_squeeze_gain);
+  defaults.force_to_release_gain =
+      yaml_utils::ReadDouble(safe_params, "force_to_release_gain",
+                             defaults.force_to_release_gain);
   defaults.force_balance_gain =
       yaml_utils::ReadDouble(safe_params, "force_balance_gain",
                              defaults.force_balance_gain);
   defaults.contact_line_align_gain =
       yaml_utils::ReadDouble(safe_params, "contact_line_align_gain",
                              defaults.contact_line_align_gain);
+  defaults.force_deadband_n =
+      yaml_utils::ReadDouble(safe_params, "force_deadband_n",
+                             defaults.force_deadband_n);
+  defaults.force_balance_deadband_n =
+      yaml_utils::ReadDouble(safe_params, "force_balance_deadband_n",
+                             defaults.force_balance_deadband_n);
+  defaults.contact_line_align_deadband_m =
+      yaml_utils::ReadDouble(safe_params, "contact_line_align_deadband_m",
+                             defaults.contact_line_align_deadband_m);
   defaults.squeeze_std =
       yaml_utils::ReadDouble(safe_params, "squeeze_std",
                              defaults.squeeze_std);
@@ -414,6 +444,15 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
   defaults.cvar_tail_fraction =
       yaml_utils::ReadDouble(robust_score, "cvar_tail_fraction",
                              defaults.cvar_tail_fraction);
+  defaults.safe_hold_score_threshold =
+      yaml_utils::ReadDouble(robust_score, "safe_hold_score_threshold",
+                             defaults.safe_hold_score_threshold);
+  defaults.min_required_score_improvement =
+      yaml_utils::ReadDouble(robust_score, "min_required_score_improvement",
+                             defaults.min_required_score_improvement);
+  defaults.action_rate_weight =
+      yaml_utils::ReadDouble(robust_score, "action_rate_weight",
+                             defaults.action_rate_weight);
 
   const YAML::Node behavior =
       yaml_utils::ReadSection(safe_params, "behavior");

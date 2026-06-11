@@ -33,6 +33,7 @@ namespace aristo_controller::state_machines
 class GraspForceState;
 class GraspTeleopState;
 class JointTeleopState;
+class MPPIMotionGraspState;
 }  // namespace aristo_controller::state_machines
 
 namespace plato_ros_controller
@@ -171,6 +172,7 @@ private:
   aristo_controller::state_machines::JointTeleopState * joint_teleop_state_{nullptr};
   aristo_controller::state_machines::GraspTeleopState * grasp_teleop_state_{nullptr};
   aristo_controller::state_machines::GraspForceState * grasp_force_state_{nullptr};
+  aristo_controller::state_machines::MPPIMotionGraspState * mppi_motion_grasp_state_{nullptr};
   std::atomic<plato_robot_system::StateId> pending_requested_state_id_{-1};
   std::atomic<double> grasp_force_reference_n_{0.0};
   std::atomic<bool> grasp_force_reference_valid_{false};

@@ -34,11 +34,18 @@ struct GraspObservation {
   Eigen::VectorXd q_ref_current;
   Eigen::VectorXd qdot_ref_current;
 
+  Eigen::VectorXd q_motion_target;
+  Eigen::VectorXd qdot_motion_target;
+  Eigen::VectorXd q_motion_weight;
+  Eigen::VectorXd qdot_motion_weight;
+  bool motion_target_valid{false};
+
   std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
       tactile_meas;
 
-  // Pinocchio RNEA updates Data as a computation cache, so rollout code needs a
-  // mutable RobotSystem even when the observation values themselves are const.
+  // Pinocchio RNEA updates Data as a computation cache, so this pointer is
+  // single-thread only. Parallel rollout should replace it with per-worker
+  // Pinocchio Data or an explicit rollout model context.
   RobotSystem* robot_system{nullptr};
   std::vector<TactileSensorContext> tactile_contexts{};
   const TactileTransitionConfig* tactile_transition_config{nullptr};

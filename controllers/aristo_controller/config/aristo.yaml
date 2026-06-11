@@ -85,6 +85,11 @@ state_machine:
         default_phi: 0.0
         default_desired_force_n: 5.0
         shared_grasp_control: true
+        shared_control_min_contact_sensors: 2
+        shared_control_enter_debounce_ticks: 3
+        shared_control_requires_u_below_threshold: true
+        # Match mppi_grasp start: both tactile sensors must report EnoughContacts.
+        shared_control_requires_enough_contact: true
 
         grasp_task:
           # q_ready is copied from grasp_ready.target_jpos.
@@ -108,6 +113,22 @@ state_machine:
             upper_bound: 1.0
             noise_std: 0.5
 
+        safety:
+          # If the driver is not tracking the MPPI reference, fall back to
+          # measured q/qdot and reset the nominal action sequence.
+          max_reference_tracking_error_rad: 0.25
+          # Post-MPPI command envelope for hardware bring-up.
+          max_qdot_cmd_rad_s: 0.5
+          max_tau_cmd_nm: 0.05
+          max_tau_rate_nm_s: 1.0
+          clamp_q_cmd_to_model_limits: true
+
+        tactile:
+          # Sign maps each sensor frame normal to the rollout convention:
+          # positive normal velocity means closing / contact approach.
+          thumb_normal_axis_sign: 1.0
+          index_normal_axis_sign: 1.0
+
         rollout:
           disturbance:
             enabled: false
@@ -121,8 +142,8 @@ state_machine:
         task:
           name: grasp_hold
           start:
-            min_enough_contact_sensors: 1
-            min_active_hemisphere_total: 1
+            min_enough_contact_sensors: 2
+            min_active_hemisphere_total: 2
           objective:
             min_active_tactile_sensors: 1
             target_active_hemisphere_total: 4
@@ -136,6 +157,60 @@ state_machine:
             rotation_weight: 5.0
             qddot_weight: 1.0
             tau_weight: 0.01
+
+    - id: 7
+      name: mppi_motion_grasp
+      stay_here: true
+      params:
+        enabled: true
+
+        command:
+          # u_open: 0 closed, 1 open / grasp-ready.
+          u_open: 1.0
+          phi: 0.5
+          desired_force_n: 1.0
+
+        initiation:
+          contact_enter_debounce_ticks: 3
+          contact_exit_debounce_ticks: 3
+          min_contact_force_n: 0.05
+          use_tactile_presence_for_contact: true
+
+          contacted_finger_hold_weight: 50.0
+          moving_finger_target_weight: 10.0
+          posture_weight: 1.0
+
+          max_reference_tracking_error_rad: 0.5
+
+        safety:
+          max_velocity_rad_s: 1.0
+          max_torque_nm: 0.2
+          max_torque_rate_nm_per_s: 2.0
+
+        mppi:
+          horizon_steps: 20
+          num_rollouts: 256
+          dt: 0.01
+          temperature: 1.0
+          random_seed: 1
+          action:
+            lower_bound: -4.0
+            upper_bound: 4.0
+            noise_std: 1.0
+
+        cost:
+          q_target_weight: 20.0
+          qdot_target_weight: 1.0
+          qddot_weight: 0.01
+          tau_weight: 0.001
+          joint_limit_weight: 2.0
+          joint_limit_margin_rad: 0.10
+          enable_line_of_action_cost: true
+          line_of_action_weight: 5.0
+
+        grasp_task:
+          # q_ready is copied from grasp_ready.target_jpos.
+          force_feedback_enabled: false
 
     - id: 6
       name: grasp_force

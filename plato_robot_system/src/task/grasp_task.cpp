@@ -171,7 +171,33 @@ bool GraspTask::PopulateCommand(
   const double dt_sec,
   RobotCommand * command)
 {
-  if (command == nullptr || !HasCompatibleState(robot, state) ||
+  if (command == nullptr) {
+    return false;
+  }
+
+  Eigen::VectorXd q_target;
+  if (!BuildMotionTarget(robot, state, input, dt_sec, &q_target)) {
+    return false;
+  }
+
+  command->Resize(robot.nq(), robot.nv());
+  command->q_cmd = q_target;
+  command->qdot_cmd.setZero();
+  command->tau_cmd.setZero();
+  command->stamp_sec = state.time_s;
+  command->valid = command->HasValidDimensions() && command->AllFinite();
+  return command->valid;
+}
+
+bool GraspTask::BuildMotionTarget(
+  RobotSystem & robot,
+  const RobotState & state,
+  const GraspTaskCommand & input,
+  const double dt_sec,
+  Eigen::VectorXd * q_target,
+  GraspTaskStatus * status)
+{
+  if (q_target == nullptr || !HasCompatibleState(robot, state) ||
     !IsFinite(dt_sec) || dt_sec <= kMinDt ||
     !IsFinite(input.u) || !IsFinite(input.phi) ||
     !IsFinite(input.desired_force_n))
@@ -182,12 +208,12 @@ bool GraspTask::PopulateCommand(
     return false;
   }
 
-  const double u = Clamp01(input.u);
+  const double u_open = Clamp01(input.u);
   const double phi = Clamp01(input.phi);
   const double desired_force_n = std::max(0.0, input.desired_force_n);
 
   const GraspTaskGripForceEstimate estimate = EstimateGripForceFromTactile(state);
-  UpdateMode(estimate, u);
+  UpdateMode(estimate, u_open);
   if (mode_ == GraspTaskMode::kForceTracking && !estimate.valid_force) {
     mode_ = GraspTaskMode::kMotionTeleop;
     force_enter_counter_ = 0;
@@ -197,25 +223,42 @@ bool GraspTask::PopulateCommand(
   }
 
   status_.mode = mode_;
-  status_.u = u;
+  status_.u = u_open;
   status_.phi = phi;
   status_.desired_force_n = desired_force_n;
   status_.measured_force_n = estimate.measured_force_n;
+  status_.force_a_n = estimate.force_a_n;
+  status_.force_b_n = estimate.force_b_n;
+  status_.contact_a = estimate.contact_a;
+  status_.contact_b = estimate.contact_b;
+  status_.enough_contact_a = estimate.enough_contact_a;
+  status_.enough_contact_b = estimate.enough_contact_b;
+  status_.lost_contact_a = estimate.lost_contact_a;
+  status_.lost_contact_b = estimate.lost_contact_b;
+  status_.valid_force = estimate.valid_force;
+  status_.contact_count =
+    (estimate.contact_a ? 1 : 0) + (estimate.contact_b ? 1 : 0);
+  status_.enough_contact_count =
+    (estimate.enough_contact_a ? 1 : 0) + (estimate.enough_contact_b ? 1 : 0);
   status_.force_enter_counter = force_enter_counter_;
   status_.force_exit_contact_lost_counter = force_exit_contact_lost_counter_;
 
   GraspTaskCommand clamped_input;
-  clamped_input.u = u;
+  clamped_input.u = u_open;
   clamped_input.phi = phi;
   clamped_input.desired_force_n = desired_force_n;
 
-  return BuildParallelJointPositionCommand(
+  const bool built = BuildParallelJointPositionTarget(
     robot,
     state,
     clamped_input,
     estimate,
     dt_sec,
-    command);
+    q_target);
+  if (status != nullptr) {
+    *status = status_;
+  }
+  return built;
 }
 
 bool GraspTask::HasCompatibleState(
@@ -260,6 +303,10 @@ GraspTaskGripForceEstimate GraspTask::EstimateGripForceFromTactile(
   const bool has_force_b = ExtractNormalForceN(tactile_b, &estimate.force_b_n);
 
   if (config_.use_tactile_presence_for_contact) {
+    estimate.contact_a =
+      tactile_a != nullptr && tactile_a->valid && tactile_a->HasContact();
+    estimate.contact_b =
+      tactile_b != nullptr && tactile_b->valid && tactile_b->HasContact();
     estimate.enough_contact_a =
       tactile_a != nullptr && tactile_a->valid && tactile_a->HasEnoughContact();
     estimate.enough_contact_b =
@@ -275,6 +322,8 @@ GraspTaskGripForceEstimate GraspTask::EstimateGripForceFromTactile(
       has_force_a && estimate.force_a_n >= config_.min_contact_force_n;
     estimate.enough_contact_b =
       has_force_b && estimate.force_b_n >= config_.min_contact_force_n;
+    estimate.contact_a = estimate.enough_contact_a;
+    estimate.contact_b = estimate.enough_contact_b;
     estimate.lost_contact_a =
       !has_force_a || estimate.force_a_n < config_.min_contact_force_n;
     estimate.lost_contact_b =
@@ -363,15 +412,15 @@ double GraspTask::ParallelQ5Geometry(const double q3) const
   return std::max(config_.parallel_q5_min_rad, std::acos(cos_q5));
 }
 
-bool GraspTask::BuildParallelJointPositionCommand(
+bool GraspTask::BuildParallelJointPositionTarget(
   const RobotSystem & robot,
   const RobotState & state,
   const GraspTaskCommand & input,
   const GraspTaskGripForceEstimate & estimate,
   const double dt_sec,
-  RobotCommand * command)
+  Eigen::VectorXd * q_target_out)
 {
-  if (command == nullptr || !HasCompatibleState(robot, state) ||
+  if (q_target_out == nullptr || !HasCompatibleState(robot, state) ||
     !IsFinite(dt_sec) || dt_sec <= kMinDt ||
     q_reference_.size() != robot.nq() || !q_reference_.allFinite())
   {
@@ -400,13 +449,13 @@ bool GraspTask::BuildParallelJointPositionCommand(
     status_.force_error_n = force_error;
   }
 
-  const double u_parallel = Clamp01(effective_u);
+  const double u_open = Clamp01(effective_u);
 
   double q3_target = 0.0;
   double q5_target = 0.0;
-  if (u_parallel > config_.parallel_midpoint_u) {
+  if (u_open > config_.parallel_midpoint_u) {
     const double ratio =
-      (u_parallel - config_.parallel_midpoint_u) /
+      (u_open - config_.parallel_midpoint_u) /
       (1.0 - config_.parallel_midpoint_u);
     const double q5_neutral = ParallelQ5Geometry(0.0);
     q3_target = 0.0;
@@ -415,7 +464,7 @@ bool GraspTask::BuildParallelJointPositionCommand(
       q5_neutral - ratio * (q5_neutral - config_.parallel_q5_min_rad));
   } else {
     const double ratio =
-      (config_.parallel_midpoint_u - u_parallel) / config_.parallel_midpoint_u;
+      (config_.parallel_midpoint_u - u_open) / config_.parallel_midpoint_u;
     q3_target = Clamp(
       config_.parallel_qmax_rad -
       ratio * (config_.parallel_qmax_rad - config_.parallel_qmin_rad),
@@ -463,20 +512,11 @@ bool GraspTask::BuildParallelJointPositionCommand(
     return false;
   }
 
-  command->Resize(robot.nq(), robot.nv());
-  command->q_cmd = q_command;
-  command->qdot_cmd.setZero();
-  command->tau_cmd.setZero();
-  command->stamp_sec = state.time_s;
-  command->valid = command->HasValidDimensions() && command->AllFinite();
-  if (!command->valid) {
-    return false;
-  }
-
   status_.effective_u = effective_u;
   status_.effective_phi = effective_phi;
-  status_.u_parallel = u_parallel;
+  status_.u_parallel = u_open;
   status_.q_target = q_command;
+  *q_target_out = q_command;
   return true;
 }
 

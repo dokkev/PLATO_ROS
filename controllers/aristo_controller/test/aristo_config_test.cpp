@@ -28,6 +28,7 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_EQ(config.grasp_teleop.id, 4);
   EXPECT_EQ(config.mppi_grasp.id, 5);
   EXPECT_EQ(config.grasp_force.id, 6);
+  EXPECT_EQ(config.mppi_motion_grasp.id, 7);
   EXPECT_EQ(config.poke.id, 1);
   EXPECT_TRUE(config.initialize.lifecycle.stay_here);
   EXPECT_FALSE(config.grasp_ready.lifecycle.stay_here);
@@ -87,6 +88,10 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_u, 0.7);
   EXPECT_DOUBLE_EQ(config.grasp_teleop.state.default_phi, 0.0);
   EXPECT_TRUE(config.grasp_teleop.state.shared_grasp_control);
+  EXPECT_EQ(config.grasp_teleop.state.shared_control_min_contact_sensors, 2);
+  EXPECT_EQ(config.grasp_teleop.state.shared_control_enter_debounce_ticks, 3);
+  EXPECT_TRUE(config.grasp_teleop.state.shared_control_requires_u_below_threshold);
+  EXPECT_TRUE(config.grasp_teleop.state.shared_control_requires_enough_contact);
   ASSERT_EQ(grasp_task.q_ready.size(), config.num_joints);
   EXPECT_TRUE(grasp_task.q_ready.isApprox(expected_grasp_ready_target));
   EXPECT_FALSE(grasp_task.force_feedback_enabled);
@@ -133,9 +138,42 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_TRUE(
     mppi_grasp.mppi.action_noise_std.isApprox(
       Eigen::VectorXd::Constant(config.num_joints, 0.5)));
-  EXPECT_EQ(mppi_grasp.task.start.min_enough_contact_sensors, 1U);
-  EXPECT_EQ(mppi_grasp.task.start.min_active_hemispheres_total, 1U);
+  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_reference_tracking_error_rad, 0.25);
+  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_qdot_cmd_rad_s, 0.5);
+  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_tau_cmd_nm, 0.05);
+  EXPECT_DOUBLE_EQ(mppi_grasp.safety.max_tau_rate_nm_s, 1.0);
+  EXPECT_TRUE(mppi_grasp.safety.clamp_q_cmd_to_model_limits);
+  EXPECT_DOUBLE_EQ(mppi_grasp.tactile.thumb_normal_axis_sign, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_grasp.tactile.index_normal_axis_sign, 1.0);
+  EXPECT_EQ(mppi_grasp.task.start.min_enough_contact_sensors, 2U);
+  EXPECT_EQ(mppi_grasp.task.start.min_active_hemispheres_total, 2U);
   EXPECT_EQ(mppi_grasp.task.cost.target_active_hemisphere_total, 4U);
   EXPECT_DOUBLE_EQ(mppi_grasp.task.tolerance.max_shear_m, 0.003);
   EXPECT_DOUBLE_EQ(mppi_grasp.tactile_transition.max_shear_m, 0.003);
+
+  const auto & mppi_motion_grasp = config.mppi_motion_grasp.state;
+  EXPECT_TRUE(mppi_motion_grasp.enabled);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_u, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_phi, 0.5);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.default_desired_force_n, 1.0);
+  EXPECT_EQ(mppi_motion_grasp.initiation.contact_enter_debounce_ticks, 3);
+  EXPECT_EQ(mppi_motion_grasp.initiation.contact_exit_debounce_ticks, 3);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.contacted_finger_hold_weight, 50.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.moving_finger_target_weight, 10.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.posture_weight, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.initiation.max_reference_tracking_error_rad, 0.5);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_velocity_rad_s, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_torque_nm, 0.2);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.safety.max_torque_rate_nm_per_s, 2.0);
+  EXPECT_EQ(mppi_motion_grasp.mppi.horizon_steps, 20U);
+  EXPECT_EQ(mppi_motion_grasp.mppi.num_rollouts, 256U);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_lower_bound[0], -4.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_upper_bound[0], 4.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.mppi.action_noise_std[0], 1.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.cost.q_target_weight, 20.0);
+  EXPECT_DOUBLE_EQ(mppi_motion_grasp.cost.line_of_action_weight, 5.0);
+  EXPECT_TRUE(mppi_motion_grasp.cost.enable_line_of_action_cost);
+  ASSERT_EQ(mppi_motion_grasp.grasp_task.q_ready.size(), config.num_joints);
+  EXPECT_TRUE(mppi_motion_grasp.grasp_task.q_ready.isApprox(expected_grasp_ready_target));
+  EXPECT_FALSE(mppi_motion_grasp.grasp_task.force_feedback_enabled);
 }

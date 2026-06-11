@@ -16,6 +16,7 @@
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
 #include "aristo_controller/state_machines/mppi_grasp.hpp"
+#include "aristo_controller/state_machines/mppi_motion_grasp.hpp"
 #include "aristo_controller/state_machines/poke.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
@@ -123,6 +124,7 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   joint_teleop_state_ = nullptr;
   grasp_teleop_state_ = nullptr;
   grasp_force_state_ = nullptr;
+  mppi_motion_grasp_state_ = nullptr;
   grasp_force_reference_n_.store(0.0);
   grasp_force_reference_valid_.store(false);
 
@@ -735,7 +737,10 @@ void PlatoRosController::grasp_force_reference_valid_callback(
 
 void PlatoRosController::sync_grasp_teleop_input()
 {
-  if (grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr) {
+  if (
+    grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr &&
+    mppi_motion_grasp_state_ == nullptr)
+  {
     return;
   }
 
@@ -762,6 +767,8 @@ void PlatoRosController::sync_grasp_teleop_input()
       default_desired_force_n = grasp_teleop_state_->default_desired_force_n();
     } else if (grasp_force_state_ != nullptr) {
       default_desired_force_n = grasp_force_state_->default_desired_force_n();
+    } else if (mppi_motion_grasp_state_ != nullptr) {
+      default_desired_force_n = mppi_motion_grasp_state_->default_desired_force_n();
     }
     input.desired_force_n = grasp_force_reference_valid_.load() ?
       grasp_force_reference_n_.load() :
@@ -777,6 +784,13 @@ void PlatoRosController::sync_grasp_teleop_input()
     force_input.phi = input.phi;
     force_input.desired_force_n = input.desired_force_n;
     grasp_force_state_->SetInput(force_input);
+  }
+  if (mppi_motion_grasp_state_ != nullptr) {
+    aristo_controller::state_machines::MPPIMotionGraspInput motion_input;
+    motion_input.u = input.u;
+    motion_input.phi = input.phi;
+    motion_input.desired_force_n = input.desired_force_n;
+    mppi_motion_grasp_state_->SetInput(motion_input);
   }
 }
 
@@ -1060,6 +1074,24 @@ bool PlatoRosController::configure_from_control_config(
     }
     mppi_grasp->ConfigureLifecycle(aristo_config.mppi_grasp.lifecycle);
     architecture.RegisterState(std::move(mppi_grasp));
+
+    auto mppi_motion_grasp_config = aristo_config.mppi_motion_grasp.state;
+    if (mppi_motion_grasp_config.grasp_task.q_ready.size() > 0) {
+      mppi_motion_grasp_config.grasp_task.q_ready =
+        map_joint_positions_to_model_q(mppi_motion_grasp_config.grasp_task.q_ready, robot);
+    }
+
+    auto mppi_motion_grasp =
+      std::make_unique<aristo_controller::state_machines::MPPIMotionGraspState>(
+        aristo_config.mppi_motion_grasp.id,
+        &robot);
+    if (!mppi_motion_grasp->ConfigureTask(mppi_motion_grasp_config)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure mppi_motion_grasp task");
+      return false;
+    }
+    mppi_motion_grasp->ConfigureLifecycle(aristo_config.mppi_motion_grasp.lifecycle);
+    mppi_motion_grasp_state_ = mppi_motion_grasp.get();
+    architecture.RegisterState(std::move(mppi_motion_grasp));
 
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,

@@ -107,6 +107,18 @@ Eigen::VectorXd parse_optional_vector_or_scalar(
   return parse_vector_or_scalar(node, key, size, 0.0);
 }
 
+Eigen::Vector3d parse_optional_vector3_or_scalar(
+  const YAML::Node & node,
+  const std::string & key,
+  const Eigen::Vector3d & fallback)
+{
+  if (!node || !node[key]) {
+    return fallback;
+  }
+  const auto vector = parse_vector_or_scalar(node, key, 3, 0.0);
+  return Eigen::Vector3d{vector[0], vector[1], vector[2]};
+}
+
 Eigen::VectorXd parse_required_vector_or_scalar(
   const YAML::Node & node,
   const std::string & key,
@@ -296,6 +308,26 @@ aristo_controller::state_machines::GraspTeleopStateConfig parse_grasp_teleop_sta
   const auto grasp_task = required_node(params, "grasp_task");
   config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
   config.grasp_task.force_feedback_enabled = false;
+  config.shared_control_min_contact_sensors =
+    optional_scalar<int>(
+      params,
+      "shared_control_min_contact_sensors",
+      config.shared_control_min_contact_sensors);
+  config.shared_control_enter_debounce_ticks =
+    optional_scalar<int>(
+      params,
+      "shared_control_enter_debounce_ticks",
+      config.grasp_task.force_enter_debounce_ticks);
+  config.shared_control_requires_u_below_threshold =
+    optional_scalar<bool>(
+      params,
+      "shared_control_requires_u_below_threshold",
+      config.shared_control_requires_u_below_threshold);
+  config.shared_control_requires_enough_contact =
+    optional_scalar<bool>(
+      params,
+      "shared_control_requires_enough_contact",
+      config.shared_control_requires_enough_contact);
 
   return config;
 }
@@ -358,6 +390,8 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
   const auto mppi_params = params ? params["mppi"] : YAML::Node();
   const auto rollout_params = params ? params["rollout"] : YAML::Node();
   const auto task_params = params ? params["task"] : YAML::Node();
+  const auto safety_params = params ? params["safety"] : YAML::Node();
+  const auto tactile_params = params ? params["tactile"] : YAML::Node();
   config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
   config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
   config.tactile_transition =
@@ -365,6 +399,173 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
   config.task = mppi_core::ParseTaskConfig(task_params, config.task);
   config.tactile_transition =
     mppi_core::ApplyTaskToleranceToTransitionConfig(config.task, config.tactile_transition);
+  config.safety.max_reference_tracking_error_rad =
+    optional_scalar<double>(
+      safety_params,
+      "max_reference_tracking_error_rad",
+      config.safety.max_reference_tracking_error_rad);
+  config.safety.max_qdot_cmd_rad_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_qdot_cmd_rad_s",
+      config.safety.max_qdot_cmd_rad_s);
+  config.safety.max_tau_cmd_nm =
+    optional_scalar<double>(
+      safety_params,
+      "max_tau_cmd_nm",
+      config.safety.max_tau_cmd_nm);
+  config.safety.max_tau_rate_nm_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_tau_rate_nm_s",
+      config.safety.max_tau_rate_nm_s);
+  config.safety.clamp_q_cmd_to_model_limits =
+    optional_scalar<bool>(
+      safety_params,
+      "clamp_q_cmd_to_model_limits",
+      config.safety.clamp_q_cmd_to_model_limits);
+  config.tactile.thumb_normal_axis_sign =
+    optional_scalar<double>(
+      tactile_params,
+      "thumb_normal_axis_sign",
+      config.tactile.thumb_normal_axis_sign);
+  config.tactile.index_normal_axis_sign =
+    optional_scalar<double>(
+      tactile_params,
+      "index_normal_axis_sign",
+      config.tactile.index_normal_axis_sign);
+  return config;
+}
+
+aristo_controller::state_machines::MPPIMotionGraspStateConfig
+parse_mppi_motion_grasp_state_config(
+  const YAML::Node & params,
+  const int num_joints)
+{
+  if (params && !params.IsMap()) {
+    throw std::runtime_error("mppi_motion_grasp.params must be a map when provided");
+  }
+
+  aristo_controller::state_machines::MPPIMotionGraspStateConfig config;
+  config.enabled = optional_scalar<bool>(params, "enabled", config.enabled);
+
+  const auto command_params = params ? params["command"] : YAML::Node();
+  config.default_u =
+    optional_scalar<double>(command_params, "u_open", config.default_u);
+  config.default_phi =
+    optional_scalar<double>(command_params, "phi", config.default_phi);
+  config.default_desired_force_n =
+    optional_scalar<double>(
+      command_params,
+      "desired_force_n",
+      config.default_desired_force_n);
+
+  const auto initiation_params = params ? params["initiation"] : YAML::Node();
+  config.initiation.contact_enter_debounce_ticks =
+    optional_scalar<int>(
+      initiation_params,
+      "contact_enter_debounce_ticks",
+      config.initiation.contact_enter_debounce_ticks);
+  config.initiation.contact_exit_debounce_ticks =
+    optional_scalar<int>(
+      initiation_params,
+      "contact_exit_debounce_ticks",
+      config.initiation.contact_exit_debounce_ticks);
+  config.initiation.min_contact_force_n =
+    optional_scalar<double>(
+      initiation_params,
+      "min_contact_force_n",
+      config.initiation.min_contact_force_n);
+  config.initiation.use_tactile_presence_for_contact =
+    optional_scalar<bool>(
+      initiation_params,
+      "use_tactile_presence_for_contact",
+      config.initiation.use_tactile_presence_for_contact);
+  config.initiation.contacted_finger_hold_weight =
+    optional_scalar<double>(
+      initiation_params,
+      "contacted_finger_hold_weight",
+      config.initiation.contacted_finger_hold_weight);
+  config.initiation.moving_finger_target_weight =
+    optional_scalar<double>(
+      initiation_params,
+      "moving_finger_target_weight",
+      config.initiation.moving_finger_target_weight);
+  config.initiation.posture_weight =
+    optional_scalar<double>(
+      initiation_params,
+      "posture_weight",
+      config.initiation.posture_weight);
+  config.initiation.max_reference_tracking_error_rad =
+    optional_scalar<double>(
+      initiation_params,
+      "max_reference_tracking_error_rad",
+      config.initiation.max_reference_tracking_error_rad);
+
+  const auto safety_params = params ? params["safety"] : YAML::Node();
+  config.safety.max_velocity_rad_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_velocity_rad_s",
+      config.safety.max_velocity_rad_s);
+  config.safety.max_torque_nm =
+    optional_scalar<double>(
+      safety_params,
+      "max_torque_nm",
+      config.safety.max_torque_nm);
+  config.safety.max_torque_rate_nm_per_s =
+    optional_scalar<double>(
+      safety_params,
+      "max_torque_rate_nm_per_s",
+      config.safety.max_torque_rate_nm_per_s);
+
+  const auto mppi_params = params ? params["mppi"] : YAML::Node();
+  config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
+
+  const auto cost_params = params ? params["cost"] : YAML::Node();
+  config.cost.q_target_weight =
+    optional_scalar<double>(
+      cost_params, "q_target_weight", config.cost.q_target_weight);
+  config.cost.qdot_target_weight =
+    optional_scalar<double>(
+      cost_params, "qdot_target_weight", config.cost.qdot_target_weight);
+  config.cost.qddot_weight =
+    optional_scalar<double>(
+      cost_params, "qddot_weight", config.cost.qddot_weight);
+  config.cost.tau_weight =
+    optional_scalar<double>(
+      cost_params, "tau_weight", config.cost.tau_weight);
+  config.cost.joint_limit_weight =
+    optional_scalar<double>(
+      cost_params, "joint_limit_weight", config.cost.joint_limit_weight);
+  config.cost.joint_limit_margin_rad =
+    optional_scalar<double>(
+      cost_params, "joint_limit_margin_rad", config.cost.joint_limit_margin_rad);
+  config.cost.enable_line_of_action_cost =
+    optional_scalar<bool>(
+      cost_params,
+      "enable_line_of_action_cost",
+      config.cost.enable_line_of_action_cost);
+  config.cost.line_of_action_weight =
+    optional_scalar<double>(
+      cost_params, "line_of_action_weight", config.cost.line_of_action_weight);
+  config.cost.frame_a_name =
+    optional_scalar<std::string>(
+      cost_params, "frame_a_name", config.cost.frame_a_name);
+  config.cost.frame_b_name =
+    optional_scalar<std::string>(
+      cost_params, "frame_b_name", config.cost.frame_b_name);
+  config.cost.close_axis_base =
+    parse_optional_vector3_or_scalar(
+      cost_params,
+      "close_axis_base",
+      config.cost.close_axis_base);
+
+  const auto grasp_task = params ? params["grasp_task"] : YAML::Node();
+  if (grasp_task) {
+    config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
+  }
+  config.grasp_task.force_feedback_enabled = false;
   return config;
 }
 
@@ -426,6 +627,11 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   const auto mppi_grasp = state_by_name(states, "mppi_grasp");
   config.mppi_grasp.state =
     parse_mppi_grasp_state_config(mppi_grasp["params"], config.num_joints);
+  static_cast<StateConfig &>(config.mppi_motion_grasp) =
+    parse_state_config(states, "mppi_motion_grasp");
+  const auto mppi_motion_grasp = state_by_name(states, "mppi_motion_grasp");
+  config.mppi_motion_grasp.state =
+    parse_mppi_motion_grasp_state_config(mppi_motion_grasp["params"], config.num_joints);
   config.initialize = parse_joint_position_config(states, "initialize", config.num_joints);
   config.poke = parse_joint_position_config(states, "poke", config.num_joints);
   config.grasp_ready =
@@ -452,11 +658,14 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
   if (config.grasp_force.state.grasp_task.q_ready.size() == 0) {
     config.grasp_force.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
   }
+  if (config.mppi_motion_grasp.state.grasp_task.q_ready.size() == 0) {
+    config.mppi_motion_grasp.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
+  }
 
   validate_distinct_state_ids(
     {config.idle.id, config.initialize.id, config.poke.id, config.grasp_ready.id,
       config.joint_teleop.id, config.grasp_teleop.id, config.grasp_force.id,
-      config.mppi_grasp.id});
+      config.mppi_grasp.id, config.mppi_motion_grasp.id});
 
   return config;
 }

@@ -20,7 +20,9 @@ set(${PROJECT_NAME}_SOURCES
   src/core/action_sequence.cpp
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
+  src/costs/motion_tracking_cost.cpp
   src/rollout/grasp_state_rollout_model.cpp
+  src/rollout/motion_rollout_model.cpp
   src/util/mppi_config.cpp
   src/util/rollout_config.cpp
   src/util/task_config.cpp

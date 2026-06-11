@@ -22,6 +22,10 @@ struct GraspTeleopStateConfig
   double default_phi{0.0};
   double default_desired_force_n{1.0};
   bool shared_grasp_control{false};
+  int shared_control_min_contact_sensors{1};
+  int shared_control_enter_debounce_ticks{3};
+  bool shared_control_requires_u_below_threshold{true};
+  bool shared_control_requires_enough_contact{false};
 
   plato_robot_system::task::GraspTaskConfig grasp_task;
 };
@@ -55,8 +59,11 @@ public:
   double default_desired_force_n() const { return config_.default_desired_force_n; }
   bool task_entered() const { return task_entered_; }
   bool force_handoff_requested() const { return force_handoff_requested_; }
+  bool shared_control_handoff_requested() const { return force_handoff_requested_; }
 
 private:
+  void UpdateSharedControlHandoff(const GraspTeleopInput & input) const;
+
   plato_robot_system::RobotSystem * robot_{nullptr};
   mutable plato_robot_system::task::GraspTask grasp_task_;
   GraspTeleopStateConfig config_;
@@ -64,6 +71,7 @@ private:
   bool task_configured_{false};
   mutable bool task_entered_{false};
   mutable bool force_handoff_requested_{false};
+  mutable int shared_control_enter_counter_{0};
 };
 
 }  // namespace aristo_controller::state_machines

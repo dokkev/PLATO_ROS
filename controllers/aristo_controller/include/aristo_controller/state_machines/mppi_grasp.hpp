@@ -17,12 +17,29 @@
 namespace aristo_controller::state_machines
 {
 
+struct MPPIGraspSafetyConfig
+{
+  double max_reference_tracking_error_rad{0.25};
+  double max_qdot_cmd_rad_s{0.5};
+  double max_tau_cmd_nm{0.05};
+  double max_tau_rate_nm_s{1.0};
+  bool clamp_q_cmd_to_model_limits{true};
+};
+
+struct MPPIGraspTactileConfig
+{
+  double thumb_normal_axis_sign{1.0};
+  double index_normal_axis_sign{1.0};
+};
+
 struct MPPIGraspStateConfig
 {
   mppi_core::MPPIConfig mppi;
   mppi_core::GraspStateRolloutConfig rollout;
   mppi_core::TactileTransitionConfig tactile_transition;
   mppi_core::TaskConfig task;
+  MPPIGraspSafetyConfig safety;
+  MPPIGraspTactileConfig tactile;
 };
 
 class MPPIGraspState final : public plato_robot_system::State
@@ -50,6 +67,8 @@ private:
   const mppi_core::PinocchioContactKinematicsContext * KinematicsForTactile(
     const mppi_core::TactileState & tactile,
     std::size_t tactile_index) const;
+  bool CanUseLastCommandReference(const plato_robot_system::RobotState & state) const;
+  bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
 
   plato_robot_system::RobotSystem * robot_{nullptr};

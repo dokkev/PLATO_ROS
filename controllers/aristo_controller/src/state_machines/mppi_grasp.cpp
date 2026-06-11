@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cmath>
 #include <exception>
 #include <memory>
 #include <string>
@@ -110,6 +111,45 @@ bool HasCompatibleRobotState(
          state.tau.size() == robot.nv();
 }
 
+bool IsNonnegativeFinite(const double value)
+{
+  return std::isfinite(value) && value >= 0.0;
+}
+
+bool IsValidNormalAxisSign(const double value)
+{
+  return std::isfinite(value) && value != 0.0;
+}
+
+double NormalizedAxisSign(const double value)
+{
+  return value < 0.0 ? -1.0 : 1.0;
+}
+
+double ClampFiniteSymmetric(const double value, const double limit)
+{
+  if (!std::isfinite(limit)) {
+    return value;
+  }
+  return std::clamp(value, -limit, limit);
+}
+
+double ClampFiniteRange(const double value, const double lower, const double upper)
+{
+  if (std::isfinite(lower) && std::isfinite(upper) && lower <= upper) {
+    return std::clamp(value, lower, upper);
+  }
+  return value;
+}
+
+bool HasValidSafetyConfig(const MPPIGraspSafetyConfig & config)
+{
+  return IsNonnegativeFinite(config.max_reference_tracking_error_rad) &&
+         IsNonnegativeFinite(config.max_qdot_cmd_rad_s) &&
+         IsNonnegativeFinite(config.max_tau_cmd_nm) &&
+         IsNonnegativeFinite(config.max_tau_rate_nm_s);
+}
+
 }  // namespace
 
 MPPIGraspState::MPPIGraspState(
@@ -126,11 +166,19 @@ bool MPPIGraspState::ConfigureTask(const MPPIGraspStateConfig & config)
   if (robot_ == nullptr || !robot_->hasModel() || robot_->nv() <= 0) {
     return false;
   }
-  if (!ConfigureContactKinematics()) {
+  if (
+    !HasValidSafetyConfig(config.safety) ||
+    !IsValidNormalAxisSign(config.tactile.thumb_normal_axis_sign) ||
+    !IsValidNormalAxisSign(config.tactile.index_normal_axis_sign))
+  {
     return false;
   }
 
   config_ = config;
+  if (!ConfigureContactKinematics()) {
+    return false;
+  }
+
   config_.mppi.action_dim = static_cast<std::size_t>(robot_->nv());
   tactile_transition_ =
     mppi_core::ApplyTaskToleranceToTransitionConfig(config_.task, config_.tactile_transition);
@@ -195,6 +243,9 @@ bool MPPIGraspState::PopulateCommand(plato_robot_system::RobotCommand * command)
     if (!next_command.IsUsable()) {
       return PopulateHoldCommand(command);
     }
+    if (!ApplyCommandSafety(&next_command)) {
+      return PopulateHoldCommand(command);
+    }
     *command = next_command;
     last_command_ = next_command;
     return true;
@@ -214,13 +265,15 @@ bool MPPIGraspState::ConfigureContactKinematics()
     contact_kinematics_[kThumbContextIndex].data = &robot_->data();
     contact_kinematics_[kThumbContextIndex].sensor_frame_id =
       robot_->FrameId(std::string(plato_robot_system::task::kThumbIndexFrameB));
-    contact_kinematics_[kThumbContextIndex].normal_axis_sign = 1.0;
+    contact_kinematics_[kThumbContextIndex].normal_axis_sign =
+      NormalizedAxisSign(config_.tactile.thumb_normal_axis_sign);
 
     contact_kinematics_[kIndexContextIndex].model = &robot_->model();
     contact_kinematics_[kIndexContextIndex].data = &robot_->data();
     contact_kinematics_[kIndexContextIndex].sensor_frame_id =
       robot_->FrameId(std::string(plato_robot_system::task::kThumbIndexFrameA));
-    contact_kinematics_[kIndexContextIndex].normal_axis_sign = 1.0;
+    contact_kinematics_[kIndexContextIndex].normal_axis_sign =
+      NormalizedAxisSign(config_.tactile.index_normal_axis_sign);
   } catch (const std::exception &) {
     return false;
   }
@@ -250,14 +303,12 @@ bool MPPIGraspState::BuildObservation(mppi_core::GraspObservation * observation)
   observation->qdot_meas = state.qdot;
   observation->tau_meas = state.tau;
   observation->q_ref_current = state.q;
-  observation->qdot_ref_current = Eigen::VectorXd::Zero(robot_->nv());
-  if (
-    last_command_.IsUsable() &&
-    last_command_.q_cmd.size() == state.q.size() &&
-    last_command_.qdot_cmd.size() == state.qdot.size())
-  {
+  observation->qdot_ref_current = state.qdot;
+  if (CanUseLastCommandReference(state)) {
     observation->q_ref_current = last_command_.q_cmd;
     observation->qdot_ref_current = last_command_.qdot_cmd;
+  } else {
+    optimizer_.ResetNominalActions();
   }
   observation->tactile_meas = std::move(tactile_meas);
   observation->robot_system = robot_;
@@ -315,6 +366,84 @@ const mppi_core::PinocchioContactKinematicsContext * MPPIGraspState::KinematicsF
   return nullptr;
 }
 
+bool MPPIGraspState::CanUseLastCommandReference(
+  const plato_robot_system::RobotState & state) const
+{
+  if (
+    !last_command_.IsUsable() ||
+    last_command_.q_cmd.size() != state.q.size() ||
+    last_command_.qdot_cmd.size() != state.qdot.size())
+  {
+    return false;
+  }
+
+  const double q_tracking_error = (last_command_.q_cmd - state.q).norm();
+  return std::isfinite(q_tracking_error) &&
+         q_tracking_error <= config_.safety.max_reference_tracking_error_rad;
+}
+
+bool MPPIGraspState::ApplyCommandSafety(
+  plato_robot_system::RobotCommand * command) const
+{
+  if (
+    command == nullptr || robot_ == nullptr || !robot_->hasModel() ||
+    command->q_cmd.size() != robot_->nq() || command->qdot_cmd.size() != robot_->nv() ||
+    command->tau_cmd.size() != robot_->nv() || !command->AllFinite())
+  {
+    return false;
+  }
+
+  if (config_.safety.clamp_q_cmd_to_model_limits) {
+    const auto & model = robot_->model();
+    if (model.lowerPositionLimit.size() == command->q_cmd.size() &&
+      model.upperPositionLimit.size() == command->q_cmd.size())
+    {
+      for (Eigen::Index i = 0; i < command->q_cmd.size(); ++i) {
+        command->q_cmd[i] = ClampFiniteRange(
+          command->q_cmd[i],
+          model.lowerPositionLimit[i],
+          model.upperPositionLimit[i]);
+      }
+    }
+  }
+
+  for (Eigen::Index i = 0; i < command->qdot_cmd.size(); ++i) {
+    command->qdot_cmd[i] =
+      ClampFiniteSymmetric(command->qdot_cmd[i], config_.safety.max_qdot_cmd_rad_s);
+  }
+
+  for (Eigen::Index i = 0; i < command->tau_cmd.size(); ++i) {
+    command->tau_cmd[i] =
+      ClampFiniteSymmetric(command->tau_cmd[i], config_.safety.max_tau_cmd_nm);
+  }
+
+  if (
+    last_command_.IsUsable() &&
+    last_command_.tau_cmd.size() == command->tau_cmd.size() &&
+    std::isfinite(config_.safety.max_tau_rate_nm_s))
+  {
+    double dt_sec = config_.mppi.dt;
+    if (std::isfinite(command->stamp_sec) && std::isfinite(last_command_.stamp_sec)) {
+      const double measured_dt = command->stamp_sec - last_command_.stamp_sec;
+      if (measured_dt > 0.0) {
+        dt_sec = measured_dt;
+      }
+    }
+    const double max_tau_delta = config_.safety.max_tau_rate_nm_s * dt_sec;
+    if (std::isfinite(max_tau_delta) && max_tau_delta >= 0.0) {
+      for (Eigen::Index i = 0; i < command->tau_cmd.size(); ++i) {
+        command->tau_cmd[i] = std::clamp(
+          command->tau_cmd[i],
+          last_command_.tau_cmd[i] - max_tau_delta,
+          last_command_.tau_cmd[i] + max_tau_delta);
+      }
+    }
+  }
+
+  command->valid = command->HasValidDimensions() && command->AllFinite();
+  return command->valid;
+}
+
 bool MPPIGraspState::PopulateHoldCommand(plato_robot_system::RobotCommand * command) const
 {
   if (command == nullptr || robot_ == nullptr || !robot_->hasState()) {
@@ -326,16 +455,15 @@ bool MPPIGraspState::PopulateHoldCommand(plato_robot_system::RobotCommand * comm
     return false;
   }
 
-  if (
-    last_command_.IsUsable() &&
-    last_command_.q_cmd.size() == state.q.size() &&
-    last_command_.qdot_cmd.size() == state.qdot.size())
-  {
+  if (CanUseLastCommandReference(state)) {
     command->Resize(static_cast<int>(state.q.size()), static_cast<int>(state.qdot.size()));
     command->q_cmd = last_command_.q_cmd;
     command->qdot_cmd.setZero();
     command->tau_cmd.setZero();
     command->stamp_sec = state.time_s;
+    if (!ApplyCommandSafety(command)) {
+      return false;
+    }
     command->valid = command->HasValidDimensions() && command->AllFinite();
     last_command_ = *command;
     return command->valid;
@@ -343,6 +471,9 @@ bool MPPIGraspState::PopulateHoldCommand(plato_robot_system::RobotCommand * comm
 
   *command = plato_robot_system::MakeZeroHoldRobotCommand(state.q, state.qdot);
   command->stamp_sec = state.time_s;
+  if (!ApplyCommandSafety(command)) {
+    return false;
+  }
   last_command_ = *command;
   return command->IsUsable();
 }

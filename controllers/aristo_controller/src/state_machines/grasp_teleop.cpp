@@ -37,7 +37,10 @@ bool GraspTeleopState::ConfigureTask(
   }
   if (
     !IsFinite(config.default_u) || !IsFinite(config.default_phi) ||
-    !IsFinite(config.default_desired_force_n))
+    !IsFinite(config.default_desired_force_n) ||
+    config.shared_control_min_contact_sensors < 1 ||
+    config.shared_control_min_contact_sensors > 2 ||
+    config.shared_control_enter_debounce_ticks < 0)
   {
     task_configured_ = false;
     return false;
@@ -60,6 +63,7 @@ bool GraspTeleopState::ConfigureTask(
   task_configured_ = true;
   task_entered_ = false;
   force_handoff_requested_ = false;
+  shared_control_enter_counter_ = 0;
   return task_configured_;
 }
 
@@ -80,6 +84,7 @@ void GraspTeleopState::OnEnter()
 {
   task_entered_ = false;
   force_handoff_requested_ = false;
+  shared_control_enter_counter_ = 0;
   if (!task_configured_ || robot_ == nullptr || !robot_->hasState()) {
     return;
   }
@@ -92,6 +97,7 @@ void GraspTeleopState::OnEnter()
 void GraspTeleopState::OnExit()
 {
   force_handoff_requested_ = false;
+  shared_control_enter_counter_ = 0;
   task_entered_ = false;
 }
 
@@ -127,14 +133,39 @@ bool GraspTeleopState::PopulateCommand(plato_robot_system::RobotCommand * comman
     task_command,
     dt(),
     command);
-  if (
-    populated &&
-    config_.shared_grasp_control &&
-    grasp_task_.mode() == plato_robot_system::task::GraspTaskMode::kForceTracking)
-  {
-    force_handoff_requested_ = true;
+  if (populated) {
+    UpdateSharedControlHandoff(input);
   }
   return populated;
+}
+
+void GraspTeleopState::UpdateSharedControlHandoff(const GraspTeleopInput & input) const
+{
+  if (!config_.shared_grasp_control || lifecycle_.next_state_id < 0) {
+    shared_control_enter_counter_ = 0;
+    return;
+  }
+
+  const auto & status = grasp_task_.status();
+  const bool command_allows_handoff =
+    !config_.shared_control_requires_u_below_threshold ||
+    input.u <= config_.grasp_task.force_exit_u_threshold;
+  const int contact_count = config_.shared_control_requires_enough_contact ?
+    status.enough_contact_count :
+    status.contact_count;
+  const bool contact_ready =
+    contact_count >= config_.shared_control_min_contact_sensors;
+
+  if (command_allows_handoff && contact_ready) {
+    ++shared_control_enter_counter_;
+  } else {
+    shared_control_enter_counter_ = 0;
+  }
+
+  const int required_ticks = std::max(1, config_.shared_control_enter_debounce_ticks);
+  if (shared_control_enter_counter_ >= required_ticks) {
+    force_handoff_requested_ = true;
+  }
 }
 
 }  // namespace aristo_controller::state_machines

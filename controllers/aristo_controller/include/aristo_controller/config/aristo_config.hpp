@@ -9,6 +9,7 @@
 #include "aristo_controller/state_machines/grasp_teleop.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
 #include "aristo_controller/state_machines/mppi_grasp.hpp"
+#include "aristo_controller/state_machines/mppi_motion_grasp.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
 
@@ -49,6 +50,11 @@ struct MPPIGraspConfig : public StateConfig
   aristo_controller::state_machines::MPPIGraspStateConfig state;
 };
 
+struct MPPIMotionGraspConfig : public StateConfig
+{
+  aristo_controller::state_machines::MPPIMotionGraspStateConfig state;
+};
+
 struct RobotModelConfig
 {
   std::string urdf_path;
@@ -71,6 +77,7 @@ struct AristoConfig
   GraspTeleopConfig grasp_teleop;
   GraspForceConfig grasp_force;
   MPPIGraspConfig mppi_grasp;
+  MPPIMotionGraspConfig mppi_motion_grasp;
 };
 
 std::string default_aristo_config_path();

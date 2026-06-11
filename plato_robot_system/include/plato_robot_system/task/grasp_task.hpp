@@ -52,7 +52,7 @@ struct GraspTaskConfig
   ForceAggregation force_aggregation{ForceAggregation::kMin};
 
   // Parameters copied from the working parallel_grasp_controller geometry.
-  // The normalized distance command follows that controller directly:
+  // The normalized aperture command is u_open:
   //   u = 0 -> closed
   //   u = 0.5 -> ready/parallel reference
   //   u = 1 -> open
@@ -77,6 +77,8 @@ struct GraspTaskGripForceEstimate
   double measured_force_n{0.0};
   double force_a_n{0.0};
   double force_b_n{0.0};
+  bool contact_a{false};
+  bool contact_b{false};
   bool enough_contact_a{false};
   bool enough_contact_b{false};
   bool lost_contact_a{true};
@@ -96,6 +98,17 @@ struct GraspTaskStatus
   double u_parallel{0.5};
   double desired_force_n{1.0};
   double measured_force_n{0.0};
+  double force_a_n{0.0};
+  double force_b_n{0.0};
+  bool contact_a{false};
+  bool contact_b{false};
+  bool enough_contact_a{false};
+  bool enough_contact_b{false};
+  bool lost_contact_a{true};
+  bool lost_contact_b{true};
+  bool valid_force{false};
+  int contact_count{0};
+  int enough_contact_count{0};
   int force_enter_counter{0};
   int force_exit_contact_lost_counter{0};
   double force_error_n{0.0};
@@ -123,6 +136,14 @@ public:
     double dt_sec,
     RobotCommand * command);
 
+  bool BuildMotionTarget(
+    RobotSystem & robot,
+    const RobotState & state,
+    const GraspTaskCommand & input,
+    double dt_sec,
+    Eigen::VectorXd * q_target,
+    GraspTaskStatus * status = nullptr);
+
   bool configured() const { return configured_; }
   int active_dof() const { return active_dof_; }
   GraspTaskMode mode() const { return mode_; }
@@ -137,13 +158,13 @@ private:
     const GraspTaskGripForceEstimate & estimate,
     double u);
   double ParallelQ5Geometry(double q3) const;
-  bool BuildParallelJointPositionCommand(
+  bool BuildParallelJointPositionTarget(
     const RobotSystem & robot,
     const RobotState & state,
     const GraspTaskCommand & input,
     const GraspTaskGripForceEstimate & estimate,
     double dt_sec,
-    RobotCommand * command);
+    Eigen::VectorXd * q_target);
 
   GraspTaskConfig config_;
   bool configured_{false};

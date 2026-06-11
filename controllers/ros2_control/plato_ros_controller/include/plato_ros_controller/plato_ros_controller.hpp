@@ -30,6 +30,7 @@
 
 namespace aristo_controller::state_machines
 {
+class GraspForceState;
 class GraspTeleopState;
 class JointTeleopState;
 }  // namespace aristo_controller::state_machines
@@ -75,8 +76,8 @@ private:
   using JointTeleopMsg = std_msgs::msg::Float64MultiArray;
   struct GraspTeleopCommand
   {
-    double u_close{1.0};
-    double u_lateral{0.5};
+    double u{0.0};
+    double phi{0.0};
     double desired_force_n{0.0};
     bool has_desired_force{false};
   };
@@ -169,6 +170,7 @@ private:
   plato_robot_system::ControlArchitecture control_architecture_;
   aristo_controller::state_machines::JointTeleopState * joint_teleop_state_{nullptr};
   aristo_controller::state_machines::GraspTeleopState * grasp_teleop_state_{nullptr};
+  aristo_controller::state_machines::GraspForceState * grasp_force_state_{nullptr};
   std::atomic<plato_robot_system::StateId> pending_requested_state_id_{-1};
   std::atomic<double> grasp_force_reference_n_{0.0};
   std::atomic<bool> grasp_force_reference_valid_{false};

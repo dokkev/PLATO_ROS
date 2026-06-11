@@ -4,7 +4,7 @@ robot_model:
   urdf_path: "package://plato_description/urdf/generated/aristo.urdf"
   is_floating_base: false
   base_frame: "base_link"
-  fixed_thumb: true  # Overrides all joint 0 and joint 1 commands to zero.
+  fixed_thumb: true
 
 controller:
   dt: 0.01
@@ -12,28 +12,39 @@ controller:
   num_joints: 8
 
 driver_gains:
-  # Driver-local impedance gains copied into RobotCommand.kp / RobotCommand.kd.
-  # These are sent to the embedded driver and are separate from host-side task gains.
-  # Limit enforcement is handled by the actuator/hardware layer.
-  #
-  # RobotCommand uses SI units inside plato_robot_system:
-  #   kp: Nm/rad
-  #   kd: Nm/(rad/s)
-  kp: [0.0, 0.0, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
-  kd: [0.0, 0.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+  # Driver-local impedance gains in SI units:
+  #   kp: Nm/rad, kd: Nm/(rad/s)
+  kp: [0.0, 0.0, 0.15, 0.15, 0.15, 0.15, 0.08, 0.08]
+  kd: [0.0, 0.0, 0.005, 0.005, 0.005, 0.005, 0.002, 0.002]
 
 state_machine:
+  # Joint arrays are ordered as:
+  # [joint1, joint2, joint3, joint4, joint5, joint6, joint7, joint8]
   states:
     - id: 0
       name: initialize
       duration: 2.0
       stay_here: true
       params:
-        target_jpos: 0.0
-        kp_task: 0.0
+        target_jpos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        kp_task: 0.05
         kd_task: 0.0
 
     - id: 1
+      name: poke
+      duration: 2.0
+      stay_here: true
+      params:
+        target_jpos: [
+          0.0, 0.0,
+          -0.25024986267089844, -1.4372527771779176,
+          0.0, 0.0,
+          1.100553035736084, 1.5071229671464579
+        ]
+        kp_task: 0.0
+        kd_task: 0.0
+
+    - id: 100
       name: idle
       stay_here: true
 
@@ -41,57 +52,109 @@ state_machine:
       name: joint_teleop
       stay_here: true
       params:
-        # Float64MultiArray target joint positions are smoothed with a first-order LPF.
-        # 0 freezes the command, and 1 applies the target immediately.
         lpf_alpha: 0.1
-
-        # Host-side task feedback gains for tau_cmd only. Driver-local gains
-        # still come from driver_gains.kp/kd during command finalization.
         kp_task: 0.0
         kd_task: 0.0
 
     - id: 3
-      name: grasp_teleop
-      stay_here: true
+      name: grasp_ready
+      duration: 2.0
+      stay_here: false
+      next_state: grasp_teleop
       params:
-        # Teleop input is [u_close, u_lateral] or [u_close, u_lateral, f]:
-        #   u_close   = 0 closed, 1 open
-        #   u_lateral = 0.5 centered contact points, 0/1 lateral offsets
-        #   f         = optional desired normal force override [N]
-        #
-        # If f is omitted, plato_ros_controller uses the external
-        # /grasp_force_reference target while reference_valid is true and falls
-        # back to this default force otherwise.
-        default_u_close: 0.8
-        default_u_lateral: 0.5
-        default_desired_force_n: 1.0
-
-        grasp_task:
-          # Core experiment knobs only. Less-frequently changed QP weights,
-          # contact policy, safety rates, QP damping, and geometry behavior use
-          # plato_robot_system::task::GraspTaskConfig header defaults.
-          distance_closed_m: 0.015
-          distance_open_m: 0.085
-          lateral_offset_limit_m: 0.02
-
-          force_exit_u_threshold: 0.75
-
-          q_posture: [0.0, 0.0, 0.0, 0.0]
-          fallback_close_axis_base: [0.0, 0.0, -1.0]
-
-          kp_lateral: 20.0
-          kd_lateral: 2.0
-          kp_tactile_fb: 0.02
-          w_lateral: 5.0
-
-          # Conservative first hardware bring-up limits.
-          max_qddot_rad_s2: 5.0
-          max_velocity_rad_s: 0.5
-          max_torque_nm: 0.05
+        target_jpos: [
+          0.0, 0.0,
+          0.0, 0.0,
+          0.8849433621761859, -0.8849433621761859,
+          0.785, 1.5708
+        ]
+        kp_task: 0.05
+        kd_task: 0.0
 
     - id: 4
+      name: grasp_teleop
+      stay_here: true
+      # Change this to grasp_force to use tactile force feedback instead of MPPI.
+      next_state: mppi_grasp
+      params:
+        # Command: [u], [u, phi], or [u, phi, f]
+        # u: 0 closed, 0.5 ready/parallel, 1 open
+        # phi: 0 extended, 0.5 centered, 1 flexed
+        # f: optional desired normal force [N]
+        default_u: 0.7
+        default_phi: 0.0
+        default_desired_force_n: 5.0
+        shared_grasp_control: true
+
+        grasp_task:
+          # q_ready is copied from grasp_ready.target_jpos.
+          # grasp_teleop uses this task for motion and contact-gated handoff only.
+          lpf_alpha: 0.2
+          force_exit_u_threshold: 0.75
+
+    - id: 5
       name: mppi_grasp
       stay_here: true
+      params:
+        mppi:
+          horizon_steps: 10
+          num_rollouts: 32
+          dt: 0.01
+          temperature: 1.0
+          random_seed: 1
+          action:
+            # MPPI action is qddot_sol in model tangent space [rad/s^2].
+            lower_bound: -1.0
+            upper_bound: 1.0
+            noise_std: 0.5
+
+        rollout:
+          disturbance:
+            enabled: false
+          tactile_model:
+            birth_approach_velocity_mps: 0.002
+            loss_unloading_velocity_mps: 0.002
+            born_normal_force_n: 0.05
+            born_confidence: 0.5
+            contact_confidence_decay: 1.0
+
+        task:
+          name: grasp_hold
+          start:
+            min_enough_contact_sensors: 1
+            min_active_hemisphere_total: 1
+          objective:
+            min_active_tactile_sensors: 1
+            target_active_hemisphere_total: 4
+          tolerance:
+            max_shear_m: 0.003
+            max_rotation_rad: 0.05
+          cost:
+            contact_loss_weight: 50.0
+            support_weight: 10.0
+            shear_weight: 5.0
+            rotation_weight: 5.0
+            qddot_weight: 1.0
+            tau_weight: 0.01
+
+    - id: 6
+      name: grasp_force
+      stay_here: true
+      params:
+        default_u: 0.7
+        default_phi: 0.0
+        default_desired_force_n: 5.0
+
+        grasp_task:
+          # q_ready is copied from grasp_ready.target_jpos.
+          force_feedback_enabled: true
+          lpf_alpha: 0.2
+          force_enter_debounce_ticks: 0
+          force_exit_u_threshold: 0.75
+          kp_tactile_u_fb: 0.02
+          kd_tactile_u_fb: 0.0
+          kp_tactile_phi_fb: 0.0
+          kd_tactile_phi_fb: 0.0
 
 debug:
   enabled: false

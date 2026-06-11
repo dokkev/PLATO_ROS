@@ -12,6 +12,7 @@
 #include "aristo_hardware_interface/aristo_protocol.hpp"
 #include "aristo_hardware_interface/can_protocol.hpp"
 #include "aristo_hardware_interface/mit_can_protocol.hpp"
+#include "aristo_hardware_interface/utils/actuator_config_loader.hpp"
 
 namespace
 {
@@ -201,6 +202,21 @@ TEST(AristoProtocolTest, DetectsDangerousAllZeroMitCommandFrame)
 
   frame.DATA[0] = 0x80;
   EXPECT_FALSE(aristo_hand::is_dangerous_all_zero_mit_command(frame));
+}
+
+TEST(AristoConfigLoaderTest, DefaultYamlCanOmitPerActuatorPositionLimits)
+{
+  const auto configs = aristo_actuator::load_aristo_actuator_configs();
+
+  ASSERT_EQ(configs.size(), aristo_actuator::expected_aristo_actuator_names().size());
+  for (const auto & config : configs) {
+    EXPECT_FALSE(std::isfinite(config.limits.position_limit_min));
+    EXPECT_FALSE(std::isfinite(config.limits.position_limit_max));
+    EXPECT_TRUE(std::isfinite(config.limits.velocity_limit));
+    EXPECT_TRUE(std::isfinite(config.limits.effort_limit));
+    EXPECT_TRUE(std::isfinite(config.limits.stiffness_limit));
+    EXPECT_TRUE(std::isfinite(config.limits.damping_limit));
+  }
 }
 
 TEST(MitCanProtocolTest, SingleByteCommandsClearUnusedPayloadBytes)

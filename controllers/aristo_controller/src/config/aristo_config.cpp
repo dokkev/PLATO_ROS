@@ -9,6 +9,10 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include "mppi_core/config/mppi_config.hpp"
+#include "mppi_core/config/rollout_config.hpp"
+#include "mppi_core/task/task_config.hpp"
+
 namespace aristo_controller::config
 {
 namespace
@@ -92,17 +96,15 @@ Eigen::VectorXd parse_vector_or_scalar(
   return vector;
 }
 
-Eigen::Vector3d parse_vector3_or_scalar(
+Eigen::VectorXd parse_optional_vector_or_scalar(
   const YAML::Node & node,
   const std::string & key,
-  const Eigen::Vector3d & fallback)
+  const int size)
 {
   if (!node || !node[key]) {
-    return fallback;
+    return Eigen::VectorXd{};
   }
-
-  const Eigen::VectorXd vector = parse_vector_or_scalar(node, key, 3, 0.0);
-  return Eigen::Vector3d{vector[0], vector[1], vector[2]};
+  return parse_vector_or_scalar(node, key, size, 0.0);
 }
 
 Eigen::VectorXd parse_required_vector_or_scalar(
@@ -121,79 +123,198 @@ StateConfig parse_state_config(const YAML::Node & states, const std::string & na
   const auto state = state_by_name(states, name);
   StateConfig config;
   config.id = required_scalar<plato_robot_system::StateId>(state, "id");
+  config.lifecycle.duration = optional_scalar<double>(state, "duration", 0.0);
+  config.lifecycle.wait_time = optional_scalar<double>(state, "wait_time", 0.0);
+  config.lifecycle.next_state_id =
+    optional_scalar<plato_robot_system::StateId>(state, "next_state_id", -1);
+  if (state["next_state"]) {
+    const auto next_state_name = state["next_state"].as<std::string>();
+    const auto next_state = state_by_name(states, next_state_name);
+    const auto next_state_id =
+      required_scalar<plato_robot_system::StateId>(next_state, "id");
+    if (state["next_state_id"] && config.lifecycle.next_state_id != next_state_id) {
+      throw std::runtime_error(
+        name + ".next_state and next_state_id refer to different states");
+    }
+    config.lifecycle.next_state_id = next_state_id;
+  }
+  config.lifecycle.stay_here = optional_scalar<bool>(state, "stay_here", true);
+  if (config.lifecycle.duration < 0.0) {
+    throw std::runtime_error(name + ".duration must be non-negative");
+  }
+  if (config.lifecycle.wait_time < 0.0) {
+    throw std::runtime_error(name + ".wait_time must be non-negative");
+  }
+  if (!config.lifecycle.stay_here && config.lifecycle.next_state_id < 0) {
+    throw std::runtime_error(name + ".next_state_id must be set when stay_here is false");
+  }
   return config;
 }
 
+std::string state_name(const YAML::Node & state)
+{
+  return required_scalar<std::string>(state, "name");
+}
+
+JointPositionConfig parse_joint_position_config(
+  const YAML::Node & states,
+  const std::string & name,
+  const int num_joints)
+{
+  const auto state = state_by_name(states, name);
+  const auto params = required_node(state, "params");
+
+  JointPositionConfig config;
+  static_cast<StateConfig &>(config) = parse_state_config(states, name);
+  config.duration_sec = optional_scalar<double>(state, "duration", 2.0);
+  if (config.duration_sec <= 0.0) {
+    throw std::runtime_error(name + ".duration must be positive");
+  }
+  config.lifecycle.duration = config.duration_sec;
+  config.target_jpos =
+    parse_vector_or_scalar(params, "target_jpos", num_joints, 0.0);
+  config.kp_task =
+    parse_required_vector_or_scalar(params, "kp_task", num_joints);
+  config.kd_task =
+    parse_required_vector_or_scalar(params, "kd_task", num_joints);
+  return config;
+}
+
+void validate_distinct_state_names(const YAML::Node & states)
+{
+  if (!states || !states.IsSequence()) {
+    throw std::runtime_error("state_machine.states must be a YAML sequence");
+  }
+
+  std::vector<std::string> names;
+  for (const auto & state : states) {
+    names.push_back(state_name(state));
+  }
+  std::sort(names.begin(), names.end());
+  if (std::adjacent_find(names.begin(), names.end()) != names.end()) {
+    throw std::runtime_error("state_machine state names must be distinct");
+  }
+}
+
 plato_robot_system::task::GraspTaskConfig parse_grasp_task_config(
-  const YAML::Node & params)
+  const YAML::Node & params,
+  const int num_joints)
 {
   plato_robot_system::task::GraspTaskConfig config;
-  const int active_dof =
-    static_cast<int>(plato_robot_system::task::kThumbIndexActiveJoints.size());
 
-  config.distance_closed_m =
-    optional_scalar<double>(params, "distance_closed_m", config.distance_closed_m);
-  config.distance_open_m =
-    optional_scalar<double>(params, "distance_open_m", config.distance_open_m);
+  config.q_ready = parse_optional_vector_or_scalar(params, "q_ready", num_joints);
+  if (config.q_ready.size() == 0) {
+    config.q_ready = parse_optional_vector_or_scalar(params, "target_jpos", num_joints);
+  }
+  config.force_enter_debounce_ticks =
+    optional_scalar<int>(
+      params, "force_enter_debounce_ticks", config.force_enter_debounce_ticks);
+  config.force_exit_contact_lost_ticks =
+    optional_scalar<int>(
+      params, "force_exit_contact_lost_ticks", config.force_exit_contact_lost_ticks);
   config.force_exit_u_threshold =
     optional_scalar<double>(
       params, "force_exit_u_threshold", config.force_exit_u_threshold);
-  config.q_posture =
-    parse_vector_or_scalar(params, "q_posture", active_dof, 0.0);
-  config.fallback_close_axis_base =
-    parse_vector3_or_scalar(
-      params, "fallback_close_axis_base", config.fallback_close_axis_base);
-  config.kp_task =
-    optional_scalar<double>(params, "kp_task", config.kp_task);
-  config.kd_task =
-    optional_scalar<double>(params, "kd_task", config.kd_task);
-  config.lateral_offset_limit_m =
+  config.min_contact_force_n =
     optional_scalar<double>(
-      params, "lateral_offset_limit_m", config.lateral_offset_limit_m);
-  config.kp_lateral =
-    optional_scalar<double>(params, "kp_lateral", config.kp_lateral);
-  config.kd_lateral =
-    optional_scalar<double>(params, "kd_lateral", config.kd_lateral);
-  config.kp_tactile_fb =
-    optional_scalar<double>(params, "kp_tactile_fb", config.kp_tactile_fb);
-  config.kd_tactile_fb =
-    optional_scalar<double>(params, "kd_tactile_fb", config.kd_tactile_fb);
-  config.w_task_motion =
-    optional_scalar<double>(params, "w_task_motion", config.w_task_motion);
-  config.w_task_tactile_mode =
-    optional_scalar<double>(params, "w_task_tactile_mode", config.w_task_tactile_mode);
-  config.w_lateral =
-    optional_scalar<double>(params, "w_lateral", config.w_lateral);
-  config.w_tactile =
-    optional_scalar<double>(params, "w_tactile", config.w_tactile);
-  config.w_posture =
-    optional_scalar<double>(params, "w_posture", config.w_posture);
-  config.damping_qp =
-    optional_scalar<double>(params, "damping_qp", config.damping_qp);
-  config.max_qddot_rad_s2 =
-    optional_scalar<double>(params, "max_qddot_rad_s2", config.max_qddot_rad_s2);
-  config.max_velocity_rad_s =
-    optional_scalar<double>(params, "max_velocity_rad_s", config.max_velocity_rad_s);
-  config.max_torque_nm =
-    optional_scalar<double>(params, "max_torque_nm", config.max_torque_nm);
+      params, "min_contact_force_n", config.min_contact_force_n);
+  config.use_tactile_presence_for_contact =
+    optional_scalar<bool>(
+      params, "use_tactile_presence_for_contact",
+      config.use_tactile_presence_for_contact);
+  config.force_feedback_enabled =
+    optional_scalar<bool>(
+      params, "force_feedback_enabled", config.force_feedback_enabled);
+  config.lpf_alpha =
+    optional_scalar<double>(
+      params, "lpf_alpha", config.lpf_alpha);
+  config.kp_tactile_u_fb =
+    optional_scalar<double>(params, "kp_tactile_fb", config.kp_tactile_u_fb);
+  config.kd_tactile_u_fb =
+    optional_scalar<double>(params, "kd_tactile_fb", config.kd_tactile_u_fb);
+  config.kp_tactile_u_fb =
+    optional_scalar<double>(params, "kp_tactile_u_fb", config.kp_tactile_u_fb);
+  config.kd_tactile_u_fb =
+    optional_scalar<double>(params, "kd_tactile_u_fb", config.kd_tactile_u_fb);
+  config.kp_tactile_phi_fb =
+    optional_scalar<double>(params, "kp_tactile_phi_fb", config.kp_tactile_phi_fb);
+  config.kd_tactile_phi_fb =
+    optional_scalar<double>(params, "kd_tactile_phi_fb", config.kd_tactile_phi_fb);
+  config.parallel_tip_radius_m =
+    optional_scalar<double>(
+      params, "parallel_tip_radius_m", config.parallel_tip_radius_m);
+  config.parallel_lateral_offset_m =
+    optional_scalar<double>(
+      params, "parallel_lateral_offset_m", config.parallel_lateral_offset_m);
+  config.parallel_qmin_rad =
+    optional_scalar<double>(
+      params, "parallel_qmin_rad", config.parallel_qmin_rad);
+  config.parallel_qmax_rad =
+    optional_scalar<double>(
+      params, "parallel_qmax_rad", config.parallel_qmax_rad);
+  config.parallel_q5_min_rad =
+    optional_scalar<double>(
+      params, "parallel_q5_min_rad", config.parallel_q5_min_rad);
+  config.parallel_midpoint_u =
+    optional_scalar<double>(
+      params, "parallel_midpoint_u", config.parallel_midpoint_u);
+  config.parallel_max_flexion_rad =
+    optional_scalar<double>(
+      params, "parallel_max_flexion_rad", config.parallel_max_flexion_rad);
 
   return config;
 }
 
 aristo_controller::state_machines::GraspTeleopStateConfig parse_grasp_teleop_state_config(
-  const YAML::Node & params)
+  const YAML::Node & params,
+  const int num_joints)
 {
   aristo_controller::state_machines::GraspTeleopStateConfig config;
 
-  config.default_u_close =
-    optional_scalar<double>(params, "default_u_close", config.default_u_close);
-  config.default_u_lateral =
-    optional_scalar<double>(params, "default_u_lateral", config.default_u_lateral);
+  config.default_u =
+    optional_scalar<double>(params, "default_u", config.default_u);
+  config.default_phi =
+    optional_scalar<double>(params, "default_phi", config.default_phi);
+  config.default_desired_force_n =
+    optional_scalar<double>(
+      params, "default_desired_force_n", config.default_desired_force_n);
+  config.shared_grasp_control =
+    optional_scalar<bool>(
+      params,
+      "handoff_to_mppi_on_force_ready",
+      config.shared_grasp_control);
+  config.shared_grasp_control =
+    optional_scalar<bool>(
+      params,
+      "handoff_on_force_ready",
+      config.shared_grasp_control);
+  config.shared_grasp_control =
+    optional_scalar<bool>(
+      params,
+      "shared_grasp_control",
+      config.shared_grasp_control);
+  const auto grasp_task = required_node(params, "grasp_task");
+  config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
+  config.grasp_task.force_feedback_enabled = false;
+
+  return config;
+}
+
+aristo_controller::state_machines::GraspForceStateConfig parse_grasp_force_state_config(
+  const YAML::Node & params,
+  const int num_joints)
+{
+  aristo_controller::state_machines::GraspForceStateConfig config;
+
+  config.default_u =
+    optional_scalar<double>(params, "default_u", config.default_u);
+  config.default_phi =
+    optional_scalar<double>(params, "default_phi", config.default_phi);
   config.default_desired_force_n =
     optional_scalar<double>(
       params, "default_desired_force_n", config.default_desired_force_n);
   const auto grasp_task = required_node(params, "grasp_task");
-  config.grasp_task = parse_grasp_task_config(grasp_task);
+  config.grasp_task = parse_grasp_task_config(grasp_task, num_joints);
 
   return config;
 }
@@ -222,6 +343,28 @@ aristo_controller::state_machines::JointTeleopStateConfig parse_joint_teleop_sta
       "joint_teleop lpf_alpha must be finite and in [0, 1]");
   }
 
+  return config;
+}
+
+aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_config(
+  const YAML::Node & params,
+  const int num_joints)
+{
+  if (params && !params.IsMap()) {
+    throw std::runtime_error("mppi_grasp.params must be a map when provided");
+  }
+
+  aristo_controller::state_machines::MPPIGraspStateConfig config;
+  const auto mppi_params = params ? params["mppi"] : YAML::Node();
+  const auto rollout_params = params ? params["rollout"] : YAML::Node();
+  const auto task_params = params ? params["task"] : YAML::Node();
+  config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
+  config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
+  config.tactile_transition =
+    mppi_core::ParseTactileTransitionConfig(rollout_params, config.tactile_transition);
+  config.task = mppi_core::ParseTaskConfig(task_params, config.task);
+  config.tactile_transition =
+    mppi_core::ApplyTaskToleranceToTransitionConfig(config.task, config.tactile_transition);
   return config;
 }
 
@@ -277,8 +420,16 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
 
   const auto state_machine = required_node(root, "state_machine");
   const auto states = required_node(state_machine, "states");
+  validate_distinct_state_names(states);
   config.idle = parse_state_config(states, "idle");
-  config.mppi_grasp = parse_state_config(states, "mppi_grasp");
+  static_cast<StateConfig &>(config.mppi_grasp) = parse_state_config(states, "mppi_grasp");
+  const auto mppi_grasp = state_by_name(states, "mppi_grasp");
+  config.mppi_grasp.state =
+    parse_mppi_grasp_state_config(mppi_grasp["params"], config.num_joints);
+  config.initialize = parse_joint_position_config(states, "initialize", config.num_joints);
+  config.poke = parse_joint_position_config(states, "poke", config.num_joints);
+  config.grasp_ready =
+    parse_joint_position_config(states, "grasp_ready", config.num_joints);
 
   const auto joint_teleop = state_by_name(states, "joint_teleop");
   config.joint_teleop.id =
@@ -287,28 +438,25 @@ AristoConfig load_aristo_config(const std::string & yaml_path)
     parse_joint_teleop_state_config(required_node(joint_teleop, "params"), config.num_joints);
 
   const auto grasp_teleop = state_by_name(states, "grasp_teleop");
-  config.grasp_teleop.id =
-    required_scalar<plato_robot_system::StateId>(grasp_teleop, "id");
+  static_cast<StateConfig &>(config.grasp_teleop) = parse_state_config(states, "grasp_teleop");
   config.grasp_teleop.state =
-    parse_grasp_teleop_state_config(grasp_teleop["params"]);
-
-  const auto initialize = state_by_name(states, "initialize");
-  const auto initialize_params = required_node(initialize, "params");
-
-  config.initialize.id = required_scalar<plato_robot_system::StateId>(initialize, "id");
-  validate_distinct_state_ids(
-    {config.idle.id, config.initialize.id, config.joint_teleop.id,
-      config.grasp_teleop.id, config.mppi_grasp.id});
-  config.initialize.duration_sec = optional_scalar<double>(initialize, "duration", 2.0);
-  if (config.initialize.duration_sec <= 0.0) {
-    throw std::runtime_error("initialize.duration must be positive");
+    parse_grasp_teleop_state_config(grasp_teleop["params"], config.num_joints);
+  if (config.grasp_teleop.state.grasp_task.q_ready.size() == 0) {
+    config.grasp_teleop.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
   }
-  config.initialize.target_jpos =
-    parse_vector_or_scalar(initialize_params, "target_jpos", config.num_joints, 0.0);
-  config.initialize.kp_task =
-    parse_required_vector_or_scalar(initialize_params, "kp_task", config.num_joints);
-  config.initialize.kd_task =
-    parse_required_vector_or_scalar(initialize_params, "kd_task", config.num_joints);
+
+  const auto grasp_force = state_by_name(states, "grasp_force");
+  static_cast<StateConfig &>(config.grasp_force) = parse_state_config(states, "grasp_force");
+  config.grasp_force.state =
+    parse_grasp_force_state_config(grasp_force["params"], config.num_joints);
+  if (config.grasp_force.state.grasp_task.q_ready.size() == 0) {
+    config.grasp_force.state.grasp_task.q_ready = config.grasp_ready.target_jpos;
+  }
+
+  validate_distinct_state_ids(
+    {config.idle.id, config.initialize.id, config.poke.id, config.grasp_ready.id,
+      config.joint_teleop.id, config.grasp_teleop.id, config.grasp_force.id,
+      config.mppi_grasp.id});
 
   return config;
 }

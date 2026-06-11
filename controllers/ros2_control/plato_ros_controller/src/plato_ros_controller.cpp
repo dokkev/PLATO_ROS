@@ -9,11 +9,14 @@
 #include <string>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
+#include "aristo_controller/state_machines/grasp_force.hpp"
+#include "aristo_controller/state_machines/grasp_ready.hpp"
 #include "aristo_controller/state_machines/grasp_teleop.hpp"
 #include "aristo_controller/state_machines/idle.hpp"
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
 #include "aristo_controller/state_machines/mppi_grasp.hpp"
+#include "aristo_controller/state_machines/poke.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -90,7 +93,9 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
   auto_declare<std::vector<std::string>>("joints", std::vector<std::string>{});
   auto_declare<std::vector<std::string>>("tactile_topics", default_tactile_topics());
   auto_declare<std::string>("joint_teleop_command_topic", "~/joint_teleop");
-  auto_declare<std::string>("grasp_teleop_command_topic", "~/grasp_teleop");
+  auto_declare<std::string>(
+    "grasp_teleop_command_topic",
+    "/plato2/parallel_grasp_controller/commands");
   auto_declare<std::string>(
     "grasp_force_reference_topic",
     "/grasp_force_reference/target_normal_force_n");
@@ -117,6 +122,7 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   control_config_yaml_path_ = get_node()->get_parameter("control_config_yaml_path").as_string();
   joint_teleop_state_ = nullptr;
   grasp_teleop_state_ = nullptr;
+  grasp_force_state_ = nullptr;
   grasp_force_reference_n_.store(0.0);
   grasp_force_reference_valid_.store(false);
 
@@ -658,28 +664,30 @@ void PlatoRosController::sync_joint_teleop_input()
 void PlatoRosController::grasp_teleop_command_callback(
   const GraspTeleopMsg::SharedPtr msg)
 {
-  if (!msg || msg->data.size() < 2U || msg->data.size() > 3U) {
+  if (!msg || msg->data.empty() || msg->data.size() > 3U) {
     const auto size = msg ? msg->data.size() : 0U;
     RCLCPP_WARN_THROTTLE(
       get_node()->get_logger(),
       *(get_node()->get_clock()),
       1000,
-      "Ignoring grasp teleop command with %zu values; expected [u_close, u_lateral] or [u_close, u_lateral, f].",
+      "Ignoring grasp teleop command with %zu values; expected [u], [u, phi], or [u, phi, f].",
       size);
     return;
   }
 
   GraspTeleopCommand command;
-  command.u_close = msg->data[0];
-  command.u_lateral = msg->data[1];
+  command.u = msg->data[0];
+  if (msg->data.size() > 1U) {
+    command.phi = msg->data[1];
+  }
   if (msg->data.size() == 3U) {
     command.desired_force_n = msg->data[2];
     command.has_desired_force = true;
   }
 
   if (
-    !std::isfinite(command.u_close) ||
-    !std::isfinite(command.u_lateral) ||
+    !std::isfinite(command.u) ||
+    !std::isfinite(command.phi) ||
     (command.has_desired_force &&
     (!std::isfinite(command.desired_force_n) || command.desired_force_n < 0.0)))
   {
@@ -727,7 +735,7 @@ void PlatoRosController::grasp_force_reference_valid_callback(
 
 void PlatoRosController::sync_grasp_teleop_input()
 {
-  if (grasp_teleop_state_ == nullptr) {
+  if (grasp_teleop_state_ == nullptr && grasp_force_state_ == nullptr) {
     return;
   }
 
@@ -735,13 +743,13 @@ void PlatoRosController::sync_grasp_teleop_input()
   const bool has_command = command_ptr != nullptr && *command_ptr;
 
   aristo_controller::state_machines::GraspTeleopInput input;
-  input.u_close = std::numeric_limits<double>::quiet_NaN();
-  input.u_lateral = std::numeric_limits<double>::quiet_NaN();
+  input.u = std::numeric_limits<double>::quiet_NaN();
+  input.phi = std::numeric_limits<double>::quiet_NaN();
 
   bool has_explicit_force = false;
   if (has_command) {
-    input.u_close = (**command_ptr).u_close;
-    input.u_lateral = (**command_ptr).u_lateral;
+    input.u = (**command_ptr).u;
+    input.phi = (**command_ptr).phi;
     if ((**command_ptr).has_desired_force) {
       input.desired_force_n = (**command_ptr).desired_force_n;
       has_explicit_force = true;
@@ -749,12 +757,27 @@ void PlatoRosController::sync_grasp_teleop_input()
   }
 
   if (!has_explicit_force) {
+    double default_desired_force_n = 0.0;
+    if (grasp_teleop_state_ != nullptr) {
+      default_desired_force_n = grasp_teleop_state_->default_desired_force_n();
+    } else if (grasp_force_state_ != nullptr) {
+      default_desired_force_n = grasp_force_state_->default_desired_force_n();
+    }
     input.desired_force_n = grasp_force_reference_valid_.load() ?
       grasp_force_reference_n_.load() :
-      grasp_teleop_state_->default_desired_force_n();
+      default_desired_force_n;
   }
 
-  grasp_teleop_state_->SetInput(input);
+  if (grasp_teleop_state_ != nullptr) {
+    grasp_teleop_state_->SetInput(input);
+  }
+  if (grasp_force_state_ != nullptr) {
+    aristo_controller::state_machines::GraspForceInput force_input;
+    force_input.u = input.u;
+    force_input.phi = input.phi;
+    force_input.desired_force_n = input.desired_force_n;
+    grasp_force_state_->SetInput(force_input);
+  }
 }
 
 plato_robot_system::sensor::NARITouchSample PlatoRosController::convert_tactile_msg(
@@ -868,24 +891,55 @@ void PlatoRosController::request_state_callback(
 
   const auto * fsm_handler = control_architecture_.fsmHandler();
   const auto & states = fsm_handler->states();
-  const auto state_it = states.find(requested_state_id);
-  if (state_it == states.end() || !state_it->second) {
+  const auto requested_state_it = states.find(requested_state_id);
+  if (requested_state_it == states.end() || !requested_state_it->second) {
     response->success = false;
     response->message = "state_id " + std::to_string(requested_state_id) +
       " is not registered";
     return;
   }
 
-  pending_requested_state_id_.store(requested_state_id);
+  plato_robot_system::StateId effective_state_id = requested_state_id;
+  if (requested_state_it->second->name() ==
+    aristo_controller::state_machines::GraspTeleopState::kName)
+  {
+    const auto grasp_ready_id =
+      fsm_handler->FindStateIdByName(
+        aristo_controller::state_machines::GraspReadyState::kName);
+    if (!grasp_ready_id) {
+      response->success = false;
+      response->message = "state '" +
+        std::string(aristo_controller::state_machines::GraspReadyState::kName) +
+        "' is not registered";
+      return;
+    }
+    effective_state_id = *grasp_ready_id;
+  }
+
+  const auto effective_state_it = states.find(effective_state_id);
+  if (effective_state_it == states.end() || !effective_state_it->second) {
+    response->success = false;
+    response->message = "redirect target state_id " + std::to_string(effective_state_id) +
+      " is not registered";
+    return;
+  }
+
+  pending_requested_state_id_.store(effective_state_id);
   response->success = true;
   response->message = "accepted request for state_id " +
-    std::to_string(requested_state_id) + " (" + state_it->second->name() + ")";
+    std::to_string(effective_state_id) + " (" + effective_state_it->second->name() + ")";
+  if (effective_state_id != requested_state_id) {
+    response->message += "; redirected from state_id " +
+      std::to_string(requested_state_id) + " (" + requested_state_it->second->name() + ")";
+  }
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Accepted FSM state request: id=%d name='%s'",
+    "Accepted FSM state request: requested_id=%d requested_name='%s' effective_id=%d effective_name='%s'",
     requested_state_id,
-    state_it->second->name().c_str());
+    requested_state_it->second->name().c_str(),
+    effective_state_id,
+    effective_state_it->second->name().c_str());
 }
 
 void PlatoRosController::apply_pending_state_request()
@@ -964,6 +1018,10 @@ bool PlatoRosController::configure_from_control_config(
     architecture.RegisterState(std::move(joint_teleop));
 
     auto grasp_teleop_config = aristo_config.grasp_teleop.state;
+    if (grasp_teleop_config.grasp_task.q_ready.size() > 0) {
+      grasp_teleop_config.grasp_task.q_ready =
+        map_joint_positions_to_model_q(grasp_teleop_config.grasp_task.q_ready, robot);
+    }
 
     auto grasp_teleop = std::make_unique<aristo_controller::state_machines::GraspTeleopState>(
       aristo_config.grasp_teleop.id,
@@ -972,16 +1030,39 @@ bool PlatoRosController::configure_from_control_config(
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure grasp_teleop task");
       return false;
     }
+    grasp_teleop->ConfigureLifecycle(aristo_config.grasp_teleop.lifecycle);
     grasp_teleop_state_ = grasp_teleop.get();
     architecture.RegisterState(std::move(grasp_teleop));
 
+    auto grasp_force_config = aristo_config.grasp_force.state;
+    if (grasp_force_config.grasp_task.q_ready.size() > 0) {
+      grasp_force_config.grasp_task.q_ready =
+        map_joint_positions_to_model_q(grasp_force_config.grasp_task.q_ready, robot);
+    }
+
+    auto grasp_force = std::make_unique<aristo_controller::state_machines::GraspForceState>(
+      aristo_config.grasp_force.id,
+      &robot);
+    if (!grasp_force->ConfigureTask(grasp_force_config)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure grasp_force task");
+      return false;
+    }
+    grasp_force->ConfigureLifecycle(aristo_config.grasp_force.lifecycle);
+    grasp_force_state_ = grasp_force.get();
+    architecture.RegisterState(std::move(grasp_force));
+
     auto mppi_grasp = std::make_unique<aristo_controller::state_machines::MPPIGraspState>(
-      aristo_config.mppi_grasp.id);
+      aristo_config.mppi_grasp.id,
+      &robot);
+    if (!mppi_grasp->ConfigureTask(aristo_config.mppi_grasp.state)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure mppi_grasp task");
+      return false;
+    }
+    mppi_grasp->ConfigureLifecycle(aristo_config.mppi_grasp.lifecycle);
     architecture.RegisterState(std::move(mppi_grasp));
 
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,
-      aristo_controller::state_machines::InitializeState::kName,
       &robot);
     initialize->SetTargetPosition(
       map_joint_positions_to_model_q(aristo_config.initialize.target_jpos, robot));
@@ -989,7 +1070,32 @@ bool PlatoRosController::configure_from_control_config(
     initialize->SetTaskFeedbackGains(
       map_joint_values_to_model_v(aristo_config.initialize.kp_task),
       map_joint_values_to_model_v(aristo_config.initialize.kd_task));
+    initialize->ConfigureLifecycle(aristo_config.initialize.lifecycle);
     architecture.RegisterState(std::move(initialize));
+
+    auto poke = std::make_unique<aristo_controller::state_machines::PokeState>(
+      aristo_config.poke.id,
+      &robot);
+    poke->SetTargetPosition(
+      map_joint_positions_to_model_q(aristo_config.poke.target_jpos, robot));
+    poke->SetDuration(aristo_config.poke.duration_sec);
+    poke->SetTaskFeedbackGains(
+      map_joint_values_to_model_v(aristo_config.poke.kp_task),
+      map_joint_values_to_model_v(aristo_config.poke.kd_task));
+    poke->ConfigureLifecycle(aristo_config.poke.lifecycle);
+    architecture.RegisterState(std::move(poke));
+
+    auto grasp_ready = std::make_unique<aristo_controller::state_machines::GraspReadyState>(
+      aristo_config.grasp_ready.id,
+      &robot);
+    grasp_ready->SetTargetPosition(
+      map_joint_positions_to_model_q(aristo_config.grasp_ready.target_jpos, robot));
+    grasp_ready->SetDuration(aristo_config.grasp_ready.duration_sec);
+    grasp_ready->SetTaskFeedbackGains(
+      map_joint_values_to_model_v(aristo_config.grasp_ready.kp_task),
+      map_joint_values_to_model_v(aristo_config.grasp_ready.kd_task));
+    grasp_ready->ConfigureLifecycle(aristo_config.grasp_ready.lifecycle);
+    architecture.RegisterState(std::move(grasp_ready));
 
     if (!architecture.SetStartState(aristo_config.initialize.id) ||
       !architecture.RequestState(aristo_config.initialize.id))

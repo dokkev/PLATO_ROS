@@ -5,8 +5,10 @@
 
 #include <string>
 
+#include "aristo_controller/state_machines/grasp_force.hpp"
 #include "aristo_controller/state_machines/grasp_teleop.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
+#include "aristo_controller/state_machines/mppi_grasp.hpp"
 #include "plato_robot_system/control/state_machine/state_machine.hpp"
 #include "plato_robot_system/control/plato_control_architecture.hpp"
 
@@ -16,6 +18,7 @@ namespace aristo_controller::config
 struct StateConfig
 {
   plato_robot_system::StateId id{0};
+  plato_robot_system::StateLifecycle lifecycle;
 };
 
 struct GraspTeleopConfig : public StateConfig
@@ -23,18 +26,27 @@ struct GraspTeleopConfig : public StateConfig
   aristo_controller::state_machines::GraspTeleopStateConfig state;
 };
 
+struct GraspForceConfig : public StateConfig
+{
+  aristo_controller::state_machines::GraspForceStateConfig state;
+};
+
 struct JointTeleopConfig : public StateConfig
 {
   aristo_controller::state_machines::JointTeleopStateConfig state;
 };
 
-struct InitializeConfig
+struct JointPositionConfig : public StateConfig
 {
-  plato_robot_system::StateId id{0};
   double duration_sec{2.0};
   Eigen::VectorXd target_jpos;
   Eigen::VectorXd kp_task;
   Eigen::VectorXd kd_task;
+};
+
+struct MPPIGraspConfig : public StateConfig
+{
+  aristo_controller::state_machines::MPPIGraspStateConfig state;
 };
 
 struct RobotModelConfig
@@ -52,10 +64,13 @@ struct AristoConfig
   RobotModelConfig robot_model;
   plato_robot_system::DriverPdGainsConfig driver_gains;
   StateConfig idle;
-  InitializeConfig initialize;
+  JointPositionConfig initialize;
+  JointPositionConfig poke;
+  JointPositionConfig grasp_ready;
   JointTeleopConfig joint_teleop;
   GraspTeleopConfig grasp_teleop;
-  StateConfig mppi_grasp;
+  GraspForceConfig grasp_force;
+  MPPIGraspConfig mppi_grasp;
 };
 
 std::string default_aristo_config_path();

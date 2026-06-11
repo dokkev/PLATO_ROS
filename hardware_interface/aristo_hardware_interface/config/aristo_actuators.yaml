@@ -4,6 +4,10 @@ defaults:
   gear_ratio: 8.0
   torque_cmd_smoothing: 0.5
   torque_meas_smoothing: 0.5
+  # position_min/position_max are intentionally omitted for now.
+  # With grounded PIP actuators, actuator travel and URDF joint limits are
+  # different coordinate systems; leaving these unset disables hardware-layer
+  # position soft limits while retaining velocity/effort/gain clamps.
   limits:
     velocity: 40.21
     effort: 1270.0
@@ -15,62 +19,38 @@ actuators:
     tx_id: 0x0A
     rx_id: 0x0A
     direction: -1
-    limits:
-      position_min: -0.2617994
-      position_max: 0.7853982
 
   - name: thumb_yaw
     tx_id: 0x0B
     rx_id: 0x0B
     direction: 1
-    limits:
-      position_min: -0.7853982
-      position_max: 0.7853982
 
   - name: thumb_mcp
     tx_id: 0x0C
     rx_id: 0x0C
     direction: -1
-    limits:
-      position_min: -1.0471976
-      position_max: 1.2217305
 
   - name: thumb_pip
     tx_id: 0x0D
     rx_id: 0x0D
     direction: -1
-    limits:
-      position_min: -1.0471976
-      position_max: 3.1415927
 
   - name: index_mcp
     tx_id: 0x0E
     rx_id: 0x0E
     direction: -1
-    limits:
-      position_min: -1.0471976
-      position_max: 1.2217305
 
   - name: index_pip
     tx_id: 0x0F
     rx_id: 0x0F
     direction: -1
-    limits:
-      position_min: -1.0471976
-      position_max: 3.1415927
 
   - name: middle_mcp
     tx_id: 0x10
     rx_id: 0x10
     direction: 1
-    limits:
-      position_min: -1.0471976
-      position_max: 1.2217305
 
   - name: middle_pip
     tx_id: 0x11
     rx_id: 0x11
     direction: 1
-    limits:
-      position_min: -1.0471976
-      position_max: 3.1415927

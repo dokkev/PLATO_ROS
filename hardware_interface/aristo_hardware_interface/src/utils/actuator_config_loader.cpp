@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cmath>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -42,11 +43,17 @@ const YAML::Node scalar_or_default(
   const YAML::Node & defaults,
   const char * key)
 {
-  if (node[key]) {
-    return node[key];
+  if (node && node.IsDefined()) {
+    const auto value = node[key];
+    if (value && value.IsDefined()) {
+      return value;
+    }
   }
-  if (defaults && defaults[key]) {
-    return defaults[key];
+  if (defaults && defaults.IsDefined()) {
+    const auto value = defaults[key];
+    if (value && value.IsDefined()) {
+      return value;
+    }
   }
   return YAML::Node();
 }
@@ -102,7 +109,7 @@ float parse_optional_float(
   float default_value)
 {
   const auto value = scalar_or_default(node, defaults, key);
-  if (!value) {
+  if (!value || !value.IsDefined() || value.IsNull()) {
     return default_value;
   }
   if (!value.IsScalar()) {
@@ -123,8 +130,16 @@ actuator::Limits parse_limits(const YAML::Node & node, const YAML::Node & defaul
   }
 
   actuator::Limits limits;
-  limits.position_limit_min = parse_float(limits_node, default_limits_node, "position_min");
-  limits.position_limit_max = parse_float(limits_node, default_limits_node, "position_max");
+  limits.position_limit_min = parse_optional_float(
+    limits_node,
+    default_limits_node,
+    "position_min",
+    std::numeric_limits<float>::quiet_NaN());
+  limits.position_limit_max = parse_optional_float(
+    limits_node,
+    default_limits_node,
+    "position_max",
+    std::numeric_limits<float>::quiet_NaN());
   limits.velocity_limit = parse_float(limits_node, default_limits_node, "velocity");
   limits.effort_limit = parse_float(limits_node, default_limits_node, "effort");
   limits.stiffness_limit = parse_float(limits_node, default_limits_node, "stiffness");

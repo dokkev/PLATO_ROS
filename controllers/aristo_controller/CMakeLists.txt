@@ -11,6 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   ament_index_cpp
+  mppi_core
   plato_robot_system
 )
 
@@ -23,11 +24,14 @@ endforeach()
 
 add_library(${PROJECT_NAME} SHARED
   src/config/aristo_config.cpp
+  src/state_machines/grasp_force.cpp
   src/state_machines/grasp_teleop.cpp
+  src/state_machines/grasp_ready.cpp
   src/state_machines/idle.cpp
   src/state_machines/initialize.cpp
   src/state_machines/joint_teleop.cpp
   src/state_machines/mppi_grasp.cpp
+  src/state_machines/poke.cpp
 )
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC

@@ -1,5 +1,5 @@
-#ifndef ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
-#define ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
+#ifndef ARISTO_CONTROLLER__STATE_MACHINES__GRASP_READY_HPP_
+#define ARISTO_CONTROLLER__STATE_MACHINES__GRASP_READY_HPP_
 
 #include <Eigen/Core>
 
@@ -10,12 +10,12 @@
 namespace aristo_controller::state_machines
 {
 
-class InitializeState final : public plato_robot_system::State
+class GraspReadyState final : public plato_robot_system::State
 {
 public:
-  static constexpr const char * kName = "initialize";
+  static constexpr const char * kName = "grasp_ready";
 
-  InitializeState(
+  GraspReadyState(
     plato_robot_system::StateId id,
     const plato_robot_system::RobotSystem * robot);
 
@@ -27,6 +27,7 @@ public:
 
   void OnEnter() override;
   void OnExit() override;
+  bool IsFinished() const override;
   bool PopulateCommand(plato_robot_system::RobotCommand * command) const override;
 
   const plato_robot_system::RobotCommand & command() const { return joint_task_.command(); }
@@ -40,4 +41,4 @@ private:
 
 }  // namespace aristo_controller::state_machines
 
-#endif  // ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
+#endif  // ARISTO_CONTROLLER__STATE_MACHINES__GRASP_READY_HPP_

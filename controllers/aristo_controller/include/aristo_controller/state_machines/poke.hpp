@@ -1,5 +1,5 @@
-#ifndef ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
-#define ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
+#ifndef ARISTO_CONTROLLER__STATE_MACHINES__POKE_HPP_
+#define ARISTO_CONTROLLER__STATE_MACHINES__POKE_HPP_
 
 #include <Eigen/Core>
 
@@ -10,12 +10,12 @@
 namespace aristo_controller::state_machines
 {
 
-class InitializeState final : public plato_robot_system::State
+class PokeState final : public plato_robot_system::State
 {
 public:
-  static constexpr const char * kName = "initialize";
+  static constexpr const char * kName = "poke";
 
-  InitializeState(
+  PokeState(
     plato_robot_system::StateId id,
     const plato_robot_system::RobotSystem * robot);
 
@@ -40,4 +40,4 @@ private:
 
 }  // namespace aristo_controller::state_machines
 
-#endif  // ARISTO_CONTROLLER__STATE_MACHINES__INITIALIZE_HPP_
+#endif  // ARISTO_CONTROLLER__STATE_MACHINES__POKE_HPP_

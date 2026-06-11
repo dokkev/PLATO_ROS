@@ -4,6 +4,9 @@
 
 #include "plato_robot_system/control/state_machine/fsm_handler.hpp"
 
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -92,6 +95,12 @@ void FSMHandler::EnterCurrentStateIfNeeded(const double global_time)
   if (!is_first_visit_ || !current_state_) {
     return;
   }
+  std::ostringstream message;
+  message << std::fixed << std::setprecision(6)
+          << "[FSM] entering state id=" << current_state_->id()
+          << " name=" << current_state_->name()
+          << " t=" << global_time;
+  std::cout << message.str() << std::endl;
   current_state_->Enter(global_time);
   is_first_visit_ = false;
 }

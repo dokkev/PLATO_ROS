@@ -125,6 +125,8 @@ inline std::vector<HemisphereMotion> ComputeHemisphereMotions(
   pinocchio::getFrameJacobian(model, data, context.sensor_frame_id,
                               pinocchio::LOCAL, frame_jacobian);
 
+  const Eigen::Matrix3d rotation_world_sensor =
+      data.oMf[context.sensor_frame_id].rotation();
   Eigen::Matrix<double, 3, Eigen::Dynamic> point_jacobian(3, model.nv);
 
   for (const auto& hemisphere : tactile.hemispheres) {
@@ -142,8 +144,17 @@ inline std::vector<HemisphereMotion> ComputeHemisphereMotions(
     HemisphereMotion motion;
     motion.hemisphere_index = hemisphere.hemisphere_index;
     motion.position_sensor_m = position_sensor_m;
+    motion.point_world_m =
+        data.oMf[context.sensor_frame_id].act(position_sensor_m);
+    motion.normal_world = rotation_world_sensor * Eigen::Vector3d::UnitZ();
+    if (std::isfinite(context.normal_axis_sign) &&
+        context.normal_axis_sign < 0.0) {
+      motion.normal_world = -motion.normal_world;
+    }
     motion.delta_position_sensor_m = ApplyTactileNormalAxisConvention(
         point_jacobian * tangent_step, context);
+    motion.J_contact_world = rotation_world_sensor * point_jacobian;
+    motion.J_normal = motion.normal_world.transpose() * motion.J_contact_world;
 
     if (motion.delta_position_sensor_m.allFinite()) {
       motions.push_back(motion);

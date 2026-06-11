@@ -1,4 +1,4 @@
-#include "aristo_controller/state_machines/grasp_teleop.hpp"
+#include "aristo_controller/state_machines/grasp_force.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,12 +15,7 @@ bool IsFinite(const double value)
 
 }  // namespace
 
-GraspTeleopState::GraspTeleopState(const plato_robot_system::StateId id)
-: plato_robot_system::State(id, kName)
-{
-}
-
-GraspTeleopState::GraspTeleopState(
+GraspForceState::GraspForceState(
   const plato_robot_system::StateId id,
   plato_robot_system::RobotSystem * robot)
 : plato_robot_system::State(id, kName),
@@ -28,8 +23,7 @@ GraspTeleopState::GraspTeleopState(
 {
 }
 
-bool GraspTeleopState::ConfigureTask(
-  const GraspTeleopStateConfig & config)
+bool GraspForceState::ConfigureTask(const GraspForceStateConfig & config)
 {
   if (robot_ == nullptr || !robot_->hasModel()) {
     task_configured_ = false;
@@ -43,27 +37,22 @@ bool GraspTeleopState::ConfigureTask(
     return false;
   }
 
-  auto task_config = config.grasp_task;
-  task_config.force_feedback_enabled = false;
-
-  if (!grasp_task_.Configure(robot_->model(), task_config)) {
+  if (!grasp_task_.Configure(robot_->model(), config.grasp_task)) {
     task_configured_ = false;
     task_entered_ = false;
     return false;
   }
 
   config_ = config;
-  config_.grasp_task = task_config;
   input_.u = std::clamp(config_.default_u, 0.0, 1.0);
   input_.phi = std::clamp(config_.default_phi, 0.0, 1.0);
   input_.desired_force_n = std::max(0.0, config_.default_desired_force_n);
   task_configured_ = true;
   task_entered_ = false;
-  force_handoff_requested_ = false;
   return task_configured_;
 }
 
-void GraspTeleopState::SetInput(const GraspTeleopInput & input)
+void GraspForceState::SetInput(const GraspForceInput & input)
 {
   if (IsFinite(input.u)) {
     input_.u = std::clamp(input.u, 0.0, 1.0);
@@ -76,10 +65,9 @@ void GraspTeleopState::SetInput(const GraspTeleopInput & input)
   }
 }
 
-void GraspTeleopState::OnEnter()
+void GraspForceState::OnEnter()
 {
   task_entered_ = false;
-  force_handoff_requested_ = false;
   if (!task_configured_ || robot_ == nullptr || !robot_->hasState()) {
     return;
   }
@@ -89,20 +77,13 @@ void GraspTeleopState::OnEnter()
   task_entered_ = grasp_task_.OnEnter(*robot_, robot_->state());
 }
 
-void GraspTeleopState::OnExit()
+void GraspForceState::OnExit()
 {
-  force_handoff_requested_ = false;
+  grasp_task_.Reset();
   task_entered_ = false;
 }
 
-bool GraspTeleopState::IsFinished() const
-{
-  return (
-    force_handoff_requested_ && lifecycle_.next_state_id >= 0) ||
-    plato_robot_system::State::IsFinished();
-}
-
-bool GraspTeleopState::PopulateCommand(plato_robot_system::RobotCommand * command) const
+bool GraspForceState::PopulateCommand(plato_robot_system::RobotCommand * command) const
 {
   if (!task_configured_ || robot_ == nullptr || !robot_->hasState() || command == nullptr) {
     return false;
@@ -115,26 +96,18 @@ bool GraspTeleopState::PopulateCommand(plato_robot_system::RobotCommand * comman
   }
 
   const auto & state = robot_->state();
-  const GraspTeleopInput input = input_;
+  const GraspForceInput input = input_;
 
   plato_robot_system::task::GraspTaskCommand task_command;
   task_command.u = input.u;
   task_command.phi = input.phi;
   task_command.desired_force_n = input.desired_force_n;
-  const bool populated = grasp_task_.PopulateCommand(
+  return grasp_task_.PopulateCommand(
     *robot_,
     state,
     task_command,
     dt(),
     command);
-  if (
-    populated &&
-    config_.shared_grasp_control &&
-    grasp_task_.mode() == plato_robot_system::task::GraspTaskMode::kForceTracking)
-  {
-    force_handoff_requested_ = true;
-  }
-  return populated;
 }
 
 }  // namespace aristo_controller::state_machines

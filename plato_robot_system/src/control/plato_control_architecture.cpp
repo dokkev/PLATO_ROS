@@ -235,6 +235,10 @@ void ControlArchitecture::UpdateStateMachine(double current_time, double dt) {
   const StateId requested_state_id = RequestedStateId();
   if (requested_state_id >= 0) {
     (void)fsm_handler_.RequestState(requested_state_id);
+    if (requested_state_id_ == requested_state_id) {
+      requested_state_id_ = -1;
+      control_state_.requested_state_id = -1;
+    }
   }
   fsm_handler_.Update(current_time, dt);
   UpdateControlStateFromFsm();
@@ -244,9 +248,8 @@ StateId ControlArchitecture::RequestedStateId() const {
   if (requested_state_id_ >= 0) {
     return requested_state_id_;
   }
-  const StateId current_state_id = fsm_handler_.GetCurrentStateId();
-  if (current_state_id >= 0) {
-    return current_state_id;
+  if (fsm_handler_.GetCurrentStateId() >= 0) {
+    return -1;
   }
   const auto idle_id = fsm_handler_.FindStateIdByName(kIdleStateName);
   return idle_id ? *idle_id : -1;
@@ -379,6 +382,8 @@ bool ControlArchitecture::SwitchToIdleAndPopulateCommand(
     return false;
   }
   fsm_handler_.Update(current_time, dt);
+  requested_state_id_ = -1;
+  control_state_.requested_state_id = -1;
   UpdateControlStateFromFsm();
   return PopulateIdleCommand(current_time, command);
 }

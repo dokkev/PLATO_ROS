@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include <pinocchio/algorithm/joint-configuration.hpp>
 
@@ -19,8 +18,6 @@ namespace
 {
 
 constexpr double kDtSec = 0.02;
-constexpr double kMaxVelocityRadS = 2.0;
-constexpr double kMaxTorqueNm = 10.0;
 constexpr double kTolerance = 1.0e-9;
 
 std::filesystem::path AristoUrdfPath()
@@ -40,50 +37,38 @@ plato_robot_system::RobotSystem MakeNeutralAristoRobot()
   return robot;
 }
 
-Eigen::Vector3d ContactVector(plato_robot_system::RobotSystem * robot)
+int JointPositionIndex(
+  const pinocchio::Model & model,
+  const std::string & joint_name)
 {
-  const Eigen::Vector3d p_a =
-    robot->FramePoseWorld(std::string(plato_robot_system::task::kThumbIndexFrameA))
-    .translation();
-  const Eigen::Vector3d p_b =
-    robot->FramePoseWorld(std::string(plato_robot_system::task::kThumbIndexFrameB))
-    .translation();
-  return p_b - p_a;
+  const auto joint_id = model.getJointId(joint_name);
+  EXPECT_LT(joint_id, static_cast<pinocchio::JointIndex>(model.njoints));
+  EXPECT_EQ(model.nqs[joint_id], 1);
+  return model.idx_qs[joint_id];
 }
 
-double ContactAxisDistance(
-  plato_robot_system::RobotSystem * robot,
-  const Eigen::Vector3d & axis_world)
+void SetJointPosition(
+  const pinocchio::Model & model,
+  const std::string & joint_name,
+  const double value,
+  Eigen::VectorXd * q)
 {
-  return axis_world.dot(ContactVector(robot));
+  ASSERT_NE(q, nullptr);
+  (*q)[JointPositionIndex(model, joint_name)] = value;
 }
 
-Eigen::Vector3d ContactLateralAxis(const Eigen::Vector3d & close_axis_world)
+Eigen::VectorXd GraspReadyQ(const pinocchio::Model & model)
 {
-  const Eigen::Vector3d motion_plane_normal{0.0, 1.0, 0.0};
-  return motion_plane_normal.cross(close_axis_world).normalized();
-}
-
-std::vector<int> ActiveVelocityIndices(const pinocchio::Model & model)
-{
-  std::vector<int> indices;
-  indices.reserve(plato_robot_system::task::kThumbIndexActiveJoints.size());
-  for (const auto joint_name : plato_robot_system::task::kThumbIndexActiveJoints) {
-    const auto joint_id = model.getJointId(std::string(joint_name));
-    indices.push_back(model.idx_vs[joint_id]);
-  }
-  return indices;
-}
-
-std::vector<int> ActivePositionIndices(const pinocchio::Model & model)
-{
-  std::vector<int> indices;
-  indices.reserve(plato_robot_system::task::kThumbIndexActiveJoints.size());
-  for (const auto joint_name : plato_robot_system::task::kThumbIndexActiveJoints) {
-    const auto joint_id = model.getJointId(std::string(joint_name));
-    indices.push_back(model.idx_qs[joint_id]);
-  }
-  return indices;
+  Eigen::VectorXd q = pinocchio::neutral(model);
+  SetJointPosition(model, "joint1", 0.0, &q);
+  SetJointPosition(model, "joint2", 0.0, &q);
+  SetJointPosition(model, "joint3", 0.0, &q);
+  SetJointPosition(model, "joint4", 0.0, &q);
+  SetJointPosition(model, "joint5", 0.8849433621761859, &q);
+  SetJointPosition(model, "joint6", -0.8849433621761859, &q);
+  SetJointPosition(model, "joint7", 0.785, &q);
+  SetJointPosition(model, "joint8", 1.5708, &q);
+  return q;
 }
 
 plato_robot_system::sensor::TactileState MakeTactileState(
@@ -119,207 +104,217 @@ plato_robot_system::RobotState MakeStateWithTactile(
 }
 
 plato_robot_system::task::GraspTaskConfig MakeTaskConfig(
-  const double current_distance_m)
+  const pinocchio::Model & model)
 {
   plato_robot_system::task::GraspTaskConfig config;
-  config.distance_closed_m = std::max(0.001, current_distance_m - 0.02);
-  config.distance_open_m = current_distance_m + 0.02;
-  config.fallback_close_axis_base = Eigen::Vector3d{0.0, 0.0, -1.0};
+  config.q_ready = GraspReadyQ(model);
   config.force_enter_debounce_ticks = 1;
   config.force_exit_contact_lost_ticks = 1;
   config.force_exit_u_threshold = 0.75;
   config.min_contact_force_n = 0.05;
   config.use_tactile_presence_for_contact = true;
-  config.kp_task = 80.0;
-  config.kd_task = 2.0;
-  config.lateral_offset_limit_m = 0.02;
-  config.kp_lateral = 80.0;
-  config.kd_lateral = 2.0;
-  config.q_posture = Eigen::VectorXd::Zero(4);
-  config.kp_tactile_fb = 0.1;
-  config.kd_tactile_fb = 0.0;
-  config.w_task_motion = 100.0;
-  config.w_task_tactile_mode = 1.0;
-  config.w_lateral = 100.0;
-  config.w_tactile = 100.0;
-  config.w_posture = 0.01;
-  config.damping_qp = 1.0e-6;
-  config.max_qddot_rad_s2 = 80.0;
-  config.max_velocity_rad_s = kMaxVelocityRadS;
-  config.max_torque_nm = kMaxTorqueNm;
-  config.max_torque_rate_nm_per_s = 1000.0;
-  config.use_inverse_dynamics = true;
-  config.joint_damping_nm_per_rad_s = 0.0;
+  config.kp_tactile_u_fb = 0.1;
+  config.kd_tactile_u_fb = 0.0;
+  config.kp_tactile_phi_fb = 0.0;
+  config.kd_tactile_phi_fb = 0.0;
   return config;
 }
 
-void ExpectSaneActiveOnlyCommand(
+double ParallelQ5Geometry(
+  const plato_robot_system::task::GraspTaskConfig & config,
+  const double q3)
+{
+  const double cos_q5 = std::clamp(
+    std::cos(q3) - config.parallel_lateral_offset_m / config.parallel_tip_radius_m,
+    -1.0,
+    1.0);
+  return std::max(config.parallel_q5_min_rad, std::acos(cos_q5));
+}
+
+void ExpectValidPositionCommand(
   const plato_robot_system::RobotSystem & robot,
-  const plato_robot_system::RobotState & state,
   const plato_robot_system::RobotCommand & command)
 {
   ASSERT_TRUE(command.IsUsable());
   EXPECT_EQ(command.q_cmd.size(), robot.nq());
   EXPECT_EQ(command.qdot_cmd.size(), robot.nv());
   EXPECT_EQ(command.tau_cmd.size(), robot.nv());
-  EXPECT_EQ(command.kp.size(), robot.nv());
-  EXPECT_EQ(command.kd.size(), robot.nv());
   EXPECT_TRUE(command.q_cmd.allFinite());
-  EXPECT_TRUE(command.qdot_cmd.allFinite());
-  EXPECT_TRUE(command.tau_cmd.allFinite());
+  EXPECT_TRUE(command.qdot_cmd.isZero(kTolerance));
+  EXPECT_TRUE(command.tau_cmd.isZero(kTolerance));
   EXPECT_TRUE(command.kp.isZero(kTolerance));
   EXPECT_TRUE(command.kd.isZero(kTolerance));
-
-  const auto active_q_indices = ActivePositionIndices(robot.model());
-  const auto active_v_indices = ActiveVelocityIndices(robot.model());
-  Eigen::VectorXd active_q_mask = Eigen::VectorXd::Zero(robot.nq());
-  Eigen::VectorXd active_v_mask = Eigen::VectorXd::Zero(robot.nv());
-
-  bool any_active_joint_moved = false;
-  const auto & model = robot.model();
-  for (std::size_t i = 0; i < active_q_indices.size(); ++i) {
-    const int q_index = active_q_indices[i];
-    const int v_index = active_v_indices[i];
-    active_q_mask[q_index] = 1.0;
-    active_v_mask[v_index] = 1.0;
-
-    const double delta_q = command.q_cmd[q_index] - state.q[q_index];
-    EXPECT_NEAR(command.qdot_cmd[v_index], delta_q / kDtSec, 1.0e-8);
-    EXPECT_LE(std::abs(command.qdot_cmd[v_index]), kMaxVelocityRadS + 1.0e-8);
-    EXPECT_LE(std::abs(command.tau_cmd[v_index]), kMaxTorqueNm + 1.0e-8);
-    EXPECT_GE(command.q_cmd[q_index], model.lowerPositionLimit[q_index] - 1.0e-8);
-    EXPECT_LE(command.q_cmd[q_index], model.upperPositionLimit[q_index] + 1.0e-8);
-    any_active_joint_moved = any_active_joint_moved || std::abs(delta_q) > 1.0e-8;
-  }
-  EXPECT_TRUE(any_active_joint_moved);
-
-  for (Eigen::Index i = 0; i < robot.nq(); ++i) {
-    if (active_q_mask[i] == 0.0) {
-      EXPECT_NEAR(command.q_cmd[i], state.q[i], kTolerance);
-    }
-  }
-  for (Eigen::Index i = 0; i < robot.nv(); ++i) {
-    if (active_v_mask[i] == 0.0) {
-      EXPECT_NEAR(command.qdot_cmd[i], 0.0, kTolerance);
-      EXPECT_NEAR(command.tau_cmd[i], 0.0, kTolerance);
-    }
-  }
 }
 
 }  // namespace
 
-TEST(GraspTaskTest, OpeningInputProducesSaneCommandAndIncreasesContactDistance)
+TEST(GraspTaskTest, ReadyCommandUsesParallelControllerGeometry)
 {
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const auto state = robot.state();
-  const Eigen::Vector3d entry_contact_vector = ContactVector(&robot);
-  ASSERT_GT(entry_contact_vector.norm(), 1.0e-6);
-  const Eigen::Vector3d entry_axis = entry_contact_vector.normalized();
-  const double entry_distance = ContactAxisDistance(&robot, entry_axis);
+  auto config = MakeTaskConfig(robot.model());
+  robot.UpdateState(
+    config.q_ready,
+    Eigen::VectorXd::Zero(robot.nv()),
+    Eigen::VectorXd::Zero(robot.nv()),
+    0.0);
+  robot.UpdateKinematics();
 
   plato_robot_system::task::GraspTask task;
-  ASSERT_TRUE(task.Configure(robot.model(), MakeTaskConfig(entry_distance)));
-  ASSERT_TRUE(task.OnEnter(robot, state));
+  ASSERT_TRUE(task.Configure(robot.model(), config));
+  ASSERT_TRUE(task.OnEnter(robot, robot.state()));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u_close = 1.0;
-  input.u_lateral = 0.5;
+  input.u = 0.5;
+  input.phi = 0.0;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
-  ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
-  EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
-  ExpectSaneActiveOnlyCommand(robot, state, command);
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidPositionCommand(robot, command);
 
-  robot.UpdateState(
-    command.q_cmd,
-    Eigen::VectorXd::Zero(robot.nv()),
-    Eigen::VectorXd::Zero(robot.nv()),
-    state.time_s + kDtSec);
-  robot.UpdateKinematics();
-  EXPECT_GT(ContactAxisDistance(&robot, entry_axis), entry_distance + 1.0e-8);
+  const auto & model = robot.model();
+  const int joint3_q = JointPositionIndex(model, "joint3");
+  const int joint4_q = JointPositionIndex(model, "joint4");
+  const int joint5_q = JointPositionIndex(model, "joint5");
+  const int joint6_q = JointPositionIndex(model, "joint6");
+
+  const double q5_ready = ParallelQ5Geometry(config, 0.0);
+  EXPECT_NEAR(command.q_cmd[joint3_q], 0.0, 1.0e-12);
+  EXPECT_NEAR(command.q_cmd[joint4_q], 0.0, 1.0e-12);
+  EXPECT_NEAR(command.q_cmd[joint5_q], q5_ready, 1.0e-12);
+  EXPECT_NEAR(command.q_cmd[joint6_q], -q5_ready, 1.0e-12);
+  EXPECT_NEAR(task.status().effective_u, 0.5, 1.0e-12);
+  EXPECT_NEAR(task.status().u_parallel, config.parallel_midpoint_u, 1.0e-12);
 }
 
-TEST(GraspTaskTest, LateralInputProducesSaneCommandAndMovesContactOffset)
+TEST(GraspTaskTest, ClosedFlexedCommandUsesParallelControllerGeometry)
 {
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const auto state = robot.state();
-  const Eigen::Vector3d entry_contact_vector = ContactVector(&robot);
-  ASSERT_GT(entry_contact_vector.norm(), 1.0e-6);
-  const Eigen::Vector3d close_axis = entry_contact_vector.normalized();
-  const Eigen::Vector3d lateral_axis = ContactLateralAxis(close_axis);
-  ASSERT_TRUE(lateral_axis.allFinite());
-  const double entry_distance = ContactAxisDistance(&robot, close_axis);
-  const double entry_lateral_offset = ContactAxisDistance(&robot, lateral_axis);
+  auto config = MakeTaskConfig(robot.model());
 
   plato_robot_system::task::GraspTask task;
-  ASSERT_TRUE(task.Configure(robot.model(), MakeTaskConfig(entry_distance)));
-  ASSERT_TRUE(task.OnEnter(robot, state));
+  ASSERT_TRUE(task.Configure(robot.model(), config));
+  ASSERT_TRUE(task.OnEnter(robot, robot.state()));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u_close = 0.5;
-  input.u_lateral = 1.0;
+  input.u = 0.0;
+  input.phi = 1.0;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
-  ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
-  EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
-  EXPECT_LT(task.status().lateral_error_m, 0.0);
-  ExpectSaneActiveOnlyCommand(robot, state, command);
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidPositionCommand(robot, command);
 
-  robot.UpdateState(
-    command.q_cmd,
-    Eigen::VectorXd::Zero(robot.nv()),
-    Eigen::VectorXd::Zero(robot.nv()),
-    state.time_s + kDtSec);
-  robot.UpdateKinematics();
-  EXPECT_GT(
-    ContactAxisDistance(&robot, lateral_axis),
-    entry_lateral_offset + 1.0e-8);
+  const auto & model = robot.model();
+  const int joint3_q = JointPositionIndex(model, "joint3");
+  const int joint4_q = JointPositionIndex(model, "joint4");
+  const int joint5_q = JointPositionIndex(model, "joint5");
+  const int joint6_q = JointPositionIndex(model, "joint6");
+  const double q3_closed = config.parallel_qmin_rad;
+  const double q5_closed = ParallelQ5Geometry(config, q3_closed);
+
+  EXPECT_NEAR(command.q_cmd[joint3_q], q3_closed, 1.0e-12);
+  EXPECT_NEAR(
+    command.q_cmd[joint4_q],
+    -q3_closed - config.parallel_max_flexion_rad,
+    1.0e-12);
+  EXPECT_NEAR(command.q_cmd[joint5_q], q5_closed, 1.0e-12);
+  EXPECT_NEAR(
+    command.q_cmd[joint6_q],
+    -q5_closed + config.parallel_max_flexion_rad,
+    1.0e-12);
 }
 
-TEST(GraspTaskTest, RejectsDegenerateFallbackCloseAxis)
+TEST(GraspTaskTest, LpfAlphaSmoothsPositionCommand)
 {
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const double entry_distance = ContactVector(&robot).norm();
-  auto config = MakeTaskConfig(entry_distance);
-  config.fallback_close_axis_base.setZero();
+  auto raw_config = MakeTaskConfig(robot.model());
+  auto smoothed_config = raw_config;
+  smoothed_config.lpf_alpha = 0.5;
+
+  plato_robot_system::task::GraspTask raw_task;
+  ASSERT_TRUE(raw_task.Configure(robot.model(), raw_config));
+  ASSERT_TRUE(raw_task.OnEnter(robot, robot.state()));
+
+  plato_robot_system::task::GraspTask smoothed_task;
+  ASSERT_TRUE(smoothed_task.Configure(robot.model(), smoothed_config));
+  ASSERT_TRUE(smoothed_task.OnEnter(robot, robot.state()));
+
+  plato_robot_system::task::GraspTaskCommand input;
+  input.u = 0.0;
+  input.phi = 1.0;
+  input.desired_force_n = 1.0;
+
+  plato_robot_system::RobotCommand raw_command;
+  ASSERT_TRUE(raw_task.PopulateCommand(robot, robot.state(), input, kDtSec, &raw_command));
+  ExpectValidPositionCommand(robot, raw_command);
+
+  plato_robot_system::RobotCommand smoothed_command;
+  ASSERT_TRUE(
+    smoothed_task.PopulateCommand(robot, robot.state(), input, kDtSec, &smoothed_command));
+  ExpectValidPositionCommand(robot, smoothed_command);
+
+  const Eigen::VectorXd expected =
+    robot.state().q + smoothed_config.lpf_alpha * (raw_command.q_cmd - robot.state().q);
+  EXPECT_TRUE(smoothed_command.q_cmd.isApprox(expected, 1.0e-12));
+  EXPECT_TRUE(smoothed_task.status().q_target.isApprox(expected, 1.0e-12));
+}
+
+TEST(GraspTaskTest, RejectsWrongSizedQReady)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  auto config = MakeTaskConfig(robot.model());
+  config.q_ready = Eigen::VectorXd::Zero(robot.nq() - 1);
 
   plato_robot_system::task::GraspTask task;
   EXPECT_FALSE(task.Configure(robot.model(), config));
 }
 
-TEST(GraspTaskTest, EnoughContactEnablesForceTrackingAndKeepsCommandSane)
+TEST(GraspTaskTest, RejectsInvalidParallelGeometry)
 {
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const Eigen::Vector3d entry_contact_vector = ContactVector(&robot);
-  ASSERT_GT(entry_contact_vector.norm(), 1.0e-6);
-  const double entry_distance = entry_contact_vector.norm();
-  const auto state = MakeStateWithTactile(&robot, 0.2, 0.25);
+  auto config = MakeTaskConfig(robot.model());
+  config.parallel_lateral_offset_m = 3.0 * config.parallel_tip_radius_m;
 
   plato_robot_system::task::GraspTask task;
-  ASSERT_TRUE(task.Configure(robot.model(), MakeTaskConfig(entry_distance)));
+  EXPECT_FALSE(task.Configure(robot.model(), config));
+}
+
+TEST(GraspTaskTest, EnoughContactEnablesForceTrackingAndOffsetsCloseCommand)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  const auto state = MakeStateWithTactile(&robot, 0.2, 0.25);
+  auto config = MakeTaskConfig(robot.model());
+  config.kp_tactile_phi_fb = 0.1;
+
+  plato_robot_system::task::GraspTask task;
+  ASSERT_TRUE(task.Configure(robot.model(), config));
   ASSERT_TRUE(task.OnEnter(robot, state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u_close = 0.2;
-  input.u_lateral = 0.5;
+  input.u = 0.2;
+  input.phi = 0.2;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
   ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
+  ExpectValidPositionCommand(robot, command);
   EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kForceTracking);
-  EXPECT_TRUE(task.status().qp_solved);
   EXPECT_GT(task.status().force_error_n, 0.0);
-  ExpectSaneActiveOnlyCommand(robot, state, command);
+  EXPECT_LT(task.status().effective_u, input.u);
+  EXPECT_GT(task.status().effective_phi, input.phi);
 }
 
 TEST(GraspTaskTest, InvalidTactileDuringForceTrackingFallsBackToMotionTeleop)
@@ -327,19 +322,16 @@ TEST(GraspTaskTest, InvalidTactileDuringForceTrackingFallsBackToMotionTeleop)
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const double entry_distance = ContactVector(&robot).norm();
   const auto contact_state = MakeStateWithTactile(&robot, 0.2, 0.25);
-
-  plato_robot_system::task::GraspTaskConfig config = MakeTaskConfig(entry_distance);
-  config.kd_tactile_fb = 1.0;
+  auto config = MakeTaskConfig(robot.model());
 
   plato_robot_system::task::GraspTask task;
   ASSERT_TRUE(task.Configure(robot.model(), config));
   ASSERT_TRUE(task.OnEnter(robot, contact_state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u_close = 0.2;
-  input.u_lateral = 0.5;
+  input.u = 0.2;
+  input.phi = 0.0;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
@@ -354,9 +346,7 @@ TEST(GraspTaskTest, InvalidTactileDuringForceTrackingFallsBackToMotionTeleop)
 
   ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
   EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
-  EXPECT_TRUE(task.status().qp_solved);
   EXPECT_DOUBLE_EQ(task.status().force_error_n, 0.0);
-  ExpectSaneActiveOnlyCommand(robot, robot.state(), command);
 }
 
 TEST(GraspTaskTest, OpeningCommandExitsForceTracking)
@@ -364,24 +354,23 @@ TEST(GraspTaskTest, OpeningCommandExitsForceTracking)
   ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
 
   auto robot = MakeNeutralAristoRobot();
-  const double entry_distance = ContactVector(&robot).norm();
   const auto state = MakeStateWithTactile(&robot, 0.2, 0.25);
+  auto config = MakeTaskConfig(robot.model());
 
   plato_robot_system::task::GraspTask task;
-  ASSERT_TRUE(task.Configure(robot.model(), MakeTaskConfig(entry_distance)));
+  ASSERT_TRUE(task.Configure(robot.model(), config));
   ASSERT_TRUE(task.OnEnter(robot, state));
 
   plato_robot_system::task::GraspTaskCommand input;
-  input.u_close = 0.2;
-  input.u_lateral = 0.5;
+  input.u = 0.2;
+  input.phi = 0.0;
   input.desired_force_n = 1.0;
 
   plato_robot_system::RobotCommand command;
   ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
   ASSERT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kForceTracking);
 
-  input.u_close = 1.0;
+  input.u = 1.0;
   ASSERT_TRUE(task.PopulateCommand(robot, state, input, kDtSec, &command));
   EXPECT_EQ(task.mode(), plato_robot_system::task::GraspTaskMode::kMotionTeleop);
-  ExpectSaneActiveOnlyCommand(robot, state, command);
 }

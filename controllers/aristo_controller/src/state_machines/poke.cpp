@@ -1,11 +1,11 @@
-#include "aristo_controller/state_machines/initialize.hpp"
+#include "aristo_controller/state_machines/poke.hpp"
 
 #include <algorithm>
 
 namespace aristo_controller::state_machines
 {
 
-InitializeState::InitializeState(
+PokeState::PokeState(
   const plato_robot_system::StateId id,
   const plato_robot_system::RobotSystem * robot)
 : plato_robot_system::State(id, kName),
@@ -13,24 +13,24 @@ InitializeState::InitializeState(
 {
 }
 
-void InitializeState::SetTargetPosition(const Eigen::Ref<const Eigen::VectorXd> & target_jpos)
+void PokeState::SetTargetPosition(const Eigen::Ref<const Eigen::VectorXd> & target_jpos)
 {
   target_jpos_ = target_jpos;
 }
 
-void InitializeState::SetDuration(const double duration_sec)
+void PokeState::SetDuration(const double duration_sec)
 {
   duration_sec_ = std::max(duration_sec, 1.0e-3);
 }
 
-void InitializeState::SetTaskFeedbackGains(
+void PokeState::SetTaskFeedbackGains(
   const Eigen::Ref<const Eigen::VectorXd> & kp_task,
   const Eigen::Ref<const Eigen::VectorXd> & kd_task)
 {
   joint_task_.SetTaskFeedbackGains(kp_task, kd_task);
 }
 
-void InitializeState::OnEnter()
+void PokeState::OnEnter()
 {
   joint_task_.Reset();
   if (robot_ == nullptr || !robot_->hasState()) {
@@ -44,12 +44,12 @@ void InitializeState::OnEnter()
   joint_task_.StartMinJerk(state, target_jpos_, duration_sec_);
 }
 
-void InitializeState::OnExit()
+void PokeState::OnExit()
 {
   joint_task_.Reset();
 }
 
-bool InitializeState::PopulateCommand(plato_robot_system::RobotCommand * command) const
+bool PokeState::PopulateCommand(plato_robot_system::RobotCommand * command) const
 {
   if (command == nullptr || robot_ == nullptr || !robot_->hasState()) {
     return false;

@@ -21,10 +21,18 @@ set(${PROJECT_NAME}_SOURCES
   src/core/mppi_optimizer.cpp
   src/costs/grasp_stability_cost.cpp
   src/costs/motion_tracking_cost.cpp
+  src/costs/robust_grasp_state_cost.cpp
+  src/disturbance/grasp_disturbance_sampler.cpp
   src/logging/mppi_rollout_logger.cpp
+  src/policy/grasp_action_library.cpp
+  src/policy/robust_grasp_policy.cpp
+  src/robot/robot_command_builder.cpp
+  src/rollout/disturbed_grasp_rollout.cpp
   src/rollout/grasp_state_rollout_model.cpp
   src/rollout/motion_rollout_model.cpp
+  src/tactile/disturbed_tactile_transition.cpp
   src/util/mppi_config.cpp
+  src/util/robust_grasp_policy_config.cpp
   src/util/rollout_config.cpp
   src/util/task_config.cpp
   src/util/yaml_utils.cpp

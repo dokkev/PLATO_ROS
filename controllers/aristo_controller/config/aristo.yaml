@@ -75,7 +75,7 @@ state_machine:
       name: grasp_teleop
       stay_here: true
       # Change this to grasp_force to use tactile force feedback instead of MPPI.
-      next_state: mppi_grasp
+      next_state: grasp_force
       params:
         # Command: [u], [u, phi], or [u, phi, f]
         # u: 0 closed, 0.5 ready/parallel, 1 open
@@ -261,8 +261,8 @@ state_machine:
       next_state: grasp_teleop
       params:
         default_u: 0.7
-        default_phi: 0.0
-        default_desired_force_n: 5.0
+        default_phi: 0.3
+        default_desired_force_n: 10.0
         exit_on_contact_lost: true
 
         grasp_task:
@@ -271,9 +271,9 @@ state_machine:
           lpf_alpha: 0.2
           force_enter_debounce_ticks: 0
           force_exit_u_threshold: 0.75
-          kp_tactile_u_fb: 0.02
+          kp_tactile_u_fb: 2.0
           kd_tactile_u_fb: 0.0
-          kp_tactile_phi_fb: 0.0
+          kp_tactile_phi_fb: 10.0
           kd_tactile_phi_fb: 0.0
 
 debug:

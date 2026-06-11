@@ -1,0 +1,78 @@
+robust_grasp:
+  rollout:
+    horizon_steps: 15
+    dt: 0.01
+    action_dim: 8
+    action_lower_bound: -20.0
+    action_upper_bound: 20.0
+
+  start:
+    min_enough_contact_sensors: 2
+    min_active_hemisphere_total: 2
+
+  disturbance:
+    num_disturbance_rollouts: 32
+    tactile_sensor_count: 2
+    random_seed: 7
+    tangent_velocity_std_mps: 0.004
+    tangent_velocity_max_mps: 0.020
+    rotational_velocity_std_radps: 0.05
+    rotational_velocity_max_radps: 0.30
+    normal_force_rate_std_nps: 1.0
+    normal_force_rate_max_nps: 5.0
+    cop_drift_velocity_std_mps: 0.001
+    cop_drift_velocity_max_mps: 0.005
+    friction_scale_mean: 1.0
+    friction_scale_std: 0.15
+    friction_scale_min: 0.4
+    friction_scale_max: 1.5
+    dropout_probability_per_step: 0.0
+    use_antithetic_samples: true
+
+  tactile_transition:
+    birth_approach_velocity_mps: 0.002
+    loss_unloading_velocity_mps: 0.002
+    max_shear_m: 0.003
+    max_rotation_rad: 0.05
+    born_normal_force_n: 0.05
+    born_confidence: 0.5
+    contact_confidence_decay: 1.0
+    normal_stiffness_n_per_m: 500.0
+    max_normal_force_n: 10.0
+    min_contact_force_n: 0.02
+    lose_contact_below_min_force: true
+
+  cost:
+    min_active_tactile_sensors: 2
+    min_active_hemisphere_total: 2
+    contact_loss_weight: 200.0
+    support_weight: 20.0
+    target_normal_force_n: 1.0
+    min_normal_force_per_sensor_n: 0.1
+    max_normal_force_per_sensor_n: 5.0
+    force_low_weight: 30.0
+    force_high_weight: 5.0
+    shear_weight: 20.0
+    rotation_weight: 20.0
+    slip_score_weight: 10.0
+    enable_contact_line_alignment: true
+    contact_line_alignment_weight: 50.0
+    close_axis_base: [0.0, 0.0, 1.0]
+    qddot_weight: 0.01
+    tau_weight: 0.0
+
+  action_library:
+    squeeze_light_accel_scale: 2.0
+    squeeze_medium_accel_scale: 5.0
+    squeeze_strong_accel_scale: 10.0
+    release_accel_scale: 2.0
+    align_accel_scale: 5.0
+    sequence_decay: 0.95
+
+  robust_score:
+    risk_weight: 1.0
+    cvar_tail_fraction: 0.25
+
+  behavior:
+    require_both_contact_for_update: true
+    return_hold_when_not_ready: true

@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <pinocchio/algorithm/joint-configuration.hpp>
-#include <pinocchio/algorithm/rnea.hpp>
 #include <stdexcept>
 #include <vector>
+
+#include "mppi_core/robot/robot_command_builder.hpp"
 
 namespace mppi_core {
 namespace {
@@ -77,39 +77,6 @@ bool HasPinocchioConfigurationSpace(const GraspObservation& observation,
              static_cast<Eigen::Index>(robot_system->nv());
 }
 
-struct RobotStateView {
-  const Eigen::VectorXd* q{nullptr};
-  const Eigen::VectorXd* qdot{nullptr};
-};
-
-RobotStateView SelectCurrentStateForRnea(const GraspObservation& observation,
-                                         std::size_t action_dim) {
-  RobotSystem* robot_system = observation.robot_system;
-  if (!HasPinocchioModelData(robot_system) ||
-      static_cast<Eigen::Index>(action_dim) != robot_system->nv()) {
-    return {};
-  }
-
-  if (robot_system->hasState()) {
-    const RobotState& state = robot_system->state();
-    if (IsValid(state) &&
-        state.q.size() == static_cast<Eigen::Index>(robot_system->nq()) &&
-        state.qdot.size() == static_cast<Eigen::Index>(robot_system->nv())) {
-      return RobotStateView{&state.q, &state.qdot};
-    }
-  }
-
-  if (observation.q_meas.size() ==
-          static_cast<Eigen::Index>(robot_system->nq()) &&
-      observation.qdot_meas.size() ==
-          static_cast<Eigen::Index>(robot_system->nv()) &&
-      observation.q_meas.allFinite() && observation.qdot_meas.allFinite()) {
-    return RobotStateView{&observation.q_meas, &observation.qdot_meas};
-  }
-
-  return {};
-}
-
 bool HasCompatibleReferenceConfiguration(const GraspObservation& observation,
                                          std::size_t action_dim) {
   return observation.q_ref_current.size() ==
@@ -134,42 +101,6 @@ Eigen::VectorXd ReferenceVelocityOrZero(const GraspObservation& observation,
     return observation.qdot_ref_current;
   }
   return Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
-}
-
-Eigen::VectorXd IntegrateReferenceStep(
-    const GraspObservation& observation,
-    const Eigen::Ref<const Eigen::VectorXd>& tangent_step) {
-  if (HasPinocchioConfigurationSpace(
-          observation, static_cast<std::size_t>(tangent_step.size()))) {
-    const RobotSystem* robot_system = observation.robot_system;
-    return pinocchio::integrate(robot_system->model(),
-                                observation.q_ref_current, tangent_step);
-  }
-  if (observation.q_ref_current.size() == tangent_step.size()) {
-    return observation.q_ref_current + tangent_step;
-  }
-  throw std::invalid_argument(
-      "MPPIOptimizer::MakeCommand: q_ref_current dimension mismatch");
-}
-
-Eigen::VectorXd CommandFeedForwardTorqueOrZero(
-    const GraspObservation& observation, const Eigen::VectorXd& qddot_sol) {
-  Eigen::VectorXd tau_ff_cmd = Eigen::VectorXd::Zero(qddot_sol.size());
-  RobotSystem* robot_system = observation.robot_system;
-  const RobotStateView current_state = SelectCurrentStateForRnea(
-      observation, static_cast<std::size_t>(qddot_sol.size()));
-  if (robot_system == nullptr || current_state.q == nullptr ||
-      current_state.qdot == nullptr) {
-    return tau_ff_cmd;
-  }
-
-  const Eigen::VectorXd rnea =
-      pinocchio::rnea(robot_system->model(), robot_system->data(),
-                      *current_state.q, *current_state.qdot, qddot_sol);
-  if (rnea.size() == tau_ff_cmd.size() && rnea.allFinite()) {
-    tau_ff_cmd = rnea;
-  }
-  return tau_ff_cmd;
 }
 
 RolloutContext MakeRolloutContext(const GraspObservation& observation,
@@ -506,44 +437,7 @@ double MPPIOptimizer::EvaluateRollout(const GraspObservation& observation,
 RobotCommand MPPIOptimizer::MakeCommand(
     const GraspObservation& observation,
     const Eigen::VectorXd& qddot_sol) const {
-  RobotCommand command;
-  if (qddot_sol.size() != static_cast<Eigen::Index>(config_.action_dim) ||
-      !qddot_sol.allFinite()) {
-    throw std::invalid_argument(
-        "MPPIOptimizer::MakeCommand: qddot_sol dimension mismatch or "
-        "nonfinite");
-  }
-  if (!HasCompatibleReferenceConfiguration(observation, config_.action_dim) ||
-      !observation.q_ref_current.allFinite()) {
-    throw std::invalid_argument(
-        "MPPIOptimizer::MakeCommand: q_ref_current dimension mismatch or "
-        "nonfinite");
-  }
-  if (observation.tau_meas.size() !=
-          static_cast<Eigen::Index>(config_.action_dim) ||
-      !observation.tau_meas.allFinite()) {
-    throw std::invalid_argument(
-        "MPPIOptimizer::MakeCommand: tau_meas dimension mismatch or nonfinite");
-  }
-
-  command.Resize(static_cast<int>(observation.q_ref_current.size()),
-                 static_cast<int>(config_.action_dim));
-  command.stamp_sec = observation.time_s;
-  const Eigen::VectorXd qdot_ref_current =
-      ReferenceVelocityOrZero(observation, config_.action_dim);
-  command.qdot_cmd = qdot_ref_current + qddot_sol * config_.dt;
-  command.q_cmd =
-      IntegrateReferenceStep(observation, command.qdot_cmd * config_.dt);
-  if (!command.q_cmd.allFinite()) {
-    throw std::invalid_argument("MPPIOptimizer::MakeCommand: q_cmd nonfinite");
-  }
-  const Eigen::VectorXd tau_ff_cmd =
-      CommandFeedForwardTorqueOrZero(observation, qddot_sol);
-  command.tau_cmd = tau_ff_cmd;
-  // Driver-local RobotCommand.kp/kd are attached during command finalization
-  // from driver_gains, outside the MPPI planner.
-  command.valid = command.HasValidDimensions() && command.AllFinite();
-  return command;
+  return MakeRobotCommandFromQddot(observation, qddot_sol, config_.dt);
 }
 
 void MPPIOptimizer::UpdateNominalActionSequence() {

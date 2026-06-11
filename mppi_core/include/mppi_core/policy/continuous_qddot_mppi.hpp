@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <limits>
 #include <random>
+#include <string>
 #include <vector>
 
 #include "mppi_core/core/action_sequence.hpp"
@@ -84,6 +85,7 @@ struct BaseGraspControllerStatus {
   bool has_index{false};
   bool contact_loss_reflex_active{false};
   bool high_force_guard_active{false};
+  std::string lost_sensor{"none"};
 
   double thumb_force_n{0.0};
   double index_force_n{0.0};
@@ -100,6 +102,9 @@ struct BaseGraspControllerStatus {
   double qddot_base_norm{0.0};
   double qddot_residual_norm{0.0};
   double base_deviation_cost{0.0};
+  double thumb_component_norm{0.0};
+  double index_component_norm{0.0};
+  double symmetric_component_norm{0.0};
 };
 
 struct ContinuousQddotMppiConfig {
@@ -109,6 +114,8 @@ struct ContinuousQddotMppiConfig {
 
   double control_rate_cost_weight{1.0e-3};
   double smoothing_alpha{0.5};
+  bool skip_mppi_when_not_enough_contacts{false};
+  std::size_t min_contacts_for_mppi{2};
 
   QddotRolloutLimits limits;
   BaseGraspControllerConfig base_grasp_controller;
@@ -119,6 +126,7 @@ struct ContinuousQddotMppiStatus {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   bool valid{false};
+  bool mppi_skipped_for_contact_recovery{false};
 
   std::size_t num_samples{0};
   std::size_t num_threads{1};
@@ -191,6 +199,14 @@ struct ContinuousQddotMppiStatus {
   std::vector<Eigen::Isometry3d,
               Eigen::aligned_allocator<Eigen::Isometry3d>>
       object_pose_rollout;
+
+  double belief_update_ms{0.0};
+  double sample_generation_ms{0.0};
+  double workspace_setup_ms{0.0};
+  double rollout_eval_ms{0.0};
+  double mppi_weighting_ms{0.0};
+  double command_build_ms{0.0};
+  double logging_ms{0.0};
 };
 
 std::vector<double> ComputeSoftMppiWeights(

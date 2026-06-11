@@ -188,7 +188,13 @@ def generate_launch_description():
     aristo_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[aristo_controller_name, "--controller-manager", controller_manager_path],
+        arguments=[
+            aristo_controller_name,
+            "--controller-manager",
+            controller_manager_path,
+            "--service-call-timeout",
+            "60.0",
+        ],
         namespace=plato_ns,
         output="screen",
     )

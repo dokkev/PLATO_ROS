@@ -4167,6 +4167,7 @@ robust_grasp:
   control_mode: continuous_qddot_mppi
   continuous_control_rate_cost_weight: 0.123
   continuous_smoothing_alpha: 0.4
+  skip_mppi_when_not_enough_contacts: true
   use_rnea_feedforward: true
   rnea:
     use_measured_state: true
@@ -4227,6 +4228,7 @@ robust_grasp:
   EXPECT_NEAR(config.continuous_control_rate_cost_weight, 0.123,
               kTolerance);
   EXPECT_NEAR(config.continuous_smoothing_alpha, 0.4, kTolerance);
+  EXPECT_TRUE(config.skip_mppi_when_not_enough_contacts);
   EXPECT_TRUE(config.rnea_feedforward.enabled);
   EXPECT_TRUE(config.rnea_feedforward.use_measured_state);
   EXPECT_FALSE(config.rnea_feedforward.subtract_contact_torque);

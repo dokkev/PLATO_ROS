@@ -8,6 +8,7 @@
 #include <pinocchio/algorithm/rnea.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <exception>
 #include <limits>
@@ -175,6 +176,9 @@ void PrepareConfig(ContinuousQddotMppiConfig* config) {
   if (config->base_grasp_controller.base_deviation_weight < 0.0) {
     config->base_grasp_controller.base_deviation_weight = 0.0;
   }
+  if (config->min_contacts_for_mppi == 0U) {
+    config->min_contacts_for_mppi = 1U;
+  }
 
   config->disturbance_sampler.horizon_steps = config->rollout.horizon_steps;
   config->disturbance_sampler.num_disturbance_rollouts =
@@ -190,7 +194,8 @@ void ValidateConfig(const ContinuousQddotMppiConfig& config) {
       config.rollout.temperature <= 0.0 ||
       !IsFiniteAndNonnegative(config.control_rate_cost_weight) ||
       !std::isfinite(config.smoothing_alpha) ||
-      config.smoothing_alpha < 0.0 || config.smoothing_alpha > 1.0) {
+      config.smoothing_alpha < 0.0 || config.smoothing_alpha > 1.0 ||
+      config.min_contacts_for_mppi == 0U) {
     throw std::invalid_argument(
         "ContinuousQddotMppiConfig: invalid scalar field");
   }
@@ -319,10 +324,17 @@ bool LooksLikeRole(const TactileState& tactile, const char* role) {
          tactile.frame_name.find(role) != std::string::npos;
 }
 
+double ElapsedMs(const std::chrono::steady_clock::time_point start) {
+  return std::chrono::duration<double, std::milli>(
+             std::chrono::steady_clock::now() - start)
+      .count();
+}
+
 struct BaseSensorBasis {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   bool valid{false};
+  bool active{false};
   bool is_thumb{false};
   bool is_index{false};
   double force_n{0.0};
@@ -339,7 +351,6 @@ BaseSensorBasis ComputeBaseSensorBasis(
   basis.close_direction =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
   if (!state.valid || !IsValid(state.robot) || !tactile.valid ||
-      !tactile.hasActiveHemisphereContact() ||
       tactile_context.kinematics == nullptr ||
       !IsValidContactKinematicsContext(*tactile_context.kinematics) ||
       action_dim == 0U ||
@@ -350,10 +361,20 @@ BaseSensorBasis ComputeBaseSensorBasis(
     return basis;
   }
 
+  TactileState basis_tactile = tactile;
+  basis.active = tactile.hasActiveHemisphereContact();
+  if (!basis.active) {
+    for (auto& hemisphere : basis_tactile.hemispheres) {
+      if (hemisphere.cop_sensor_m.allFinite()) {
+        hemisphere.contact = true;
+      }
+    }
+  }
+
   const Eigen::VectorXd zero_tangent =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(action_dim));
   const auto motions = ComputeHemisphereMotions(
-      state.robot, tactile, zero_tangent, *tactile_context.kinematics);
+      state.robot, basis_tactile, zero_tangent, *tactile_context.kinematics);
   if (motions.empty()) {
     return basis;
   }
@@ -375,7 +396,7 @@ BaseSensorBasis ComputeBaseSensorBasis(
 
   basis.close_direction = NormalizedOrZero(close_sum, action_dim);
   basis.valid = basis.close_direction.norm() > 0.0;
-  basis.force_n = tactile.activeHemisphereNormalForceN();
+  basis.force_n = basis.active ? tactile.activeHemisphereNormalForceN() : 0.0;
   basis.is_thumb = LooksLikeRole(tactile, "thumb");
   basis.is_index = LooksLikeRole(tactile, "index");
   if (!basis.is_thumb && !basis.is_index) {
@@ -999,25 +1020,39 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
       sensor_bases.push_back(std::move(basis));
     }
   }
-  status.active_sensor_count = sensor_bases.size();
   if (sensor_bases.empty()) {
     return status;
   }
 
   Eigen::VectorXd squeeze_sum =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  Eigen::VectorXd active_squeeze_sum =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
   double force_sum = 0.0;
   status.min_force_n = std::numeric_limits<double>::infinity();
   status.max_force_n = 0.0;
+  const BaseSensorBasis* thumb_basis = nullptr;
+  const BaseSensorBasis* index_basis = nullptr;
   const BaseSensorBasis* thumb = nullptr;
   const BaseSensorBasis* index = nullptr;
   for (const auto& basis : sensor_bases) {
     squeeze_sum += basis.close_direction;
+    if (basis.is_thumb && thumb_basis == nullptr) {
+      thumb_basis = &basis;
+    }
+    if (basis.is_index && index_basis == nullptr) {
+      index_basis = &basis;
+    }
+    if (!basis.active) {
+      continue;
+    }
+    active_squeeze_sum += basis.close_direction;
     force_sum += std::max(0.0, basis.force_n);
     status.min_force_n =
         std::min(status.min_force_n, std::max(0.0, basis.force_n));
     status.max_force_n =
         std::max(status.max_force_n, std::max(0.0, basis.force_n));
+    ++status.active_sensor_count;
     if (basis.is_thumb && thumb == nullptr) {
       thumb = &basis;
     }
@@ -1025,11 +1060,14 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
       index = &basis;
     }
   }
+  if (status.active_sensor_count == 0U) {
+    return status;
+  }
   if (!std::isfinite(status.min_force_n)) {
     status.min_force_n = 0.0;
   }
   status.average_force_n =
-      force_sum / static_cast<double>(sensor_bases.size());
+      force_sum / static_cast<double>(status.active_sensor_count);
   status.has_thumb = thumb != nullptr;
   status.has_index = index != nullptr;
   status.thumb_force_n =
@@ -1045,12 +1083,24 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
         std::max(status.thumb_force_n, status.index_force_n);
   }
 
-  const Eigen::VectorXd squeeze_dir = NormalizedOrZero(squeeze_sum, dim);
+  const Eigen::VectorXd symmetric_squeeze_dir =
+      NormalizedOrZero(squeeze_sum, dim);
+  const Eigen::VectorXd active_squeeze_dir =
+      NormalizedOrZero(active_squeeze_sum, dim);
+  Eigen::VectorXd squeeze_dir = status.active_sensor_count >= 2U
+                                    ? symmetric_squeeze_dir
+                                    : active_squeeze_dir;
   if (squeeze_dir.norm() <= 0.0) {
     return status;
   }
 
   Eigen::VectorXd qddot_base =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  Eigen::VectorXd thumb_component =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  Eigen::VectorXd index_component =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
+  Eigen::VectorXd symmetric_component =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dim));
   const auto& config = config_.base_grasp_controller;
   status.force_error_n =
@@ -1058,10 +1108,11 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
   const double weakest_force_deficit_n =
       std::max(0.0, config.min_normal_force_per_sensor_n -
                         status.min_force_n);
-  qddot_base +=
+  symmetric_component +=
       config.force_gain *
       (status.force_error_n + weakest_force_deficit_n) *
       squeeze_dir;
+  qddot_base += symmetric_component;
 
   if (config.use_force_balance && thumb != nullptr && index != nullptr) {
     status.force_balance_error_n =
@@ -1090,7 +1141,23 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
       config.use_contact_loss_reflex &&
       status.active_sensor_count < 2U) {
     status.contact_loss_reflex_active = true;
-    qddot_base += config.contact_loss_gain * squeeze_dir;
+    if (thumb == nullptr && index != nullptr) {
+      status.lost_sensor = "thumb";
+      const Eigen::VectorXd lost_dir =
+          thumb_basis != nullptr ? thumb_basis->close_direction : squeeze_dir;
+      thumb_component += config.contact_loss_gain * lost_dir;
+      qddot_base += thumb_component;
+    } else if (index == nullptr && thumb != nullptr) {
+      status.lost_sensor = "index";
+      const Eigen::VectorXd lost_dir =
+          index_basis != nullptr ? index_basis->close_direction : squeeze_dir;
+      index_component += config.contact_loss_gain * lost_dir;
+      qddot_base += index_component;
+    } else {
+      status.lost_sensor = "unknown";
+      symmetric_component += config.contact_loss_gain * squeeze_dir;
+      qddot_base += config.contact_loss_gain * squeeze_dir;
+    }
   }
 
   qddot_base =
@@ -1101,6 +1168,9 @@ ContinuousQddotMppiController::ComputeBaseGraspCommand(
   status.qddot_base = qddot_base;
   status.qddot_base_norm = qddot_base.norm();
   status.active = status.qddot_base_norm > kTiny;
+  status.thumb_component_norm = thumb_component.norm();
+  status.index_component_norm = index_component.norm();
+  status.symmetric_component_norm = symmetric_component.norm();
   return status;
 }
 
@@ -1337,6 +1407,43 @@ RobotCommand ContinuousQddotMppiController::Update(
                   config_.rollout.action_lower_bound,
                   config_.rollout.action_upper_bound);
 
+  if (config_.base_grasp_controller.enabled &&
+      config_.skip_mppi_when_not_enough_contacts &&
+      base_status.active_sensor_count < config_.min_contacts_for_mppi) {
+    ResetNominalSequence();
+    const auto command_start = std::chrono::steady_clock::now();
+    RobotCommand command =
+        MakeCommand(observation, initial_state, context, qddot_base);
+    status_.command_build_ms = ElapsedMs(command_start);
+    status_.valid = command.valid;
+    status_.mppi_skipped_for_contact_recovery = true;
+    status_.num_samples = 0U;
+    status_.num_threads = 0U;
+    status_.best_sample_index = 0U;
+    status_.best_sample_cost = 0.0;
+    status_.weighted_cost_estimate = 0.0;
+    status_.nominal_sample_cost = 0.0;
+    status_.cost_min = 0.0;
+    status_.cost_mean = 0.0;
+    status_.cost_max = 0.0;
+    status_.effective_sample_size = 0.0;
+    status_.qddot_cmd = qddot_base;
+    status_.qddot_residual_cmd =
+        Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+            config_.rollout.action_dim));
+    status_.qddot_nominal_first = qddot_base;
+    status_.qddot_best_first = qddot_base;
+    status_.base_grasp.qddot_residual = status_.qddot_residual_cmd;
+    status_.base_grasp.qddot_residual_norm = 0.0;
+    status_.base_grasp.base_deviation_cost = 0.0;
+    previous_qddot_cmd_ = qddot_base;
+    previous_qddot_residual_cmd_ = status_.qddot_residual_cmd;
+    has_previous_qddot_cmd_ = true;
+    has_previous_qddot_residual_cmd_ = true;
+    return command;
+  }
+
+  const auto sample_start = std::chrono::steady_clock::now();
   std::vector<ActionSequence> samples;
   samples.reserve(config_.rollout.num_rollouts);
   for (std::size_t i = 0; i < config_.rollout.num_rollouts; ++i) {
@@ -1344,6 +1451,7 @@ RobotCommand ContinuousQddotMppiController::Update(
   }
 
   const auto disturbances = disturbance_sampler_.SampleBatch();
+  status_.sample_generation_ms = ElapsedMs(sample_start);
   status_.sampled_object_linear_disturbances_world_mps.clear();
   status_.sampled_object_angular_disturbances_world_radps.clear();
   status_.sampled_object_linear_disturbances_world_mps.reserve(
@@ -1364,6 +1472,7 @@ RobotCommand ContinuousQddotMppiController::Update(
   std::size_t total_geometry_queries = 0U;
   std::size_t total_object_samples = 0U;
 
+  const auto rollout_start = std::chrono::steady_clock::now();
   if (status_.num_threads <= 1U || samples.size() <= 1U) {
     for (std::size_t i = 0; i < samples.size(); ++i) {
       evaluations[i] = EvaluateSequence(
@@ -1376,6 +1485,7 @@ RobotCommand ContinuousQddotMppiController::Update(
     std::vector<std::thread> workers;
     workers.reserve(worker_count);
     std::vector<std::exception_ptr> exceptions(worker_count);
+    std::vector<double> workspace_setup_ms(worker_count, 0.0);
     const std::size_t chunk_size =
         (samples.size() + worker_count - 1U) / worker_count;
     for (std::size_t worker_index = 0; worker_index < worker_count;
@@ -1388,11 +1498,15 @@ RobotCommand ContinuousQddotMppiController::Update(
       }
       workers.emplace_back(
           [this, &initial_state, &samples, &qddot_base, &disturbances,
-           &context, &evaluations, &costs, &exceptions, worker_index,
+           &context, &evaluations, &costs, &exceptions, &workspace_setup_ms,
+           worker_index,
            begin, end]() {
             try {
               ThreadLocalRolloutWorkspace workspace;
+              const auto workspace_start = std::chrono::steady_clock::now();
               ConfigureThreadLocalRolloutWorkspace(context, &workspace);
+              workspace_setup_ms[worker_index] =
+                  ElapsedMs(workspace_start);
               for (std::size_t i = begin; i < end; ++i) {
                 evaluations[i] = EvaluateSequence(
                     initial_state, samples[i], qddot_base, disturbances[i],
@@ -1412,7 +1526,11 @@ RobotCommand ContinuousQddotMppiController::Update(
         std::rethrow_exception(exception);
       }
     }
+    status_.workspace_setup_ms =
+        std::accumulate(workspace_setup_ms.begin(), workspace_setup_ms.end(),
+                        0.0);
   }
+  status_.rollout_eval_ms = ElapsedMs(rollout_start);
 
   for (std::size_t i = 0; i < samples.size(); ++i) {
     total_geometry_queries +=
@@ -1441,6 +1559,7 @@ RobotCommand ContinuousQddotMppiController::Update(
     return hold;
   }
 
+  const auto weighting_start = std::chrono::steady_clock::now();
   const auto best_it = std::min_element(costs.begin(), costs.end());
   const std::size_t best_index =
       static_cast<std::size_t>(best_it - costs.begin());
@@ -1532,6 +1651,7 @@ RobotCommand ContinuousQddotMppiController::Update(
     status_.object_angular_disturbance_speed_radps =
         best_costs.objectAngularDisturbanceSpeedAverage();
   }
+  status_.mppi_weighting_ms = ElapsedMs(weighting_start);
   status_.geometry_query_count = total_geometry_queries;
   status_.object_sample_count = total_object_samples;
   if (!std::isfinite(status_.object_edge_margin_m)) {
@@ -1541,8 +1661,10 @@ RobotCommand ContinuousQddotMppiController::Update(
     status_.object_min_signed_distance_m = 0.0;
   }
 
+  const auto command_start = std::chrono::steady_clock::now();
   RobotCommand command =
       MakeCommand(observation, initial_state, context, qddot_cmd);
+  status_.command_build_ms = ElapsedMs(command_start);
   previous_qddot_cmd_ = qddot_cmd;
   previous_qddot_residual_cmd_ = qddot_residual_cmd;
   has_previous_qddot_cmd_ = true;

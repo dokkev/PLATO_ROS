@@ -47,6 +47,7 @@ struct RobustGraspPolicyConfig {
       RobustGraspControlMode::kContinuousQddotMppi};
   double continuous_control_rate_cost_weight{1.0e-3};
   double continuous_smoothing_alpha{0.5};
+  bool skip_mppi_when_not_enough_contacts{false};
   BaseGraspControllerConfig base_grasp_controller;
   RneaFeedforwardConfig rnea_feedforward;
 
@@ -68,6 +69,7 @@ struct RobustGraspPolicyStatus {
   RobustGraspControlMode control_mode{
       RobustGraspControlMode::kContinuousQddotMppi};
   bool used_continuous_qddot_mppi{false};
+  bool mppi_skipped_for_contact_recovery{false};
 
   std::size_t candidate_count{0};
   std::size_t disturbance_count{0};
@@ -154,6 +156,13 @@ struct RobustGraspPolicyStatus {
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       sampled_object_angular_disturbances_world_radps;
   double solve_time_ms{0.0};
+  double belief_update_ms{0.0};
+  double sample_generation_ms{0.0};
+  double workspace_setup_ms{0.0};
+  double rollout_eval_ms{0.0};
+  double mppi_weighting_ms{0.0};
+  double command_build_ms{0.0};
+  double logging_ms{0.0};
 
   std::vector<Eigen::Isometry3d,
               Eigen::aligned_allocator<Eigen::Isometry3d>>

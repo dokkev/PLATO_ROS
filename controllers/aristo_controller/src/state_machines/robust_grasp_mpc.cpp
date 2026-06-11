@@ -1,5 +1,6 @@
 #include "aristo_controller/state_machines/robust_grasp_mpc.hpp"
 
+#include <chrono>
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -231,6 +232,12 @@ std::string_view ControlModeName(const mppi_core::RobustGraspControlMode mode)
   return "unknown";
 }
 
+double ElapsedMs(const std::chrono::steady_clock::time_point start)
+{
+  return std::chrono::duration<double, std::milli>(
+    std::chrono::steady_clock::now() - start).count();
+}
+
 }  // namespace
 
 RobustGraspMpcState::RobustGraspMpcState(
@@ -243,6 +250,8 @@ RobustGraspMpcState::RobustGraspMpcState(
 
 bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config)
 {
+  const auto configure_start = std::chrono::steady_clock::now();
+  std::cout << "[robust_grasp_mpc] configure begin" << std::endl;
   configured_ = false;
   if (
     robot_ == nullptr || !robot_->hasModel() || robot_->nv() <= 0 ||
@@ -256,12 +265,17 @@ bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config
   config_ = config;
   config_.policy.rollout.action_dim = static_cast<std::size_t>(robot_->nv());
   config_.policy.action_library.action_dim = static_cast<std::size_t>(robot_->nv());
+  std::cout << "[robust_grasp_mpc] configure contact kinematics" << std::endl;
   if (!ConfigureContactKinematics()) {
     return false;
   }
 
   try {
+    const auto policy_start = std::chrono::steady_clock::now();
+    std::cout << "[robust_grasp_mpc] initialize policy" << std::endl;
     policy_.Initialize(config_.policy);
+    std::cout << "[robust_grasp_mpc] policy initialized in "
+              << ElapsedMs(policy_start) << " ms" << std::endl;
   } catch (const std::exception &) {
     return false;
   }
@@ -283,6 +297,7 @@ bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config
             << " base_max_qddot_base=" << base.max_qddot_base
             << " base_max_qddot_residual=" << base.max_qddot_residual
             << " base_deviation_weight=" << base.base_deviation_weight
+            << " configure_ms=" << ElapsedMs(configure_start)
             << std::endl;
 
   last_command_ = plato_robot_system::RobotCommand{};
@@ -686,6 +701,8 @@ void RobustGraspMpcState::PrintStatus(
          << " mode=" << ControlModeName(status.control_mode)
          << " ready=" << (status.ready ? "true" : "false")
          << " fallback=" << (status.used_hold_fallback ? "true" : "false")
+         << " mppi_skipped_for_contact_recovery="
+         << (status.mppi_skipped_for_contact_recovery ? "true" : "false")
          << " rollout_only=" << (config_.safety.rollout_only ? "true" : "false")
          << " samples=" << status.candidate_count
          << " threads=" << status.evaluation_thread_count
@@ -713,6 +730,10 @@ void RobustGraspMpcState::PrintStatus(
          << " base_balance_error_n=" << status.base_grasp.force_balance_error_n
          << " base_contact_loss_reflex="
          << (status.base_grasp.contact_loss_reflex_active ? "true" : "false")
+         << " lost_sensor=" << status.base_grasp.lost_sensor
+         << " thumb_component=" << status.base_grasp.thumb_component_norm
+         << " index_component=" << status.base_grasp.index_component_norm
+         << " symmetric_component=" << status.base_grasp.symmetric_component_norm
          << " base_high_force_guard="
          << (status.base_grasp.high_force_guard_active ? "true" : "false")
          << " base_deviation_cost=" << status.selected_base_deviation_cost
@@ -779,6 +800,13 @@ void RobustGraspMpcState::PrintStatus(
          << status.selected_object_linear_disturbance_speed_mps
          << " selected_object_disturbance_omega="
          << status.selected_object_angular_disturbance_speed_radps
+         << " belief_update_ms=" << status.belief_update_ms
+         << " sample_generation_ms=" << status.sample_generation_ms
+         << " workspace_setup_ms=" << status.workspace_setup_ms
+         << " rollout_eval_ms=" << status.rollout_eval_ms
+         << " mppi_weighting_ms=" << status.mppi_weighting_ms
+         << " command_build_ms=" << status.command_build_ms
+         << " logging_ms=" << status.logging_ms
          << " solve_ms=" << status.solve_time_ms;
   if (config_.debug.print_action_vectors) {
     stream << " qddot_cmd=" << FormatVector(status.qddot_cmd)

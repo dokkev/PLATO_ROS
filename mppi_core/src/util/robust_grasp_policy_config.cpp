@@ -743,6 +743,10 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
       yaml_utils::ReadDouble(
           safe_params, "continuous_smoothing_alpha",
           defaults.continuous_smoothing_alpha);
+  defaults.skip_mppi_when_not_enough_contacts =
+      yaml_utils::ReadBool(
+          safe_params, "skip_mppi_when_not_enough_contacts",
+          defaults.skip_mppi_when_not_enough_contacts);
   defaults.rnea_feedforward =
       ParseRneaFeedforwardConfig(safe_params, defaults.rnea_feedforward);
 

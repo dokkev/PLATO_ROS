@@ -40,6 +40,7 @@ robust_grasp:
   control_mode: continuous_qddot_mppi
   continuous_control_rate_cost_weight: 0.005
   continuous_smoothing_alpha: 0.7
+  skip_mppi_when_not_enough_contacts: true
   use_base_grasp_controller: true
   use_rnea_feedforward: true
 
@@ -48,7 +49,7 @@ robust_grasp:
     min_normal_force_per_sensor_n: 0.5
     max_normal_force_per_sensor_n: 30.0
     force_gain: 0.2
-    force_balance_gain: 0.1
+    force_balance_gain: 10.0
     contact_loss_gain: 0.2
     high_force_release_gain: 0.2
     max_qddot_base: 2.0
@@ -72,7 +73,7 @@ robust_grasp:
     horizon_steps: 2
     dt: 0.01
     num_rollouts: 32
-    num_threads: 0
+    num_threads: 4
     temperature: 1.0
     random_seed: 7
     action_lower_bound: -5.0

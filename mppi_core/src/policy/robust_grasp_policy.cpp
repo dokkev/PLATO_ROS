@@ -306,6 +306,17 @@ bool ShouldRunBaseGraspBeforeMppiReady(
          state.hasAnyTactileContact();
 }
 
+bool ShouldSkipMppiForContactRecovery(
+    const RobustGraspPolicyConfig& config,
+    const GraspState& state) {
+  return config.control_mode == RobustGraspControlMode::kContinuousQddotMppi &&
+         config.base_grasp_controller.enabled &&
+         config.skip_mppi_when_not_enough_contacts &&
+         state.valid &&
+         state.activeTactileSensorCount() <
+             config.start.min_enough_contact_sensors;
+}
+
 }  // namespace
 
 void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
@@ -390,6 +401,10 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
   continuous_config.control_rate_cost_weight =
       config_.continuous_control_rate_cost_weight;
   continuous_config.smoothing_alpha = config_.continuous_smoothing_alpha;
+  continuous_config.skip_mppi_when_not_enough_contacts =
+      config_.skip_mppi_when_not_enough_contacts;
+  continuous_config.min_contacts_for_mppi =
+      config_.start.min_enough_contact_sensors;
   continuous_config.base_grasp_controller =
       config_.base_grasp_controller;
   continuous_config.rnea_feedforward = config_.rnea_feedforward;
@@ -455,31 +470,33 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   Eigen::VectorXd zero_qddot =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
           config_.rollout.action_dim));
-  RobustGraspStateCostBreakdown initial_breakdown;
-  status_.initial_total_cost =
-      cost_->Evaluate(initial_state, zero_qddot, context, &initial_breakdown);
-  status_.initial_object_support_cost =
-      initial_breakdown.object_support_cost;
-  status_.initial_contact_loss_cost =
-      initial_breakdown.object_support.contact_loss_cost;
-  status_.initial_support_cost =
-      initial_breakdown.object_support.support_cost;
-  status_.initial_edge_cost =
-      initial_breakdown.object_support.edge_cost;
-  status_.initial_penetration_cost =
-      initial_breakdown.object_support.penetration_cost;
-  status_.initial_preload_cost = initial_breakdown.preload_cost;
-  status_.initial_force_low_cost = initial_breakdown.force_low_cost;
-  status_.initial_force_high_cost = initial_breakdown.force_high_cost;
-  status_.initial_balance_cost = initial_breakdown.force_balance_cost;
-  status_.initial_object_min_gap_m =
-      initial_breakdown.object_support.valid
-          ? initial_breakdown.object_support.min_signed_distance_m
-          : 0.0;
-  status_.initial_object_edge_margin_m =
-      initial_breakdown.object_support.valid
-          ? initial_breakdown.object_support.min_edge_margin_m
-          : 0.0;
+  if (!ShouldSkipMppiForContactRecovery(config_, initial_state)) {
+    RobustGraspStateCostBreakdown initial_breakdown;
+    status_.initial_total_cost =
+        cost_->Evaluate(initial_state, zero_qddot, context, &initial_breakdown);
+    status_.initial_object_support_cost =
+        initial_breakdown.object_support_cost;
+    status_.initial_contact_loss_cost =
+        initial_breakdown.object_support.contact_loss_cost;
+    status_.initial_support_cost =
+        initial_breakdown.object_support.support_cost;
+    status_.initial_edge_cost =
+        initial_breakdown.object_support.edge_cost;
+    status_.initial_penetration_cost =
+        initial_breakdown.object_support.penetration_cost;
+    status_.initial_preload_cost = initial_breakdown.preload_cost;
+    status_.initial_force_low_cost = initial_breakdown.force_low_cost;
+    status_.initial_force_high_cost = initial_breakdown.force_high_cost;
+    status_.initial_balance_cost = initial_breakdown.force_balance_cost;
+    status_.initial_object_min_gap_m =
+        initial_breakdown.object_support.valid
+            ? initial_breakdown.object_support.min_signed_distance_m
+            : 0.0;
+    status_.initial_object_edge_margin_m =
+        initial_breakdown.object_support.valid
+            ? initial_breakdown.object_support.min_edge_margin_m
+            : 0.0;
+  }
 
   RobotCommand command =
       config_.control_mode == RobustGraspControlMode::kContinuousQddotMppi
@@ -669,6 +686,8 @@ RobotCommand RobustGraspPolicy::UpdateContinuousQddotMppi(
 void RobustGraspPolicy::CopyContinuousStatus(
     const ContinuousQddotMppiStatus& continuous_status) {
   status_.used_continuous_qddot_mppi = true;
+  status_.mppi_skipped_for_contact_recovery =
+      continuous_status.mppi_skipped_for_contact_recovery;
   status_.candidate_count = continuous_status.num_samples;
   status_.disturbance_count = continuous_status.num_samples;
   status_.evaluation_thread_count = continuous_status.num_threads;
@@ -777,6 +796,13 @@ void RobustGraspPolicy::CopyContinuousStatus(
       continuous_status.tau_ff_zeroed_not_ready;
   status_.tau_ff_zeroed_contact_loss =
       continuous_status.tau_ff_zeroed_contact_loss;
+  status_.belief_update_ms = continuous_status.belief_update_ms;
+  status_.sample_generation_ms = continuous_status.sample_generation_ms;
+  status_.workspace_setup_ms = continuous_status.workspace_setup_ms;
+  status_.rollout_eval_ms = continuous_status.rollout_eval_ms;
+  status_.mppi_weighting_ms = continuous_status.mppi_weighting_ms;
+  status_.command_build_ms = continuous_status.command_build_ms;
+  status_.logging_ms = continuous_status.logging_ms;
 }
 
 GraspState RobustGraspPolicy::MakeInitialState(

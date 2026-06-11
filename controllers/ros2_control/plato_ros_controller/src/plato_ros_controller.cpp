@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -165,6 +166,12 @@ bool has_sampled_object_disturbances(
     !status.sampled_object_linear_disturbances_world_mps.empty() ||
     !status.sampled_object_angular_disturbances_world_radps.empty() ||
     !status.selected_object_pose_rollout.empty();
+}
+
+double elapsed_ms(const std::chrono::steady_clock::time_point start)
+{
+  return std::chrono::duration<double, std::milli>(
+    std::chrono::steady_clock::now() - start).count();
 }
 
 Eigen::Matrix3d rotation_from_angular_velocity_world(
@@ -437,6 +444,8 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
 controller_interface::CallbackReturn PlatoRosController::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  const auto configure_start = std::chrono::steady_clock::now();
+  RCLCPP_INFO(get_node()->get_logger(), "Plato ROS controller configure: begin");
   joint_names_ = get_node()->get_parameter("joints").as_string_array();
   tactile_topics_ = get_node()->get_parameter("tactile_topics").as_string_array();
   joint_teleop_command_topic_ =
@@ -481,10 +490,17 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   robot_ = std::make_shared<plato_robot_system::RobotSystem>();
   control_architecture_.SetRobot(robot_);
   if (!control_config_yaml_path_.empty()) {
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Plato ROS controller configure: loading control config '%s'",
+      control_config_yaml_path_.c_str());
     if (!configure_from_control_config(control_architecture_, *robot_)) {
       return controller_interface::CallbackReturn::ERROR;
     }
   } else {
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Plato ROS controller configure: using built-in identity architecture");
     control_architecture_.Configure(static_cast<int>(num_joints), static_cast<int>(num_joints));
     configure_identity_joint_mapping(num_joints);
     if (configure_control_architecture(control_architecture_) !=
@@ -495,7 +511,16 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
     register_robot_states(control_architecture_, *robot_);
     configure_initial_state(control_architecture_);
   }
+  RCLCPP_INFO(
+    get_node()->get_logger(),
+    "Plato ROS controller configure: architecture configured in %.3f ms",
+    elapsed_ms(configure_start));
+  const auto initialize_start = std::chrono::steady_clock::now();
   control_architecture_.Initialize();
+  RCLCPP_INFO(
+    get_node()->get_logger(),
+    "Plato ROS controller configure: architecture initialized in %.3f ms",
+    elapsed_ms(initialize_start));
   model_q_.setZero(control_architecture_.nq());
   model_qdot_.setZero(control_architecture_.nv());
   model_tau_.setZero(control_architecture_.nv());
@@ -579,14 +604,15 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', grasp force reference topics '%s'/'%s', robust grasp debug marker topic '%s'",
+    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', grasp force reference topics '%s'/'%s', robust grasp debug marker topic '%s' in %.3f ms",
     num_joints,
     tactile_topics_.size(),
     joint_teleop_command_topic_.c_str(),
     grasp_teleop_command_topic_.c_str(),
     grasp_force_reference_topic_.c_str(),
     grasp_force_reference_valid_topic_.c_str(),
-    robust_grasp_debug_marker_pub_ ? robust_grasp_debug_marker_topic_.c_str() : "<disabled>");
+    robust_grasp_debug_marker_pub_ ? robust_grasp_debug_marker_topic_.c_str() : "<disabled>",
+    elapsed_ms(configure_start));
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -1701,9 +1727,19 @@ bool PlatoRosController::configure_from_control_config(
   plato_robot_system::RobotSystem & robot)
 {
   try {
+    const auto config_start = std::chrono::steady_clock::now();
     const auto resolved_config_path = resolve_package_url(control_config_yaml_path_);
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Control config stage: resolved config path '%s'",
+      resolved_config_path.c_str());
+    const auto yaml_start = std::chrono::steady_clock::now();
     const auto aristo_config =
       aristo_controller::config::load_aristo_config(resolved_config_path);
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Control config stage: loaded YAML in %.3f ms",
+      elapsed_ms(yaml_start));
 
     if (aristo_config.num_joints != static_cast<int>(joint_names_.size())) {
       RCLCPP_ERROR(
@@ -1714,11 +1750,23 @@ bool PlatoRosController::configure_from_control_config(
       return false;
     }
 
+    const auto urdf_start = std::chrono::steady_clock::now();
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: loading robot model");
     const auto resolved_urdf_path = load_robot_model_from_config(aristo_config.robot_model, robot);
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Control config stage: loaded robot model '%s' in %.3f ms",
+      resolved_urdf_path.c_str(),
+      elapsed_ms(urdf_start));
+    const auto architecture_start = std::chrono::steady_clock::now();
     architecture.Configure(robot.nq(), robot.nv());
     if (!configure_model_joint_mapping(robot)) {
       return false;
     }
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Control config stage: configured model mapping in %.3f ms",
+      elapsed_ms(architecture_start));
 
     fixed_thumb_ = aristo_config.robot_model.fixed_thumb;
     architecture.setTimingEnabled(aristo_config.debug_enabled);
@@ -1734,12 +1782,14 @@ bool PlatoRosController::configure_from_control_config(
     }
     architecture.SetDriverPdGainsConfig(driver_gains);
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: registering idle");
     auto idle = std::make_unique<aristo_controller::state_machines::IdleState>(
       aristo_config.idle.id,
       architecture.nq(),
       architecture.nv());
     architecture.RegisterState(std::move(idle));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring joint_teleop");
     auto joint_teleop_config = aristo_config.joint_teleop.state;
     joint_teleop_config.joint_task.kp_task =
       map_joint_values_to_model_v(aristo_config.joint_teleop.state.joint_task.kp_task);
@@ -1756,6 +1806,7 @@ bool PlatoRosController::configure_from_control_config(
     joint_teleop_state_ = joint_teleop.get();
     architecture.RegisterState(std::move(joint_teleop));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring grasp_teleop");
     auto grasp_teleop_config = aristo_config.grasp_teleop.state;
     if (grasp_teleop_config.grasp_task.q_ready.size() > 0) {
       grasp_teleop_config.grasp_task.q_ready =
@@ -1773,6 +1824,7 @@ bool PlatoRosController::configure_from_control_config(
     grasp_teleop_state_ = grasp_teleop.get();
     architecture.RegisterState(std::move(grasp_teleop));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring grasp_force");
     auto grasp_force_config = aristo_config.grasp_force.state;
     if (grasp_force_config.grasp_task.q_ready.size() > 0) {
       grasp_force_config.grasp_task.q_ready =
@@ -1790,6 +1842,8 @@ bool PlatoRosController::configure_from_control_config(
     grasp_force_state_ = grasp_force.get();
     architecture.RegisterState(std::move(grasp_force));
 
+    const auto robust_start = std::chrono::steady_clock::now();
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring robust_grasp_mpc");
     auto robust_grasp_mpc =
       std::make_unique<aristo_controller::state_machines::RobustGraspMpcState>(
         aristo_config.robust_grasp_mpc.id,
@@ -1801,7 +1855,12 @@ bool PlatoRosController::configure_from_control_config(
     robust_grasp_mpc->ConfigureLifecycle(aristo_config.robust_grasp_mpc.lifecycle);
     robust_grasp_mpc_state_ = robust_grasp_mpc.get();
     architecture.RegisterState(std::move(robust_grasp_mpc));
+    RCLCPP_INFO(
+      get_node()->get_logger(),
+      "Control config stage: configured robust_grasp_mpc in %.3f ms",
+      elapsed_ms(robust_start));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring initialize");
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(
       aristo_config.initialize.id,
       &robot);
@@ -1814,6 +1873,7 @@ bool PlatoRosController::configure_from_control_config(
     initialize->ConfigureLifecycle(aristo_config.initialize.lifecycle);
     architecture.RegisterState(std::move(initialize));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring poke");
     auto poke = std::make_unique<aristo_controller::state_machines::PokeState>(
       aristo_config.poke.id,
       &robot);
@@ -1826,6 +1886,7 @@ bool PlatoRosController::configure_from_control_config(
     poke->ConfigureLifecycle(aristo_config.poke.lifecycle);
     architecture.RegisterState(std::move(poke));
 
+    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring grasp_ready");
     auto grasp_ready = std::make_unique<aristo_controller::state_machines::GraspReadyState>(
       aristo_config.grasp_ready.id,
       &robot);
@@ -1850,13 +1911,14 @@ bool PlatoRosController::configure_from_control_config(
 
     RCLCPP_INFO(
       get_node()->get_logger(),
-      "Loaded control config '%s', robot model '%s' (nq=%d, nv=%d), and selected state 'initialize' (id=%d, fixed_thumb=%s)",
+      "Loaded control config '%s', robot model '%s' (nq=%d, nv=%d), and selected state 'initialize' (id=%d, fixed_thumb=%s) in %.3f ms",
       resolved_config_path.c_str(),
       resolved_urdf_path.c_str(),
       robot.nq(),
       robot.nv(),
       aristo_config.initialize.id,
-      fixed_thumb_ ? "true" : "false");
+      fixed_thumb_ ? "true" : "false",
+      elapsed_ms(config_start));
     return true;
   } catch (const std::exception & e) {
     RCLCPP_ERROR(

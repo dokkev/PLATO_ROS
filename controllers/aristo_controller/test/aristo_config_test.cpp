@@ -159,12 +159,18 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_FALSE(mppi_motion_grasp.grasp_task.force_feedback_enabled);
 
   const auto & robust_grasp = config.robust_grasp_mpc.state;
-  EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 15U);
+  EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 30U);
   EXPECT_EQ(robust_grasp.policy.rollout.action_dim, static_cast<std::size_t>(config.num_joints));
   EXPECT_DOUBLE_EQ(robust_grasp.policy.rollout.dt, 0.01);
+  EXPECT_EQ(robust_grasp.policy.start.min_enough_contact_sensors, 1U);
+  EXPECT_EQ(robust_grasp.policy.start.min_active_hemispheres_total, 2U);
   EXPECT_EQ(robust_grasp.policy.disturbance_sampler.num_disturbance_rollouts, 32U);
   EXPECT_EQ(robust_grasp.policy.disturbance_sampler.tactile_sensor_count, 2U);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.disturbance_sampler.sensor_local_noise_scale, 0.25);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 200.0);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.force_balance_weight, 10.0);
+  EXPECT_EQ(robust_grasp.policy.action_library.num_action_samples, 32U);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.action_library.target_min_normal_force_n, 1.0);
   EXPECT_TRUE(robust_grasp.policy.require_both_contact_for_update);
   EXPECT_TRUE(robust_grasp.policy.return_hold_when_not_ready);
   EXPECT_TRUE(robust_grasp.debug.print_status);

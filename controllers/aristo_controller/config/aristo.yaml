@@ -74,7 +74,7 @@ state_machine:
     - id: 4
       name: grasp_teleop
       stay_here: true
-      # Change this to grasp_force to use tactile force feedback instead of MPPI.
+      # Change this to grasp_force to use tactile force feedback instead of robust MPC.
       next_state: robust_grasp_mpc
       params:
         # Command: [u], [u, phi], or [u, phi, f]

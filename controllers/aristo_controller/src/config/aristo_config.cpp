@@ -11,8 +11,6 @@
 
 #include "mppi_core/config/mppi_config.hpp"
 #include "mppi_core/config/robust_grasp_policy_config.hpp"
-#include "mppi_core/config/rollout_config.hpp"
-#include "mppi_core/task/task_config.hpp"
 
 namespace aristo_controller::config
 {

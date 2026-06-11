@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
 #include <cstddef>
@@ -66,6 +67,8 @@ struct ContinuousQddotMppiStatus {
   double selected_edge_cost{0.0};
   double selected_penetration_cost{0.0};
   double selected_preload_cost{0.0};
+  double selected_force_low_cost{0.0};
+  double selected_force_high_cost{0.0};
   double selected_balance_cost{0.0};
   double selected_control_cost{0.0};
   double selected_rate_cost{0.0};
@@ -76,12 +79,17 @@ struct ContinuousQddotMppiStatus {
   double measured_active_hemisphere_total{0.0};
   double object_contact_loss_count{0.0};
   double object_edge_margin_m{0.0};
+  double object_min_signed_distance_m{0.0};
   Eigen::Vector2d predicted_centroid_sensor_m{
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
   Eigen::Vector2d measured_centroid_sensor_m{
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
   double object_linear_disturbance_speed_mps{0.0};
   double object_angular_disturbance_speed_radps{0.0};
+
+  std::vector<Eigen::Isometry3d,
+              Eigen::aligned_allocator<Eigen::Isometry3d>>
+      object_pose_rollout;
 };
 
 std::vector<double> ComputeSoftMppiWeights(

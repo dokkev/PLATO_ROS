@@ -10,6 +10,7 @@
 #include <string_view>
 #include <utility>
 
+#include "mppi_core/object/object_belief_initializer.hpp"
 #include "mppi_core/state/grasp_state.hpp"
 #include "plato_robot_system/task/thumb_index_grasp_constants.hpp"
 
@@ -20,6 +21,7 @@ namespace
 
 constexpr std::size_t kThumbContextIndex = 0;
 constexpr std::size_t kIndexContextIndex = 1;
+constexpr double kBeliefWeightEps = 1.0e-12;
 
 using MppiTactileStateVector =
   std::vector<mppi_core::TactileState, Eigen::aligned_allocator<mppi_core::TactileState>>;
@@ -151,6 +153,61 @@ int ActiveHemisphereCountTotal(const MppiTactileStateVector & tactile)
   return count;
 }
 
+std::string FormatVector(
+  const Eigen::Ref<const Eigen::VectorXd> & values,
+  const int precision = 4)
+{
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(precision) << "[";
+  for (Eigen::Index i = 0; i < values.size(); ++i) {
+    if (i > 0) {
+      stream << ", ";
+    }
+    stream << values[i];
+  }
+  stream << "]";
+  return stream.str();
+}
+
+bool RepresentativeObjectBeliefPose(
+  const mppi_core::VirtualObjectBelief & belief,
+  Eigen::Isometry3d * pose_world)
+{
+  if (
+    pose_world == nullptr ||
+    !mppi_core::HasVirtualObjectBelief(belief) ||
+    !mppi_core::IsValidVirtualObjectBelief(belief) ||
+    belief.particles.empty())
+  {
+    return false;
+  }
+
+  double weight_sum = 0.0;
+  Eigen::Vector3d weighted_translation_m = Eigen::Vector3d::Zero();
+  const mppi_core::VirtualObjectState * orientation_source = nullptr;
+  double best_weight = -1.0;
+  for (const auto & particle : belief.particles) {
+    if (!mppi_core::IsValidVirtualObjectState(particle)) {
+      continue;
+    }
+    const double weight =
+      std::isfinite(particle.weight) && particle.weight > 0.0 ? particle.weight : 1.0;
+    weighted_translation_m.noalias() += weight * particle.pose_world.translation();
+    weight_sum += weight;
+    if (weight > best_weight) {
+      best_weight = weight;
+      orientation_source = &particle;
+    }
+  }
+
+  if (orientation_source == nullptr || weight_sum <= kBeliefWeightEps) {
+    return false;
+  }
+  *pose_world = orientation_source->pose_world;
+  pose_world->translation() = weighted_translation_m / weight_sum;
+  return pose_world->matrix().allFinite();
+}
+
 }  // namespace
 
 RobustGraspMpcState::RobustGraspMpcState(
@@ -182,6 +239,12 @@ bool RobustGraspMpcState::ConfigureTask(const RobustGraspMpcStateConfig & config
   }
 
   last_command_ = plato_robot_system::RobotCommand{};
+  object_belief_ = mppi_core::VirtualObjectBelief{};
+  object_belief_contact_count_ = 0;
+  object_belief_update_count_ = 0;
+  object_belief_best_cost_ = std::numeric_limits<double>::infinity();
+  object_belief_updated_this_tick_ = false;
+  exit_requested_ = false;
   tick_index_ = 0;
   last_status_print_time_s_ = -1.0e100;
   configured_ = true;
@@ -193,6 +256,12 @@ void RobustGraspMpcState::OnEnter()
   tick_index_ = 0;
   last_status_print_time_s_ = -1.0e100;
   last_command_ = plato_robot_system::RobotCommand{};
+  object_belief_ = mppi_core::VirtualObjectBelief{};
+  object_belief_contact_count_ = 0;
+  object_belief_update_count_ = 0;
+  object_belief_best_cost_ = std::numeric_limits<double>::infinity();
+  object_belief_updated_this_tick_ = false;
+  exit_requested_ = false;
   if (robot_ == nullptr || !robot_->hasState()) {
     return;
   }
@@ -204,9 +273,27 @@ void RobustGraspMpcState::OnEnter()
   last_command_.stamp_sec = state.time_s;
 }
 
+void RobustGraspMpcState::OnExit()
+{
+  last_command_ = plato_robot_system::RobotCommand{};
+  object_belief_ = mppi_core::VirtualObjectBelief{};
+  object_belief_contact_count_ = 0;
+  object_belief_update_count_ = 0;
+  object_belief_best_cost_ = std::numeric_limits<double>::infinity();
+  object_belief_updated_this_tick_ = false;
+  exit_requested_ = false;
+}
+
 const mppi_core::RobustGraspPolicyStatus & RobustGraspMpcState::policy_status() const
 {
   return policy_.status();
+}
+
+bool RobustGraspMpcState::IsFinished() const
+{
+  UpdateExitCondition();
+  return (exit_requested_ && lifecycle_.next_state_id >= 0) ||
+         plato_robot_system::State::IsFinished();
 }
 
 bool RobustGraspMpcState::PopulateCommand(plato_robot_system::RobotCommand * command) const
@@ -222,6 +309,13 @@ bool RobustGraspMpcState::PopulateCommand(plato_robot_system::RobotCommand * com
 
   try {
     auto next_command = policy_.Update(observation);
+    if (config_.safety.rollout_only) {
+      if (!PopulateHoldCommand(command)) {
+        return false;
+      }
+      PrintStatus(observation.time_s, observation, *command);
+      return true;
+    }
     if (!next_command.IsUsable() || !ApplyCommandSafety(&next_command)) {
       return PopulateHoldCommand(command);
     }
@@ -287,14 +381,61 @@ bool RobustGraspMpcState::BuildObservation(mppi_core::GraspObservation * observa
     observation->q_ref_current = last_command_.q_cmd;
     observation->qdot_ref_current = last_command_.qdot_cmd;
   }
+  UpdateObjectBelief(state.q, tactile_meas, tactile_contexts);
   observation->tactile_meas = std::move(tactile_meas);
   observation->object_prior = config_.object_prior;
+  if (has_object_belief()) {
+    observation->object_belief = object_belief_;
+  }
   observation->robot_system = robot_;
   observation->tactile_contexts = std::move(tactile_contexts);
   observation->tactile_transition_config =
     &config_.policy.tactile_only_transition.tactile_transition.base;
   observation->time_s = state.time_s;
   return true;
+}
+
+bool RobustGraspMpcState::UpdateObjectBelief(
+  const Eigen::Ref<const Eigen::VectorXd> & q_meas,
+  const TactileStateVector & tactile_meas,
+  const std::vector<mppi_core::TactileSensorContext> & tactile_contexts) const
+{
+  object_belief_updated_this_tick_ = false;
+  object_belief_contact_count_ = 0;
+  object_belief_best_cost_ = std::numeric_limits<double>::infinity();
+
+  if (!mppi_core::HasObjectPrior(config_.object_prior) ||
+    !mppi_core::IsValidObjectPrior(config_.object_prior))
+  {
+    object_belief_ = mppi_core::VirtualObjectBelief{};
+    return false;
+  }
+
+  mppi_core::ObjectPrior tracking_prior = config_.object_prior;
+  Eigen::Isometry3d previous_pose_world = Eigen::Isometry3d::Identity();
+  if (RepresentativeObjectBeliefPose(object_belief_, &previous_pose_world)) {
+    tracking_prior.initial_pose_world = previous_pose_world;
+  }
+
+  const auto result = mppi_core::InitializeObjectBeliefFromContacts(
+    tracking_prior,
+    q_meas,
+    tactile_meas,
+    tactile_contexts,
+    config_.policy.object_belief_initialization);
+  object_belief_contact_count_ = result.contacts.size();
+  object_belief_best_cost_ = result.best_cost;
+  if (result.valid) {
+    object_belief_ = result.belief;
+    object_belief_updated_this_tick_ = true;
+    ++object_belief_update_count_;
+    return true;
+  }
+
+  if (!has_object_belief()) {
+    object_belief_ = mppi_core::VirtualObjectBelief{};
+  }
+  return false;
 }
 
 bool RobustGraspMpcState::BuildTactileContexts(
@@ -425,6 +566,39 @@ bool RobustGraspMpcState::PopulateHoldCommand(plato_robot_system::RobotCommand *
   return command->IsUsable();
 }
 
+bool RobustGraspMpcState::AllContactsLost() const
+{
+  if (robot_ == nullptr || !robot_->hasState()) {
+    return false;
+  }
+
+  const auto & tactile_sensors = robot_->state().tactile_sensors;
+  for (const auto & tactile : tactile_sensors) {
+    if (tactile.valid && tactile.HasActiveHemisphereContact()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void RobustGraspMpcState::UpdateExitCondition() const
+{
+  if (
+    exit_requested_ ||
+    !config_.safety.exit_on_all_contacts_lost ||
+    lifecycle_.next_state_id < 0)
+  {
+    return;
+  }
+
+  if (!AllContactsLost()) {
+    return;
+  }
+
+  std::cout << "[robust_grasp_mpc] exiting on all contacts lost" << std::endl;
+  exit_requested_ = true;
+}
+
 void RobustGraspMpcState::PrintStatus(
   const double time_s,
   const mppi_core::GraspObservation & observation,
@@ -442,6 +616,7 @@ void RobustGraspMpcState::PrintStatus(
          << " mode="
          << (status.used_continuous_qddot_mppi ? "continuous_qddot_mppi" :
              "discrete_action_selector")
+         << " rollout_only=" << (config_.safety.rollout_only ? "true" : "false")
          << " candidate_count=" << status.candidate_count
          << " disturbance_count=" << status.disturbance_count
          << " horizon=" << status.horizon_steps
@@ -471,6 +646,25 @@ void RobustGraspMpcState::PrintStatus(
          << " qdot_cmd_norm=" << command.qdot_cmd.norm()
          << " active_sensors=" << ActiveTactileSensorCount(observation.tactile_meas)
          << " active_hemispheres=" << ActiveHemisphereCountTotal(observation.tactile_meas)
+         << " belief_valid=" << (has_object_belief() ? "true" : "false")
+         << " belief_updated=" << (object_belief_updated_this_tick_ ? "true" : "false")
+         << " belief_contacts=" << object_belief_contact_count_
+         << " belief_updates=" << object_belief_update_count_
+         << " belief_particles=" << object_belief_.particleCount()
+         << " belief_best_cost=" << object_belief_best_cost_
+         << " exit_requested=" << (exit_requested_ ? "true" : "false")
+         << " initial_total_cost=" << status.initial_total_cost
+         << " initial_object_support_cost=" << status.initial_object_support_cost
+         << " initial_contact_loss_cost=" << status.initial_contact_loss_cost
+         << " initial_support_cost=" << status.initial_support_cost
+         << " initial_edge_cost=" << status.initial_edge_cost
+         << " initial_penetration_cost=" << status.initial_penetration_cost
+         << " initial_preload_cost=" << status.initial_preload_cost
+         << " initial_force_low_cost=" << status.initial_force_low_cost
+         << " initial_force_high_cost=" << status.initial_force_high_cost
+         << " initial_balance_cost=" << status.initial_balance_cost
+         << " initial_min_gap_m=" << status.initial_object_min_gap_m
+         << " initial_edge_margin_m=" << status.initial_object_edge_margin_m
          << " object_samples=" << status.selected_object_sample_count
          << " object_queries=" << status.selected_object_geometry_query_count
          << " object_support_cost=" << status.selected_object_support_cost
@@ -479,18 +673,30 @@ void RobustGraspMpcState::PrintStatus(
          << " edge_cost=" << status.selected_edge_cost
          << " penetration_cost=" << status.selected_penetration_cost
          << " preload_cost=" << status.selected_preload_cost
+         << " force_low_cost=" << status.selected_force_low_cost
+         << " force_high_cost=" << status.selected_force_high_cost
          << " balance_cost=" << status.selected_balance_cost
          << " control_cost=" << status.selected_control_cost
          << " rate_cost=" << status.selected_rate_cost
          << " pred_hemi=" << status.selected_predicted_active_hemisphere_total
          << " meas_hemi=" << status.selected_measured_active_hemisphere_total
          << " lost_object_contacts=" << status.selected_object_contact_loss_count
+         << " selected_min_gap_m=" << status.selected_object_min_gap_m
          << " object_edge_margin_m=" << status.selected_object_edge_margin_m
          << " pred_centroid=[" << status.selected_predicted_centroid_sensor_m.transpose()
          << "] meas_centroid=[" << status.selected_measured_centroid_sensor_m.transpose()
          << "] object_disturbance_speed=" << status.selected_object_linear_disturbance_speed_mps
          << " object_disturbance_omega=" << status.selected_object_angular_disturbance_speed_radps
          << " solve_ms=" << status.solve_time_ms;
+  if (config_.debug.print_action_vectors) {
+    stream << " qddot_cmd=" << FormatVector(status.qddot_cmd)
+           << " qddot_best=" << FormatVector(status.qddot_best_first)
+           << " qddot_nominal=" << FormatVector(status.qddot_nominal_first)
+           << " qdot_cmd=" << FormatVector(command.qdot_cmd);
+    if (command.q_cmd.size() == observation.q_meas.size()) {
+      stream << " dq_cmd=" << FormatVector(command.q_cmd - observation.q_meas);
+    }
+  }
   std::cout << stream.str() << std::endl;
 }
 

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
 #include <cstddef>
@@ -16,6 +17,7 @@
 #include "mppi_core/core/mppi_config.hpp"
 #include "mppi_core/costs/robust_grasp_state_cost.hpp"
 #include "mppi_core/disturbance/grasp_disturbance_sampler.hpp"
+#include "mppi_core/object/object_belief_initializer.hpp"
 #include "mppi_core/policy/continuous_qddot_mppi.hpp"
 #include "mppi_core/policy/grasp_action_library.hpp"
 #include "mppi_core/rollout/disturbed_grasp_rollout.hpp"
@@ -37,6 +39,7 @@ struct RobustGraspPolicyConfig {
 
   TactileOnlyContactTransitionConfig tactile_only_transition;
   GraspDisturbanceSamplerConfig disturbance_sampler;
+  ObjectBeliefInitializationConfig object_belief_initialization;
   RobustGraspStateCostConfig cost;
   GraspActionLibraryConfig action_library;
 
@@ -98,6 +101,8 @@ struct RobustGraspPolicyStatus {
   double selected_edge_cost{0.0};
   double selected_penetration_cost{0.0};
   double selected_preload_cost{0.0};
+  double selected_force_low_cost{0.0};
+  double selected_force_high_cost{0.0};
   double selected_balance_cost{0.0};
   double selected_action_cost{0.0};
   double selected_control_cost{0.0};
@@ -114,6 +119,19 @@ struct RobustGraspPolicyStatus {
   double selected_measured_active_hemisphere_total{0.0};
   double selected_object_contact_loss_count{0.0};
   double selected_object_edge_margin_m{0.0};
+  double selected_object_min_gap_m{0.0};
+  double initial_total_cost{0.0};
+  double initial_object_support_cost{0.0};
+  double initial_contact_loss_cost{0.0};
+  double initial_support_cost{0.0};
+  double initial_edge_cost{0.0};
+  double initial_penetration_cost{0.0};
+  double initial_preload_cost{0.0};
+  double initial_force_low_cost{0.0};
+  double initial_force_high_cost{0.0};
+  double initial_balance_cost{0.0};
+  double initial_object_min_gap_m{0.0};
+  double initial_object_edge_margin_m{0.0};
   Eigen::Vector2d selected_predicted_centroid_sensor_m{
       Eigen::Vector2d::Constant(std::numeric_limits<double>::quiet_NaN())};
   Eigen::Vector2d selected_measured_centroid_sensor_m{
@@ -121,6 +139,10 @@ struct RobustGraspPolicyStatus {
   double selected_object_linear_disturbance_speed_mps{0.0};
   double selected_object_angular_disturbance_speed_radps{0.0};
   double solve_time_ms{0.0};
+
+  std::vector<Eigen::Isometry3d,
+              Eigen::aligned_allocator<Eigen::Isometry3d>>
+      selected_object_pose_rollout;
 
   Eigen::VectorXd qddot_cmd;
   Eigen::VectorXd qddot_nominal_first;

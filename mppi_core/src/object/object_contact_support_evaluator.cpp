@@ -51,6 +51,7 @@ struct SensorContactAccumulator {
 
   std::size_t count{0};
   Eigen::Vector2d centroid_sum{Eigen::Vector2d::Zero()};
+  double weight_sum{0.0};
   bool bounds_valid{false};
   double min_x{0.0};
   double max_x{0.0};
@@ -65,6 +66,10 @@ struct PinocchioPlacementCache {
 
 bool IsNonnegativeFinite(const double value) {
   return std::isfinite(value) && value >= 0.0;
+}
+
+bool IsFinite(const double value) {
+  return std::isfinite(value);
 }
 
 double Square(const double value) { return value * value; }
@@ -91,21 +96,20 @@ bool HasValidConfig(const ObjectContactSupportEvaluatorConfig& config) {
          IsNonnegativeFinite(config.contact_birth_margin_m) &&
          IsNonnegativeFinite(config.contact_loss_margin_m) &&
          config.contact_loss_margin_m >= config.contact_birth_margin_m &&
-         IsNonnegativeFinite(config.contact_stiffness_n_per_m) &&
          IsNonnegativeFinite(config.hemisphere_radius_m) &&
          IsNonnegativeFinite(config.support_distance_scale_m) &&
          config.support_distance_scale_m > 0.0 &&
+         IsFinite(config.good_contact_gap_min_m) &&
+         IsFinite(config.good_contact_gap_max_m) &&
+         config.good_contact_gap_max_m >= config.good_contact_gap_min_m &&
+         IsNonnegativeFinite(config.deep_contact_scale_m) &&
+         config.deep_contact_scale_m > 0.0 &&
+         IsNonnegativeFinite(config.deep_contact_weight) &&
          IsNonnegativeFinite(config.max_allowed_penetration_m) &&
-         IsNonnegativeFinite(config.target_predicted_normal_force_n) &&
-         IsNonnegativeFinite(config.max_predicted_normal_force_n) &&
-         IsNonnegativeFinite(config.min_predicted_contact_force_n) &&
-         IsNonnegativeFinite(config.max_predicted_force_per_sensor_n) &&
          IsNonnegativeFinite(config.contact_loss_weight) &&
          IsNonnegativeFinite(config.support_weight) &&
          IsNonnegativeFinite(config.edge_weight) &&
          IsNonnegativeFinite(config.penetration_weight) &&
-         IsNonnegativeFinite(config.predicted_force_low_weight) &&
-         IsNonnegativeFinite(config.predicted_force_high_weight) &&
          IsNonnegativeFinite(config.target_edge_margin_m);
 }
 
@@ -166,9 +170,15 @@ bool AddPointFromGeometry(
     return false;
   }
 
-  const Eigen::Vector3d point_sensor_m =
-      measured != nullptr ? HemisphereLocalPointSensorM(*measured, geometry)
-                          : geometry.center_sensor_m;
+  const bool use_measured_cop =
+      measured != nullptr &&
+      measured->contact &&
+      measured->cop_sensor_m.allFinite();
+  Eigen::Vector3d point_sensor_m = geometry.center_sensor_m;
+  if (use_measured_cop) {
+    point_sensor_m = Eigen::Vector3d{
+        measured->cop_sensor_m.x(), measured->cop_sensor_m.y(), 0.0};
+  }
   if (!point_sensor_m.allFinite()) {
     return false;
   }
@@ -280,21 +290,6 @@ std::vector<SensorGridBounds> ComputeSensorGridBounds(
   return bounds;
 }
 
-double ComputePredictedForce(
-    const double gap_m,
-    const ObjectContactSupportEvaluatorConfig& config) {
-  if (!std::isfinite(gap_m) || config.contact_stiffness_n_per_m <= 0.0) {
-    return 0.0;
-  }
-  const double compression_m =
-      config.contact_birth_margin_m - gap_m;
-  if (compression_m <= 0.0) {
-    return 0.0;
-  }
-  return std::min(config.max_predicted_normal_force_n,
-                  config.contact_stiffness_n_per_m * compression_m);
-}
-
 double SensorEdgeMargin(
     const SensorGridBounds& bounds,
     const Eigen::Vector2d& centroid_sensor_m) {
@@ -308,12 +303,41 @@ double SensorEdgeMargin(
       bounds.max_y - centroid_sensor_m.y()});
 }
 
+double GoodContactScore(
+    const double gap_m,
+    const ObjectContactSupportEvaluatorConfig& config) {
+  if (!std::isfinite(gap_m) ||
+      !std::isfinite(config.good_contact_gap_min_m) ||
+      !std::isfinite(config.good_contact_gap_max_m) ||
+      !std::isfinite(config.support_distance_scale_m) ||
+      !std::isfinite(config.deep_contact_scale_m) ||
+      config.good_contact_gap_max_m < config.good_contact_gap_min_m ||
+      config.support_distance_scale_m <= 0.0 ||
+      config.deep_contact_scale_m <= 0.0) {
+    return 0.0;
+  }
+  if (gap_m >= config.good_contact_gap_min_m &&
+      gap_m <= config.good_contact_gap_max_m) {
+    return 1.0;
+  }
+  if (gap_m > config.good_contact_gap_max_m) {
+    const double error_m = gap_m - config.good_contact_gap_max_m;
+    return std::exp(-error_m / config.support_distance_scale_m);
+  }
+
+  const double error_m = config.good_contact_gap_min_m - gap_m;
+  return std::exp(-error_m / config.deep_contact_scale_m);
+}
+
 void AddSensorPoint(SensorContactAccumulator* accumulator,
-                    const Eigen::Vector2d& point_sensor_m) {
-  if (accumulator == nullptr || !point_sensor_m.allFinite()) {
+                    const Eigen::Vector2d& point_sensor_m,
+                    const double weight = 1.0) {
+  if (accumulator == nullptr || !point_sensor_m.allFinite() ||
+      !std::isfinite(weight) || weight <= 0.0) {
     return;
   }
-  accumulator->centroid_sum += point_sensor_m;
+  accumulator->centroid_sum += weight * point_sensor_m;
+  accumulator->weight_sum += weight;
   if (!accumulator->bounds_valid) {
     accumulator->min_x = accumulator->max_x = point_sensor_m.x();
     accumulator->min_y = accumulator->max_y = point_sensor_m.y();
@@ -338,19 +362,20 @@ double SensorSupportArea(const SensorContactAccumulator& accumulator) {
 Eigen::Vector2d CentroidOrNan(
     const std::vector<SensorContactAccumulator>& accumulators) {
   Eigen::Vector2d sum = Eigen::Vector2d::Zero();
-  std::size_t count = 0;
+  double weight_sum = 0.0;
   for (const auto& accumulator : accumulators) {
-    if (accumulator.count == 0U) {
+    if (accumulator.weight_sum <= 0.0 ||
+        !std::isfinite(accumulator.weight_sum)) {
       continue;
     }
     sum += accumulator.centroid_sum;
-    count += accumulator.count;
+    weight_sum += accumulator.weight_sum;
   }
-  if (count == 0U) {
+  if (weight_sum <= 0.0) {
     return Eigen::Vector2d::Constant(
         std::numeric_limits<double>::quiet_NaN());
   }
-  return sum / static_cast<double>(count);
+  return sum / weight_sum;
 }
 
 bool FiniteVector(const Eigen::Vector2d& value) {
@@ -382,8 +407,9 @@ void FinalizeSummaryFromEvaluation(ObjectContactSupportEvaluation* evaluation) {
           evaluation->measured_active_hemisphere_total));
   evaluation->support_summary.predicted_edge_margin_m =
       evaluation->min_edge_margin_m;
-  evaluation->support_summary.predicted_total_force_n =
-      evaluation->predicted_normal_force_total_n;
+  // Object support evaluation is geometric. It does not estimate true contact
+  // force. Force/preload costs use measured tactile force only.
+  evaluation->support_summary.predicted_total_force_n = 0.0;
 }
 
 ObjectContactSupportEvaluation EvaluateOneObjectSample(
@@ -410,13 +436,11 @@ ObjectContactSupportEvaluation EvaluateOneObjectSample(
   out.measured_active_tactile_sensors =
       static_cast<double>(state.activeTactileSensorCount());
 
-  std::vector<double> predicted_force_by_sensor(state.tactile_sensors.size(),
-                                                0.0);
-  std::vector<std::size_t> predicted_count_by_sensor(
-      state.tactile_sensors.size(), 0);
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       predicted_centroid_sum(
       state.tactile_sensors.size(), Eigen::Vector2d::Zero());
+  std::vector<double> predicted_support_score_by_sensor(
+      state.tactile_sensors.size(), 0.0);
   std::vector<SensorContactAccumulator> predicted_accumulators(
       state.tactile_sensors.size());
   std::vector<SensorContactAccumulator> measured_accumulators(
@@ -436,18 +460,21 @@ ObjectContactSupportEvaluation EvaluateOneObjectSample(
     out.min_signed_distance_m =
         std::min(out.min_signed_distance_m, gap_m);
 
-    const double predicted_force_n =
-        ComputePredictedForce(gap_m, config);
-    const bool predicted_contact =
-        gap_m <= config.contact_birth_margin_m &&
-        predicted_force_n >= config.min_predicted_contact_force_n;
     const bool measured_contact_lost =
         point.measured_contact &&
         gap_m > config.contact_loss_margin_m;
-    const double penetration_violation_m = HingePositive(
-        -gap_m - config.max_allowed_penetration_m);
-    out.penetration_cost +=
-        config.penetration_weight * Square(penetration_violation_m);
+    double support_score = GoodContactScore(gap_m, config);
+    if (point.measured_contact && !measured_contact_lost) {
+      // The tactile sensor says this is real contact. Do not open the hand
+      // just because the current object particle/prior appears slightly inside
+      // the measured contact point.
+      support_score = 1.0;
+    } else if (!point.measured_contact) {
+      const double deep_violation_m =
+          HingePositive(config.good_contact_gap_min_m - gap_m);
+      out.penetration_cost +=
+          config.deep_contact_weight * Square(deep_violation_m);
+    }
 
     if (measured_contact_lost) {
       out.lost_measured_contact_count += 1.0;
@@ -457,40 +484,35 @@ ObjectContactSupportEvaluation EvaluateOneObjectSample(
       AddSensorPoint(&measured_accumulators[point.sensor_vector_index],
                      point.point_sensor_xy_m);
     }
-    if (!predicted_contact ||
+    if (support_score <= kTiny ||
+        !std::isfinite(support_score) ||
         point.sensor_vector_index >= state.tactile_sensors.size()) {
       continue;
     }
 
-    const double support_score = std::exp(
-        -std::max(0.0, gap_m) / config.support_distance_scale_m);
     out.predicted_active_hemisphere_total += support_score;
-    out.predicted_normal_force_total_n += predicted_force_n;
-    predicted_force_by_sensor[point.sensor_vector_index] += predicted_force_n;
-    predicted_count_by_sensor[point.sensor_vector_index] += 1U;
     predicted_centroid_sum[point.sensor_vector_index] +=
-        point.point_sensor_xy_m;
+        support_score * point.point_sensor_xy_m;
+    predicted_support_score_by_sensor[point.sensor_vector_index] +=
+        support_score;
     AddSensorPoint(&predicted_accumulators[point.sensor_vector_index],
-                   point.point_sensor_xy_m);
+                   point.point_sensor_xy_m, support_score);
   }
 
-  for (std::size_t sensor_i = 0; sensor_i < predicted_count_by_sensor.size();
+  for (std::size_t sensor_i = 0;
+       sensor_i < predicted_support_score_by_sensor.size();
        ++sensor_i) {
-    if (predicted_count_by_sensor[sensor_i] == 0U) {
+    const double support_weight =
+        predicted_support_score_by_sensor[sensor_i];
+    if (support_weight <= 0.0 || !std::isfinite(support_weight)) {
       continue;
     }
-    out.predicted_active_tactile_sensors += 1.0;
+    out.predicted_active_tactile_sensors += std::min(1.0, support_weight);
     const Eigen::Vector2d centroid =
-        predicted_centroid_sum[sensor_i] /
-        static_cast<double>(predicted_count_by_sensor[sensor_i]);
+        predicted_centroid_sum[sensor_i] / support_weight;
     out.min_edge_margin_m = std::min(
         out.min_edge_margin_m,
         SensorEdgeMargin(sensor_bounds[sensor_i], centroid));
-    const double force_excess_n = HingePositive(
-        predicted_force_by_sensor[sensor_i] -
-        config.max_predicted_force_per_sensor_n);
-    out.predicted_force_high_cost +=
-        config.predicted_force_high_weight * Square(force_excess_n);
   }
 
   if (!std::isfinite(out.min_signed_distance_m)) {
@@ -513,11 +535,9 @@ ObjectContactSupportEvaluation EvaluateOneObjectSample(
   const double edge_deficit =
       HingePositive(config.target_edge_margin_m - out.min_edge_margin_m);
   out.edge_cost = config.edge_weight * Square(edge_deficit);
-  const double predicted_force_deficit_n = HingePositive(
-      config.target_predicted_normal_force_n -
-      out.predicted_normal_force_total_n);
-  out.predicted_force_low_cost =
-      config.predicted_force_low_weight * Square(predicted_force_deficit_n);
+  out.predicted_normal_force_total_n = 0.0;
+  out.predicted_force_low_cost = 0.0;
+  out.predicted_force_high_cost = 0.0;
   out.support_summary.predicted_centroid_sensor_m =
       CentroidOrNan(predicted_accumulators);
   out.support_summary.measured_centroid_sensor_m =

@@ -29,6 +29,10 @@ ObjectContactSupportEvaluatorConfig ParseObjectContactSupportEvaluatorConfig(
     const YAML::Node& params,
     ObjectContactSupportEvaluatorConfig defaults = {});
 
+ObjectBeliefInitializationConfig ParseObjectBeliefInitializationConfig(
+    const YAML::Node& params,
+    ObjectBeliefInitializationConfig defaults = {});
+
 GraspActionLibraryConfig ParseGraspActionLibraryConfig(
     const YAML::Node& params, std::size_t action_dim,
     GraspActionLibraryConfig defaults = {});

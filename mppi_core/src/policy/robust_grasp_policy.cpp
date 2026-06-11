@@ -26,6 +26,8 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
   double edge_cost{0.0};
   double penetration_cost{0.0};
   double preload_cost{0.0};
+  double force_low_cost{0.0};
+  double force_high_cost{0.0};
   double balance_cost{0.0};
   double action_cost{0.0};
   std::size_t object_sample_count{0};
@@ -34,6 +36,7 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
   double measured_active_hemisphere_total_sum{0.0};
   double object_contact_loss_count_sum{0.0};
   double object_edge_margin_min{std::numeric_limits<double>::infinity()};
+  double object_min_signed_distance_min{std::numeric_limits<double>::infinity()};
   Eigen::Vector2d predicted_centroid_sum{Eigen::Vector2d::Zero()};
   Eigen::Vector2d measured_centroid_sum{Eigen::Vector2d::Zero()};
   std::size_t predicted_centroid_count{0};
@@ -89,6 +92,18 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
                : preload_cost / static_cast<double>(object_support_step_count);
   }
 
+  double forceLowCostAverage() const {
+    return object_support_step_count == 0U
+               ? 0.0
+               : force_low_cost / static_cast<double>(object_support_step_count);
+  }
+
+  double forceHighCostAverage() const {
+    return object_support_step_count == 0U
+               ? 0.0
+               : force_high_cost / static_cast<double>(object_support_step_count);
+  }
+
   double balanceCostAverage() const {
     return object_support_step_count == 0U
                ? 0.0
@@ -120,20 +135,28 @@ struct RobustGraspPolicy::CandidateEvaluationStats {
                                                  : 0.0;
   }
 
+  double objectMinSignedDistanceMin() const {
+    return std::isfinite(object_min_signed_distance_min)
+               ? object_min_signed_distance_min
+               : 0.0;
+  }
+
   Eigen::Vector2d predictedCentroidAverage() const {
-    return predicted_centroid_count == 0U
-               ? Eigen::Vector2d::Constant(
-                     std::numeric_limits<double>::quiet_NaN())
-               : predicted_centroid_sum /
-                     static_cast<double>(predicted_centroid_count);
+    if (predicted_centroid_count == 0U) {
+      return Eigen::Vector2d::Constant(
+          std::numeric_limits<double>::quiet_NaN());
+    }
+    return predicted_centroid_sum /
+           static_cast<double>(predicted_centroid_count);
   }
 
   Eigen::Vector2d measuredCentroidAverage() const {
-    return measured_centroid_count == 0U
-               ? Eigen::Vector2d::Constant(
-                     std::numeric_limits<double>::quiet_NaN())
-               : measured_centroid_sum /
-                     static_cast<double>(measured_centroid_count);
+    if (measured_centroid_count == 0U) {
+      return Eigen::Vector2d::Constant(
+          std::numeric_limits<double>::quiet_NaN());
+    }
+    return measured_centroid_sum /
+           static_cast<double>(measured_centroid_count);
   }
 
   double objectLinearDisturbanceSpeedAverage() const {
@@ -326,6 +349,36 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   status_.control_mode = config_.control_mode;
   status_.horizon_steps = config_.rollout.horizon_steps;
   status_.lambda = config_.rollout.temperature;
+
+  Eigen::VectorXd zero_qddot =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(
+          config_.rollout.action_dim));
+  RobustGraspStateCostBreakdown initial_breakdown;
+  status_.initial_total_cost =
+      cost_->Evaluate(initial_state, zero_qddot, context, &initial_breakdown);
+  status_.initial_object_support_cost =
+      initial_breakdown.object_support_cost;
+  status_.initial_contact_loss_cost =
+      initial_breakdown.object_support.contact_loss_cost;
+  status_.initial_support_cost =
+      initial_breakdown.object_support.support_cost;
+  status_.initial_edge_cost =
+      initial_breakdown.object_support.edge_cost;
+  status_.initial_penetration_cost =
+      initial_breakdown.object_support.penetration_cost;
+  status_.initial_preload_cost = initial_breakdown.preload_cost;
+  status_.initial_force_low_cost = initial_breakdown.force_low_cost;
+  status_.initial_force_high_cost = initial_breakdown.force_high_cost;
+  status_.initial_balance_cost = initial_breakdown.force_balance_cost;
+  status_.initial_object_min_gap_m =
+      initial_breakdown.object_support.valid
+          ? initial_breakdown.object_support.min_signed_distance_m
+          : 0.0;
+  status_.initial_object_edge_margin_m =
+      initial_breakdown.object_support.valid
+          ? initial_breakdown.object_support.min_edge_margin_m
+          : 0.0;
+
   RobotCommand command =
       config_.control_mode == RobustGraspControlMode::kContinuousQddotMppi
           ? UpdateContinuousQddotMppi(observation, initial_state, context)
@@ -449,6 +502,8 @@ RobotCommand RobustGraspPolicy::UpdateDiscreteActionSelector(
   status_.selected_penetration_cost =
       best_stats.penetrationCostAverage();
   status_.selected_preload_cost = best_stats.preloadCostAverage();
+  status_.selected_force_low_cost = best_stats.forceLowCostAverage();
+  status_.selected_force_high_cost = best_stats.forceHighCostAverage();
   status_.selected_balance_cost = best_stats.balanceCostAverage();
   status_.selected_action_cost = best_stats.actionCostAverage();
   status_.selected_object_sample_count = best_stats.object_sample_count;
@@ -462,6 +517,8 @@ RobotCommand RobustGraspPolicy::UpdateDiscreteActionSelector(
       best_stats.objectContactLossAverage();
   status_.selected_object_edge_margin_m =
       best_stats.objectEdgeMarginMin();
+  status_.selected_object_min_gap_m =
+      best_stats.objectMinSignedDistanceMin();
   status_.selected_predicted_centroid_sensor_m =
       best_stats.predictedCentroidAverage();
   status_.selected_measured_centroid_sensor_m =
@@ -541,6 +598,10 @@ void RobustGraspPolicy::CopyContinuousStatus(
   status_.selected_penetration_cost =
       continuous_status.selected_penetration_cost;
   status_.selected_preload_cost = continuous_status.selected_preload_cost;
+  status_.selected_force_low_cost =
+      continuous_status.selected_force_low_cost;
+  status_.selected_force_high_cost =
+      continuous_status.selected_force_high_cost;
   status_.selected_balance_cost = continuous_status.selected_balance_cost;
   status_.selected_action_cost = continuous_status.selected_control_cost;
   status_.selected_control_cost = continuous_status.selected_control_cost;
@@ -557,6 +618,8 @@ void RobustGraspPolicy::CopyContinuousStatus(
       continuous_status.object_contact_loss_count;
   status_.selected_object_edge_margin_m =
       continuous_status.object_edge_margin_m;
+  status_.selected_object_min_gap_m =
+      continuous_status.object_min_signed_distance_m;
   status_.selected_predicted_centroid_sensor_m =
       continuous_status.predicted_centroid_sensor_m;
   status_.selected_measured_centroid_sensor_m =
@@ -565,6 +628,8 @@ void RobustGraspPolicy::CopyContinuousStatus(
       continuous_status.object_linear_disturbance_speed_mps;
   status_.selected_object_angular_disturbance_speed_radps =
       continuous_status.object_angular_disturbance_speed_radps;
+  status_.selected_object_pose_rollout =
+      continuous_status.object_pose_rollout;
 
   status_.qddot_cmd = continuous_status.qddot_cmd;
   status_.qddot_nominal_first = continuous_status.qddot_nominal_first;
@@ -594,7 +659,8 @@ GraspState RobustGraspPolicy::MakeInitialState(
   return MakeGraspState(
       MakeRobotState(q, qdot, tau, observation.time_s),
       observation.tactile_meas,
-      ResolveObjectBeliefForObservation(observation, q));
+      ResolveObjectBeliefForObservation(
+          observation, q, config_.object_belief_initialization));
 }
 
 double RobustGraspPolicy::EvaluateCandidate(
@@ -645,6 +711,8 @@ double RobustGraspPolicy::EvaluateCandidate(
         local_stats.penetration_cost +=
             breakdown.object_support.penetration_cost;
         local_stats.preload_cost += breakdown.preload_cost;
+        local_stats.force_low_cost += breakdown.force_low_cost;
+        local_stats.force_high_cost += breakdown.force_high_cost;
         local_stats.balance_cost += breakdown.force_balance_cost;
         local_stats.action_cost += breakdown.action_cost;
         local_stats.object_sample_count +=
@@ -660,6 +728,9 @@ double RobustGraspPolicy::EvaluateCandidate(
         local_stats.object_edge_margin_min = std::min(
             local_stats.object_edge_margin_min,
             breakdown.object_support.min_edge_margin_m);
+        local_stats.object_min_signed_distance_min = std::min(
+            local_stats.object_min_signed_distance_min,
+            breakdown.object_support.min_signed_distance_m);
         if (breakdown.object_support.support_summary
                 .predicted_centroid_sensor_m.allFinite()) {
           local_stats.predicted_centroid_sum +=

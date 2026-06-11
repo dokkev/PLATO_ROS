@@ -40,9 +40,13 @@ struct ObjectBeliefInitializationConfig {
   double contact_force_threshold_n{0.0};
   double contact_force_weight_scale_n{1.0};
 
+  bool use_thumb_index_contact_width{true};
+  double contact_width_sigma_m{0.005};
+
   double w_surface{1.0};
   double w_normal{0.5};
   double w_prior{0.1};
+  double w_contact_width{0.5};
 };
 
 struct ObjectContactObservation {
@@ -64,9 +68,11 @@ struct ObjectParticleScore {
   double surface_cost{std::numeric_limits<double>::infinity()};
   double normal_cost{std::numeric_limits<double>::infinity()};
   double prior_cost{std::numeric_limits<double>::infinity()};
+  double contact_width_cost{0.0};
   double total_cost{std::numeric_limits<double>::infinity()};
   double mean_surface_distance_m{std::numeric_limits<double>::infinity()};
   double mean_normal_alignment_error{std::numeric_limits<double>::infinity()};
+  double contact_width_error_m{std::numeric_limits<double>::quiet_NaN()};
 };
 
 struct ObjectBeliefInitializationResult {

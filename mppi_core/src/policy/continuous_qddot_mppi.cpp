@@ -239,6 +239,8 @@ struct CostAccumulation {
   double edge_cost{0.0};
   double penetration_cost{0.0};
   double preload_cost{0.0};
+  double force_low_cost{0.0};
+  double force_high_cost{0.0};
   double balance_cost{0.0};
   double control_cost{0.0};
   double rate_cost{0.0};
@@ -249,6 +251,7 @@ struct CostAccumulation {
   double measured_active_hemisphere_total{0.0};
   double object_contact_loss_count{0.0};
   double object_edge_margin_m{std::numeric_limits<double>::infinity()};
+  double object_min_signed_distance_m{std::numeric_limits<double>::infinity()};
   Eigen::Vector2d predicted_centroid_sum{Eigen::Vector2d::Zero()};
   Eigen::Vector2d measured_centroid_sum{Eigen::Vector2d::Zero()};
   double predicted_centroid_weight{0.0};
@@ -258,19 +261,113 @@ struct CostAccumulation {
   double normalization_count{0.0};
 
   Eigen::Vector2d predictedCentroid() const {
-    return predicted_centroid_weight <= 0.0
-               ? Eigen::Vector2d::Constant(
-                     std::numeric_limits<double>::quiet_NaN())
-               : predicted_centroid_sum / predicted_centroid_weight;
+    if (predicted_centroid_weight <= 0.0) {
+      return Eigen::Vector2d::Constant(
+          std::numeric_limits<double>::quiet_NaN());
+    }
+    return predicted_centroid_sum / predicted_centroid_weight;
   }
 
   Eigen::Vector2d measuredCentroid() const {
-    return measured_centroid_weight <= 0.0
-               ? Eigen::Vector2d::Constant(
-                     std::numeric_limits<double>::quiet_NaN())
-               : measured_centroid_sum / measured_centroid_weight;
+    if (measured_centroid_weight <= 0.0) {
+      return Eigen::Vector2d::Constant(
+          std::numeric_limits<double>::quiet_NaN());
+    }
+    return measured_centroid_sum / measured_centroid_weight;
   }
 };
+
+using ObjectPoseRollout =
+    std::vector<Eigen::Isometry3d,
+                Eigen::aligned_allocator<Eigen::Isometry3d>>;
+
+bool RepresentativeObjectPose(const VirtualObjectBelief& belief,
+                              Eigen::Isometry3d* pose_world) {
+  if (pose_world == nullptr || !HasVirtualObjectBelief(belief) ||
+      !IsValidVirtualObjectBelief(belief) || belief.particles.empty()) {
+    return false;
+  }
+
+  double weight_sum = 0.0;
+  Eigen::Vector3d weighted_translation = Eigen::Vector3d::Zero();
+  const VirtualObjectState* orientation_source = nullptr;
+  double orientation_weight = -1.0;
+  for (const auto& particle : belief.particles) {
+    if (!IsValidVirtualObjectState(particle) ||
+        !particle.pose_world.matrix().allFinite()) {
+      continue;
+    }
+    const double weight =
+        std::isfinite(particle.weight) && particle.weight > 0.0
+            ? particle.weight
+            : 1.0;
+    weighted_translation += weight * particle.pose_world.translation();
+    weight_sum += weight;
+    if (weight > orientation_weight) {
+      orientation_weight = weight;
+      orientation_source = &particle;
+    }
+  }
+  if (orientation_source == nullptr || weight_sum <= kTiny) {
+    return false;
+  }
+
+  *pose_world = orientation_source->pose_world;
+  pose_world->translation() = weighted_translation / weight_sum;
+  return true;
+}
+
+void AppendRepresentativeObjectPose(const VirtualObjectBelief& belief,
+                                    ObjectPoseRollout* rollout) {
+  if (rollout == nullptr) {
+    return;
+  }
+  Eigen::Isometry3d pose_world = Eigen::Isometry3d::Identity();
+  if (RepresentativeObjectPose(belief, &pose_world)) {
+    rollout->push_back(pose_world);
+  }
+}
+
+template <typename EvaluationVector>
+ObjectPoseRollout WeightedObjectPoseRollout(
+    const EvaluationVector& evaluations, const std::vector<double>& weights,
+    const std::size_t best_index) {
+  ObjectPoseRollout output;
+  if (evaluations.empty() || weights.size() != evaluations.size() ||
+      best_index >= evaluations.size()) {
+    return output;
+  }
+
+  const auto& best_rollout = evaluations[best_index].stats.object_pose_rollout;
+  std::size_t max_steps = best_rollout.size();
+  for (const auto& evaluation : evaluations) {
+    max_steps = std::max(max_steps, evaluation.stats.object_pose_rollout.size());
+  }
+  output.reserve(max_steps);
+
+  for (std::size_t step = 0; step < max_steps; ++step) {
+    Eigen::Vector3d weighted_translation = Eigen::Vector3d::Zero();
+    double weight_sum = 0.0;
+    for (std::size_t sample = 0; sample < evaluations.size(); ++sample) {
+      const auto& rollout = evaluations[sample].stats.object_pose_rollout;
+      if (step >= rollout.size() || weights[sample] <= 0.0 ||
+          !std::isfinite(weights[sample])) {
+        continue;
+      }
+      weighted_translation += weights[sample] * rollout[step].translation();
+      weight_sum += weights[sample];
+    }
+
+    Eigen::Isometry3d pose_world =
+        step < best_rollout.size() ? best_rollout[step]
+                                   : Eigen::Isometry3d::Identity();
+    if (weight_sum > kTiny) {
+      pose_world.translation() = weighted_translation / weight_sum;
+    }
+    output.push_back(pose_world);
+  }
+  return output;
+}
 
 void AccumulateStageBreakdown(
     const RobustGraspStateCostBreakdown& breakdown,
@@ -281,6 +378,8 @@ void AccumulateStageBreakdown(
     return;
   }
   total->preload_cost += breakdown.preload_cost;
+  total->force_low_cost += breakdown.force_low_cost;
+  total->force_high_cost += breakdown.force_high_cost;
   total->balance_cost += breakdown.force_balance_cost;
   total->control_cost += breakdown.action_cost;
   total->rate_cost += rate_cost;
@@ -307,6 +406,9 @@ void AccumulateStageBreakdown(
   total->object_contact_loss_count += object.lost_measured_contact_count;
   total->object_edge_margin_m =
       std::min(total->object_edge_margin_m, object.min_edge_margin_m);
+  total->object_min_signed_distance_m =
+      std::min(total->object_min_signed_distance_m,
+               object.min_signed_distance_m);
   if (object.support_summary.predicted_centroid_sensor_m.allFinite()) {
     total->predicted_centroid_sum +=
         object.support_summary.predicted_centroid_sensor_m;
@@ -330,6 +432,8 @@ void AddWeightedStats(const CostAccumulation& sample,
   status->selected_edge_cost += weight * sample.edge_cost;
   status->selected_penetration_cost += weight * sample.penetration_cost;
   status->selected_preload_cost += weight * sample.preload_cost;
+  status->selected_force_low_cost += weight * sample.force_low_cost;
+  status->selected_force_high_cost += weight * sample.force_high_cost;
   status->selected_balance_cost += weight * sample.balance_cost;
   status->selected_control_cost += weight * sample.control_cost;
   status->selected_rate_cost += weight * sample.rate_cost;
@@ -344,6 +448,10 @@ void AddWeightedStats(const CostAccumulation& sample,
       weight * sample.object_contact_loss_count * average_scale;
   status->object_edge_margin_m =
       std::min(status->object_edge_margin_m, sample.object_edge_margin_m);
+  status->object_min_signed_distance_m =
+      std::min(
+          status->object_min_signed_distance_m,
+          sample.object_min_signed_distance_m);
   status->object_linear_disturbance_speed_mps +=
       weight * sample.object_linear_disturbance_speed_mps * average_scale;
   status->object_angular_disturbance_speed_radps +=
@@ -371,6 +479,7 @@ struct ContinuousQddotMppiController::SampleStats {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   CostAccumulation costs;
+  ObjectPoseRollout object_pose_rollout;
 };
 
 struct ContinuousQddotMppiController::SampleEvaluation {
@@ -523,6 +632,8 @@ ContinuousQddotMppiController::EvaluateSequence(
   }
 
   GraspState state = initial_state;
+  AppendRepresentativeObjectPose(
+      state.object_belief, &evaluation.stats.object_pose_rollout);
   Eigen::VectorXd previous_action =
       has_previous_qddot_cmd_ &&
               previous_qddot_cmd_.size() ==
@@ -565,6 +676,8 @@ ContinuousQddotMppiController::EvaluateSequence(
         breakdown, disturbance_step, rate_cost, &evaluation.stats.costs);
 
     state = result.next_state;
+    AppendRepresentativeObjectPose(
+        state.object_belief, &evaluation.stats.object_pose_rollout);
     previous_action = action;
   }
 
@@ -626,6 +739,8 @@ RobotCommand ContinuousQddotMppiController::Update(
   status_.horizon_steps = config_.rollout.horizon_steps;
   status_.lambda = config_.rollout.temperature;
   status_.object_edge_margin_m = std::numeric_limits<double>::infinity();
+  status_.object_min_signed_distance_m =
+      std::numeric_limits<double>::infinity();
   status_.qddot_nominal_first = nominal_sequence_.firstAction();
 
   std::vector<ActionSequence> samples;
@@ -706,10 +821,15 @@ RobotCommand ContinuousQddotMppiController::Update(
       weight_square_sum > kTiny ? 1.0 / weight_square_sum : 0.0;
   status_.qddot_cmd = qddot_cmd;
   status_.qddot_best_first = samples[best_index].firstAction();
+  status_.object_pose_rollout =
+      WeightedObjectPoseRollout(evaluations, weights, best_index);
   status_.geometry_query_count = total_geometry_queries;
   status_.object_sample_count = total_object_samples;
   if (!std::isfinite(status_.object_edge_margin_m)) {
     status_.object_edge_margin_m = 0.0;
+  }
+  if (!std::isfinite(status_.object_min_signed_distance_m)) {
+    status_.object_min_signed_distance_m = 0.0;
   }
 
   RobotCommand command =

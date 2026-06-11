@@ -27,6 +27,7 @@
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "mppi_core/object/object_contact_belief.hpp"
 #include "mppi_core/object/object_prior.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/algorithm/joint-configuration.hpp"
@@ -49,6 +50,7 @@ namespace
 constexpr double kMNmToNm = 1.0e-3;
 constexpr double kNmToMNm = 1.0e3;
 constexpr double kDebugMarkerLifetimeS = 0.25;
+constexpr double kDisturbanceVelocityPreviewS = 0.5;
 
 using MarkerMsg = visualization_msgs::msg::Marker;
 using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
@@ -157,6 +159,45 @@ bool is_positive_finite_box_size(const Eigen::Vector3d & size_m)
   return size_m.allFinite() && size_m.x() > 0.0 && size_m.y() > 0.0 && size_m.z() > 0.0;
 }
 
+bool representative_object_belief_pose(
+  const mppi_core::VirtualObjectBelief & belief,
+  Eigen::Isometry3d * pose_world)
+{
+  if (
+    pose_world == nullptr ||
+    !mppi_core::HasVirtualObjectBelief(belief) ||
+    !mppi_core::IsValidVirtualObjectBelief(belief) ||
+    belief.particles.empty())
+  {
+    return false;
+  }
+
+  double weight_sum = 0.0;
+  Eigen::Vector3d weighted_translation_m = Eigen::Vector3d::Zero();
+  const mppi_core::VirtualObjectState * orientation_source = nullptr;
+  double best_weight = -1.0;
+  for (const auto & particle : belief.particles) {
+    if (!mppi_core::IsValidVirtualObjectState(particle)) {
+      continue;
+    }
+    const double weight =
+      std::isfinite(particle.weight) && particle.weight > 0.0 ? particle.weight : 1.0;
+    weighted_translation_m.noalias() += weight * particle.pose_world.translation();
+    weight_sum += weight;
+    if (weight > best_weight) {
+      best_weight = weight;
+      orientation_source = &particle;
+    }
+  }
+
+  if (orientation_source == nullptr || weight_sum <= 1.0e-12) {
+    return false;
+  }
+  *pose_world = orientation_source->pose_world;
+  pose_world->translation() = weighted_translation_m / weight_sum;
+  return pose_world->matrix().allFinite();
+}
+
 void append_box_edges(
   const Eigen::Isometry3d & box_pose,
   const Eigen::Vector3d & box_size_m,
@@ -199,6 +240,34 @@ bool get_frame_placement(
   }
   *placement = data.oMf[frame_id];
   return true;
+}
+
+Eigen::Vector3d tactile_hemisphere_center_sensor_m(
+  const plato_robot_system::sensor::HemisphereState & hemisphere)
+{
+  const auto centers_m = plato_robot_system::sensor::NARITouchUnitPositionsM();
+  if (hemisphere.hemisphere_index < centers_m.size()) {
+    return Eigen::Vector3d{
+      centers_m[hemisphere.hemisphere_index].x(),
+      centers_m[hemisphere.hemisphere_index].y(),
+      0.0};
+  }
+  return Eigen::Vector3d{
+    hemisphere.cop_sensor_m.x(),
+    hemisphere.cop_sensor_m.y(),
+    0.0};
+}
+
+Eigen::Vector3d tactile_contact_point_sensor_m(
+  const plato_robot_system::sensor::HemisphereState & hemisphere)
+{
+  if (hemisphere.cop_sensor_m.allFinite()) {
+    return Eigen::Vector3d{
+      hemisphere.cop_sensor_m.x(),
+      hemisphere.cop_sensor_m.y(),
+      0.0};
+  }
+  return tactile_hemisphere_center_sensor_m(hemisphere);
 }
 
 void append_sphere_marker(
@@ -1104,7 +1173,7 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
   const std::string frame_id =
     robust_grasp_debug_frame_id_.empty() ? "base_link" : robust_grasp_debug_frame_id_;
   MarkerArrayMsg markers;
-  markers.markers.reserve(96);
+  markers.markers.reserve(160);
   markers.markers.push_back(make_delete_all_marker(time, frame_id));
 
   Eigen::Vector3d label_position_m{0.0, 0.0, 0.12};
@@ -1151,6 +1220,35 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
 
       label_position_m = object_prior.initial_pose_world.translation();
       label_position_m.z() += 0.08;
+
+      const auto & object_belief = robust_grasp_mpc_state_->object_belief();
+      Eigen::Isometry3d object_belief_pose = Eigen::Isometry3d::Identity();
+      const Eigen::Vector3d belief_size_m =
+        is_positive_finite_box_size(object_belief.geometry.primitive_size_m) ?
+        object_belief.geometry.primitive_size_m :
+        object_prior.geometry.primitive_size_m;
+      if (
+        representative_object_belief_pose(object_belief, &object_belief_pose) &&
+        is_positive_finite_box_size(belief_size_m))
+      {
+        MarkerMsg belief_marker;
+        initialize_marker(
+          &belief_marker,
+          time,
+          frame_id,
+          "jenga_object_belief",
+          3,
+          MarkerMsg::CUBE);
+        belief_marker.pose = make_pose(object_belief_pose);
+        belief_marker.scale.x = belief_size_m.x();
+        belief_marker.scale.y = belief_size_m.y();
+        belief_marker.scale.z = belief_size_m.z();
+        belief_marker.color = make_color(0.12, 0.86, 0.68, 0.58);
+        markers.markers.push_back(belief_marker);
+
+        label_position_m = object_belief_pose.translation();
+        label_position_m.z() += 0.08;
+      }
     }
   }
 
@@ -1167,8 +1265,15 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
 
   if (have_current_fk) {
     int grid_marker_id = 0;
-    int contact_marker_id = 0;
     int force_marker_id = 0;
+    double tactile_hemisphere_diameter_m = 0.0;
+    if (robust_grasp_mpc_state_ != nullptr) {
+      const double radius_m =
+        robust_grasp_mpc_state_->config().policy.cost.object_support.hemisphere_radius_m;
+      if (std::isfinite(radius_m) && radius_m > 0.0) {
+        tactile_hemisphere_diameter_m = 2.0 * radius_m;
+      }
+    }
     const auto & tactile_sensors = state.tactile_sensors;
     for (std::size_t sensor_index = 0; sensor_index < tactile_sensors.size(); ++sensor_index) {
       const auto & tactile = tactile_sensors[sensor_index];
@@ -1184,37 +1289,30 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
         sensor_pose_world.rotation() * Eigen::Vector3d::UnitZ();
 
       for (const auto & hemisphere : tactile.hemispheres) {
-        const Eigen::Vector3d point_sensor_m{
-          hemisphere.cop_sensor_m.x(),
-          hemisphere.cop_sensor_m.y(),
-          0.0};
-        const Eigen::Vector3d point_world_m = sensor_pose_world.act(point_sensor_m);
-        append_sphere_marker(
-          &markers,
-          time,
-          frame_id,
-          "tactile_hemisphere_centers",
-          grid_marker_id++,
-          point_world_m,
-          0.0035,
-          make_color(0.72, 0.76, 0.80, 0.34));
+        const Eigen::Vector3d hemisphere_center_world_m =
+          sensor_pose_world.act(tactile_hemisphere_center_sensor_m(hemisphere));
+        if (tactile_hemisphere_diameter_m > 0.0) {
+          const auto hemisphere_color =
+            hemisphere.contact ? make_color(0.12, 0.95, 0.26, 0.72) :
+            make_color(0.72, 0.76, 0.80, 0.34);
+          append_sphere_marker(
+            &markers,
+            time,
+            frame_id,
+            "tactile_hemispheres",
+            grid_marker_id++,
+            hemisphere_center_world_m,
+            tactile_hemisphere_diameter_m,
+            hemisphere_color);
+        }
 
         if (!hemisphere.contact) {
           continue;
         }
         const double force_n =
           std::isfinite(hemisphere.normal_force_n) ? std::max(0.0, hemisphere.normal_force_n) : 0.0;
-        const double contact_diameter_m = 0.007 + std::min(force_n, 5.0) * 0.0015;
-        append_sphere_marker(
-          &markers,
-          time,
-          frame_id,
-          "measured_tactile_contacts",
-          contact_marker_id++,
-          point_world_m,
-          contact_diameter_m,
-          make_color(0.12, 0.95, 0.26, 0.92));
-
+        const Eigen::Vector3d contact_point_world_m =
+          sensor_pose_world.act(tactile_contact_point_sensor_m(hemisphere));
         const double arrow_length_m = 0.012 + std::min(force_n, 5.0) * 0.004;
         append_arrow_marker(
           &markers,
@@ -1222,8 +1320,8 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
           frame_id,
           "measured_contact_force",
           force_marker_id++,
-          point_world_m,
-          point_world_m + arrow_length_m * normal_world,
+          contact_point_world_m,
+          contact_point_world_m + arrow_length_m * normal_world,
           0.0022,
           0.006,
           make_color(1.0, 0.24, 0.08, 0.9));
@@ -1233,6 +1331,78 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
 
   if (robust_grasp_mpc_state_ != nullptr && have_current_fk) {
     const auto & status = robust_grasp_mpc_state_->policy_status();
+    const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
+    if (
+      mppi_core::IsValidObjectPrior(object_prior) &&
+      mppi_core::HasObjectPrior(object_prior) &&
+      is_positive_finite_box_size(object_prior.geometry.primitive_size_m) &&
+      !status.selected_object_pose_rollout.empty())
+    {
+      MarkerMsg path_marker;
+      initialize_marker(
+        &path_marker,
+        time,
+        frame_id,
+        "jenga_disturbed_rollout_path",
+        0,
+        MarkerMsg::LINE_STRIP);
+      path_marker.scale.x = 0.004;
+      path_marker.color = make_color(0.28, 0.72, 1.0, 0.86);
+      path_marker.points.reserve(status.selected_object_pose_rollout.size());
+
+      for (std::size_t step = 0; step < status.selected_object_pose_rollout.size(); ++step) {
+        const auto & pose = status.selected_object_pose_rollout[step];
+        if (!pose.matrix().allFinite()) {
+          continue;
+        }
+        path_marker.points.push_back(make_point(pose.translation()));
+
+        MarkerMsg disturbed_object_marker;
+        initialize_marker(
+          &disturbed_object_marker,
+          time,
+          frame_id,
+          "jenga_disturbed_rollout",
+          static_cast<int>(step),
+          MarkerMsg::CUBE);
+        disturbed_object_marker.pose = make_pose(pose);
+        disturbed_object_marker.scale.x = object_prior.geometry.primitive_size_m.x();
+        disturbed_object_marker.scale.y = object_prior.geometry.primitive_size_m.y();
+        disturbed_object_marker.scale.z = object_prior.geometry.primitive_size_m.z();
+        const double alpha =
+          step == 0 ? 0.22 :
+          std::min(0.68, 0.18 + 0.10 * static_cast<double>(step));
+        disturbed_object_marker.color = make_color(0.18, 0.56, 1.0, alpha);
+        markers.markers.push_back(disturbed_object_marker);
+      }
+
+      if (path_marker.points.size() >= 2U) {
+        markers.markers.push_back(path_marker);
+        const Eigen::Vector3d first_position_m =
+          status.selected_object_pose_rollout.front().translation();
+        const Eigen::Vector3d last_position_m =
+          status.selected_object_pose_rollout.back().translation();
+        const double rollout_dt = robust_grasp_mpc_state_->config().policy.rollout.dt;
+        const double rollout_time_s =
+          rollout_dt * static_cast<double>(status.selected_object_pose_rollout.size() - 1U);
+        if (std::isfinite(rollout_time_s) && rollout_time_s > 0.0) {
+          const Eigen::Vector3d velocity_mps =
+            (last_position_m - first_position_m) / rollout_time_s;
+          append_arrow_marker(
+            &markers,
+            time,
+            frame_id,
+            "jenga_disturbance_velocity_preview",
+            0,
+            first_position_m,
+            first_position_m + kDisturbanceVelocityPreviewS * velocity_mps,
+            0.003,
+            0.008,
+            make_color(0.15, 0.82, 1.0, 0.95));
+        }
+      }
+    }
+
     const double rollout_dt = robust_grasp_mpc_state_->config().policy.rollout.dt;
     if (
       std::isfinite(rollout_dt) &&
@@ -1301,13 +1471,25 @@ void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time &
     label_marker.color = make_color(0.96, 0.98, 1.0, 0.92);
 
     std::ostringstream text;
+    const auto & object_belief = robust_grasp_mpc_state_->object_belief();
     text << std::fixed << std::setprecision(3)
          << "action="
          << (status.best_action_name.empty() ? "none" : status.best_action_name)
          << " score=" << status.best_score
          << "\nhold=" << (status.selected_hold_by_margin ? "true" : "false")
          << " pred_hemi=" << status.selected_predicted_active_hemisphere_total
-         << " edge=" << status.selected_object_edge_margin_m << "m";
+         << " edge=" << status.selected_object_edge_margin_m << "m"
+         << "\ngap0=" << status.initial_object_min_gap_m
+         << "m gap=" << status.selected_object_min_gap_m
+         << "m pen=" << status.selected_penetration_cost
+         << "\nflow=" << status.selected_force_low_cost
+         << " fhigh=" << status.selected_force_high_cost
+         << "\nobject_steps=" << status.selected_object_pose_rollout.size()
+         << " v=" << status.selected_object_linear_disturbance_speed_mps
+         << "m/s w=" << status.selected_object_angular_disturbance_speed_radps
+         << "rad/s"
+         << "\nbelief=" << (robust_grasp_mpc_state_->has_object_belief() ? "true" : "false")
+         << " particles=" << object_belief.particleCount();
     label_marker.text = text.str();
     markers.markers.push_back(label_marker);
   }

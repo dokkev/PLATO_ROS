@@ -118,8 +118,10 @@ ObjectSurfaceQueryResult QuerySphere(
   }
 
   const double norm = p_object_m.norm();
-  const Eigen::Vector3d normal =
-      norm > kTiny ? p_object_m / norm : Eigen::Vector3d::UnitX();
+  Eigen::Vector3d normal = Eigen::Vector3d::UnitX();
+  if (norm > kTiny) {
+    normal = p_object_m / norm;
+  }
   return MakeWorldResult(pose_world, radius_m * normal, normal,
                          norm - radius_m);
 }
@@ -137,8 +139,10 @@ ObjectSurfaceQueryResult QueryCylinder(
   const double half_height = 0.5 * height_m;
   const Eigen::Vector2d xy = p_object_m.head<2>();
   const double xy_norm = xy.norm();
-  const Eigen::Vector2d radial =
-      xy_norm > kTiny ? xy / xy_norm : Eigen::Vector2d::UnitX();
+  Eigen::Vector2d radial = Eigen::Vector2d::UnitX();
+  if (xy_norm > kTiny) {
+    radial = xy / xy_norm;
+  }
 
   const bool inside_radial = xy_norm <= radius_m;
   const bool inside_height = std::abs(p_object_m.z()) <= half_height;

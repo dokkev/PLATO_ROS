@@ -458,6 +458,16 @@ parse_robust_grasp_mpc_state_config(
       safety_params,
       "clamp_q_cmd_to_model_limits",
       config.safety.clamp_q_cmd_to_model_limits);
+  config.safety.exit_on_all_contacts_lost =
+    optional_scalar<bool>(
+      safety_params,
+      "exit_on_all_contacts_lost",
+      config.safety.exit_on_all_contacts_lost);
+  config.safety.rollout_only =
+    optional_scalar<bool>(
+      safety_params,
+      "rollout_only",
+      config.safety.rollout_only);
 
   const auto tactile_params = params ? params["tactile"] : YAML::Node();
   config.tactile.thumb_normal_axis_sign =
@@ -482,6 +492,11 @@ parse_robust_grasp_mpc_state_config(
       debug_params,
       "print_status_interval_s",
       config.debug.print_status_interval_s);
+  config.debug.print_action_vectors =
+    optional_scalar<bool>(
+      debug_params,
+      "print_action_vectors",
+      config.debug.print_action_vectors);
   return config;
 }
 

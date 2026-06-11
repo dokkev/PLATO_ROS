@@ -3,10 +3,14 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
+#include <Eigen/Core>
+
 #include "mppi_core/contact/contact_kinematics.hpp"
+#include "mppi_core/object/object_contact_belief.hpp"
 #include "mppi_core/object/object_prior.hpp"
 #include "mppi_core/policy/robust_grasp_policy.hpp"
 #include "mppi_core/tactile/tactile_sensor_context.hpp"
@@ -20,6 +24,7 @@ struct RobustGraspMpcDebugConfig
 {
   bool print_status{true};
   double print_status_interval_s{0.5};
+  bool print_action_vectors{false};
 };
 
 struct RobustGraspMpcSafetyConfig
@@ -29,6 +34,8 @@ struct RobustGraspMpcSafetyConfig
   double max_tau_cmd_nm{0.05};
   double max_tau_rate_nm_s{1.0};
   bool clamp_q_cmd_to_model_limits{true};
+  bool exit_on_all_contacts_lost{true};
+  bool rollout_only{false};
 };
 
 struct RobustGraspMpcTactileConfig
@@ -57,9 +64,17 @@ public:
 
   bool ConfigureTask(const RobustGraspMpcStateConfig & config);
   void OnEnter() override;
+  void OnExit() override;
+  bool IsFinished() const override;
   bool PopulateCommand(plato_robot_system::RobotCommand * command) const override;
   const RobustGraspMpcStateConfig & config() const { return config_; }
   const mppi_core::RobustGraspPolicyStatus & policy_status() const;
+  const mppi_core::VirtualObjectBelief & object_belief() const { return object_belief_; }
+  bool has_object_belief() const
+  {
+    return mppi_core::HasVirtualObjectBelief(object_belief_) &&
+           mppi_core::IsValidVirtualObjectBelief(object_belief_);
+  }
 
 private:
   using TactileStateVector =
@@ -67,6 +82,10 @@ private:
 
   bool ConfigureContactKinematics();
   bool BuildObservation(mppi_core::GraspObservation * observation) const;
+  bool UpdateObjectBelief(
+    const Eigen::Ref<const Eigen::VectorXd> & q_meas,
+    const TactileStateVector & tactile_meas,
+    const std::vector<mppi_core::TactileSensorContext> & tactile_contexts) const;
   bool BuildTactileContexts(
     const TactileStateVector & tactile_meas,
     std::vector<mppi_core::TactileSensorContext> * contexts) const;
@@ -76,6 +95,8 @@ private:
   bool CanUseLastCommandReference(const plato_robot_system::RobotState & state) const;
   bool ApplyCommandSafety(plato_robot_system::RobotCommand * command) const;
   bool PopulateHoldCommand(plato_robot_system::RobotCommand * command) const;
+  bool AllContactsLost() const;
+  void UpdateExitCondition() const;
   void PrintStatus(
     double time_s,
     const mppi_core::GraspObservation & observation,
@@ -88,6 +109,12 @@ private:
   bool configured_{false};
   std::array<mppi_core::PinocchioContactKinematicsContext, 2> contact_kinematics_{};
   mutable plato_robot_system::RobotCommand last_command_;
+  mutable mppi_core::VirtualObjectBelief object_belief_;
+  mutable std::size_t object_belief_contact_count_{0};
+  mutable std::size_t object_belief_update_count_{0};
+  mutable double object_belief_best_cost_{std::numeric_limits<double>::infinity()};
+  mutable bool object_belief_updated_this_tick_{false};
+  mutable bool exit_requested_{false};
   mutable uint64_t tick_index_{0};
   mutable double last_status_print_time_s_{-1.0e100};
 };

@@ -29,6 +29,8 @@ bool IsFiniteAndNonnegative(const double value) {
   return std::isfinite(value) && value >= 0.0;
 }
 
+bool IsFinite(const double value) { return std::isfinite(value); }
+
 bool IsValidObjectSupportCostConfig(
     const ObjectContactSupportEvaluatorConfig& config) {
   return config.max_object_samples > 0 &&
@@ -37,21 +39,20 @@ bool IsValidObjectSupportCostConfig(
          IsFiniteAndNonnegative(config.contact_birth_margin_m) &&
          IsFiniteAndNonnegative(config.contact_loss_margin_m) &&
          config.contact_loss_margin_m >= config.contact_birth_margin_m &&
-         IsFiniteAndNonnegative(config.contact_stiffness_n_per_m) &&
          IsFiniteAndNonnegative(config.hemisphere_radius_m) &&
          IsFiniteAndNonnegative(config.support_distance_scale_m) &&
          config.support_distance_scale_m > 0.0 &&
+         IsFinite(config.good_contact_gap_min_m) &&
+         IsFinite(config.good_contact_gap_max_m) &&
+         config.good_contact_gap_max_m >= config.good_contact_gap_min_m &&
+         IsFiniteAndNonnegative(config.deep_contact_scale_m) &&
+         config.deep_contact_scale_m > 0.0 &&
+         IsFiniteAndNonnegative(config.deep_contact_weight) &&
          IsFiniteAndNonnegative(config.max_allowed_penetration_m) &&
-         IsFiniteAndNonnegative(config.target_predicted_normal_force_n) &&
-         IsFiniteAndNonnegative(config.max_predicted_normal_force_n) &&
-         IsFiniteAndNonnegative(config.min_predicted_contact_force_n) &&
-         IsFiniteAndNonnegative(config.max_predicted_force_per_sensor_n) &&
          IsFiniteAndNonnegative(config.contact_loss_weight) &&
          IsFiniteAndNonnegative(config.support_weight) &&
          IsFiniteAndNonnegative(config.edge_weight) &&
          IsFiniteAndNonnegative(config.penetration_weight) &&
-         IsFiniteAndNonnegative(config.predicted_force_low_weight) &&
-         IsFiniteAndNonnegative(config.predicted_force_high_weight) &&
          IsFiniteAndNonnegative(config.target_edge_margin_m);
 }
 
@@ -87,6 +88,8 @@ void ValidateConfig(const RobustGraspStateCostConfig& config) {
 
 struct ForceCostTerms {
   double preload_cost{0.0};
+  double force_low_cost{0.0};
+  double force_high_cost{0.0};
   double balance_cost{0.0};
 
   double totalCost() const { return preload_cost + balance_cost; }
@@ -125,14 +128,18 @@ ForceCostTerms ForceCost(const GraspState& state,
         std::max(0.0, tactile.activeHemisphereNormalForceN());
     active_forces_n.push_back(force_n);
     if (force_n < config.min_normal_force_per_sensor_n) {
-      terms.preload_cost +=
+      const double cost =
           config.force_low_weight *
           Square(config.min_normal_force_per_sensor_n - force_n);
+      terms.preload_cost += cost;
+      terms.force_low_cost += cost;
     }
     if (force_n > config.max_normal_force_per_sensor_n) {
-      terms.preload_cost +=
+      const double cost =
           config.force_high_weight *
           Square(force_n - config.max_normal_force_per_sensor_n);
+      terms.preload_cost += cost;
+      terms.force_high_cost += cost;
     }
   }
 
@@ -141,8 +148,9 @@ ForceCostTerms ForceCost(const GraspState& state,
         *std::min_element(active_forces_n.begin(), active_forces_n.end());
     const double force_deficit_n =
         std::max(0.0, config.target_normal_force_n - weakest_force_n);
-    terms.preload_cost +=
-        config.force_low_weight * Square(force_deficit_n);
+    const double cost = config.force_low_weight * Square(force_deficit_n);
+    terms.preload_cost += cost;
+    terms.force_low_cost += cost;
   }
 
   if (active_forces_n.size() >= 2U) {
@@ -282,6 +290,8 @@ double RobustGraspStateCost::Evaluate(
   local.tactile_contact_support_cost = ContactSupportCost(state, config_);
   const ForceCostTerms force_terms = ForceCost(state, config_);
   local.preload_cost = force_terms.preload_cost;
+  local.force_low_cost = force_terms.force_low_cost;
+  local.force_high_cost = force_terms.force_high_cost;
   local.force_balance_cost = force_terms.balance_cost;
   local.force_cost = force_terms.totalCost();
   local.shear_cost = ShearCost(state, config_);

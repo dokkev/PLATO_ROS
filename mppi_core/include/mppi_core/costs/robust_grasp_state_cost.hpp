@@ -54,6 +54,8 @@ struct RobustGraspStateCostBreakdown {
   double tactile_contact_support_cost{0.0};
   double force_cost{0.0};
   double preload_cost{0.0};
+  double force_low_cost{0.0};
+  double force_high_cost{0.0};
   double force_balance_cost{0.0};
   double shear_cost{0.0};
   double contact_line_alignment_cost{0.0};

@@ -282,6 +282,18 @@ ObjectContactSupportEvaluatorConfig ParseObjectContactSupportEvaluatorConfig(
   defaults.support_distance_scale_m =
       yaml_utils::ReadDouble(safe_params, "support_distance_scale_m",
                              defaults.support_distance_scale_m);
+  defaults.good_contact_gap_min_m =
+      yaml_utils::ReadDouble(safe_params, "good_contact_gap_min_m",
+                             defaults.good_contact_gap_min_m);
+  defaults.good_contact_gap_max_m =
+      yaml_utils::ReadDouble(safe_params, "good_contact_gap_max_m",
+                             defaults.good_contact_gap_max_m);
+  defaults.deep_contact_scale_m =
+      yaml_utils::ReadDouble(safe_params, "deep_contact_scale_m",
+                             defaults.deep_contact_scale_m);
+  defaults.deep_contact_weight =
+      yaml_utils::ReadDouble(safe_params, "deep_contact_weight",
+                             defaults.deep_contact_weight);
   defaults.max_allowed_penetration_m =
       yaml_utils::ReadDouble(safe_params, "max_allowed_penetration_m",
                              defaults.max_allowed_penetration_m);
@@ -323,6 +335,84 @@ ObjectContactSupportEvaluatorConfig ParseObjectContactSupportEvaluatorConfig(
   defaults.use_particle_weights =
       yaml_utils::ReadBool(safe_params, "use_particle_weights",
                            defaults.use_particle_weights);
+  return defaults;
+}
+
+ObjectBeliefInitializationConfig ParseObjectBeliefInitializationConfig(
+    const YAML::Node& params,
+    ObjectBeliefInitializationConfig defaults) {
+  const YAML::Node safe_params =
+      yaml_utils::HasValue(params) ? params : YAML::Node();
+  CheckMap(safe_params, "ParseObjectBeliefInitializationConfig");
+
+  defaults.particle_count =
+      yaml_utils::ReadSize(safe_params, "particle_count",
+                           defaults.particle_count);
+  defaults.particle_count =
+      yaml_utils::ReadSize(safe_params, "object_pose_samples",
+                           defaults.particle_count);
+  defaults.random_seed = static_cast<std::uint32_t>(
+      yaml_utils::ReadSize(safe_params, "random_seed",
+                           defaults.random_seed));
+  defaults.min_contact_count =
+      yaml_utils::ReadSize(safe_params, "min_contact_count",
+                           defaults.min_contact_count);
+  defaults.fallback_position_sample_std_m =
+      ReadVector3OrScalar(
+          safe_params, "fallback_position_sample_std_m",
+          defaults.fallback_position_sample_std_m);
+  defaults.fallback_rpy_sample_std_rad =
+      ReadVector3OrScalar(
+          safe_params, "fallback_rpy_sample_std_rad",
+          defaults.fallback_rpy_sample_std_rad);
+  defaults.surface_distance_sigma_m =
+      yaml_utils::ReadDouble(
+          safe_params, "surface_distance_sigma_m",
+          defaults.surface_distance_sigma_m);
+  defaults.normal_alignment_sigma =
+      yaml_utils::ReadDouble(
+          safe_params, "normal_alignment_sigma",
+          defaults.normal_alignment_sigma);
+  defaults.prior_position_sigma_m =
+      yaml_utils::ReadDouble(
+          safe_params, "prior_position_sigma_m",
+          defaults.prior_position_sigma_m);
+  defaults.prior_rotation_sigma_rad =
+      yaml_utils::ReadDouble(
+          safe_params, "prior_rotation_sigma_rad",
+          defaults.prior_rotation_sigma_rad);
+  defaults.contact_force_threshold_n =
+      yaml_utils::ReadDouble(
+          safe_params, "contact_force_threshold_n",
+          defaults.contact_force_threshold_n);
+  defaults.contact_force_weight_scale_n =
+      yaml_utils::ReadDouble(
+          safe_params, "contact_force_weight_scale_n",
+          defaults.contact_force_weight_scale_n);
+  defaults.use_thumb_index_contact_width =
+      yaml_utils::ReadBool(
+          safe_params, "use_thumb_index_contact_width",
+          defaults.use_thumb_index_contact_width);
+  defaults.use_thumb_index_contact_width =
+      yaml_utils::ReadBool(
+          safe_params, "thumb_index_contact_width_enabled",
+          defaults.use_thumb_index_contact_width);
+  defaults.contact_width_sigma_m =
+      yaml_utils::ReadDouble(
+          safe_params, "contact_width_sigma_m",
+          defaults.contact_width_sigma_m);
+  defaults.w_surface =
+      yaml_utils::ReadDouble(safe_params, "w_surface", defaults.w_surface);
+  defaults.w_normal =
+      yaml_utils::ReadDouble(safe_params, "w_normal", defaults.w_normal);
+  defaults.w_prior =
+      yaml_utils::ReadDouble(safe_params, "w_prior", defaults.w_prior);
+  defaults.w_contact_width =
+      yaml_utils::ReadDouble(
+          safe_params, "w_contact_width", defaults.w_contact_width);
+  defaults.w_contact_width =
+      yaml_utils::ReadDouble(
+          safe_params, "contact_width_weight", defaults.w_contact_width);
   return defaults;
 }
 
@@ -576,6 +666,14 @@ RobustGraspPolicyConfig ParseRobustGraspPolicyConfig(
                   ? "tactile_only_transition"
                   : "tactile_transition"),
           defaults.tactile_only_transition.tactile_transition);
+  defaults.object_belief_initialization =
+      ParseObjectBeliefInitializationConfig(
+          yaml_utils::ReadSection(
+              safe_params,
+              yaml_utils::HasValue(safe_params["object_belief"])
+                  ? "object_belief"
+                  : "object_belief_initialization"),
+          defaults.object_belief_initialization);
   defaults.cost = ParseRobustGraspStateCostConfig(
       yaml_utils::ReadSection(safe_params, "cost"), defaults.cost);
   defaults.action_library = ParseGraspActionLibraryConfig(

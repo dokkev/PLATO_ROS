@@ -10,6 +10,8 @@ safety:
   max_tau_cmd_nm: 0.05
   max_tau_rate_nm_s: 1.0
   clamp_q_cmd_to_model_limits: true
+  exit_on_all_contacts_lost: true
+  rollout_only: true
 
 tactile:
   thumb_normal_axis_sign: 1.0
@@ -18,6 +20,7 @@ tactile:
 debug:
   print_status: true
   print_status_interval_s: 0.5
+  print_action_vectors: true
 
 task:
   object:
@@ -26,7 +29,7 @@ task:
     uri: package://mppi_core/object/jenga_block.urdf
     primitive_size_m: [0.15, 0.05, 0.03]
     initial_pose_world:
-      xyz: [0.0, 0.0, 0.0]
+      xyz: [0.26, 0.04, -0.05]
       rpy: [0.0, 0.0, 0.0]
     perturbation:
       xyz_std_m: [0.01, 0.01, 0.02]
@@ -34,20 +37,24 @@ task:
 
 robust_grasp:
   control_mode: continuous_qddot_mppi
-  continuous_control_rate_cost_weight: 0.001
-  continuous_smoothing_alpha: 0.5
+  continuous_control_rate_cost_weight: 0.005
+  continuous_smoothing_alpha: 0.7
 
   rollout:
     horizon_steps: 3
     dt: 0.01
+    # 128 is the normal hardware-debug setting. Temporarily try 512 only when
+    # checking whether "open wins" is caused by sample shortage.
     num_rollouts: 128
     temperature: 1.0
     random_seed: 7
-    action_lower_bound: -10.0
-    action_upper_bound: 10.0
-    action_noise_std: 1.0
-    action_noise_clip: 8.0
-    qdot_limit: 10.0
+    # MPPI action is qddot [rad/s^2]. Keep this near the command qdot safety
+    # limit during first deploy so rollout motion resembles executable motion.
+    action_lower_bound: -2.0
+    action_upper_bound: 2.0
+    action_noise_std: 0.25
+    action_noise_clip: 1.0
+    qdot_limit: 0.5
 
   disturbance:
     num_disturbance_rollouts: 128
@@ -78,6 +85,13 @@ robust_grasp:
     dropout_probability_per_step: 0.0
     use_antithetic_samples: true
 
+  object_belief:
+    object_pose_samples: 16
+    min_contact_count: 1
+    use_thumb_index_contact_width: true
+    contact_width_sigma_m: 0.005
+    contact_width_weight: 0.5
+
   start:
     min_enough_contact_sensors: 1
     min_active_hemisphere_total: 2
@@ -91,38 +105,43 @@ robust_grasp:
     min_normal_force_per_sensor_n: 0.1
     max_normal_force_per_sensor_n: 5.0
     force_low_weight: 30.0
+    # Diagnostic: set to 0.0 if force_high_cost is large and open keeps winning.
     force_high_weight: 5.0
     force_balance_weight: 10.0
     force_balance_deadband_n: 0.05
-    shear_weight: 20.0
-    rotation_weight: 20.0
-    slip_score_weight: 10.0
+    shear_weight: 0.0
+    rotation_weight: 0.0
+    slip_score_weight: 0.0
     shear_safe_limit_m: 0.001
     rotation_safe_limit_rad: 0.01
     slip_score_safe_limit: 0.05
     enable_contact_line_alignment: true
-    contact_line_alignment_weight: 50.0
+    contact_line_alignment_weight: 0.0
     contact_line_alignment_deadband_m: 0.002
     close_axis_base: [0.0, 0.0, 1.0]
-    qddot_weight: 0.01
+    qddot_weight: 0.05
     tau_weight: 0.0
     object_support:
+      # Diagnostic: set enabled=false. If opening stops, geometry/support is
+      # driving the policy rather than measured tactile force.
       enabled: true
-      object_pose_samples: 16
+      object_pose_samples: 8
       contact_birth_margin_m: 0.001
       contact_loss_margin_m: 0.003
-      contact_stiffness_n_per_m: 500.0
-      hemisphere_radius_m: 0.0
+      hemisphere_radius_m: 0.002
       support_distance_scale_m: 0.001
-      max_allowed_penetration_m: 0.001
-      target_predicted_normal_force_n: 1.0
-      max_predicted_normal_force_n: 10.0
-      min_predicted_contact_force_n: 0.01
-      max_predicted_force_per_sensor_n: 5.0
+      good_contact_gap_min_m: -0.001
+      good_contact_gap_max_m: 0.001
+      deep_contact_scale_m: 0.002
+      deep_contact_weight: 5.0
+      # Deprecated compatibility fields. Hard penetration penalties are not
+      # used; measured tactile contacts are treated as real contact anchors.
+      max_allowed_penetration_m: 0.0005
       edge_weight: 10.0
-      penetration_weight: 100.0
-      predicted_force_low_weight: 30.0
-      predicted_force_high_weight: 5.0
+      penetration_weight: 0.0
+      # Object support is geometric only. Do not use geometry-derived force proxy.
+      predicted_force_low_weight: 0.0
+      predicted_force_high_weight: 0.0
       target_edge_margin_m: 0.001
       use_particle_weights: true
 

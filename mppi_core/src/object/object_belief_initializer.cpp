@@ -84,11 +84,138 @@ double ContactWeight(const ObjectContactObservation& contact,
   return confidence * (1.0 + force_n / force_scale);
 }
 
+struct SensorContactAggregate {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  std::size_t sensor_index{0};
+  Eigen::Vector3d weighted_point_world_m{Eigen::Vector3d::Zero()};
+  double weight_sum{0.0};
+
+  Eigen::Vector3d pointWorld() const {
+    if (weight_sum > kTiny) {
+      return weighted_point_world_m / weight_sum;
+    }
+    return Eigen::Vector3d::Zero();
+  }
+};
+
+struct ContactWidthObservation {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  bool valid{false};
+  Eigen::Vector3d point_a_world_m{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d point_b_world_m{Eigen::Vector3d::Zero()};
+  double measured_width_m{0.0};
+};
+
+ContactWidthObservation MakeContactWidthObservation(
+    const std::vector<ObjectContactObservation,
+                      Eigen::aligned_allocator<ObjectContactObservation>>&
+        contacts,
+    const ObjectBeliefInitializationConfig& config) {
+  ContactWidthObservation width;
+  if (!config.use_thumb_index_contact_width ||
+      std::max(0.0, config.w_contact_width) <= 0.0) {
+    return width;
+  }
+
+  std::vector<SensorContactAggregate,
+              Eigen::aligned_allocator<SensorContactAggregate>>
+      sensor_contacts;
+  for (const auto& contact : contacts) {
+    if (!contact.point_world_m.allFinite()) {
+      continue;
+    }
+    const double contact_weight = ContactWeight(contact, config);
+    if (contact_weight <= kTiny) {
+      continue;
+    }
+
+    auto found = std::find_if(
+        sensor_contacts.begin(), sensor_contacts.end(),
+        [&contact](const SensorContactAggregate& aggregate) {
+          return aggregate.sensor_index == contact.sensor_index;
+        });
+    if (found == sensor_contacts.end()) {
+      SensorContactAggregate aggregate;
+      aggregate.sensor_index = contact.sensor_index;
+      sensor_contacts.push_back(aggregate);
+      found = sensor_contacts.end() - 1;
+    }
+    found->weighted_point_world_m += contact_weight * contact.point_world_m;
+    found->weight_sum += contact_weight;
+  }
+
+  sensor_contacts.erase(
+      std::remove_if(
+          sensor_contacts.begin(), sensor_contacts.end(),
+          [](const SensorContactAggregate& aggregate) {
+            return aggregate.weight_sum <= kTiny;
+          }),
+      sensor_contacts.end());
+  if (sensor_contacts.size() < 2) {
+    return width;
+  }
+
+  std::sort(
+      sensor_contacts.begin(), sensor_contacts.end(),
+      [](const SensorContactAggregate& lhs,
+         const SensorContactAggregate& rhs) {
+        return lhs.weight_sum > rhs.weight_sum;
+      });
+
+  width.point_a_world_m = sensor_contacts[0].pointWorld();
+  width.point_b_world_m = sensor_contacts[1].pointWorld();
+  width.measured_width_m =
+      (width.point_b_world_m - width.point_a_world_m).norm();
+  width.valid =
+      width.point_a_world_m.allFinite() &&
+      width.point_b_world_m.allFinite() &&
+      std::isfinite(width.measured_width_m) &&
+      width.measured_width_m > kTiny;
+  return width;
+}
+
+void ScoreContactWidth(
+    const ObjectPrior& prior,
+    const Eigen::Isometry3d& particle_pose_world,
+    const ContactWidthObservation& width,
+    const ObjectBeliefInitializationConfig& config,
+    ObjectParticleScore* score) {
+  if (score == nullptr || !width.valid) {
+    return;
+  }
+
+  const ObjectSurfaceQueryResult surface_a = QueryObjectSurface(
+      prior.geometry, particle_pose_world, width.point_a_world_m);
+  const ObjectSurfaceQueryResult surface_b = QueryObjectSurface(
+      prior.geometry, particle_pose_world, width.point_b_world_m);
+  if (!surface_a.valid || !surface_b.valid ||
+      !surface_a.closest_point_world.allFinite() ||
+      !surface_b.closest_point_world.allFinite()) {
+    return;
+  }
+
+  const double particle_width_m =
+      (surface_b.closest_point_world - surface_a.closest_point_world).norm();
+  if (!std::isfinite(particle_width_m)) {
+    return;
+  }
+
+  const double width_sigma =
+      PositiveOrDefault(config.contact_width_sigma_m, 0.005);
+  score->contact_width_error_m =
+      particle_width_m - width.measured_width_m;
+  score->contact_width_cost =
+      SafeSquared(score->contact_width_error_m / width_sigma);
+}
+
 ObjectParticleScore ScoreParticle(
     const ObjectPrior& prior, const Eigen::Isometry3d& particle_pose_world,
     const std::vector<ObjectContactObservation,
                       Eigen::aligned_allocator<ObjectContactObservation>>&
         contacts,
+    const ContactWidthObservation& contact_width,
     const ObjectBeliefInitializationConfig& config) {
   ObjectParticleScore score;
   if (!particle_pose_world.matrix().allFinite() || contacts.empty()) {
@@ -162,11 +289,14 @@ ObjectParticleScore ScoreParticle(
   score.prior_cost =
       SafeSquared(position_error_m / prior_position_sigma) +
       SafeSquared(rotation_error_rad / prior_rotation_sigma);
+  ScoreContactWidth(
+      prior, particle_pose_world, contact_width, config, &score);
 
   score.total_cost =
       std::max(0.0, config.w_surface) * score.surface_cost +
       std::max(0.0, config.w_normal) * score.normal_cost +
-      std::max(0.0, config.w_prior) * score.prior_cost;
+      std::max(0.0, config.w_prior) * score.prior_cost +
+      std::max(0.0, config.w_contact_width) * score.contact_width_cost;
   return score;
 }
 
@@ -344,6 +474,8 @@ ObjectBeliefInitializationResult InitializeObjectBeliefFromContacts(
 
   std::mt19937 rng(config.random_seed);
   std::normal_distribution<double> unit_normal(0.0, 1.0);
+  const ContactWidthObservation contact_width =
+      MakeContactWidthObservation(result.contacts, config);
 
   result.belief.geometry = prior.geometry;
   result.belief.particles.reserve(config.particle_count);
@@ -367,7 +499,9 @@ ObjectBeliefInitializationResult InitializeObjectBeliefFromContacts(
     particle.valid = particle.pose_world.matrix().allFinite();
 
     result.particle_scores.push_back(
-        ScoreParticle(prior, particle.pose_world, result.contacts, config));
+        ScoreParticle(
+            prior, particle.pose_world, result.contacts, contact_width,
+            config));
     result.belief.particles.push_back(std::move(particle));
   }
 

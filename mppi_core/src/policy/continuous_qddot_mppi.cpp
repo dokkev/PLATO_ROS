@@ -814,6 +814,7 @@ RobotCommand ContinuousQddotMppiController::Update(
   status_.best_sample_index = best_index;
   status_.best_sample_cost = *best_it;
   status_.weighted_cost_estimate = weighted_cost;
+  status_.nominal_sample_cost = costs.empty() ? kLargeCost : costs[0];
   status_.cost_min = *best_it;
   status_.cost_mean = cost_sum / static_cast<double>(finite_count);
   status_.cost_max = cost_max;

@@ -53,6 +53,7 @@ struct ContinuousQddotMppiStatus {
   std::size_t best_sample_index{0};
   double best_sample_cost{0.0};
   double weighted_cost_estimate{0.0};
+  double nominal_sample_cost{0.0};
   double cost_min{0.0};
   double cost_mean{0.0};
   double cost_max{0.0};

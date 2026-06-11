@@ -109,6 +109,7 @@ struct RobustGraspPolicyStatus {
   double selected_rate_cost{0.0};
   double best_sample_cost{0.0};
   double weighted_cost_estimate{0.0};
+  double nominal_cost{0.0};
   double cost_min{0.0};
   double cost_mean{0.0};
   double cost_max{0.0};
@@ -120,6 +121,8 @@ struct RobustGraspPolicyStatus {
   double selected_object_contact_loss_count{0.0};
   double selected_object_edge_margin_m{0.0};
   double selected_object_min_gap_m{0.0};
+  double measured_thumb_force_n{0.0};
+  double measured_index_force_n{0.0};
   double initial_total_cost{0.0};
   double initial_object_support_cost{0.0};
   double initial_contact_loss_cost{0.0};

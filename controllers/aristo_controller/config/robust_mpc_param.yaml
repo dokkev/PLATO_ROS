@@ -1,8 +1,7 @@
-# Aristo-specific robust grasp MPC parameters.
-# Generic MPPI rollout/sampling defaults stay in mppi_core/config and
-# mppi_core headers. Keep this file focused on robot-specific overrides,
-# task/object prior for the Aristo demo, and cost/score weights that are likely
-# to be tuned on hardware.
+# Aristo robust grasp MPC hardware parameters.
+# Active path: continuous qddot MPPI with real tactile contacts as anchors.
+# Measured tactile force drives preload/balance. Object geometry drives support,
+# edge margin, contact loss, and a mild deep-contact guard only.
 
 safety:
   max_reference_tracking_error_rad: 0.25
@@ -45,17 +44,13 @@ robust_grasp:
   rollout:
     horizon_steps: 3
     dt: 0.01
-    # 128 is the normal hardware-debug setting. Temporarily try 512 only when
-    # checking whether "open wins" is caused by sample shortage.
     num_rollouts: 128
     temperature: 1.0
     random_seed: 7
-    # MPPI action is qddot [rad/s^2]. Keep this near the command qdot safety
-    # limit during first deploy so rollout motion resembles executable motion.
-    action_lower_bound: -2.0
-    action_upper_bound: 2.0
-    action_noise_std: 0.25
-    action_noise_clip: 1.0
+    action_lower_bound: -5.0
+    action_upper_bound: 5.0
+    action_noise_std: 0.5
+    action_noise_clip: 3.0
     qdot_limit: 0.5
 
   disturbance:
@@ -71,31 +66,10 @@ robust_grasp:
       pose_xyz_max_m: 0.0
       pose_rpy_std_rad: 0.0
       pose_rpy_max_rad: 0.0
-    tangent_velocity_std_mps: 0.0
-    tangent_velocity_max_mps: 0.0
-    rotational_velocity_std_radps: 0.0
-    rotational_velocity_max_radps: 0.0
-    normal_force_rate_std_nps: 0.0
-    normal_force_rate_max_nps: 0.0
-    cop_drift_velocity_std_mps: 0.0
-    cop_drift_velocity_max_mps: 0.0
-    sensor_local_noise_scale: 0.0
-    friction_scale_mean: 1.0
-    friction_scale_std: 0.0
-    friction_scale_min: 1.0
-    friction_scale_max: 1.0
-    dropout_probability_per_step: 0.0
     use_antithetic_samples: true
 
-  object_belief:
-    object_pose_samples: 16
-    min_contact_count: 1
-    use_thumb_index_contact_width: true
-    contact_width_sigma_m: 0.005
-    contact_width_weight: 0.5
-
   start:
-    min_enough_contact_sensors: 1
+    min_enough_contact_sensors: 2
     min_active_hemisphere_total: 2
 
   cost:
@@ -103,60 +77,28 @@ robust_grasp:
     min_active_hemisphere_total: 2
     contact_loss_weight: 200.0
     support_weight: 20.0
+
     target_normal_force_n: 1.0
     min_normal_force_per_sensor_n: 0.1
     max_normal_force_per_sensor_n: 5.0
     force_low_weight: 30.0
-    # Diagnostic: set to 0.0 if force_high_cost is large and open keeps winning.
-    force_high_weight: 5.0
+    force_high_weight: 0.0
     force_balance_weight: 10.0
     force_balance_deadband_n: 0.05
-    shear_weight: 0.0
-    rotation_weight: 0.0
-    slip_score_weight: 0.0
-    shear_safe_limit_m: 0.001
-    rotation_safe_limit_rad: 0.01
-    slip_score_safe_limit: 0.05
-    enable_contact_line_alignment: true
-    contact_line_alignment_weight: 0.0
-    contact_line_alignment_deadband_m: 0.002
-    close_axis_base: [0.0, 0.0, 1.0]
+
     qddot_weight: 0.05
-    tau_weight: 0.0
     object_support:
-      # Diagnostic: set enabled=false. If opening stops, geometry/support is
-      # driving the policy rather than measured tactile force.
       enabled: true
       object_pose_samples: 8
-      contact_birth_margin_m: 0.001
-      contact_loss_margin_m: 0.003
-      hemisphere_radius_m: 0.002
+      hemisphere_radius_m: 0.003
       support_distance_scale_m: 0.001
       good_contact_gap_min_m: -0.001
       good_contact_gap_max_m: 0.001
       deep_contact_scale_m: 0.002
       deep_contact_weight: 5.0
-      # Deprecated compatibility fields. Hard penetration penalties are not
-      # used; measured tactile contacts are treated as real contact anchors.
-      max_allowed_penetration_m: 0.0005
       edge_weight: 10.0
-      penetration_weight: 0.0
-      # Object support is geometric only. Do not use geometry-derived force proxy.
-      predicted_force_low_weight: 0.0
-      predicted_force_high_weight: 0.0
       target_edge_margin_m: 0.001
       use_particle_weights: true
-
-  action_library:
-    num_action_samples: 1
-    include_basis_probe_actions: true
-
-  robust_score:
-    risk_weight: 1.0
-    cvar_tail_fraction: 0.25
-    safe_hold_score_threshold: -1.0
-    min_required_score_improvement: 1.0
-    action_rate_weight: 0.01
 
   behavior:
     require_both_contact_for_update: true

@@ -247,6 +247,38 @@ std::string CandidateName(const ActionSequence& candidate,
   return std::string("candidate_") + std::to_string(index);
 }
 
+double ActiveForceForFrameRole(const GraspState& state,
+                               const std::string& role) {
+  for (const auto& tactile : state.tactile_sensors) {
+    if (tactile.frame_name.find(role) != std::string::npos &&
+        tactile.hasActiveHemisphereContact()) {
+      return tactile.activeHemisphereNormalForceN();
+    }
+  }
+  return std::numeric_limits<double>::quiet_NaN();
+}
+
+void FillMeasuredForceStatus(const GraspState& state,
+                             RobustGraspPolicyStatus* status) {
+  if (status == nullptr) {
+    return;
+  }
+  double thumb_force_n = ActiveForceForFrameRole(state, "thumb");
+  double index_force_n = ActiveForceForFrameRole(state, "index");
+  if (!std::isfinite(thumb_force_n) && !state.tactile_sensors.empty() &&
+      state.tactile_sensors[0].hasActiveHemisphereContact()) {
+    thumb_force_n = state.tactile_sensors[0].activeHemisphereNormalForceN();
+  }
+  if (!std::isfinite(index_force_n) && state.tactile_sensors.size() > 1U &&
+      state.tactile_sensors[1].hasActiveHemisphereContact()) {
+    index_force_n = state.tactile_sensors[1].activeHemisphereNormalForceN();
+  }
+  status->measured_thumb_force_n =
+      std::isfinite(thumb_force_n) ? std::max(0.0, thumb_force_n) : 0.0;
+  status->measured_index_force_n =
+      std::isfinite(index_force_n) ? std::max(0.0, index_force_n) : 0.0;
+}
+
 }  // namespace
 
 void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
@@ -272,23 +304,26 @@ void RobustGraspPolicy::Initialize(RobustGraspPolicyConfig config) {
 
   config_ = std::move(config);
   config_.disturbance_sampler.horizon_steps = config_.rollout.horizon_steps;
-  config_.action_library.horizon_steps = config_.rollout.horizon_steps;
-  config_.action_library.action_dim = config_.rollout.action_dim;
-  config_.action_library.dt = config_.rollout.dt;
-  if (config_.action_library.qddot_lower_bound.size() == 0) {
-    config_.action_library.qddot_lower_bound =
-        config_.rollout.action_lower_bound;
-  }
-  if (config_.action_library.qddot_upper_bound.size() == 0) {
-    config_.action_library.qddot_upper_bound =
-        config_.rollout.action_upper_bound;
-  }
 
   disturbance_sampler_ =
       std::make_unique<GraspDisturbanceSampler>(
           config_.disturbance_sampler);
-  action_library_ =
-      std::make_unique<GraspActionLibrary>(config_.action_library);
+  action_library_.reset();
+  if (config_.control_mode == RobustGraspControlMode::kDiscreteActionSelector) {
+    config_.action_library.horizon_steps = config_.rollout.horizon_steps;
+    config_.action_library.action_dim = config_.rollout.action_dim;
+    config_.action_library.dt = config_.rollout.dt;
+    if (config_.action_library.qddot_lower_bound.size() == 0) {
+      config_.action_library.qddot_lower_bound =
+          config_.rollout.action_lower_bound;
+    }
+    if (config_.action_library.qddot_upper_bound.size() == 0) {
+      config_.action_library.qddot_upper_bound =
+          config_.rollout.action_upper_bound;
+    }
+    action_library_ =
+        std::make_unique<GraspActionLibrary>(config_.action_library);
+  }
   cost_ = std::make_unique<RobustGraspStateCost>(config_.cost);
   ContinuousQddotMppiConfig continuous_config;
   continuous_config.rollout = config_.rollout;
@@ -316,6 +351,7 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
     throw std::logic_error("RobustGraspPolicy::Update: policy is not initialized");
   }
   status_ = RobustGraspPolicyStatus{};
+  status_.control_mode = config_.control_mode;
   const auto solve_start = std::chrono::steady_clock::now();
   const auto stamp_solve_time = [this, solve_start]() {
     const auto elapsed = std::chrono::steady_clock::now() - solve_start;
@@ -334,6 +370,7 @@ RobotCommand RobustGraspPolicy::Update(const GraspObservation& observation) {
   }
 
   GraspState initial_state = MakeInitialState(observation);
+  FillMeasuredForceStatus(initial_state, &status_);
   status_.ready = IsReady(initial_state);
   if (!status_.ready) {
     if (config_.return_hold_when_not_ready) {
@@ -391,6 +428,10 @@ RobotCommand RobustGraspPolicy::UpdateDiscreteActionSelector(
     const GraspObservation& observation,
     const GraspState& initial_state,
     const RolloutContext& context) {
+  if (!action_library_) {
+    status_.used_hold_fallback = true;
+    return MakeHoldCommand(observation);
+  }
   const auto candidates =
       action_library_->BuildCandidates(initial_state, context);
   const auto disturbances = disturbance_sampler_->SampleBatch();
@@ -488,6 +529,7 @@ RobotCommand RobustGraspPolicy::UpdateDiscreteActionSelector(
   status_.hold_mean_cost = hold_mean;
   status_.hold_cvar_cost = hold_cvar;
   status_.hold_action_name = CandidateName(candidates[0], 0U);
+  status_.nominal_cost = hold_score;
   status_.second_best_score =
       std::isfinite(second_best_score) ? second_best_score : best_score;
   status_.second_best_candidate_index = second_best_index;
@@ -581,6 +623,7 @@ void RobustGraspPolicy::CopyContinuousStatus(
 
   status_.best_sample_cost = continuous_status.best_sample_cost;
   status_.weighted_cost_estimate = continuous_status.weighted_cost_estimate;
+  status_.nominal_cost = continuous_status.nominal_sample_cost;
   status_.cost_min = continuous_status.cost_min;
   status_.cost_mean = continuous_status.cost_mean;
   status_.cost_max = continuous_status.cost_max;

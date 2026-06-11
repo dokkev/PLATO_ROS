@@ -108,6 +108,15 @@ ObjectBeliefInitializationResult InitializeObjectBeliefFromContacts(
     const std::vector<TactileSensorContext>& tactile_contexts,
     const ObjectBeliefInitializationConfig& config = {});
 
+ObjectBeliefInitializationResult UpdateObjectBeliefFromCurrentContacts(
+    const ObjectPrior& prior,
+    const VirtualObjectBelief& previous_belief,
+    const Eigen::Ref<const Eigen::VectorXd>& q_meas,
+    const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
+        tactile_sensors,
+    const std::vector<TactileSensorContext>& tactile_contexts,
+    const ObjectBeliefInitializationConfig& config = {});
+
 ObjectBeliefInitializationResult InitializeObjectBeliefFromObservation(
     const GraspObservation& observation,
     const ObjectBeliefInitializationConfig& config = {});

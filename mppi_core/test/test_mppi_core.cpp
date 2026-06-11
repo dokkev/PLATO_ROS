@@ -834,6 +834,76 @@ TEST(ObjectBeliefInitializerTest, ObservationInitializationUsesMeasuredQ) {
   EXPECT_NEAR(resolved.particles[0].weight, 1.0, kTolerance);
 }
 
+TEST(ObjectBeliefInitializerTest,
+     ExistingBeliefIsReweightedFromCurrentTactileContacts) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(0, Eigen::Vector2d::Zero()));
+
+  auto tactile_context = MakeTactileContextForState(tactile);
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief previous;
+  previous.geometry = prior.geometry;
+  for (const auto z_m : {0.0, 0.2}) {
+    mppi_core::VirtualObjectState particle;
+    particle.pose_world.setIdentity();
+    particle.pose_world.translation().z() = z_m;
+    particle.velocity_world.setZero();
+    particle.weight = z_m > 0.0 ? 0.95 : 0.05;
+    particle.valid = true;
+    previous.particles.push_back(std::move(particle));
+  }
+  previous.valid = true;
+
+  mppi_core::ObjectBeliefInitializationConfig config;
+  config.min_contact_count = 1;
+  config.w_prior = 0.0;
+
+  const Eigen::VectorXd q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  const auto result = mppi_core::UpdateObjectBeliefFromCurrentContacts(
+      prior, previous, q_meas,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      std::vector<mppi_core::TactileSensorContext>{tactile_context}, config);
+
+  ASSERT_TRUE(result.valid);
+  ASSERT_EQ(result.contacts.size(), 1U);
+  ASSERT_EQ(result.belief.particleCount(), 2U);
+  EXPECT_EQ(result.best_particle_index, 0U);
+  EXPECT_GT(result.belief.particles[0].weight,
+            result.belief.particles[1].weight);
+  EXPECT_NEAR(result.best_surface_distance_m, 0.0, kTolerance);
+
+  mppi_core::GraspObservation observation;
+  observation.q_meas = q_meas;
+  observation.tactile_meas =
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile};
+  observation.tactile_contexts = {tactile_context};
+  observation.object_prior = prior;
+  observation.object_belief = previous;
+
+  const auto resolved = mppi_core::ResolveObjectBeliefForObservation(
+      observation, q_meas, config);
+  ASSERT_TRUE(mppi_core::HasVirtualObjectBelief(resolved));
+  ASSERT_EQ(resolved.particleCount(), 2U);
+  EXPECT_GT(resolved.particles[0].weight, resolved.particles[1].weight);
+}
+
 TEST(ObjectContactPredictionTest,
      PredictsInactiveHemisphereBirthFromObjectDistance) {
   const auto sensor_model = MakeSinglePrismaticZSensorModel();
@@ -3909,24 +3979,13 @@ robust_grasp:
     object_support:
       enabled: true
       object_pose_samples: 9
-      contact_birth_margin_m: 0.004
-      contact_loss_margin_m: 0.006
-      contact_stiffness_n_per_m: 700.0
       hemisphere_radius_m: 0.0015
       support_distance_scale_m: 0.0025
       good_contact_gap_min_m: -0.0011
       good_contact_gap_max_m: 0.0012
       deep_contact_scale_m: 0.0023
       deep_contact_weight: 6.0
-      max_allowed_penetration_m: 0.0007
-      target_predicted_normal_force_n: 1.7
-      max_predicted_normal_force_n: 4.0
-      min_predicted_contact_force_n: 0.02
-      max_predicted_force_per_sensor_n: 3.0
       edge_weight: 12.0
-      penetration_weight: 14.0
-      predicted_force_low_weight: 13.0
-      predicted_force_high_weight: 2.5
       target_edge_margin_m: 0.002
       use_particle_weights: false
   disturbance:
@@ -3964,12 +4023,6 @@ robust_grasp:
   EXPECT_NEAR(config.cost.object_support.contact_loss_weight, 70.0,
               kTolerance);
   EXPECT_NEAR(config.cost.object_support.support_weight, 8.0, kTolerance);
-  EXPECT_NEAR(config.cost.object_support.contact_birth_margin_m, 0.004,
-              kTolerance);
-  EXPECT_NEAR(config.cost.object_support.contact_loss_margin_m, 0.006,
-              kTolerance);
-  EXPECT_NEAR(config.cost.object_support.contact_stiffness_n_per_m, 700.0,
-              kTolerance);
   EXPECT_NEAR(config.cost.object_support.hemisphere_radius_m, 0.0015,
               kTolerance);
   EXPECT_NEAR(config.cost.object_support.support_distance_scale_m, 0.0025,
@@ -3982,20 +4035,20 @@ robust_grasp:
               kTolerance);
   EXPECT_NEAR(config.cost.object_support.deep_contact_weight, 6.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.max_allowed_penetration_m, 0.0007,
+  EXPECT_NEAR(config.cost.object_support.contact_stiffness_n_per_m, 0.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.target_predicted_normal_force_n, 1.7,
+  EXPECT_NEAR(config.cost.object_support.target_predicted_normal_force_n, 0.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.max_predicted_normal_force_n, 4.0,
+  EXPECT_NEAR(config.cost.object_support.max_predicted_normal_force_n, 0.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.max_predicted_force_per_sensor_n, 3.0,
+  EXPECT_NEAR(config.cost.object_support.max_predicted_force_per_sensor_n, 0.0,
               kTolerance);
   EXPECT_NEAR(config.cost.object_support.edge_weight, 12.0, kTolerance);
-  EXPECT_NEAR(config.cost.object_support.penetration_weight, 14.0,
+  EXPECT_NEAR(config.cost.object_support.penetration_weight, 0.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.predicted_force_low_weight, 13.0,
+  EXPECT_NEAR(config.cost.object_support.predicted_force_low_weight, 0.0,
               kTolerance);
-  EXPECT_NEAR(config.cost.object_support.predicted_force_high_weight, 2.5,
+  EXPECT_NEAR(config.cost.object_support.predicted_force_high_weight, 0.0,
               kTolerance);
   EXPECT_NEAR(config.cost.object_support.target_edge_margin_m, 0.002,
               kTolerance);

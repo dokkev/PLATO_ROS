@@ -48,11 +48,9 @@ bool IsValidObjectSupportCostConfig(
          IsFiniteAndNonnegative(config.deep_contact_scale_m) &&
          config.deep_contact_scale_m > 0.0 &&
          IsFiniteAndNonnegative(config.deep_contact_weight) &&
-         IsFiniteAndNonnegative(config.max_allowed_penetration_m) &&
          IsFiniteAndNonnegative(config.contact_loss_weight) &&
          IsFiniteAndNonnegative(config.support_weight) &&
          IsFiniteAndNonnegative(config.edge_weight) &&
-         IsFiniteAndNonnegative(config.penetration_weight) &&
          IsFiniteAndNonnegative(config.target_edge_margin_m);
 }
 

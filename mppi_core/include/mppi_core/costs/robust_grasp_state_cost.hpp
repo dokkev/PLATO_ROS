@@ -28,23 +28,23 @@ struct RobustGraspStateCostConfig {
   double min_normal_force_per_sensor_n{0.1};
   double max_normal_force_per_sensor_n{5.0};
   double force_low_weight{30.0};
-  double force_high_weight{5.0};
+  double force_high_weight{0.0};
   double force_balance_weight{10.0};
   double force_balance_deadband_n{0.05};
 
-  double shear_weight{20.0};
-  double rotation_weight{20.0};
-  double slip_score_weight{10.0};
+  double shear_weight{0.0};
+  double rotation_weight{0.0};
+  double slip_score_weight{0.0};
   double shear_safe_limit_m{0.001};
   double rotation_safe_limit_rad{0.01};
   double slip_score_safe_limit{0.05};
 
-  bool enable_contact_line_alignment{true};
-  double contact_line_alignment_weight{50.0};
+  bool enable_contact_line_alignment{false};
+  double contact_line_alignment_weight{0.0};
   double contact_line_alignment_deadband_m{0.002};
   Eigen::Vector3d close_axis_base{0.0, 0.0, 1.0};
 
-  double qddot_weight{0.01};
+  double qddot_weight{0.05};
   double tau_weight{0.0};
 
   ObjectContactSupportEvaluatorConfig object_support;

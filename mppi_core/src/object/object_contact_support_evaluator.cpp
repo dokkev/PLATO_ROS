@@ -105,11 +105,9 @@ bool HasValidConfig(const ObjectContactSupportEvaluatorConfig& config) {
          IsNonnegativeFinite(config.deep_contact_scale_m) &&
          config.deep_contact_scale_m > 0.0 &&
          IsNonnegativeFinite(config.deep_contact_weight) &&
-         IsNonnegativeFinite(config.max_allowed_penetration_m) &&
          IsNonnegativeFinite(config.contact_loss_weight) &&
          IsNonnegativeFinite(config.support_weight) &&
          IsNonnegativeFinite(config.edge_weight) &&
-         IsNonnegativeFinite(config.penetration_weight) &&
          IsNonnegativeFinite(config.target_edge_margin_m);
 }
 

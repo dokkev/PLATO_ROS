@@ -208,6 +208,17 @@ bool RepresentativeObjectBeliefPose(
   return pose_world->matrix().allFinite();
 }
 
+std::string_view ControlModeName(const mppi_core::RobustGraspControlMode mode)
+{
+  switch (mode) {
+    case mppi_core::RobustGraspControlMode::kContinuousQddotMppi:
+      return "continuous_qddot_mppi";
+    case mppi_core::RobustGraspControlMode::kDiscreteActionSelector:
+      return "discrete_action_selector";
+  }
+  return "unknown";
+}
+
 }  // namespace
 
 RobustGraspMpcState::RobustGraspMpcState(
@@ -401,8 +412,15 @@ bool RobustGraspMpcState::BuildObservation(mppi_core::GraspObservation * observa
   }
   observation->robot_system = robot_;
   observation->tactile_contexts = std::move(tactile_contexts);
-  observation->tactile_transition_config =
-    &config_.policy.tactile_only_transition.tactile_transition.base;
+  if (
+    config_.policy.control_mode ==
+    mppi_core::RobustGraspControlMode::kDiscreteActionSelector)
+  {
+    observation->tactile_transition_config =
+      &config_.policy.tactile_only_transition.tactile_transition.base;
+  } else {
+    observation->tactile_transition_config = nullptr;
+  }
   observation->time_s = state.time_s;
   return true;
 }
@@ -429,8 +447,9 @@ bool RobustGraspMpcState::UpdateObjectBelief(
     tracking_prior.initial_pose_world = previous_pose_world;
   }
 
-  const auto result = mppi_core::InitializeObjectBeliefFromContacts(
+  const auto result = mppi_core::UpdateObjectBeliefFromCurrentContacts(
     tracking_prior,
+    object_belief_,
     q_meas,
     tactile_meas,
     tactile_contexts,
@@ -633,34 +652,19 @@ void RobustGraspMpcState::PrintStatus(
   std::ostringstream stream;
   stream << std::fixed << std::setprecision(4)
          << "[robust_grasp_mpc] tick=" << tick_index_
+         << " mode=" << ControlModeName(status.control_mode)
          << " ready=" << (status.ready ? "true" : "false")
          << " fallback=" << (status.used_hold_fallback ? "true" : "false")
-         << " mode="
-         << (status.used_continuous_qddot_mppi ? "continuous_qddot_mppi" :
-             "discrete_action_selector")
          << " rollout_only=" << (config_.safety.rollout_only ? "true" : "false")
-         << " candidate_count=" << status.candidate_count
-         << " disturbance_count=" << status.disturbance_count
+         << " samples=" << status.candidate_count
+         << " disturbances=" << status.disturbance_count
          << " horizon=" << status.horizon_steps
          << " lambda=" << status.lambda
-         << " best_idx=" << status.best_candidate_index
-         << " best_action=" << status.best_action_name
-         << " raw_best_idx=" << status.raw_best_candidate_index
-         << " raw_best_action=" << status.raw_best_action_name
-         << " second_best_action=" << status.second_best_action_name
-         << " second_best_score=" << status.second_best_score
-         << " hold_selected=" << (status.selected_hold_by_margin ? "true" : "false")
-         << " score=" << status.best_score
-         << " raw_best_score=" << status.raw_best_score
-         << " hold_score=" << status.hold_score
-         << " hold_improvement=" << status.hold_score_improvement
-         << " mean=" << status.best_mean_cost
-         << " cvar=" << status.best_cvar_cost
          << " best_sample_cost=" << status.best_sample_cost
          << " weighted_cost=" << status.weighted_cost_estimate
-         << " cost_min=" << status.cost_min
-         << " cost_mean=" << status.cost_mean
-         << " cost_max=" << status.cost_max
+         << " nominal_cost=" << status.nominal_cost
+         << " cost_range=[" << status.cost_min << ","
+         << status.cost_mean << "," << status.cost_max << "]"
          << " ess=" << status.effective_sample_size
          << " qddot_norm=" << status.selected_qddot.norm()
          << " qddot_best_norm=" << status.qddot_best_first.norm()
@@ -668,6 +672,8 @@ void RobustGraspMpcState::PrintStatus(
          << " qdot_cmd_norm=" << command.qdot_cmd.norm()
          << " active_sensors=" << ActiveTactileSensorCount(observation.tactile_meas)
          << " active_hemispheres=" << ActiveHemisphereCountTotal(observation.tactile_meas)
+         << " measured_thumb_force_n=" << status.measured_thumb_force_n
+         << " measured_index_force_n=" << status.measured_index_force_n
          << " belief_valid=" << (has_object_belief() ? "true" : "false")
          << " belief_updated=" << (object_belief_updated_this_tick_ ? "true" : "false")
          << " belief_contacts=" << object_belief_contact_count_
@@ -680,7 +686,7 @@ void RobustGraspMpcState::PrintStatus(
          << " initial_contact_loss_cost=" << status.initial_contact_loss_cost
          << " initial_support_cost=" << status.initial_support_cost
          << " initial_edge_cost=" << status.initial_edge_cost
-         << " initial_penetration_cost=" << status.initial_penetration_cost
+         << " initial_deep_contact_cost=" << status.initial_penetration_cost
          << " initial_preload_cost=" << status.initial_preload_cost
          << " initial_force_low_cost=" << status.initial_force_low_cost
          << " initial_force_high_cost=" << status.initial_force_high_cost
@@ -693,7 +699,7 @@ void RobustGraspMpcState::PrintStatus(
          << " contact_loss_cost=" << status.selected_contact_loss_cost
          << " support_cost=" << status.selected_support_cost
          << " edge_cost=" << status.selected_edge_cost
-         << " penetration_cost=" << status.selected_penetration_cost
+         << " deep_contact_cost=" << status.selected_penetration_cost
          << " preload_cost=" << status.selected_preload_cost
          << " force_low_cost=" << status.selected_force_low_cost
          << " force_high_cost=" << status.selected_force_high_cost

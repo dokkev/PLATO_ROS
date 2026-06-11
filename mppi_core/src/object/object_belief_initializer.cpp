@@ -351,6 +351,109 @@ std::size_t BestParticleIndex(const std::vector<ObjectParticleScore>& scores) {
   return best_index;
 }
 
+bool RepresentativeObjectBeliefPose(const VirtualObjectBelief& belief,
+                                    Eigen::Isometry3d* pose_world) {
+  if (pose_world == nullptr || !HasVirtualObjectBelief(belief) ||
+      !IsValidVirtualObjectBelief(belief) || belief.particles.empty()) {
+    return false;
+  }
+
+  double weight_sum = 0.0;
+  Eigen::Vector3d weighted_translation = Eigen::Vector3d::Zero();
+  const VirtualObjectState* orientation_source = nullptr;
+  double orientation_weight = -1.0;
+  for (const auto& particle : belief.particles) {
+    if (!IsValidVirtualObjectState(particle) ||
+        !particle.pose_world.matrix().allFinite()) {
+      continue;
+    }
+    const double weight =
+        std::isfinite(particle.weight) && particle.weight > 0.0
+            ? particle.weight
+            : 1.0;
+    weighted_translation += weight * particle.pose_world.translation();
+    weight_sum += weight;
+    if (weight > orientation_weight) {
+      orientation_weight = weight;
+      orientation_source = &particle;
+    }
+  }
+  if (orientation_source == nullptr || weight_sum <= kTiny) {
+    return false;
+  }
+
+  *pose_world = orientation_source->pose_world;
+  pose_world->translation() = weighted_translation / weight_sum;
+  return pose_world->matrix().allFinite();
+}
+
+ObjectBeliefInitializationResult ReweightExistingBeliefFromContacts(
+    const ObjectPrior& prior,
+    const VirtualObjectBelief& previous_belief,
+    const Eigen::Ref<const Eigen::VectorXd>& q_meas,
+    const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
+        tactile_sensors,
+    const std::vector<TactileSensorContext>& tactile_contexts,
+    const ObjectBeliefInitializationConfig& config) {
+  ObjectBeliefInitializationResult result;
+  if (!IsValidObjectPrior(prior) ||
+      !HasVirtualObjectBelief(previous_belief) ||
+      !IsValidVirtualObjectBelief(previous_belief) ||
+      previous_belief.particles.empty()) {
+    return result;
+  }
+
+  result.contacts =
+      ExtractObjectContactObservations(q_meas, tactile_sensors, tactile_contexts);
+  double total_contact_force_n = 0.0;
+  for (const auto& contact : result.contacts) {
+    if (std::isfinite(contact.normal_force_n)) {
+      total_contact_force_n += std::max(0.0, contact.normal_force_n);
+    }
+  }
+  const double force_threshold_n =
+      std::max(0.0, config.contact_force_threshold_n);
+  if (result.contacts.size() < config.min_contact_count ||
+      total_contact_force_n < force_threshold_n) {
+    return result;
+  }
+
+  ObjectPrior scoring_prior = prior;
+  if (IsValidObjectGeometry(previous_belief.geometry)) {
+    scoring_prior.geometry = previous_belief.geometry;
+  }
+
+  result.belief = previous_belief;
+  result.belief.geometry = scoring_prior.geometry;
+  result.particle_scores.reserve(result.belief.particles.size());
+  const ContactWidthObservation contact_width =
+      MakeContactWidthObservation(result.contacts, config);
+
+  for (const auto& particle : result.belief.particles) {
+    result.particle_scores.push_back(
+        ScoreParticle(scoring_prior, particle.pose_world, result.contacts,
+                      contact_width, config));
+  }
+
+  NormalizeParticleWeights(result.particle_scores, &result.belief);
+  result.best_particle_index = BestParticleIndex(result.particle_scores);
+  if (result.best_particle_index < result.particle_scores.size()) {
+    const auto& best_score = result.particle_scores[result.best_particle_index];
+    result.best_cost = best_score.total_cost;
+    result.best_surface_distance_m = best_score.mean_surface_distance_m;
+    result.best_normal_alignment_error =
+        best_score.mean_normal_alignment_error;
+  }
+
+  result.belief.valid = true;
+  result.valid = std::isfinite(result.best_cost) &&
+                 IsValidVirtualObjectBelief(result.belief);
+  if (!result.valid) {
+    result.belief = VirtualObjectBelief{};
+  }
+  return result;
+}
+
 }  // namespace
 
 std::vector<ObjectContactObservation,
@@ -524,6 +627,35 @@ ObjectBeliefInitializationResult InitializeObjectBeliefFromContacts(
   return result;
 }
 
+ObjectBeliefInitializationResult UpdateObjectBeliefFromCurrentContacts(
+    const ObjectPrior& prior,
+    const VirtualObjectBelief& previous_belief,
+    const Eigen::Ref<const Eigen::VectorXd>& q_meas,
+    const std::vector<TactileState, Eigen::aligned_allocator<TactileState>>&
+        tactile_sensors,
+    const std::vector<TactileSensorContext>& tactile_contexts,
+    const ObjectBeliefInitializationConfig& config) {
+  if (!IsValidObjectPrior(prior)) {
+    return ObjectBeliefInitializationResult{};
+  }
+
+  ObjectPrior tracking_prior = prior;
+  Eigen::Isometry3d previous_pose_world = Eigen::Isometry3d::Identity();
+  if (RepresentativeObjectBeliefPose(previous_belief, &previous_pose_world)) {
+    tracking_prior.initial_pose_world = previous_pose_world;
+  }
+
+  auto reweighted = ReweightExistingBeliefFromContacts(
+      tracking_prior, previous_belief, q_meas, tactile_sensors,
+      tactile_contexts, config);
+  if (reweighted.valid) {
+    return reweighted;
+  }
+
+  return InitializeObjectBeliefFromContacts(
+      tracking_prior, q_meas, tactile_sensors, tactile_contexts, config);
+}
+
 ObjectBeliefInitializationResult InitializeObjectBeliefFromObservation(
     const GraspObservation& observation,
     const ObjectBeliefInitializationConfig& config) {
@@ -536,17 +668,21 @@ VirtualObjectBelief ResolveObjectBeliefForObservation(
     const GraspObservation& observation,
     const Eigen::Ref<const Eigen::VectorXd>& q_rollout_root,
     const ObjectBeliefInitializationConfig& config) {
-  if (HasVirtualObjectBelief(observation.object_belief)) {
-    return observation.object_belief;
-  }
   if (!HasObjectPrior(observation.object_prior)) {
-    return VirtualObjectBelief{};
+    return HasVirtualObjectBelief(observation.object_belief)
+               ? observation.object_belief
+               : VirtualObjectBelief{};
   }
 
-  const auto result = InitializeObjectBeliefFromContacts(
-      observation.object_prior, q_rollout_root, observation.tactile_meas,
-      observation.tactile_contexts, config);
-  return result.valid ? result.belief : VirtualObjectBelief{};
+  const auto result = UpdateObjectBeliefFromCurrentContacts(
+      observation.object_prior, observation.object_belief, q_rollout_root,
+      observation.tactile_meas, observation.tactile_contexts, config);
+  if (result.valid) {
+    return result.belief;
+  }
+  return HasVirtualObjectBelief(observation.object_belief)
+             ? observation.object_belief
+             : VirtualObjectBelief{};
 }
 
 }  // namespace mppi_core

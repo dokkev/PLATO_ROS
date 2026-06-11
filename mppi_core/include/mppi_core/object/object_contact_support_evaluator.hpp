@@ -42,7 +42,9 @@ struct ObjectContactSupportEvaluatorConfig {
 
   double contact_birth_margin_m{0.001};
   double contact_loss_margin_m{0.003};
-  double contact_stiffness_n_per_m{500.0};
+  // Deprecated compatibility field. Geometry support does not synthesize a
+  // contact force.
+  double contact_stiffness_n_per_m{0.0};
   double hemisphere_radius_m{0.0};
   double support_distance_scale_m{0.001};
 
@@ -56,21 +58,21 @@ struct ObjectContactSupportEvaluatorConfig {
   // Deprecated compatibility field. Hard penetration penalties are not used by
   // the current evaluator because measured tactile contact is treated as a real
   // contact anchor.
-  double max_allowed_penetration_m{0.001};
+  double max_allowed_penetration_m{0.0};
 
   // Deprecated compatibility fields. Object support evaluation is geometric and
   // does not estimate true contact force; force/preload costs use measured
   // tactile force only.
-  double target_predicted_normal_force_n{1.0};
-  double max_predicted_normal_force_n{10.0};
-  double min_predicted_contact_force_n{0.01};
-  double max_predicted_force_per_sensor_n{5.0};
+  double target_predicted_normal_force_n{0.0};
+  double max_predicted_normal_force_n{0.0};
+  double min_predicted_contact_force_n{0.0};
+  double max_predicted_force_per_sensor_n{0.0};
 
   double contact_loss_weight{200.0};
   double support_weight{20.0};
   double edge_weight{10.0};
   // Deprecated compatibility field. Use deep_contact_weight instead.
-  double penetration_weight{100.0};
+  double penetration_weight{0.0};
   double predicted_force_low_weight{0.0};
   double predicted_force_high_weight{0.0};
   double target_edge_margin_m{0.001};

@@ -15,7 +15,7 @@ driver_gains:
   # Driver-local impedance gains in SI units:
   #   kp: Nm/rad, kd: Nm/(rad/s)
   kp: [0.0, 0.0, 0.15, 0.15, 0.15, 0.15, 0.08, 0.08]
-  kd: [0.0, 0.0, 0.005, 0.005, 0.005, 0.005, 0.002, 0.002]
+  kd: [0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.002, 0.002]
 
 state_machine:
   # Joint arrays are ordered as:
@@ -104,9 +104,9 @@ state_machine:
       stay_here: true
       next_state: grasp_teleop
       params:
-        default_u: 0.5
-        default_phi: 0.3
-        default_desired_force_n: 10.0
+        default_u: 0.2
+        default_phi: 0.4
+        default_desired_force_n: 15.0
         exit_on_contact_lost: true
         exit_on_u_above_threshold: true
 
@@ -116,7 +116,7 @@ state_machine:
           lpf_alpha: 0.2
           force_enter_debounce_ticks: 0
           force_exit_u_threshold: 0.6
-          kp_tactile_u_fb: 2.0
+          kp_tactile_u_fb: 3.0
           kd_tactile_u_fb: 0.0
           kp_tactile_phi_fb: 10.0
           kd_tactile_phi_fb: 0.0

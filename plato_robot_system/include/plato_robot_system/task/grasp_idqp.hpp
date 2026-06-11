@@ -21,9 +21,17 @@ enum class GraspIDQPMode
   kForceTracking,
 };
 
+enum class GraspIDQPBackend
+{
+  kLegacyTrigPosition,
+  kAccelerationIdQp,
+};
+
 struct GraspIDQPConfig
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  GraspIDQPBackend backend{GraspIDQPBackend::kLegacyTrigPosition};
 
   Eigen::VectorXd q_ready;
 
@@ -71,6 +79,26 @@ struct GraspIDQPConfig
   double parallel_solver_fd_eps_rad{1.0e-4};
   double parallel_solver_max_step_rad{0.05};
   int parallel_solver_max_iters{10};
+
+  double idqp_dt_min{1.0e-4};
+  double idqp_qddot_limit_rad_s2{10.0};
+  double idqp_qdot_limit_rad_s{1.0};
+  double idqp_tau_limit_nm{0.05};
+
+  double idqp_w_aperture{100.0};
+  double idqp_w_parallel{30.0};
+  double idqp_w_moment{1.0};
+  double idqp_w_posture{5.0};
+  double idqp_w_acceleration{1.0e-3};
+
+  double idqp_kp_aperture{50.0};
+  double idqp_kd_aperture{5.0};
+  double idqp_kp_parallel{20.0};
+  double idqp_kd_parallel{2.0};
+  double idqp_kp_moment{5.0};
+  double idqp_kd_moment{0.5};
+  double idqp_kp_posture{20.0};
+  double idqp_kd_posture{2.0};
 };
 
 struct GraspIDQPCommand
@@ -115,6 +143,13 @@ struct GraspIDQPStatus
   double solver_cost{0.0};
   int solver_iters{0};
   bool used_pinocchio_parallel_solver{false};
+
+  bool used_idqp{false};
+  bool idqp_solved{false};
+  double idqp_cost{0.0};
+  Eigen::VectorXd qddot_sol;
+  Eigen::VectorXd tau_ff_active;
+  bool fallback_used{false};
 };
 
 class GraspIDQP
@@ -146,10 +181,10 @@ public:
     Eigen::VectorXd * q_target,
     GraspIDQPStatus * status = nullptr);
 
-  bool configured() const { return configured_; }
-  int active_dof() const { return active_dof_; }
-  GraspIDQPMode mode() const { return mode_; }
-  const GraspIDQPStatus & status() const { return status_; }
+  bool configured() const {return configured_;}
+  int active_dof() const {return active_dof_;}
+  GraspIDQPMode mode() const {return mode_;}
+  const GraspIDQPStatus & status() const {return status_;}
 
 private:
   bool HasCompatibleState(const RobotSystem & robot, const RobotState & state) const;
@@ -162,8 +197,15 @@ private:
   void UpdateMode(
     const sensor::TactileGripObservation & estimate,
     double u);
+  bool PrepareTick(
+    const RobotSystem & robot,
+    const RobotState & state,
+    const GraspIDQPCommand & input,
+    double dt_sec,
+    sensor::TactileGripObservation * estimate,
+    GraspIDQPCommand * clamped_input);
   double ParallelQ5Geometry(double q3) const;
-  bool BuildTeleopSeedTarget(
+  bool BuildLegacyParallelSeedTarget(
     const RobotSystem & robot,
     const RobotState & state,
     const GraspIDQPCommand & input,
@@ -177,12 +219,24 @@ private:
     const sensor::TactileGripObservation & estimate,
     double dt_sec,
     Eigen::VectorXd * q_target);
+  bool PopulateAccelerationIdQpCommand(
+    RobotSystem & robot,
+    const RobotState & state,
+    const GraspIDQPCommand & input,
+    double dt_sec,
+    RobotCommand * command);
+  bool PopulateIdQpFallbackCommand(
+    const RobotSystem & robot,
+    const RobotState & state,
+    const Eigen::VectorXd & q_seed,
+    RobotCommand * command);
 
   GraspIDQPConfig config_;
   bool configured_{false};
   int active_dof_{0};
 
   std::array<int, kThumbIndexActiveJoints.size()> active_q_indices_{};
+  std::array<int, kThumbIndexActiveJoints.size()> active_v_indices_{};
   pinocchio::FrameIndex index_contact_point_frame_id_{0};
   pinocchio::FrameIndex thumb_contact_point_frame_id_{0};
   bool has_pinocchio_parallel_frames_{false};

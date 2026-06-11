@@ -47,6 +47,16 @@ int JointPositionIndex(
   return model.idx_qs[joint_id];
 }
 
+int JointVelocityIndex(
+  const pinocchio::Model & model,
+  const std::string & joint_name)
+{
+  const auto joint_id = model.getJointId(joint_name);
+  EXPECT_LT(joint_id, static_cast<pinocchio::JointIndex>(model.njoints));
+  EXPECT_EQ(model.nvs[joint_id], 1);
+  return model.idx_vs[joint_id];
+}
+
 void SetJointPosition(
   const pinocchio::Model & model,
   const std::string & joint_name,
@@ -146,6 +156,21 @@ void ExpectValidPositionCommand(
   EXPECT_TRUE(command.kd.isZero(kTolerance));
 }
 
+void ExpectValidAccelerationCommand(
+  const plato_robot_system::RobotSystem & robot,
+  const plato_robot_system::RobotCommand & command)
+{
+  ASSERT_TRUE(command.IsUsable());
+  EXPECT_EQ(command.q_cmd.size(), robot.nq());
+  EXPECT_EQ(command.qdot_cmd.size(), robot.nv());
+  EXPECT_EQ(command.tau_cmd.size(), robot.nv());
+  EXPECT_TRUE(command.q_cmd.allFinite());
+  EXPECT_TRUE(command.qdot_cmd.allFinite());
+  EXPECT_TRUE(command.tau_cmd.allFinite());
+  EXPECT_TRUE(command.kp.isZero(kTolerance));
+  EXPECT_TRUE(command.kd.isZero(kTolerance));
+}
+
 void ExpectFiniteSolverStatus(
   const plato_robot_system::task::GraspIDQPStatus & status)
 {
@@ -154,6 +179,7 @@ void ExpectFiniteSolverStatus(
   EXPECT_TRUE(std::isfinite(status.parallel_axis_error));
   EXPECT_TRUE(std::isfinite(status.moment_arm_m));
   EXPECT_TRUE(std::isfinite(status.solver_cost));
+  EXPECT_TRUE(std::isfinite(status.idqp_cost));
   EXPECT_GE(status.solver_iters, 0);
 }
 
@@ -302,4 +328,114 @@ TEST(GraspIDQPTest, EnabledSolverReportsFiniteDiagnostics)
   ExpectValidPositionCommand(robot, command);
   EXPECT_TRUE(task.status().used_pinocchio_parallel_solver);
   ExpectFiniteSolverStatus(task.status());
+}
+
+TEST(GraspIDQPTest, AccelerationBackendReturnsFiniteCommandAndDiagnostics)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  auto config = MakeTaskConfig(robot.model());
+  config.backend = plato_robot_system::task::GraspIDQPBackend::kAccelerationIdQp;
+
+  plato_robot_system::task::GraspIDQP task;
+  ASSERT_TRUE(task.Configure(robot.model(), config));
+  ASSERT_TRUE(task.OnEnter(robot, robot.state()));
+
+  plato_robot_system::task::GraspIDQPCommand input;
+  input.u = 0.0;
+  input.phi = 0.0;
+  input.desired_force_n = 1.0;
+
+  plato_robot_system::RobotCommand command;
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidAccelerationCommand(robot, command);
+
+  const auto & status = task.status();
+  EXPECT_TRUE(status.used_idqp);
+  EXPECT_TRUE(status.idqp_solved);
+  EXPECT_FALSE(status.fallback_used);
+  EXPECT_FALSE(status.used_pinocchio_parallel_solver);
+  EXPECT_EQ(status.qddot_sol.size(), plato_robot_system::task::kThumbIndexActiveJoints.size());
+  EXPECT_EQ(status.tau_ff_active.size(), plato_robot_system::task::kThumbIndexActiveJoints.size());
+  EXPECT_TRUE(status.qddot_sol.allFinite());
+  EXPECT_TRUE(status.tau_ff_active.allFinite());
+  EXPECT_GT(command.qdot_cmd.norm(), 1.0e-9);
+  EXPECT_TRUE(status.q_target.isApprox(command.q_cmd, kTolerance));
+  ExpectFiniteSolverStatus(status);
+
+  for (std::size_t i = 0; i < plato_robot_system::task::kThumbIndexActiveJoints.size(); ++i) {
+    const int v_index = JointVelocityIndex(
+      robot.model(),
+      std::string(plato_robot_system::task::kThumbIndexActiveJoints[i]));
+    EXPECT_LE(std::abs(command.tau_cmd[v_index]), config.idqp_tau_limit_nm + 1.0e-12);
+    EXPECT_NEAR(command.tau_cmd[v_index], status.tau_ff_active[static_cast<int>(i)], 1.0e-12);
+  }
+}
+
+TEST(GraspIDQPTest, AccelerationBackendClosedDesiredApertureIsSmallerThanOpen)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  auto config = MakeTaskConfig(robot.model());
+  config.backend = plato_robot_system::task::GraspIDQPBackend::kAccelerationIdQp;
+
+  plato_robot_system::task::GraspIDQP task;
+  ASSERT_TRUE(task.Configure(robot.model(), config));
+  ASSERT_TRUE(task.OnEnter(robot, robot.state()));
+
+  plato_robot_system::task::GraspIDQPCommand input;
+  input.phi = 0.0;
+  input.desired_force_n = 1.0;
+
+  plato_robot_system::RobotCommand command;
+  input.u = 0.0;
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidAccelerationCommand(robot, command);
+  ASSERT_TRUE(task.status().idqp_solved);
+  const double closed_aperture_des_m = task.status().aperture_des_m;
+
+  input.u = 1.0;
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidAccelerationCommand(robot, command);
+  ASSERT_TRUE(task.status().idqp_solved);
+  const double open_aperture_des_m = task.status().aperture_des_m;
+
+  EXPECT_TRUE(std::isfinite(closed_aperture_des_m));
+  EXPECT_TRUE(std::isfinite(open_aperture_des_m));
+  EXPECT_LT(closed_aperture_des_m, open_aperture_des_m);
+}
+
+TEST(GraspIDQPTest, AccelerationBackendFallsBackToLegacySeedWhenDtTooSmall)
+{
+  ASSERT_TRUE(std::filesystem::exists(AristoUrdfPath())) << AristoUrdfPath();
+
+  auto robot = MakeNeutralAristoRobot();
+  auto config = MakeTaskConfig(robot.model());
+  config.backend = plato_robot_system::task::GraspIDQPBackend::kAccelerationIdQp;
+  config.idqp_dt_min = 1.0;
+
+  plato_robot_system::task::GraspIDQP task;
+  ASSERT_TRUE(task.Configure(robot.model(), config));
+  ASSERT_TRUE(task.OnEnter(robot, robot.state()));
+
+  plato_robot_system::task::GraspIDQPCommand input;
+  input.u = 0.25;
+  input.phi = 0.5;
+  input.desired_force_n = 1.0;
+
+  plato_robot_system::RobotCommand command;
+  ASSERT_TRUE(task.PopulateCommand(robot, robot.state(), input, kDtSec, &command));
+  ExpectValidPositionCommand(robot, command);
+
+  const auto & status = task.status();
+  EXPECT_TRUE(status.used_idqp);
+  EXPECT_FALSE(status.idqp_solved);
+  EXPECT_TRUE(status.fallback_used);
+  EXPECT_TRUE(status.q_target.isApprox(command.q_cmd, kTolerance));
+  EXPECT_EQ(status.qddot_sol.size(), plato_robot_system::task::kThumbIndexActiveJoints.size());
+  EXPECT_TRUE(status.qddot_sol.isZero(kTolerance));
+  EXPECT_EQ(status.tau_ff_active.size(), plato_robot_system::task::kThumbIndexActiveJoints.size());
+  EXPECT_TRUE(status.tau_ff_active.isZero(kTolerance));
 }

@@ -688,6 +688,7 @@ void RobustGraspMpcState::PrintStatus(
          << " fallback=" << (status.used_hold_fallback ? "true" : "false")
          << " rollout_only=" << (config_.safety.rollout_only ? "true" : "false")
          << " samples=" << status.candidate_count
+         << " threads=" << status.evaluation_thread_count
          << " disturbances=" << status.disturbance_count
          << " horizon=" << status.horizon_steps
          << " lambda=" << status.lambda

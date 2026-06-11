@@ -71,6 +71,7 @@ struct RobustGraspPolicyStatus {
 
   std::size_t candidate_count{0};
   std::size_t disturbance_count{0};
+  std::size_t evaluation_thread_count{1};
   std::size_t horizon_steps{0};
   double lambda{0.0};
 

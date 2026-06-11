@@ -123,11 +123,17 @@ MPPIConfig ParseMPPIConfig(const YAML::Node& params, std::size_t action_dim,
                                     static_cast<int>(defaults.horizon_steps));
   const int num_rollouts = ReadInt(safe_params, "num_rollouts",
                                    static_cast<int>(defaults.num_rollouts));
+  const int num_threads = ReadInt(safe_params, "num_threads",
+                                  static_cast<int>(defaults.num_threads));
   ValidatePositiveInt(horizon_steps, "horizon_steps");
   ValidatePositiveInt(num_rollouts, "num_rollouts");
+  if (num_threads < 0) {
+    throw std::invalid_argument("MPPIConfig: num_threads must be nonnegative");
+  }
 
   defaults.horizon_steps = static_cast<std::size_t>(horizon_steps);
   defaults.num_rollouts = static_cast<std::size_t>(num_rollouts);
+  defaults.num_threads = static_cast<std::size_t>(num_threads);
   defaults.action_dim = action_dim;
   defaults.dt = ReadDouble(safe_params, "dt", defaults.dt);
   defaults.temperature =

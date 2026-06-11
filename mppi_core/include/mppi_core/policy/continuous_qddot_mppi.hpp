@@ -121,6 +121,7 @@ struct ContinuousQddotMppiStatus {
   bool valid{false};
 
   std::size_t num_samples{0};
+  std::size_t num_threads{1};
   std::size_t horizon_steps{0};
   double lambda{0.0};
 

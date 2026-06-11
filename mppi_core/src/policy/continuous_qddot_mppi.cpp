@@ -9,11 +9,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <numeric>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
+#include <vector>
 
 #include "mppi_core/contact/contact_kinematics.hpp"
 #include "mppi_core/rollout/object_prior_grasp_rollout.hpp"
@@ -24,8 +27,64 @@ namespace {
 constexpr double kLargeCost = 1.0e30;
 constexpr double kTiny = 1.0e-12;
 
+struct ThreadLocalRolloutWorkspace {
+  RobotSystem robot_system;
+  std::vector<PinocchioContactKinematicsContext> kinematics;
+  RolloutContext context;
+};
+
 Eigen::VectorXd DefaultVector(const std::size_t dim, const double value) {
   return Eigen::VectorXd::Constant(static_cast<Eigen::Index>(dim), value);
+}
+
+std::size_t ResolveEvaluationThreadCount(const MPPIConfig& config) {
+  if (config.num_rollouts <= 1U || config.num_threads == 1U) {
+    return 1U;
+  }
+  std::size_t requested = config.num_threads;
+  if (requested == 0U) {
+    requested = static_cast<std::size_t>(std::thread::hardware_concurrency());
+  }
+  if (requested == 0U) {
+    return 1U;
+  }
+  return std::max<std::size_t>(
+      1U, std::min<std::size_t>(config.num_rollouts, requested));
+}
+
+void ConfigureThreadLocalRolloutWorkspace(
+    const RolloutContext& source,
+    ThreadLocalRolloutWorkspace* workspace) {
+  if (workspace == nullptr) {
+    return;
+  }
+  workspace->context = source;
+  workspace->context.tactile_contexts = source.tactile_contexts;
+  workspace->context.robot_system = source.robot_system;
+  workspace->kinematics.clear();
+
+  if (source.robot_system == nullptr || !source.robot_system->hasModel()) {
+    return;
+  }
+
+  workspace->robot_system.LoadModel(source.robot_system->model());
+  workspace->context.robot_system = &workspace->robot_system;
+  workspace->kinematics.resize(workspace->context.tactile_contexts.size());
+  for (std::size_t i = 0; i < workspace->context.tactile_contexts.size(); ++i) {
+    const auto* source_kinematics = source.tactile_contexts[i].kinematics;
+    if (source_kinematics == nullptr) {
+      workspace->context.tactile_contexts[i].kinematics = nullptr;
+      continue;
+    }
+    auto& local_kinematics = workspace->kinematics[i];
+    local_kinematics.model = &workspace->robot_system.model();
+    local_kinematics.data = &workspace->robot_system.data();
+    local_kinematics.sensor_frame_id = source_kinematics->sensor_frame_id;
+    local_kinematics.normal_axis_sign =
+        source_kinematics->normal_axis_sign;
+    workspace->context.tactile_contexts[i].kinematics =
+        &local_kinematics;
+  }
 }
 
 bool IsFiniteAndNonnegative(const double value) {
@@ -1247,6 +1306,7 @@ RobotCommand ContinuousQddotMppiController::Update(
 
   status_ = ContinuousQddotMppiStatus{};
   status_.num_samples = config_.rollout.num_rollouts;
+  status_.num_threads = ResolveEvaluationThreadCount(config_.rollout);
   status_.horizon_steps = config_.rollout.horizon_steps;
   status_.lambda = config_.rollout.temperature;
   status_.use_rnea_feedforward = config_.rnea_feedforward.enabled;
@@ -1304,10 +1364,57 @@ RobotCommand ContinuousQddotMppiController::Update(
   std::size_t total_geometry_queries = 0U;
   std::size_t total_object_samples = 0U;
 
+  if (status_.num_threads <= 1U || samples.size() <= 1U) {
+    for (std::size_t i = 0; i < samples.size(); ++i) {
+      evaluations[i] = EvaluateSequence(
+          initial_state, samples[i], qddot_base, disturbances[i], context);
+      costs[i] = SanitizeCost(evaluations[i].total_cost);
+    }
+  } else {
+    const std::size_t worker_count =
+        std::min<std::size_t>(status_.num_threads, samples.size());
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count);
+    std::vector<std::exception_ptr> exceptions(worker_count);
+    const std::size_t chunk_size =
+        (samples.size() + worker_count - 1U) / worker_count;
+    for (std::size_t worker_index = 0; worker_index < worker_count;
+         ++worker_index) {
+      const std::size_t begin = worker_index * chunk_size;
+      const std::size_t end =
+          std::min<std::size_t>(samples.size(), begin + chunk_size);
+      if (begin >= end) {
+        continue;
+      }
+      workers.emplace_back(
+          [this, &initial_state, &samples, &qddot_base, &disturbances,
+           &context, &evaluations, &costs, &exceptions, worker_index,
+           begin, end]() {
+            try {
+              ThreadLocalRolloutWorkspace workspace;
+              ConfigureThreadLocalRolloutWorkspace(context, &workspace);
+              for (std::size_t i = begin; i < end; ++i) {
+                evaluations[i] = EvaluateSequence(
+                    initial_state, samples[i], qddot_base, disturbances[i],
+                    workspace.context);
+                costs[i] = SanitizeCost(evaluations[i].total_cost);
+              }
+            } catch (...) {
+              exceptions[worker_index] = std::current_exception();
+            }
+          });
+    }
+    for (auto& worker : workers) {
+      worker.join();
+    }
+    for (const auto& exception : exceptions) {
+      if (exception) {
+        std::rethrow_exception(exception);
+      }
+    }
+  }
+
   for (std::size_t i = 0; i < samples.size(); ++i) {
-    evaluations[i] = EvaluateSequence(
-        initial_state, samples[i], qddot_base, disturbances[i], context);
-    costs[i] = SanitizeCost(evaluations[i].total_cost);
     total_geometry_queries +=
         evaluations[i].stats.costs.geometry_query_count;
     total_object_samples += evaluations[i].stats.costs.object_sample_count;

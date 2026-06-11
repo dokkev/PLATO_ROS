@@ -671,6 +671,7 @@ void RobustGraspPolicy::CopyContinuousStatus(
   status_.used_continuous_qddot_mppi = true;
   status_.candidate_count = continuous_status.num_samples;
   status_.disturbance_count = continuous_status.num_samples;
+  status_.evaluation_thread_count = continuous_status.num_threads;
   status_.horizon_steps = continuous_status.horizon_steps;
   status_.lambda = continuous_status.lambda;
 

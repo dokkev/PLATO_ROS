@@ -44,15 +44,15 @@ robust_grasp:
   use_rnea_feedforward: true
 
   base_grasp_controller:
-    target_normal_force_n: 10.0
-    min_normal_force_per_sensor_n: 5.0
+    target_normal_force_n: 2.0
+    min_normal_force_per_sensor_n: 0.5
     max_normal_force_per_sensor_n: 30.0
     force_gain: 0.2
     force_balance_gain: 0.1
     contact_loss_gain: 0.2
     high_force_release_gain: 0.2
     max_qddot_base: 2.0
-    max_qddot_residual: 1.0
+    max_qddot_residual: 0.5
     base_deviation_weight: 0.01
     use_force_balance: true
     use_contact_loss_reflex: true
@@ -69,26 +69,27 @@ robust_grasp:
     gravity_only_when_qddot_zero: false
 
   rollout:
-    horizon_steps: 3
+    horizon_steps: 2
     dt: 0.01
-    num_rollouts: 128
+    num_rollouts: 32
+    num_threads: 0
     temperature: 1.0
     random_seed: 7
     action_lower_bound: -5.0
     action_upper_bound: 5.0
-    action_noise_std: 0.5
-    action_noise_clip: 3.0
+    action_noise_std: 0.25
+    action_noise_clip: 1.0
     qdot_limit: 0.5
 
   disturbance:
-    num_disturbance_rollouts: 128
+    num_disturbance_rollouts: 32
     tactile_sensor_count: 2
     random_seed: 7
     object_motion:
-      linear_velocity_std_mps: 0.002
-      linear_velocity_max_mps: 0.010
-      angular_velocity_std_radps: 0.03
-      angular_velocity_max_radps: 0.15
+      linear_velocity_std_mps: 0.0
+      linear_velocity_max_mps: 0.0
+      angular_velocity_std_radps: 0.0
+      angular_velocity_max_radps: 0.0
     use_antithetic_samples: true
 
   start:
@@ -98,11 +99,11 @@ robust_grasp:
   cost:
     min_active_tactile_sensors: 1
     min_active_hemisphere_total: 2
-    contact_loss_weight: 200.0
-    support_weight: 20.0
+    contact_loss_weight: 20.0
+    support_weight: 5.0
 
-    target_normal_force_n: 10.0
-    min_normal_force_per_sensor_n: 5.0
+    target_normal_force_n: 2.0
+    min_normal_force_per_sensor_n: 0.5
     max_normal_force_per_sensor_n: 30.0
     force_low_weight: 30.0
     force_high_weight: 0.0
@@ -112,7 +113,7 @@ robust_grasp:
     qddot_weight: 0.05
     object_support:
       enabled: true
-      object_pose_samples: 12
+      object_pose_samples: 2
       hemisphere_radius_m: 0.003
       support_distance_scale_m: 0.001
       good_contact_gap_min_m: -0.001

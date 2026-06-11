@@ -14,6 +14,8 @@ namespace mppi_core {
 struct MPPIConfig {
   std::size_t horizon_steps{20};
   std::size_t num_rollouts{128};
+  // 0 selects std::thread::hardware_concurrency(); 1 preserves serial behavior.
+  std::size_t num_threads{1};
   std::size_t action_dim{0};
   double dt{0.01};
   double temperature{1.0};

@@ -14,6 +14,7 @@ find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(plato_robot_system REQUIRED)
+find_package(Threads REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 set(${PROJECT_NAME}_SOURCES
@@ -53,6 +54,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   plato_robot_system::plato_robot_system
   Eigen3::Eigen
   pinocchio::pinocchio
+  Threads::Threads
   yaml-cpp
 )
 

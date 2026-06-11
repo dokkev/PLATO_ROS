@@ -162,6 +162,13 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(mppi_grasp.debug.print_action_interval_s, 1.0);
   EXPECT_EQ(mppi_grasp.continuation.min_active_tactile_sensors, 1U);
   EXPECT_EQ(mppi_grasp.continuation.min_active_hemisphere_total, 1U);
+  EXPECT_TRUE(mppi_grasp.maintenance.enabled);
+  EXPECT_EQ(mppi_grasp.maintenance.target_active_hemisphere_total, 4U);
+  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.target_total_force_n, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.min_sensor_force_n, 0.05);
+  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.closing_qddot_rad_s2, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.hemisphere_deficit_qddot_rad_s2, 1.0);
+  EXPECT_DOUBLE_EQ(mppi_grasp.maintenance.one_sided_closing_qddot_rad_s2, 1.0);
   EXPECT_EQ(mppi_grasp.task.start.min_enough_contact_sensors, 2U);
   EXPECT_EQ(mppi_grasp.task.start.min_active_hemispheres_total, 2U);
   EXPECT_EQ(mppi_grasp.task.cost.target_active_hemisphere_total, 4U);

@@ -37,10 +37,17 @@ struct MaintenanceContactSummary
   bool index_active{false};
   double thumb_force_n{0.0};
   double index_force_n{0.0};
+  std::size_t thumb_active_hemispheres{0};
+  std::size_t index_active_hemispheres{0};
 
   double totalForceN() const
   {
     return thumb_force_n + index_force_n;
+  }
+
+  std::size_t activeHemisphereTotal() const
+  {
+    return thumb_active_hemispheres + index_active_hemispheres;
   }
 };
 
@@ -175,6 +182,7 @@ bool HasValidMaintenanceConfig(const MPPIGraspMaintenanceConfig & config)
   return IsNonnegativeFinite(config.target_total_force_n) &&
          IsNonnegativeFinite(config.min_sensor_force_n) &&
          IsNonnegativeFinite(config.closing_qddot_rad_s2) &&
+         IsNonnegativeFinite(config.hemisphere_deficit_qddot_rad_s2) &&
          IsNonnegativeFinite(config.one_sided_closing_qddot_rad_s2);
 }
 
@@ -691,6 +699,184 @@ bool MPPIGraspState::PopulateHoldCommand(plato_robot_system::RobotCommand * comm
   }
   last_command_ = *command;
   return command->IsUsable();
+}
+
+void MPPIGraspState::ApplyMaintenanceHeuristic(
+  const mppi_core::GraspObservation & observation,
+  const mppi_core::GraspState & state,
+  plato_robot_system::RobotCommand * command,
+  Eigen::VectorXd * applied_action,
+  std::string * detail) const
+{
+  if (
+    !config_.maintenance.enabled ||
+    command == nullptr ||
+    applied_action == nullptr ||
+    robot_ == nullptr ||
+    !state.valid ||
+    command->q_cmd.size() != observation.q_ref_current.size() ||
+    command->qdot_cmd.size() != robot_->nv())
+  {
+    return;
+  }
+
+  if (applied_action->size() != robot_->nv()) {
+    *applied_action = Eigen::VectorXd::Zero(robot_->nv());
+  }
+  if (!applied_action->allFinite()) {
+    return;
+  }
+
+  MaintenanceContactSummary contact;
+  for (const auto & tactile : state.tactile_sensors) {
+    const double force_n = TactileForceN(tactile);
+    const std::size_t active_hemispheres = tactile.activeHemisphereCount();
+    const bool active =
+      tactile.valid &&
+      (tactile.hasActiveHemisphereContact() ||
+      tactile.hasContact() ||
+      force_n >= config_.maintenance.min_sensor_force_n);
+
+    const bool thumb_frame =
+      SameFrame(tactile.frame_name, plato_robot_system::task::kThumbIndexFrameB);
+    const bool index_frame =
+      SameFrame(tactile.frame_name, plato_robot_system::task::kThumbIndexFrameA);
+    if (
+      thumb_frame ||
+      (!index_frame && tactile.sensor_index == static_cast<int>(kThumbContextIndex)))
+    {
+      contact.thumb_active = contact.thumb_active || active;
+      contact.thumb_force_n += force_n;
+      contact.thumb_active_hemispheres += active_hemispheres;
+    } else if (
+      index_frame ||
+      (!thumb_frame && tactile.sensor_index == static_cast<int>(kIndexContextIndex)))
+    {
+      contact.index_active = contact.index_active || active;
+      contact.index_force_n += force_n;
+      contact.index_active_hemispheres += active_hemispheres;
+    }
+  }
+
+  if (!contact.thumb_active && !contact.index_active) {
+    return;
+  }
+
+  Eigen::VectorXd desired_action = *applied_action;
+  std::string maintenance_mode;
+  const auto enforce_closing = [&](const std::size_t slot, const double closing_sign,
+                                   const double min_closing_qddot) {
+      if (slot >= active_v_indices_.size()) {
+        return;
+      }
+      const int v_index = active_v_indices_[slot];
+      if (v_index < 0 || v_index >= desired_action.size()) {
+        return;
+      }
+      const double current_closing_qddot = closing_sign * desired_action[v_index];
+      desired_action[v_index] =
+        closing_sign * std::max(current_closing_qddot, min_closing_qddot);
+    };
+  const auto close_index = [&](const double min_closing_qddot) {
+      enforce_closing(kIndexMcpSlot, 1.0, min_closing_qddot);
+      enforce_closing(kIndexPipSlot, -1.0, min_closing_qddot);
+    };
+  const auto close_thumb = [&](const double min_closing_qddot) {
+      enforce_closing(kThumbMcpSlot, -1.0, min_closing_qddot);
+      enforce_closing(kThumbIpSlot, 1.0, min_closing_qddot);
+    };
+
+  if (contact.thumb_active && !contact.index_active) {
+    close_index(config_.maintenance.one_sided_closing_qddot_rad_s2);
+    maintenance_mode = "close_index_missing_contact";
+  } else if (contact.index_active && !contact.thumb_active) {
+    close_thumb(config_.maintenance.one_sided_closing_qddot_rad_s2);
+    maintenance_mode = "close_thumb_missing_contact";
+  } else {
+    const std::size_t target_active_hemispheres =
+      std::max(
+        config_.maintenance.target_active_hemisphere_total,
+        config_.task.cost.target_active_hemisphere_total);
+    if (contact.activeHemisphereTotal() < target_active_hemispheres) {
+      const double target =
+        std::max(1.0, static_cast<double>(target_active_hemispheres));
+      const double deficit =
+        static_cast<double>(target_active_hemispheres - contact.activeHemisphereTotal());
+      const double support_scale = std::clamp(deficit / target, 0.0, 1.0);
+      const double min_closing_qddot =
+        config_.maintenance.hemisphere_deficit_qddot_rad_s2 *
+        std::max(0.25, support_scale);
+      close_index(min_closing_qddot);
+      close_thumb(min_closing_qddot);
+      maintenance_mode = "close_both_hemisphere_deficit";
+    }
+    const double target_force_n = config_.maintenance.target_total_force_n;
+    const double force_error_n = target_force_n - contact.totalForceN();
+    if (maintenance_mode.empty() && target_force_n > 0.0 && force_error_n > 0.0) {
+      const double force_scale =
+        std::clamp(force_error_n / target_force_n, 0.0, 1.0);
+      const double min_closing_qddot =
+        config_.maintenance.closing_qddot_rad_s2 * std::max(0.25, force_scale);
+      close_index(min_closing_qddot);
+      close_thumb(min_closing_qddot);
+      maintenance_mode = "close_both_force_deficit";
+    }
+  }
+
+  if (maintenance_mode.empty()) {
+    return;
+  }
+
+  if (
+    config_.mppi.action_lower_bound.size() == desired_action.size() &&
+    config_.mppi.action_upper_bound.size() == desired_action.size())
+  {
+    for (Eigen::Index i = 0; i < desired_action.size(); ++i) {
+      desired_action[i] =
+        ClampFiniteRange(
+          desired_action[i],
+          config_.mppi.action_lower_bound[i],
+          config_.mppi.action_upper_bound[i]);
+    }
+  }
+
+  const Eigen::VectorXd action_delta = desired_action - *applied_action;
+  if (action_delta.norm() <= 1.0e-12 || !action_delta.allFinite()) {
+    return;
+  }
+
+  const double dt_sec = config_.mppi.dt;
+  if (!std::isfinite(dt_sec) || dt_sec <= 0.0) {
+    return;
+  }
+  command->qdot_cmd += action_delta * dt_sec;
+  const double dt_squared = dt_sec * dt_sec;
+  for (std::size_t i = 0; i < active_q_indices_.size(); ++i) {
+    const int q_index = active_q_indices_[i];
+    const int v_index = active_v_indices_[i];
+    if (
+      q_index >= 0 && q_index < command->q_cmd.size() &&
+      v_index >= 0 && v_index < action_delta.size())
+    {
+      command->q_cmd[q_index] += action_delta[v_index] * dt_squared;
+    }
+  }
+
+  *applied_action = desired_action;
+  if (detail != nullptr) {
+    std::ostringstream stream;
+    stream << *detail
+           << "; maintenance=" << maintenance_mode
+           << " thumb_active=" << (contact.thumb_active ? "true" : "false")
+           << " index_active=" << (contact.index_active ? "true" : "false")
+           << " thumb_force_n=" << std::fixed << std::setprecision(4)
+           << contact.thumb_force_n
+           << " index_force_n=" << contact.index_force_n
+           << " total_force_n=" << contact.totalForceN()
+           << " active_hemispheres=" << contact.activeHemisphereTotal()
+           << " action_delta_norm=" << action_delta.norm();
+    *detail = stream.str();
+  }
 }
 
 bool MPPIGraspState::HasContinuationContact(const mppi_core::GraspState & state) const

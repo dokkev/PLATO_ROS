@@ -52,9 +52,11 @@ struct MPPIGraspContinuationConfig
 struct MPPIGraspMaintenanceConfig
 {
   bool enabled{true};
+  std::size_t target_active_hemisphere_total{4};
   double target_total_force_n{1.0};
   double min_sensor_force_n{0.05};
   double closing_qddot_rad_s2{1.0};
+  double hemisphere_deficit_qddot_rad_s2{1.0};
   double one_sided_closing_qddot_rad_s2{1.0};
 };
 

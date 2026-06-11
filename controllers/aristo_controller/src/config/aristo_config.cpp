@@ -428,6 +428,7 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
   const auto logging_params = params ? params["logging"] : YAML::Node();
   const auto debug_params = params ? params["debug"] : YAML::Node();
   const auto continuation_params = params ? params["continuation"] : YAML::Node();
+  const auto maintenance_params = params ? params["maintenance"] : YAML::Node();
   config.mppi = mppi_core::ParseMPPIConfig(mppi_params, num_joints, config.mppi);
   config.rollout = mppi_core::ParseGraspStateRolloutConfig(rollout_params, config.rollout);
   config.tactile_transition =
@@ -491,6 +492,41 @@ aristo_controller::state_machines::MPPIGraspStateConfig parse_mppi_grasp_state_c
       continuation_params,
       "min_active_hemisphere_total",
       config.continuation.min_active_hemisphere_total);
+  config.maintenance.enabled =
+    optional_scalar<bool>(
+      maintenance_params,
+      "enabled",
+      config.maintenance.enabled);
+  config.maintenance.target_active_hemisphere_total =
+    optional_scalar<std::size_t>(
+      maintenance_params,
+      "target_active_hemisphere_total",
+      config.maintenance.target_active_hemisphere_total);
+  config.maintenance.target_total_force_n =
+    optional_scalar<double>(
+      maintenance_params,
+      "target_total_force_n",
+      config.maintenance.target_total_force_n);
+  config.maintenance.min_sensor_force_n =
+    optional_scalar<double>(
+      maintenance_params,
+      "min_sensor_force_n",
+      config.maintenance.min_sensor_force_n);
+  config.maintenance.closing_qddot_rad_s2 =
+    optional_scalar<double>(
+      maintenance_params,
+      "closing_qddot_rad_s2",
+      config.maintenance.closing_qddot_rad_s2);
+  config.maintenance.hemisphere_deficit_qddot_rad_s2 =
+    optional_scalar<double>(
+      maintenance_params,
+      "hemisphere_deficit_qddot_rad_s2",
+      config.maintenance.hemisphere_deficit_qddot_rad_s2);
+  config.maintenance.one_sided_closing_qddot_rad_s2 =
+    optional_scalar<double>(
+      maintenance_params,
+      "one_sided_closing_qddot_rad_s2",
+      config.maintenance.one_sided_closing_qddot_rad_s2);
   return config;
 }
 

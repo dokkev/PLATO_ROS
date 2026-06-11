@@ -153,6 +153,17 @@ state_machine:
           min_active_tactile_sensors: 1
           min_active_hemisphere_total: 1
 
+        # Conservative post-MPPI grasp maintenance. This only biases the
+        # thumb/index active joints and still passes through command safety.
+        maintenance:
+          enabled: true
+          target_active_hemisphere_total: 4
+          target_total_force_n: 1.0
+          min_sensor_force_n: 0.05
+          closing_qddot_rad_s2: 1.0
+          hemisphere_deficit_qddot_rad_s2: 1.0
+          one_sided_closing_qddot_rad_s2: 1.0
+
         rollout:
           disturbance:
             enabled: false

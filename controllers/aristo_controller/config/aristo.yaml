@@ -14,7 +14,7 @@ controller:
 driver_gains:
   # Driver-local impedance gains in SI units:
   #   kp: Nm/rad, kd: Nm/(rad/s)
-  kp: [0.0, 0.0, 0.15, 0.15, 0.15, 0.15, 0.08, 0.08]
+  kp: [0.0, 0.0, 0.2, 0.2, 0.2, 0.2, 0.08, 0.08]
   kd: [0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.002, 0.002]
 
 state_machine:

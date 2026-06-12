@@ -59,12 +59,6 @@ Direct grasp command topic:
 Terminal 2:
 
 ```bash
-ros2 launch joint_impedance_controller joint_impedance_trajectory_controller.launch.py
-```
-
-Terminal 3:
-
-```bash
 ros2 launch maestro_teleop joint_teleop.launch.py
 ```
 
@@ -74,10 +68,16 @@ Input topic:
 /plato2/joint_impedance_controller/commands_float8array_HY
 ```
 
+Relay output:
+
+```text
+/plato2/aristo_controller/joint_teleop
+```
+
 ## Notes
 
 - Parallel grasp launches Naritouch and the reference grasp force generator.
-  Joint teleop and the joint trajectory launch do not launch tactile sensing.
+  Joint teleop does not launch tactile sensing.
 - Do not use the old `grasp_node` or `/naritouch_grasp_demo/start_grasp`
   commands from the old branch.
 - To verify hardware:

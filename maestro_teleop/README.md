@@ -25,7 +25,7 @@ It publishes:
 [t-i_dis, I_PIP]
 ```
 
-## HY Float8 To LPF Trajectory
+## HY Float8 To Joint Teleop
 
 `float8array_to_impedance_trajectory` subscribes to:
 
@@ -36,7 +36,7 @@ It publishes:
 It republishes the 8-value position command to:
 
 ```text
-/plato2/joint_impedance_trajectory_controller/commands std_msgs/msg/Float64MultiArray
+/plato2/aristo_controller/joint_teleop std_msgs/msg/Float64MultiArray
 ```
 
-The joint impedance trajectory controller applies the LPF.
+The `plato_ros_controller` joint teleop state consumes this target.

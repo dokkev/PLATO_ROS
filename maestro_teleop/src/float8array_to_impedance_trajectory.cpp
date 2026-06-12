@@ -11,12 +11,12 @@ class Float8ArrayToImpedanceTrajectory : public rclcpp::Node
 {
 public:
   Float8ArrayToImpedanceTrajectory()
-  : Node("float8array_to_impedance_trajectory")
+  : Node("float8array_to_joint_teleop")
   {
     source_topic_ = declare_parameter<std::string>(
       "source_topic", "/plato2/joint_impedance_controller/commands_float8array_HY");
     target_topic_ = declare_parameter<std::string>(
-      "target_topic", "/plato2/joint_impedance_trajectory_controller/commands");
+      "target_topic", "/plato2/aristo_controller/joint_teleop");
     expected_size_ = declare_parameter<int>("expected_size", 8);
 
     publisher_ = create_publisher<std_msgs::msg::Float64MultiArray>(target_topic_, 10);
@@ -27,7 +27,7 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "Relaying %s -> %s through joint impedance trajectory LPF",
+      "Relaying %s -> %s as plato_ros_controller joint teleop target",
       source_topic_.c_str(),
       target_topic_.c_str());
   }

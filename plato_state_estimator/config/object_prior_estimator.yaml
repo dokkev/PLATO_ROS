@@ -1,0 +1,62 @@
+# Tactile object prior particle estimator.
+
+object_prior_estimator:
+  ros__parameters:
+    update_rate: 100.0
+    world_frame: base_link
+
+    joint_state_topic: /plato2/joint_states
+    tactile_topics:
+      - /tactile_0/tactile_states
+      - /tactile_1/tactile_states
+    tactile_frame_names:
+      - thumb_distal_tactile
+      - index_distal_tactile
+    tactile_normal_axis_signs: [1.0, 1.0]
+
+    object_pose_topic: ~/object_pose
+    particle_pose_topic: ~/particle_poses
+    status_topic: ~/status
+    marker_topic: ~/markers
+    publish_markers: true
+    publish_prior_marker_when_no_belief: true
+    hide_corrected_markers_without_contact: true
+    log_corrections: true
+    correction_log_interval_s: 0.5
+
+    cop_scale_m: 0.001
+    hemisphere_radius_m: 0.003
+    hemisphere_contact_threshold_n: 0.1
+    # Fingertips can be close during a real block grasp, so keep this as an
+    # opt-in safety gate rather than suppressing corrected beliefs by default.
+    reject_close_sensor_gap_as_fingertip_touch: false
+    sensor_gap_min_object_extent_scale: 0.8
+    sensor_gap_min_margin_m: 0.002
+
+    object_name: jenga_block
+    object_geometry_name: jenga_block
+    object_geometry_type: box
+    object_geometry_uri: package://mppi_core/object/jenga_block.urdf
+    object_primitive_size_m: [0.15, 0.05, 0.03]
+    object_initial_xyz: [0.26, 0.04, -0.05]
+    object_initial_rpy: [0.0, 0.0, 0.0]
+    object_position_std_m: [0.02, 0.01, 0.02]
+    object_rpy_std_rad: [0.1, 0.1, 0.2]
+
+    belief_particle_count: 32
+    belief_random_seed: 17
+    belief_min_contact_count: 1
+    belief_fallback_position_sample_std_m: [0.01, 0.01, 0.01]
+    belief_fallback_rpy_sample_std_rad: [0.05, 0.05, 0.05]
+    belief_surface_distance_sigma_m: 0.005
+    belief_normal_alignment_sigma: 0.25
+    belief_prior_position_sigma_m: 0.02
+    belief_prior_rotation_sigma_rad: 0.35
+    belief_contact_force_threshold_n: 0.0
+    belief_contact_force_weight_scale_n: 1.0
+    belief_use_thumb_index_contact_width: true
+    belief_contact_width_sigma_m: 0.005
+    belief_w_surface: 1.0
+    belief_w_normal: 0.5
+    belief_w_prior: 0.1
+    belief_w_contact_width: 0.5

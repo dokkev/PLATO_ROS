@@ -43,6 +43,7 @@
 #include "mppi_core/object/object_contact_prediction.hpp"
 #include "mppi_core/object/object_contact_support_evaluator.hpp"
 #include "mppi_core/object/object_geometry_query.hpp"
+#include "mppi_core/object/object_prior_estimator.hpp"
 #include "mppi_core/policy/continuous_qddot_mppi.hpp"
 #include "mppi_core/robot/robot_system.hpp"
 #include "mppi_core/rollout/contact_force_rollout.hpp"
@@ -914,6 +915,126 @@ TEST(ObjectBeliefInitializerTest,
   ASSERT_TRUE(mppi_core::HasVirtualObjectBelief(resolved));
   ASSERT_EQ(resolved.particleCount(), 2U);
   EXPECT_GT(resolved.particles[0].weight, resolved.particles[1].weight);
+}
+
+TEST(ObjectPriorEstimatorTest, UpdatesAndKeepsBeliefAcrossMissingContacts) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(MakeHemisphere(0, Eigen::Vector2d::Zero()));
+
+  auto tactile_context = MakeTactileContextForState(tactile);
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+
+  mppi_core::ObjectBeliefInitializationConfig config;
+  config.particle_count = 1;
+  config.min_contact_count = 1;
+
+  mppi_core::ObjectPriorEstimator estimator;
+  ASSERT_TRUE(estimator.Configure(
+      MakeTestBoxObjectPrior(Eigen::Vector3d::Zero()), config));
+
+  const Eigen::VectorXd q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  const auto first_result = estimator.Update(
+      q_meas,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      std::vector<mppi_core::TactileSensorContext>{tactile_context});
+
+  ASSERT_TRUE(first_result.valid);
+  EXPECT_TRUE(estimator.has_belief());
+  EXPECT_TRUE(estimator.status().updated);
+  EXPECT_TRUE(estimator.status().belief_valid);
+  EXPECT_EQ(estimator.status().update_count, 1U);
+  EXPECT_EQ(estimator.status().contact_count, 1U);
+  EXPECT_EQ(estimator.status().particle_count, 1U);
+
+  Eigen::Isometry3d representative_pose = Eigen::Isometry3d::Identity();
+  EXPECT_TRUE(estimator.representativePose(&representative_pose));
+  EXPECT_TRUE(representative_pose.matrix().allFinite());
+
+  const auto inactive_tactile = MakeInactiveTactileState(tactile);
+  const auto missing_contact_result = estimator.Update(
+      q_meas,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{
+          inactive_tactile},
+      std::vector<mppi_core::TactileSensorContext>{tactile_context});
+
+  EXPECT_FALSE(missing_contact_result.valid);
+  EXPECT_TRUE(estimator.has_belief());
+  EXPECT_FALSE(estimator.status().updated);
+  EXPECT_TRUE(estimator.status().belief_valid);
+  EXPECT_EQ(estimator.status().update_count, 1U);
+  EXPECT_EQ(estimator.status().contact_count, 0U);
+  EXPECT_EQ(estimator.status().particle_count, 1U);
+}
+
+TEST(ObjectPriorEstimatorTest, RejectsCloseTwoSensorGapAsFingertipTouch) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState thumb;
+  thumb.valid = true;
+  thumb.sensor_index = 0;
+  thumb.contact_state = mppi_core::TactileState::kEnoughContacts;
+  thumb.hemispheres.push_back(MakeHemisphere(0, Eigen::Vector2d::Zero()));
+
+  mppi_core::TactileState index = thumb;
+  index.sensor_index = 1;
+
+  auto thumb_context = MakeTactileContextForState(thumb);
+  thumb_context.sensor_index = 0;
+  thumb_context.kinematics = &kinematics;
+  auto index_context = MakeTactileContextForState(index);
+  index_context.sensor_index = 1;
+  index_context.kinematics = &kinematics;
+
+  mppi_core::ObjectPriorEstimatorConfig config;
+  config.belief.particle_count = 1;
+  config.belief.min_contact_count = 1;
+  config.reject_close_sensor_gap_as_fingertip_touch = true;
+  config.sensor_gap_min_object_extent_scale = 0.8;
+  config.sensor_gap_min_margin_m = 0.0;
+
+  mppi_core::ObjectPriorEstimator estimator;
+  ASSERT_TRUE(estimator.Configure(
+      MakeTestBoxObjectPrior(Eigen::Vector3d::Zero(),
+                             Eigen::Vector3d{0.10, 0.08, 0.06}),
+      config));
+
+  const Eigen::VectorXd q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  const auto result = estimator.Update(
+      q_meas, MakeTactileSensors(thumb, index),
+      std::vector<mppi_core::TactileSensorContext>{
+          thumb_context, index_context});
+
+  EXPECT_FALSE(result.valid);
+  EXPECT_FALSE(estimator.has_belief());
+  EXPECT_FALSE(estimator.status().updated);
+  EXPECT_TRUE(estimator.status().close_sensor_gap_rejected);
+  EXPECT_EQ(estimator.status().update_count, 0U);
+  EXPECT_EQ(estimator.status().contact_count, 2U);
+  EXPECT_NEAR(estimator.status().sensor_gap_m, 0.0, kTolerance);
+  EXPECT_NEAR(estimator.status().object_min_extent_m, 0.06, kTolerance);
+  EXPECT_NEAR(estimator.status().min_sensor_gap_m, 0.048, kTolerance);
 }
 
 TEST(ObjectContactPredictionTest,

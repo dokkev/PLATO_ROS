@@ -16,7 +16,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "target_topic",
-            default_value="/plato2/parallel_grasp_controller/commands",
+            default_value="/plato2/parallel_grasp_controller/teleop_commands",
             description="Output Float64MultiArray: [t-i_dis, I_PIP].",
         ),
         Node(

@@ -28,6 +28,7 @@ set(${PROJECT_NAME}_SOURCES
   src/object/object_contact_prediction.cpp
   src/object/object_contact_support_evaluator.cpp
   src/object/object_geometry_query.cpp
+  src/object/object_prior_estimator.cpp
   src/policy/continuous_qddot_mppi.cpp
   src/policy/grasp_action_library.cpp
   src/policy/robust_grasp_policy.cpp

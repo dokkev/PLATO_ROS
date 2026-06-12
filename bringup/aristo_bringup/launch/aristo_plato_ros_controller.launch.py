@@ -160,22 +160,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    static_tf_optimo_to_plato = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_tf_optimo_to_plato",
-        arguments=[
-            "--x", "0",
-            "--y", "0",
-            "--z", "0",
-            "--roll", "0.0",
-            "--pitch", "-1.5708",
-            "--yaw", "3.14159",
-            "--frame-id", "ee",
-            "--child-frame-id", "base_link",
-        ],
-        output="screen",
-    )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -214,7 +198,6 @@ def generate_launch_description():
         + [
             control_node,
             robot_state_pub,
-            static_tf_optimo_to_plato,
             tf_merger,
             index_fingertip_pose_pub,
             joint_state_broadcaster_spawner,

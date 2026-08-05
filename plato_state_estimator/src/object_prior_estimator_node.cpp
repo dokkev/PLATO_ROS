@@ -441,11 +441,35 @@ ObjectPriorEstimatorNode::loadEstimatorConfigFromParameters()
     this->declare_parameter<bool>("belief_use_thumb_index_contact_width", true);
   belief.contact_width_sigma_m =
     this->declare_parameter<double>("belief_contact_width_sigma_m", 0.005);
+  belief.use_quasi_static_rbd =
+    this->declare_parameter<bool>(
+    "belief_use_quasi_static_rbd", belief.use_quasi_static_rbd);
+  belief.object_mass_kg =
+    this->declare_parameter<double>(
+    "belief_object_mass_kg", belief.object_mass_kg);
+  belief.gravity_world_mps2 = Vector3FromParam(
+    this->declare_parameter<std::vector<double>>(
+      "belief_gravity_world_mps2", std::vector<double>{0.0, 0.0, -9.81}),
+    belief.gravity_world_mps2);
+  belief.static_force_sigma_n =
+    this->declare_parameter<double>(
+    "belief_static_force_sigma_n", belief.static_force_sigma_n);
+  belief.static_torque_sigma_nm =
+    this->declare_parameter<double>(
+    "belief_static_torque_sigma_nm", belief.static_torque_sigma_nm);
+  belief.w_static_force_balance =
+    this->declare_parameter<double>(
+    "belief_w_static_force_balance", belief.w_static_force_balance);
+  belief.w_static_torque_balance =
+    this->declare_parameter<double>(
+    "belief_w_static_torque_balance", belief.w_static_torque_balance);
   belief.w_surface = this->declare_parameter<double>("belief_w_surface", 1.0);
   belief.w_normal = this->declare_parameter<double>("belief_w_normal", 0.5);
   belief.w_prior = this->declare_parameter<double>("belief_w_prior", 0.1);
   belief.w_contact_width =
     this->declare_parameter<double>("belief_w_contact_width", 0.5);
+  belief.w_quasi_static_rbd =
+    this->declare_parameter<double>("belief_w_quasi_static_rbd", belief.w_quasi_static_rbd);
   return config;
 }
 
@@ -729,7 +753,10 @@ void ObjectPriorEstimatorNode::publishEstimate(
          << " best_particle_index=" << status.best_particle_index
          << " best_cost=" << status.best_cost
          << " best_surface_distance_m=" << status.best_surface_distance_m
-         << " best_normal_alignment_error=" << status.best_normal_alignment_error;
+         << " best_normal_alignment_error=" << status.best_normal_alignment_error
+         << " best_quasi_static_rbd_cost=" << status.best_quasi_static_rbd_cost
+         << " best_static_force_residual_n=" << status.best_static_force_residual_n
+         << " best_static_torque_residual_nm=" << status.best_static_torque_residual_nm;
   status_msg.data = stream.str();
   status_pub_->publish(status_msg);
 
@@ -788,7 +815,8 @@ void ObjectPriorEstimatorNode::logCorrection(
       this->get_logger(),
       "object prior corrected: update=%zu contacts=%zu active_sensors=%zu "
       "active_hemispheres=%zu particles=%zu best_cost=%.4f "
-      "surface_dist=%.5f normal_err=%.5f pose_xyz=[%.4f %.4f %.4f]",
+      "surface_dist=%.5f normal_err=%.5f rbd_cost=%.4f "
+      "force_res=%.4fN torque_res=%.5fNm pose_xyz=[%.4f %.4f %.4f]",
       status.update_count,
       status.contact_count,
       active_sensor_count,
@@ -797,6 +825,9 @@ void ObjectPriorEstimatorNode::logCorrection(
       status.best_cost,
       status.best_surface_distance_m,
       status.best_normal_alignment_error,
+      status.best_quasi_static_rbd_cost,
+      status.best_static_force_residual_n,
+      status.best_static_torque_residual_nm,
       corrected_pose.translation().x(),
       corrected_pose.translation().y(),
       corrected_pose.translation().z());
@@ -805,7 +836,8 @@ void ObjectPriorEstimatorNode::logCorrection(
       this->get_logger(),
       "object prior corrected: update=%zu contacts=%zu active_sensors=%zu "
       "active_hemispheres=%zu particles=%zu best_cost=%.4f "
-      "surface_dist=%.5f normal_err=%.5f pose_unavailable=true",
+      "surface_dist=%.5f normal_err=%.5f rbd_cost=%.4f "
+      "force_res=%.4fN torque_res=%.5fNm pose_unavailable=true",
       status.update_count,
       status.contact_count,
       active_sensor_count,
@@ -813,7 +845,10 @@ void ObjectPriorEstimatorNode::logCorrection(
       status.particle_count,
       status.best_cost,
       status.best_surface_distance_m,
-      status.best_normal_alignment_error);
+      status.best_normal_alignment_error,
+      status.best_quasi_static_rbd_cost,
+      status.best_static_force_residual_n,
+      status.best_static_torque_residual_nm);
   }
   last_logged_correction_update_count_ = status.update_count;
   last_correction_log_time_ = stamp;
@@ -926,6 +961,9 @@ void ObjectPriorEstimatorNode::publishMarkers(
   normal_marker.color = Color(0.0F, 1.0F, 0.25F, 0.8F);
 
   constexpr double kNormalLengthM = 0.025;
+  Eigen::Vector3d contact_centroid_world = Eigen::Vector3d::Zero();
+  double lowest_contact_z_m = std::numeric_limits<double>::infinity();
+  std::size_t visible_contact_count = 0;
   for (const auto & contact : result.contacts) {
     if (!contact.point_world_m.allFinite() ||
       !contact.normal_world.allFinite() ||
@@ -937,18 +975,26 @@ void ObjectPriorEstimatorNode::publishMarkers(
     contact_marker.points.push_back(PointMsg(contact.point_world_m));
     normal_marker.points.push_back(PointMsg(contact.point_world_m));
     normal_marker.points.push_back(PointMsg(contact.point_world_m + kNormalLengthM * normal));
+    contact_centroid_world += contact.point_world_m;
+    lowest_contact_z_m = std::min(lowest_contact_z_m, contact.point_world_m.z());
+    ++visible_contact_count;
   }
   markers.markers.push_back(contact_marker);
   markers.markers.push_back(normal_marker);
 
   Eigen::Vector3d text_position = estimator_.prior().initial_pose_world.translation();
-  if (has_corrected_pose) {
+  Eigen::Vector3d text_offset{0.0, 0.0, 0.08};
+  if (visible_contact_count > 0U) {
+    text_position = contact_centroid_world / static_cast<double>(visible_contact_count);
+    text_position.z() = lowest_contact_z_m;
+    text_offset = Eigen::Vector3d{0.0, 0.0, -0.02};
+  } else if (has_corrected_pose) {
     text_position = representative_pose.translation();
   }
   auto text_marker = BaseMarker(
     world_frame_, stamp, "object_prior_status", 0,
     visualization_msgs::msg::Marker::TEXT_VIEW_FACING);
-  text_marker.pose.position = PointMsg(text_position + Eigen::Vector3d{0.0, 0.0, 0.08});
+  text_marker.pose.position = PointMsg(text_position + text_offset);
   text_marker.scale.z = 0.025;
   text_marker.color = Color(1.0F, 1.0F, 1.0F, 0.9F);
   std::ostringstream text;
@@ -957,7 +1003,9 @@ void ObjectPriorEstimatorNode::publishMarkers(
        << " corrected_block=" << (has_corrected_pose ? "true" : "false")
        << " live_contact=" << (has_live_contact ? "true" : "false")
        << " contacts=" << result.contacts.size()
-       << " active_sensors=" << active_sensor_count;
+       << " active_sensors=" << active_sensor_count
+       << "\nrbd torque=" << estimator_.status().best_static_torque_residual_nm
+       << "Nm";
   for (std::size_t i = 0; i < tactile_sensors.size(); ++i) {
     const auto & tactile = tactile_sensors[i];
     const double force_z_n =

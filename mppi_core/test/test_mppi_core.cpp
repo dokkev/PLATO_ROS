@@ -917,6 +917,71 @@ TEST(ObjectBeliefInitializerTest,
   EXPECT_GT(resolved.particles[0].weight, resolved.particles[1].weight);
 }
 
+TEST(ObjectBeliefInitializerTest,
+     QuasiStaticRbdTermPrefersContactWrenchThroughCom) {
+  const auto sensor_model = MakeSinglePrismaticZSensorModel();
+  pinocchio::Data data(sensor_model.model);
+
+  mppi_core::PinocchioContactKinematicsContext kinematics;
+  kinematics.model = &sensor_model.model;
+  kinematics.data = &data;
+  kinematics.sensor_frame_id = sensor_model.sensor_frame_id;
+  kinematics.normal_axis_sign = -1.0;
+
+  mppi_core::TactileState tactile;
+  tactile.valid = true;
+  tactile.sensor_index = 0;
+  tactile.contact_state = mppi_core::TactileState::kEnoughContacts;
+  tactile.hemispheres.push_back(
+      MakeHemisphere(0, Eigen::Vector2d::Zero(), 1.0));
+
+  auto tactile_context = MakeTactileContextForState(tactile);
+  tactile_context.sensor_index = 0;
+  tactile_context.kinematics = &kinematics;
+
+  const auto prior = MakeTestBoxObjectPrior(Eigen::Vector3d::Zero());
+  mppi_core::VirtualObjectBelief previous;
+  previous.geometry = prior.geometry;
+  for (const double x_m : {0.0, 0.02}) {
+    mppi_core::VirtualObjectState particle;
+    particle.pose_world.setIdentity();
+    particle.pose_world.translation().x() = x_m;
+    particle.velocity_world.setZero();
+    particle.weight = 0.5;
+    particle.valid = true;
+    previous.particles.push_back(std::move(particle));
+  }
+  previous.valid = true;
+
+  mppi_core::ObjectBeliefInitializationConfig config;
+  config.min_contact_count = 1;
+  config.w_prior = 0.0;
+  config.w_contact_width = 0.0;
+  config.use_quasi_static_rbd = true;
+  config.w_quasi_static_rbd = 1.0;
+  config.w_static_force_balance = 0.0;
+  config.w_static_torque_balance = 1.0;
+  config.static_torque_sigma_nm = 0.01;
+
+  const Eigen::VectorXd q_meas = Eigen::VectorXd::Constant(1, 0.05);
+  const auto result = mppi_core::UpdateObjectBeliefFromCurrentContacts(
+      prior, previous, q_meas,
+      std::vector<mppi_core::TactileState,
+                  Eigen::aligned_allocator<mppi_core::TactileState>>{tactile},
+      std::vector<mppi_core::TactileSensorContext>{tactile_context}, config);
+
+  ASSERT_TRUE(result.valid);
+  ASSERT_EQ(result.particle_scores.size(), 2U);
+  EXPECT_EQ(result.best_particle_index, 0U);
+  EXPECT_NEAR(result.particle_scores[0].quasi_static_rbd_cost, 0.0,
+              kTolerance);
+  EXPECT_GT(result.particle_scores[1].quasi_static_rbd_cost,
+            result.particle_scores[0].quasi_static_rbd_cost);
+  EXPECT_GT(result.belief.particles[0].weight,
+            result.belief.particles[1].weight);
+  EXPECT_NEAR(result.best_static_torque_residual_nm, 0.0, kTolerance);
+}
+
 TEST(ObjectPriorEstimatorTest, UpdatesAndKeepsBeliefAcrossMissingContacts) {
   const auto sensor_model = MakeSinglePrismaticZSensorModel();
   pinocchio::Data data(sensor_model.model);

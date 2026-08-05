@@ -43,10 +43,23 @@ struct ObjectBeliefInitializationConfig {
   bool use_thumb_index_contact_width{true};
   double contact_width_sigma_m{0.005};
 
+  // Optional quasi-static rigid-body cue. This scores each object particle by
+  // how plausible the measured tactile contact wrench is for the particle COM.
+  // Net-force balance is off by default because fingertip tactile normals do
+  // not measure friction; torque balance is usually the safer tilt cue.
+  bool use_quasi_static_rbd{false};
+  double object_mass_kg{0.012};
+  Eigen::Vector3d gravity_world_mps2{Eigen::Vector3d{0.0, 0.0, -9.81}};
+  double static_force_sigma_n{1.0};
+  double static_torque_sigma_nm{0.01};
+  double w_static_force_balance{0.0};
+  double w_static_torque_balance{1.0};
+
   double w_surface{1.0};
   double w_normal{0.5};
   double w_prior{0.1};
   double w_contact_width{0.5};
+  double w_quasi_static_rbd{0.0};
 };
 
 struct ObjectContactObservation {
@@ -69,10 +82,13 @@ struct ObjectParticleScore {
   double normal_cost{std::numeric_limits<double>::infinity()};
   double prior_cost{std::numeric_limits<double>::infinity()};
   double contact_width_cost{0.0};
+  double quasi_static_rbd_cost{0.0};
   double total_cost{std::numeric_limits<double>::infinity()};
   double mean_surface_distance_m{std::numeric_limits<double>::infinity()};
   double mean_normal_alignment_error{std::numeric_limits<double>::infinity()};
   double contact_width_error_m{std::numeric_limits<double>::quiet_NaN()};
+  double static_force_residual_n{std::numeric_limits<double>::quiet_NaN()};
+  double static_torque_residual_nm{std::numeric_limits<double>::quiet_NaN()};
 };
 
 struct ObjectBeliefInitializationResult {
@@ -90,6 +106,11 @@ struct ObjectBeliefInitializationResult {
   double best_cost{std::numeric_limits<double>::infinity()};
   double best_surface_distance_m{std::numeric_limits<double>::infinity()};
   double best_normal_alignment_error{std::numeric_limits<double>::infinity()};
+  double best_quasi_static_rbd_cost{std::numeric_limits<double>::quiet_NaN()};
+  double best_static_force_residual_n{
+      std::numeric_limits<double>::quiet_NaN()};
+  double best_static_torque_residual_nm{
+      std::numeric_limits<double>::quiet_NaN()};
 };
 
 std::vector<ObjectContactObservation,

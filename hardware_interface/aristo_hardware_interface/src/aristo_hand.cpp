@@ -327,6 +327,7 @@ bool Hand::execute_direct_frames_(
 
 bool Hand::query_startup_metadata_()
 {
+  bool all_motor_params_ready = true;
   for (std::size_t i = 0; i < actuators_.size(); ++i) {
     TPCANMsg frame{};
     {
@@ -334,15 +335,13 @@ bool Hand::query_startup_metadata_()
       frame = actuators_[i].read_motor_params().frame;
     }
 
-    if (!execute_direct_frames_({frame}, kDirectTxFrameTimeout)) {
-      return false;
-    }
-    if (!wait_for_motor_params_(i, kStartupMetadataTimeout)) {
+    if (!wait_for_motor_params_(i, frame, kStartupMetadataTimeout)) {
       RCLCPP_ERROR(
         logger(),
         "Timed out waiting for Aristo actuator %zu motor params.",
         i + 1);
-      return false;
+      all_motor_params_ready = false;
+      continue;
     }
     {
       std::lock_guard<std::mutex> lock(state_mutex_);
@@ -350,6 +349,7 @@ bool Hand::query_startup_metadata_()
     }
   }
 
+  bool all_limits_ready = true;
   for (std::size_t i = 0; i < actuators_.size(); ++i) {
     TPCANMsg frame{};
     {
@@ -357,15 +357,13 @@ bool Hand::query_startup_metadata_()
       frame = actuators_[i].read_can_limits().frame;
     }
 
-    if (!execute_direct_frames_({frame}, kDirectTxFrameTimeout)) {
-      return false;
-    }
-    if (!wait_for_active_limits_(i, kStartupMetadataTimeout)) {
+    if (!wait_for_active_limits_(i, frame, kStartupMetadataTimeout)) {
       RCLCPP_ERROR(
         logger(),
         "Timed out waiting for Aristo actuator %zu MIT limits.",
         i + 1);
-      return false;
+      all_limits_ready = false;
+      continue;
     }
     {
       std::lock_guard<std::mutex> lock(state_mutex_);
@@ -373,7 +371,7 @@ bool Hand::query_startup_metadata_()
     }
   }
 
-  return true;
+  return all_motor_params_ready && all_limits_ready;
 }
 
 bool Hand::confirm_mit_mode_(std::chrono::milliseconds timeout)
@@ -420,11 +418,24 @@ bool Hand::confirm_mit_mode_(std::chrono::milliseconds timeout)
   return false;
 }
 
-bool Hand::wait_for_motor_params_(std::size_t actuator_index, std::chrono::milliseconds timeout)
+bool Hand::wait_for_motor_params_(
+  std::size_t actuator_index,
+  const TPCANMsg & request_frame,
+  std::chrono::milliseconds timeout)
 {
   const auto deadline = std::chrono::steady_clock::now() + timeout;
+  auto next_request_time = std::chrono::steady_clock::now();
 
   while (std::chrono::steady_clock::now() < deadline) {
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= next_request_time) {
+      const TPCANStatus status = send_frame_blocking_(request_frame, kDirectTxFrameTimeout);
+      if (status != PCAN_ERROR_OK) {
+        return false;
+      }
+      next_request_time = now + kStartupMetadataRetryInterval;
+    }
+
     (void)poll_can_bus();
 
     {
@@ -441,11 +452,24 @@ bool Hand::wait_for_motor_params_(std::size_t actuator_index, std::chrono::milli
   return actuator_has_motor_params_(actuator_index);
 }
 
-bool Hand::wait_for_active_limits_(std::size_t actuator_index, std::chrono::milliseconds timeout)
+bool Hand::wait_for_active_limits_(
+  std::size_t actuator_index,
+  const TPCANMsg & request_frame,
+  std::chrono::milliseconds timeout)
 {
   const auto deadline = std::chrono::steady_clock::now() + timeout;
+  auto next_request_time = std::chrono::steady_clock::now();
 
   while (std::chrono::steady_clock::now() < deadline) {
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= next_request_time) {
+      const TPCANStatus status = send_frame_blocking_(request_frame, kDirectTxFrameTimeout);
+      if (status != PCAN_ERROR_OK) {
+        return false;
+      }
+      next_request_time = now + kStartupMetadataRetryInterval;
+    }
+
     (void)poll_can_bus();
 
     {

@@ -47,6 +47,12 @@ struct ObjectPriorEstimatorStatus {
   double best_surface_distance_m{std::numeric_limits<double>::infinity()};
   double best_normal_alignment_error{
       std::numeric_limits<double>::infinity()};
+  double best_quasi_static_rbd_cost{
+      std::numeric_limits<double>::quiet_NaN()};
+  double best_static_force_residual_n{
+      std::numeric_limits<double>::quiet_NaN()};
+  double best_static_torque_residual_nm{
+      std::numeric_limits<double>::quiet_NaN()};
   double sensor_gap_m{std::numeric_limits<double>::infinity()};
   double min_sensor_gap_m{0.0};
   double object_min_extent_m{std::numeric_limits<double>::infinity()};

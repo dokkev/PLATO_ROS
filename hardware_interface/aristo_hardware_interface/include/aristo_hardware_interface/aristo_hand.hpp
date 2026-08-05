@@ -55,6 +55,7 @@ private:
   static constexpr std::chrono::microseconds kDirectTxFrameTimeout{10000};
   static constexpr std::chrono::milliseconds kRxStaleTimeout{20};
   static constexpr std::chrono::milliseconds kStartupMetadataTimeout{500};
+  static constexpr std::chrono::milliseconds kStartupMetadataRetryInterval{50};
 
   bool update_measurements_() override;
   void refresh_state_snapshot_() override;
@@ -67,8 +68,14 @@ private:
     std::chrono::microseconds timeout);
   bool query_startup_metadata_();
   bool confirm_mit_mode_(std::chrono::milliseconds timeout);
-  bool wait_for_motor_params_(std::size_t actuator_index, std::chrono::milliseconds timeout);
-  bool wait_for_active_limits_(std::size_t actuator_index, std::chrono::milliseconds timeout);
+  bool wait_for_motor_params_(
+    std::size_t actuator_index,
+    const TPCANMsg & request_frame,
+    std::chrono::milliseconds timeout);
+  bool wait_for_active_limits_(
+    std::size_t actuator_index,
+    const TPCANMsg & request_frame,
+    std::chrono::milliseconds timeout);
   bool startup_metadata_ready_() const;
   bool actuator_has_motor_params_(std::size_t actuator_index) const;
   bool actuator_has_active_limits_(std::size_t actuator_index) const;

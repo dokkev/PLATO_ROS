@@ -276,6 +276,11 @@ ObjectBeliefInitializationResult ObjectPriorEstimator::Update(
   status_.best_surface_distance_m = result.best_surface_distance_m;
   status_.best_normal_alignment_error =
       result.best_normal_alignment_error;
+  status_.best_quasi_static_rbd_cost = result.best_quasi_static_rbd_cost;
+  status_.best_static_force_residual_n =
+      result.best_static_force_residual_n;
+  status_.best_static_torque_residual_nm =
+      result.best_static_torque_residual_nm;
 
   if (result.valid) {
     belief_ = result.belief;

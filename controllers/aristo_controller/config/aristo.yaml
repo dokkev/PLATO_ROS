@@ -88,7 +88,7 @@ state_machine:
         grasp_task:
           # q_ready is copied from grasp_ready.target_jpos.
           # grasp_teleop uses this task for motion and contact-gated handoff only.
-          lpf_alpha: 0.2
+          lpf_alpha: 0.05
           force_exit_u_threshold: 0.75
           debug_print_contact_states: false
           debug_print_contact_interval_s: 0.25

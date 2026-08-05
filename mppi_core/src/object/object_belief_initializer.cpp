@@ -210,6 +210,82 @@ void ScoreContactWidth(
       SafeSquared(score->contact_width_error_m / width_sigma);
 }
 
+void ScoreQuasiStaticRbd(
+    const Eigen::Isometry3d& particle_pose_world,
+    const std::vector<ObjectContactObservation,
+                      Eigen::aligned_allocator<ObjectContactObservation>>&
+        contacts,
+    const ObjectBeliefInitializationConfig& config,
+    ObjectParticleScore* score) {
+  if (score == nullptr || !config.use_quasi_static_rbd ||
+      std::max(0.0, config.w_quasi_static_rbd) <= 0.0) {
+    return;
+  }
+
+  const double force_weight = std::max(0.0, config.w_static_force_balance);
+  const double torque_weight = std::max(0.0, config.w_static_torque_balance);
+  if (force_weight <= 0.0 && torque_weight <= 0.0) {
+    return;
+  }
+  if (!particle_pose_world.matrix().allFinite() ||
+      !config.gravity_world_mps2.allFinite() ||
+      !std::isfinite(config.object_mass_kg) || config.object_mass_kg < 0.0) {
+    return;
+  }
+
+  const Eigen::Vector3d com_world_m = particle_pose_world.translation();
+  Eigen::Vector3d net_contact_force_n = Eigen::Vector3d::Zero();
+  Eigen::Vector3d net_contact_torque_nm = Eigen::Vector3d::Zero();
+  std::size_t force_contact_count = 0;
+
+  for (const auto& contact : contacts) {
+    if (!contact.point_world_m.allFinite() ||
+        !contact.normal_world.allFinite() ||
+        contact.normal_world.norm() <= kTiny ||
+        !std::isfinite(contact.normal_force_n) ||
+        contact.normal_force_n <= 0.0) {
+      continue;
+    }
+
+    const Eigen::Vector3d force_world_n =
+        contact.normal_force_n * contact.normal_world.normalized();
+    net_contact_force_n.noalias() += force_world_n;
+    net_contact_torque_nm.noalias() +=
+        (contact.point_world_m - com_world_m).cross(force_world_n);
+    ++force_contact_count;
+  }
+
+  if (force_contact_count == 0U) {
+    return;
+  }
+
+  const Eigen::Vector3d gravity_force_n =
+      config.object_mass_kg * config.gravity_world_mps2;
+  const Eigen::Vector3d force_residual_n =
+      net_contact_force_n + gravity_force_n;
+  const Eigen::Vector3d torque_residual_nm = net_contact_torque_nm;
+
+  score->static_force_residual_n = force_residual_n.norm();
+  score->static_torque_residual_nm = torque_residual_nm.norm();
+
+  double rbd_cost = 0.0;
+  if (force_weight > 0.0) {
+    const double force_sigma =
+        PositiveOrDefault(config.static_force_sigma_n, 1.0);
+    rbd_cost += force_weight *
+                SafeSquared(score->static_force_residual_n / force_sigma);
+  }
+  if (torque_weight > 0.0) {
+    const double torque_sigma =
+        PositiveOrDefault(config.static_torque_sigma_nm, 0.01);
+    rbd_cost += torque_weight *
+                SafeSquared(score->static_torque_residual_nm / torque_sigma);
+  }
+  if (std::isfinite(rbd_cost)) {
+    score->quasi_static_rbd_cost = rbd_cost;
+  }
+}
+
 ObjectParticleScore ScoreParticle(
     const ObjectPrior& prior, const Eigen::Isometry3d& particle_pose_world,
     const std::vector<ObjectContactObservation,
@@ -291,12 +367,15 @@ ObjectParticleScore ScoreParticle(
       SafeSquared(rotation_error_rad / prior_rotation_sigma);
   ScoreContactWidth(
       prior, particle_pose_world, contact_width, config, &score);
+  ScoreQuasiStaticRbd(particle_pose_world, contacts, config, &score);
 
   score.total_cost =
       std::max(0.0, config.w_surface) * score.surface_cost +
       std::max(0.0, config.w_normal) * score.normal_cost +
       std::max(0.0, config.w_prior) * score.prior_cost +
-      std::max(0.0, config.w_contact_width) * score.contact_width_cost;
+      std::max(0.0, config.w_contact_width) * score.contact_width_cost +
+      std::max(0.0, config.w_quasi_static_rbd) *
+          score.quasi_static_rbd_cost;
   return score;
 }
 
@@ -443,6 +522,11 @@ ObjectBeliefInitializationResult ReweightExistingBeliefFromContacts(
     result.best_surface_distance_m = best_score.mean_surface_distance_m;
     result.best_normal_alignment_error =
         best_score.mean_normal_alignment_error;
+    result.best_quasi_static_rbd_cost = best_score.quasi_static_rbd_cost;
+    result.best_static_force_residual_n =
+        best_score.static_force_residual_n;
+    result.best_static_torque_residual_nm =
+        best_score.static_torque_residual_nm;
   }
 
   result.belief.valid = true;
@@ -616,6 +700,11 @@ ObjectBeliefInitializationResult InitializeObjectBeliefFromContacts(
     result.best_surface_distance_m = best_score.mean_surface_distance_m;
     result.best_normal_alignment_error =
         best_score.mean_normal_alignment_error;
+    result.best_quasi_static_rbd_cost = best_score.quasi_static_rbd_cost;
+    result.best_static_force_residual_n =
+        best_score.static_force_residual_n;
+    result.best_static_torque_residual_nm =
+        best_score.static_torque_residual_nm;
   }
 
   result.belief.valid = true;

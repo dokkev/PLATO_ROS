@@ -39,7 +39,7 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_FALSE(config.grasp_ready.lifecycle.stay_here);
   EXPECT_DOUBLE_EQ(config.grasp_ready.lifecycle.duration, 2.0);
   EXPECT_EQ(config.grasp_ready.lifecycle.next_state_id, config.grasp_teleop.id);
-  EXPECT_EQ(config.grasp_teleop.lifecycle.next_state_id, config.robust_grasp_mpc.id);
+  EXPECT_EQ(config.grasp_teleop.lifecycle.next_state_id, config.grasp_force.id);
   EXPECT_EQ(config.grasp_force.lifecycle.next_state_id, config.grasp_teleop.id);
 
   EXPECT_EQ(config.driver_gains.kp.size(), config.num_joints);
@@ -119,8 +119,8 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
     plato_robot_system::task::GraspTaskConfig::ForceAggregation::kMin);
 
   const auto & grasp_force_task = config.grasp_force.state.grasp_task;
-  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_u, 0.5);
-  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_phi, 0.3);
+  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_u, 0.2);
+  EXPECT_DOUBLE_EQ(config.grasp_force.state.default_phi, 0.4);
   EXPECT_TRUE(config.grasp_force.state.exit_on_contact_lost);
   EXPECT_TRUE(config.grasp_force.state.exit_on_u_above_threshold);
   ASSERT_EQ(grasp_force_task.q_ready.size(), config.num_joints);
@@ -130,17 +130,17 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(grasp_force_task.lpf_alpha, 0.2);
   EXPECT_EQ(grasp_force_task.force_enter_debounce_ticks, 0);
   EXPECT_DOUBLE_EQ(grasp_force_task.force_exit_u_threshold, 0.6);
-  EXPECT_DOUBLE_EQ(grasp_force_task.kp_tactile_u_fb, 2.0);
+  EXPECT_DOUBLE_EQ(grasp_force_task.kp_tactile_u_fb, 3.0);
 
   const auto & robust_grasp = config.robust_grasp_mpc.state;
-  EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 3U);
+  EXPECT_EQ(robust_grasp.policy.rollout.horizon_steps, 2U);
   EXPECT_EQ(robust_grasp.policy.rollout.action_dim, static_cast<std::size_t>(config.num_joints));
   EXPECT_DOUBLE_EQ(robust_grasp.policy.rollout.dt, 0.01);
-  EXPECT_EQ(robust_grasp.policy.start.min_enough_contact_sensors, 1U);
+  EXPECT_EQ(robust_grasp.policy.start.min_enough_contact_sensors, 2U);
   EXPECT_EQ(robust_grasp.policy.start.min_active_hemispheres_total, 2U);
-  EXPECT_EQ(robust_grasp.policy.disturbance_sampler.num_disturbance_rollouts, 128U);
+  EXPECT_EQ(robust_grasp.policy.disturbance_sampler.num_disturbance_rollouts, 32U);
   EXPECT_EQ(robust_grasp.policy.disturbance_sampler.tactile_sensor_count, 2U);
-  EXPECT_DOUBLE_EQ(robust_grasp.policy.disturbance_sampler.sensor_local_noise_scale, 0.0);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.disturbance_sampler.sensor_local_noise_scale, 0.25);
   EXPECT_TRUE(mppi_core::IsValidObjectPrior(robust_grasp.object_prior));
   EXPECT_EQ(robust_grasp.object_prior.name, "jenga_block");
   EXPECT_EQ(
@@ -149,21 +149,22 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   EXPECT_DOUBLE_EQ(
     robust_grasp.object_prior.geometry.primitive_size_m.x(),
     0.15);
-  EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 200.0);
+  EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.contact_loss_weight, 20.0);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.cost.force_balance_weight, 10.0);
   EXPECT_TRUE(robust_grasp.policy.cost.object_support.enabled);
   EXPECT_DOUBLE_EQ(robust_grasp.safety.exit_u_threshold, 0.6);
   EXPECT_TRUE(robust_grasp.safety.exit_on_u_above_threshold);
   EXPECT_TRUE(robust_grasp.safety.exit_on_all_contacts_lost);
-  EXPECT_EQ(robust_grasp.policy.cost.object_support.max_object_samples, 8U);
+  EXPECT_EQ(robust_grasp.policy.cost.object_support.max_object_samples, 2U);
   EXPECT_DOUBLE_EQ(
     robust_grasp.policy.cost.object_support.contact_birth_margin_m,
     0.001);
   EXPECT_DOUBLE_EQ(
     robust_grasp.policy.cost.object_support.contact_loss_margin_m,
     0.003);
-  EXPECT_EQ(robust_grasp.policy.action_library.num_action_samples, 1U);
+  EXPECT_EQ(robust_grasp.policy.action_library.num_action_samples, 32U);
   EXPECT_DOUBLE_EQ(robust_grasp.policy.action_library.target_min_normal_force_n, 1.0);
+  EXPECT_TRUE(robust_grasp.policy.skip_mppi_when_not_enough_contacts);
   EXPECT_TRUE(robust_grasp.policy.require_both_contact_for_update);
   EXPECT_TRUE(robust_grasp.policy.return_hold_when_not_ready);
   EXPECT_TRUE(robust_grasp.debug.print_status);

@@ -5,64 +5,12 @@ short enough that an agent can quickly decide what matters.
 
 ## Current Focus
 
-- Work on `mppi_core` first.
-- Keep `mppi_core` ROS-free while making it ready to drive the PLATO grasp stack
-  through an explicit adapter layer.
-- Validate MPPI behavior with deterministic tests before connecting it to live
-  ROS topics or hardware.
+- Keep the source workspace focused on deployed hand control, tactile
+  feedback, and hardware support.
+- Avoid workspace-wide builds on machines where they freeze the system; prefer
+  focused package builds.
 
 ## Active Tasks
-
-### MPPI Core Integration Readiness
-
-Status: In progress
-
-Goal:
-
-- Make the contact-local MPPI core ready for the next integration step: measured
-  joint state + tactile/contact observation in, hybrid impedance command out.
-
-Non-goals:
-
-- Add ROS message dependencies to `mppi_core`.
-- Start real hardware validation before the adapter and tests are clear.
-- Hide tactile/contact preconditions inside `MPPIOptimizer`; the caller should
-  gate no-contact observations before calling `Update(...)`.
-
-Steps:
-
-1. Review the current `mppi_core` API surface: `GraspObservation`,
-   `TactileState`, `MPPIOptimizer`, `GraspStateRolloutModel`,
-   `GraspStabilityCost`, and `RobotCommand`.
-2. Keep the MPPI action contract as solver acceleration `qddot_sol` with units
-   `rad/s^2` or `m/s^2`; the rollout predicts `GraspState = RobotState +
-   vector<TactileState>`, where `RobotState` carries `q`, `qdot`, and `tau`,
-   and each `TactileState` carries predicted hemisphere/contact features plus
-   sensor-level aggregate fields.
-3. Define the adapter boundary outside `mppi_core`: ROS joint/tactile messages
-   become `GraspObservation`; `RobotCommand` becomes `ImpedanceCommands`.
-4. Check whether contact kinematics, split rollout/task config loading, and
-   NARI tactile conversion are available at the intended runtime call site.
-5. Add or tighten deterministic tests for no-contact gating, invalid tactile
-   transition, acceleration integration, RNEA/zero fallback, config parsing,
-   and command dimensions before wiring into ROS.
-6. Only after tests pass, choose the package/node that owns the ROS adapter and
-   launch wiring.
-
-Validation:
-
-- `colcon build --symlink-install --packages-up-to mppi_core`
-- `colcon test --packages-select mppi_core`
-- `colcon test-result --verbose`
-
-Notes:
-
-- `mppi_core` documents its intended shape in `mppi_core/MPPI.md`.
-- Detailed package notes live in `mppi_core/docs/grasp_state_mppi.md` and
-  `mppi_core/docs/file_structure.md`.
-- GraspState rollout is contact-kinematic and residual-free; residual/contact
-  force projection remains outside horizon dynamics for later correction work.
-- `RobotCommand` is the final embedded packet, not the sampled MPPI action.
 
 ### Repository Harness Cleanup
 
@@ -99,17 +47,9 @@ Validation:
 
 - Broad package restructuring.
 - Renaming launch arguments or topics without an explicit compatibility plan.
-- Real hardware testing before `mppi_core` adapter behavior is covered by
-  deterministic tests.
 - Reformatting unrelated source files.
 
 ## Open Questions
 
-- Which package should own the first ROS adapter from tactile/joint ROS topics
-  to `mppi_core::GraspObservation`?
-- Does the first integration target use NARI tactile messages directly, or a
-  higher-level tactile/contact estimate already produced elsewhere?
-- Which integration package should construct and cache the runtime
-  `RobotSystem` and per-sensor Pinocchio contact kinematics contexts?
 - Are `tactile_sensing` and `sdr_grasp_msgs` always expected in the same
   workspace, or should setup docs point to an external source?

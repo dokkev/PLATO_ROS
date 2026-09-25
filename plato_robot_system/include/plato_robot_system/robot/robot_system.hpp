@@ -31,9 +31,8 @@ using TactileSensorVector = sensor::TactileStateVector;
 //   tau may include measured motor torque, embedded feedback effects, contact
 //   reaction, filtering, and unmodeled dynamics.
 //
-// For MPPI rollout:
-//   q/qdot are predicted ideal states.
-//   tau is the model torque computed by RNEA(q, qdot, qddot_sol).
+// For model-based prediction, q/qdot may represent predicted states and tau
+// may hold inverse-dynamics torque estimates.
 //
 // RobotState::tau is not necessarily tau_cmd, tau_ff_cmd, tau_fb_cmd,
 // tau_meas, or tau_applied. Those names belong to command, measurement, or
@@ -81,10 +80,8 @@ inline bool IsValid(const RobotState& robot) {
          std::isfinite(robot.time_s);
 }
 
-// Final robot/low-level-controller command packet. This is not the MPPI action
-// and does not carry the solver acceleration. The host MPPI solves qddot_sol,
-// integrates it to q_cmd/qdot_cmd, computes tau_ff_cmd with Pinocchio RNEA,
-// and stores the final host-to-driver torque as tau_cmd.
+// Final robot/low-level-controller command packet. This carries the joint
+// references and torque command consumed by the downstream driver.
 //
 // Ownership convention:
 //   q_cmd, qdot_cmd, tau_cmd: populated by task/state/planner code.
@@ -181,8 +178,7 @@ inline RobotCommand MakeInvalidRobotCommand(int nq, int nv = -1) {
 // Pinocchio-backed robot model and state holder.
 //
 // RobotSystem owns the Pinocchio model/data pair loaded from URDF and stores
-// measured robot feedback. It does not own tactile state or GraspState; those
-// are composed at the MPPI/grasp layer.
+// measured robot feedback. Tactile observations are updated separately.
 class RobotSystem {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

@@ -18,7 +18,7 @@ struct GraspTeleopStateConfig
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  double default_u{0.5};
+  double default_u{1.0};
   double default_phi{0.0};
   double default_desired_force_n{1.0};
   bool shared_grasp_control{false};

@@ -15,7 +15,6 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   controller_interface
   geometry_msgs
   hardware_interface
-  mppi_core
   pinocchio
   pluginlib
   rclcpp
@@ -25,7 +24,6 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   plato_robot_system
   sdr_grasp_msgs
   std_msgs
-  visualization_msgs
 )
 
 find_package(ament_cmake REQUIRED)

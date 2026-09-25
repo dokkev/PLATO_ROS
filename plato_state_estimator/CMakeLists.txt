@@ -13,12 +13,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(mppi_core REQUIRED)
-find_package(pinocchio REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sdr_grasp_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -45,17 +41,6 @@ ament_target_dependencies(object_state_estimator_node
   std_msgs
   sdr_grasp_msgs)
 
-add_executable(object_prior_estimator_node src/object_prior_estimator_node.cpp)
-ament_target_dependencies(object_prior_estimator_node
-  rclcpp
-  geometry_msgs
-  mppi_core
-  pinocchio
-  sensor_msgs
-  std_msgs
-  sdr_grasp_msgs
-  visualization_msgs)
-
 # Install library
 install(TARGETS reference_grasp_force_generator
   ARCHIVE DESTINATION lib
@@ -67,7 +52,6 @@ install(TARGETS reference_grasp_force_generator
 install(TARGETS
   contact_estimator
   object_state_estimator_node
-  object_prior_estimator_node
   DESTINATION lib/${PROJECT_NAME})
 
 # Install headers
@@ -78,7 +62,7 @@ install(
 
 # Install launch and config files
 install(
-  DIRECTORY launch config rviz
+  DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

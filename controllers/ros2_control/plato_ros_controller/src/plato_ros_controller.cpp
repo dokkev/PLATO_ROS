@@ -1,12 +1,8 @@
 #include "plato_ros_controller/plato_ros_controller.hpp"
 
-#include <Eigen/Geometry>
-
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -22,22 +18,11 @@
 #include "aristo_controller/state_machines/initialize.hpp"
 #include "aristo_controller/state_machines/joint_teleop.hpp"
 #include "aristo_controller/state_machines/poke.hpp"
-#include "aristo_controller/state_machines/robust_grasp_mpc.hpp"
-#include "geometry_msgs/msg/point.hpp"
-#include "geometry_msgs/msg/pose.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
-#include "mppi_core/object/object_contact_belief.hpp"
-#include "mppi_core/object/object_prior.hpp"
-#include "pinocchio/algorithm/frames.hpp"
-#include "pinocchio/algorithm/joint-configuration.hpp"
-#include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/multibody/joint/joint-free-flyer.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "plato_robot_system/sensor/nari_touch_adapter.hpp"
-#include "plato_robot_system/task/thumb_index_grasp_constants.hpp"
 #include "rclcpp/qos.hpp"
-#include "std_msgs/msg/color_rgba.hpp"
-#include "visualization_msgs/msg/marker.hpp"
 
 namespace plato_ros_controller
 {
@@ -48,12 +33,12 @@ namespace
 // RobotCommand use SI units internally.
 constexpr double kMNmToNm = 1.0e-3;
 constexpr double kNmToMNm = 1.0e3;
-constexpr double kDebugMarkerPublishPeriodS = 0.05;
-constexpr double kDebugMarkerLifetimeS = 0.50;
-constexpr double kDisturbancePosePreviewS = 0.5;
 
-using MarkerMsg = visualization_msgs::msg::Marker;
-using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
+double elapsed_ms(const std::chrono::steady_clock::time_point start)
+{
+  return std::chrono::duration<double, std::milli>(
+    std::chrono::steady_clock::now() - start).count();
+}
 
 void set_command_interface_value(
   hardware_interface::LoanedCommandInterface & command_interface,
@@ -88,314 +73,6 @@ std::string resolve_package_url(const std::string & path)
   const auto package_name = package_and_path.substr(0, slash);
   const auto relative_path = package_and_path.substr(slash + 1);
   return ament_index_cpp::get_package_share_directory(package_name) + "/" + relative_path;
-}
-
-std_msgs::msg::ColorRGBA make_color(
-  const double red,
-  const double green,
-  const double blue,
-  const double alpha)
-{
-  std_msgs::msg::ColorRGBA color;
-  color.r = static_cast<float>(red);
-  color.g = static_cast<float>(green);
-  color.b = static_cast<float>(blue);
-  color.a = static_cast<float>(alpha);
-  return color;
-}
-
-geometry_msgs::msg::Point make_point(const Eigen::Vector3d & point_m)
-{
-  geometry_msgs::msg::Point point;
-  point.x = point_m.x();
-  point.y = point_m.y();
-  point.z = point_m.z();
-  return point;
-}
-
-geometry_msgs::msg::Pose make_pose(const Eigen::Isometry3d & pose)
-{
-  geometry_msgs::msg::Pose msg;
-  msg.position = make_point(pose.translation());
-  Eigen::Quaterniond orientation(pose.rotation());
-  orientation.normalize();
-  msg.orientation.x = orientation.x();
-  msg.orientation.y = orientation.y();
-  msg.orientation.z = orientation.z();
-  msg.orientation.w = orientation.w();
-  return msg;
-}
-
-void initialize_marker(
-  MarkerMsg * marker,
-  const rclcpp::Time & time,
-  const std::string & frame_id,
-  const std::string & marker_namespace,
-  const int id,
-  const int type)
-{
-  marker->header.frame_id = frame_id;
-  marker->header.stamp = time;
-  marker->ns = marker_namespace;
-  marker->id = id;
-  marker->type = type;
-  marker->action = MarkerMsg::ADD;
-  marker->pose.orientation.w = 1.0;
-  marker->lifetime.sec = 0;
-  marker->lifetime.nanosec =
-    static_cast<std::uint32_t>(kDebugMarkerLifetimeS * 1.0e9);
-}
-
-MarkerMsg make_delete_all_marker(const rclcpp::Time & time, const std::string & frame_id)
-{
-  MarkerMsg marker;
-  initialize_marker(&marker, time, frame_id, "robust_grasp_debug", 0, MarkerMsg::CUBE);
-  marker.action = MarkerMsg::DELETEALL;
-  return marker;
-}
-
-bool is_positive_finite_box_size(const Eigen::Vector3d & size_m)
-{
-  return size_m.allFinite() && size_m.x() > 0.0 && size_m.y() > 0.0 && size_m.z() > 0.0;
-}
-
-bool has_sampled_object_disturbances(
-  const mppi_core::RobustGraspPolicyStatus & status)
-{
-  return
-    !status.sampled_object_linear_disturbances_world_mps.empty() ||
-    !status.sampled_object_angular_disturbances_world_radps.empty() ||
-    !status.selected_object_pose_rollout.empty();
-}
-
-double elapsed_ms(const std::chrono::steady_clock::time_point start)
-{
-  return std::chrono::duration<double, std::milli>(
-    std::chrono::steady_clock::now() - start).count();
-}
-
-Eigen::Matrix3d rotation_from_angular_velocity_world(
-  const Eigen::Vector3d & angular_velocity_world_radps,
-  const double preview_time_s)
-{
-  if (
-    !angular_velocity_world_radps.allFinite() ||
-    !std::isfinite(preview_time_s) ||
-    preview_time_s <= 0.0)
-  {
-    return Eigen::Matrix3d::Identity();
-  }
-
-  const double angle_rad = angular_velocity_world_radps.norm() * preview_time_s;
-  if (angle_rad <= 1.0e-9) {
-    return Eigen::Matrix3d::Identity();
-  }
-  return Eigen::AngleAxisd(
-    angle_rad,
-    angular_velocity_world_radps.normalized()).toRotationMatrix();
-}
-
-Eigen::Isometry3d disturbed_object_pose_preview(
-  const Eigen::Isometry3d & base_pose_world,
-  const Eigen::Vector3d & linear_velocity_world_mps,
-  const Eigen::Vector3d & angular_velocity_world_radps,
-  const double preview_time_s)
-{
-  Eigen::Isometry3d pose_world = base_pose_world;
-  if (linear_velocity_world_mps.allFinite() && std::isfinite(preview_time_s)) {
-    pose_world.translation() += preview_time_s * linear_velocity_world_mps;
-  }
-  pose_world.linear() =
-    rotation_from_angular_velocity_world(
-      angular_velocity_world_radps,
-      preview_time_s) *
-    base_pose_world.linear();
-  return pose_world;
-}
-
-void append_box_marker(
-  MarkerArrayMsg * markers,
-  const rclcpp::Time & time,
-  const std::string & frame_id,
-  const std::string & marker_namespace,
-  const int id,
-  const Eigen::Isometry3d & pose_world,
-  const Eigen::Vector3d & size_m,
-  const std_msgs::msg::ColorRGBA & color)
-{
-  if (
-    markers == nullptr ||
-    !pose_world.matrix().allFinite() ||
-    !is_positive_finite_box_size(size_m))
-  {
-    return;
-  }
-
-  MarkerMsg marker;
-  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::CUBE);
-  marker.pose = make_pose(pose_world);
-  marker.scale.x = size_m.x();
-  marker.scale.y = size_m.y();
-  marker.scale.z = size_m.z();
-  marker.color = color;
-  markers->markers.push_back(marker);
-}
-
-bool representative_object_belief_pose(
-  const mppi_core::VirtualObjectBelief & belief,
-  Eigen::Isometry3d * pose_world)
-{
-  if (
-    pose_world == nullptr ||
-    !mppi_core::HasVirtualObjectBelief(belief) ||
-    !mppi_core::IsValidVirtualObjectBelief(belief) ||
-    belief.particles.empty())
-  {
-    return false;
-  }
-
-  double weight_sum = 0.0;
-  Eigen::Vector3d weighted_translation_m = Eigen::Vector3d::Zero();
-  const mppi_core::VirtualObjectState * orientation_source = nullptr;
-  double best_weight = -1.0;
-  for (const auto & particle : belief.particles) {
-    if (!mppi_core::IsValidVirtualObjectState(particle)) {
-      continue;
-    }
-    const double weight =
-      std::isfinite(particle.weight) && particle.weight > 0.0 ? particle.weight : 1.0;
-    weighted_translation_m.noalias() += weight * particle.pose_world.translation();
-    weight_sum += weight;
-    if (weight > best_weight) {
-      best_weight = weight;
-      orientation_source = &particle;
-    }
-  }
-
-  if (orientation_source == nullptr || weight_sum <= 1.0e-12) {
-    return false;
-  }
-  *pose_world = orientation_source->pose_world;
-  pose_world->translation() = weighted_translation_m / weight_sum;
-  return pose_world->matrix().allFinite();
-}
-
-void append_box_edges(
-  const Eigen::Isometry3d & box_pose,
-  const Eigen::Vector3d & box_size_m,
-  MarkerMsg * marker)
-{
-  const Eigen::Vector3d half_size = 0.5 * box_size_m;
-  const std::array<Eigen::Vector3d, 8> local_corners{
-    Eigen::Vector3d{-half_size.x(), -half_size.y(), -half_size.z()},
-    Eigen::Vector3d{half_size.x(), -half_size.y(), -half_size.z()},
-    Eigen::Vector3d{half_size.x(), half_size.y(), -half_size.z()},
-    Eigen::Vector3d{-half_size.x(), half_size.y(), -half_size.z()},
-    Eigen::Vector3d{-half_size.x(), -half_size.y(), half_size.z()},
-    Eigen::Vector3d{half_size.x(), -half_size.y(), half_size.z()},
-    Eigen::Vector3d{half_size.x(), half_size.y(), half_size.z()},
-    Eigen::Vector3d{-half_size.x(), half_size.y(), half_size.z()}};
-  const std::array<std::array<int, 2>, 12> edges{{
-    {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}},
-    {{4, 5}}, {{5, 6}}, {{6, 7}}, {{7, 4}},
-    {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}}}};
-
-  marker->points.reserve(marker->points.size() + edges.size() * 2U);
-  for (const auto & edge : edges) {
-    marker->points.push_back(make_point(box_pose * local_corners[edge[0]]));
-    marker->points.push_back(make_point(box_pose * local_corners[edge[1]]));
-  }
-}
-
-bool get_frame_placement(
-  const pinocchio::Model & model,
-  const pinocchio::Data & data,
-  const std::string & frame_name,
-  pinocchio::SE3 * placement)
-{
-  if (placement == nullptr) {
-    return false;
-  }
-  const auto frame_id = model.getFrameId(frame_name);
-  if (frame_id >= static_cast<pinocchio::FrameIndex>(model.nframes)) {
-    return false;
-  }
-  *placement = data.oMf[frame_id];
-  return true;
-}
-
-Eigen::Vector3d tactile_hemisphere_center_sensor_m(
-  const plato_robot_system::sensor::HemisphereState & hemisphere)
-{
-  const auto centers_m = plato_robot_system::sensor::NARITouchUnitPositionsM();
-  if (hemisphere.hemisphere_index < centers_m.size()) {
-    return Eigen::Vector3d{
-      centers_m[hemisphere.hemisphere_index].x(),
-      centers_m[hemisphere.hemisphere_index].y(),
-      0.0};
-  }
-  return Eigen::Vector3d{
-    hemisphere.cop_sensor_m.x(),
-    hemisphere.cop_sensor_m.y(),
-    0.0};
-}
-
-Eigen::Vector3d tactile_contact_point_sensor_m(
-  const plato_robot_system::sensor::HemisphereState & hemisphere)
-{
-  if (hemisphere.cop_sensor_m.allFinite()) {
-    return Eigen::Vector3d{
-      hemisphere.cop_sensor_m.x(),
-      hemisphere.cop_sensor_m.y(),
-      0.0};
-  }
-  return tactile_hemisphere_center_sensor_m(hemisphere);
-}
-
-void append_sphere_marker(
-  MarkerArrayMsg * markers,
-  const rclcpp::Time & time,
-  const std::string & frame_id,
-  const std::string & marker_namespace,
-  const int id,
-  const Eigen::Vector3d & point_m,
-  const double diameter_m,
-  const std_msgs::msg::ColorRGBA & color)
-{
-  MarkerMsg marker;
-  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::SPHERE);
-  marker.pose.position = make_point(point_m);
-  marker.scale.x = diameter_m;
-  marker.scale.y = diameter_m;
-  marker.scale.z = diameter_m;
-  marker.color = color;
-  markers->markers.push_back(marker);
-}
-
-void append_arrow_marker(
-  MarkerArrayMsg * markers,
-  const rclcpp::Time & time,
-  const std::string & frame_id,
-  const std::string & marker_namespace,
-  const int id,
-  const Eigen::Vector3d & start_m,
-  const Eigen::Vector3d & end_m,
-  const double shaft_diameter_m,
-  const double head_diameter_m,
-  const std_msgs::msg::ColorRGBA & color)
-{
-  if ((end_m - start_m).norm() < 1.0e-6) {
-    return;
-  }
-  MarkerMsg marker;
-  initialize_marker(&marker, time, frame_id, marker_namespace, id, MarkerMsg::ARROW);
-  marker.points.push_back(make_point(start_m));
-  marker.points.push_back(make_point(end_m));
-  marker.scale.x = shaft_diameter_m;
-  marker.scale.y = head_diameter_m;
-  marker.scale.z = head_diameter_m;
-  marker.color = color;
-  markers->markers.push_back(marker);
 }
 
 std::string load_robot_model_from_config(
@@ -433,11 +110,6 @@ controller_interface::CallbackReturn PlatoRosController::on_init()
     "grasp_force_reference_valid_topic",
     "/grasp_force_reference/reference_valid");
   auto_declare<std::string>("control_config_yaml_path", "");
-  auto_declare<bool>("publish_robust_grasp_debug_markers", true);
-  auto_declare<std::string>(
-    "robust_grasp_debug_marker_topic",
-    "~/robust_grasp_debug_markers");
-  auto_declare<std::string>("robust_grasp_debug_frame_id", "base_link");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -457,18 +129,16 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   grasp_force_reference_valid_topic_ =
     get_node()->get_parameter("grasp_force_reference_valid_topic").as_string();
   control_config_yaml_path_ = get_node()->get_parameter("control_config_yaml_path").as_string();
-  publish_robust_grasp_debug_markers_ =
-    get_node()->get_parameter("publish_robust_grasp_debug_markers").as_bool();
-  robust_grasp_debug_marker_topic_ =
-    get_node()->get_parameter("robust_grasp_debug_marker_topic").as_string();
-  robust_grasp_debug_frame_id_ =
-    get_node()->get_parameter("robust_grasp_debug_frame_id").as_string();
   joint_teleop_state_ = nullptr;
   grasp_teleop_state_ = nullptr;
   grasp_force_state_ = nullptr;
-  robust_grasp_mpc_state_ = nullptr;
   grasp_force_reference_n_.store(0.0);
   grasp_force_reference_valid_.store(false);
+  pending_state_request_.store(-1);
+  deferred_state_after_initialize_id_ = -1;
+  initialize_state_id_ = -1;
+  initialize_state_duration_sec_ = 0.0;
+  waiting_for_initialize_before_requested_state_ = false;
 
   if (joint_names_.empty()) {
     RCLCPP_ERROR(get_node()->get_logger(), "'joints' parameter is empty");
@@ -584,15 +254,6 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
   controller_state_pub_ =
     get_node()->create_publisher<plato_interfaces::msg::ImpedanceControllerState>(
       "~/controller_state", rclcpp::SystemDefaultsQoS());
-  robust_grasp_debug_marker_pub_.reset();
-  if (
-    publish_robust_grasp_debug_markers_ &&
-    !robust_grasp_debug_marker_topic_.empty())
-  {
-    robust_grasp_debug_marker_pub_ = get_node()->create_publisher<MarkerArrayMsg>(
-      robust_grasp_debug_marker_topic_,
-      rclcpp::SystemDefaultsQoS());
-  }
   request_state_srv_ = get_node()->create_service<RequestStateSrv>(
     "~/request_state",
     [this](
@@ -604,14 +265,13 @@ controller_interface::CallbackReturn PlatoRosController::on_configure(
 
   RCLCPP_INFO(
     get_node()->get_logger(),
-    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', grasp force reference topics '%s'/'%s', robust grasp debug marker topic '%s' in %.3f ms",
+    "Configured Plato ROS controller with %zu joints, %zu tactile topics, joint teleop topic '%s', grasp teleop topic '%s', grasp force reference topics '%s'/'%s' in %.3f ms",
     num_joints,
     tactile_topics_.size(),
     joint_teleop_command_topic_.c_str(),
     grasp_teleop_command_topic_.c_str(),
     grasp_force_reference_topic_.c_str(),
     grasp_force_reference_valid_topic_.c_str(),
-    robust_grasp_debug_marker_pub_ ? robust_grasp_debug_marker_topic_.c_str() : "<disabled>",
     elapsed_ms(configure_start));
 
   return controller_interface::CallbackReturn::SUCCESS;
@@ -727,8 +387,8 @@ controller_interface::return_type PlatoRosController::update(
     return controller_interface::return_type::ERROR;
   }
   publish_controller_state(time, filtered_command_);
-  publish_robust_grasp_debug_markers(time);
   write_command(filtered_command_);
+  advance_state_request_sequence();
 
   return controller_interface::return_type::OK;
 }
@@ -1109,8 +769,7 @@ void PlatoRosController::sync_grasp_teleop_input()
 {
   if (
     grasp_teleop_state_ == nullptr &&
-    grasp_force_state_ == nullptr &&
-    robust_grasp_mpc_state_ == nullptr)
+    grasp_force_state_ == nullptr)
   {
     return;
   }
@@ -1153,11 +812,6 @@ void PlatoRosController::sync_grasp_teleop_input()
     force_input.phi = input.phi;
     force_input.desired_force_n = input.desired_force_n;
     grasp_force_state_->SetInput(force_input);
-  }
-  if (robust_grasp_mpc_state_ != nullptr) {
-    aristo_controller::state_machines::RobustGraspMpcInput mpc_input;
-    mpc_input.u = input.u;
-    robust_grasp_mpc_state_->SetInput(mpc_input);
   }
 }
 
@@ -1258,390 +912,6 @@ void PlatoRosController::publish_controller_state(
   controller_state_pub_->publish(msg);
 }
 
-void PlatoRosController::publish_robust_grasp_debug_markers(const rclcpp::Time & time) const
-{
-  if (
-    !robust_grasp_debug_marker_pub_ ||
-    !robot_ ||
-    !robot_->hasModel() ||
-    !robot_->hasState())
-  {
-    return;
-  }
-
-  const double now_s = time.seconds();
-  if (
-    std::isfinite(now_s) &&
-    std::isfinite(last_robust_grasp_debug_marker_pub_time_s_) &&
-    now_s >= last_robust_grasp_debug_marker_pub_time_s_ &&
-    now_s - last_robust_grasp_debug_marker_pub_time_s_ < kDebugMarkerPublishPeriodS)
-  {
-    return;
-  }
-  last_robust_grasp_debug_marker_pub_time_s_ = now_s;
-
-  const auto & model = robot_->model();
-  const auto & state = robot_->state();
-  if (
-    state.q.size() != static_cast<Eigen::Index>(model.nq) ||
-    state.qdot.size() != static_cast<Eigen::Index>(model.nv) ||
-    !state.q.allFinite() ||
-    !state.qdot.allFinite())
-  {
-    return;
-  }
-
-  const std::string frame_id =
-    robust_grasp_debug_frame_id_.empty() ? "base_link" : robust_grasp_debug_frame_id_;
-  MarkerArrayMsg markers;
-  markers.markers.reserve(160);
-
-  const bool robust_mpc_active =
-    robust_grasp_mpc_state_ != nullptr &&
-    control_architecture_.current_state_id() == robust_grasp_mpc_state_->id();
-  const auto * robust_mpc_status =
-    robust_grasp_mpc_state_ != nullptr ? &robust_grasp_mpc_state_->policy_status() : nullptr;
-  const bool have_live_disturbance_markers =
-    robust_mpc_active &&
-    robust_mpc_status != nullptr &&
-    has_sampled_object_disturbances(*robust_mpc_status);
-  if (last_debug_publish_had_live_disturbance_markers_ && !have_live_disturbance_markers) {
-    markers.markers.push_back(make_delete_all_marker(time, frame_id));
-  }
-  last_debug_publish_had_live_disturbance_markers_ = have_live_disturbance_markers;
-
-  bool have_object_debug_pose = false;
-  Eigen::Isometry3d object_debug_pose_world = Eigen::Isometry3d::Identity();
-  Eigen::Vector3d object_debug_size_m = Eigen::Vector3d::Zero();
-  if (robust_grasp_mpc_state_ != nullptr) {
-    const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
-    if (
-      mppi_core::IsValidObjectPrior(object_prior) &&
-      mppi_core::HasObjectPrior(object_prior) &&
-      is_positive_finite_box_size(object_prior.geometry.primitive_size_m))
-    {
-      MarkerMsg object_marker;
-      initialize_marker(
-        &object_marker,
-        time,
-        frame_id,
-        "jenga_object_prior",
-        1,
-        MarkerMsg::CUBE);
-      object_marker.pose = make_pose(object_prior.initial_pose_world);
-      object_marker.scale.x = object_prior.geometry.primitive_size_m.x();
-      object_marker.scale.y = object_prior.geometry.primitive_size_m.y();
-      object_marker.scale.z = object_prior.geometry.primitive_size_m.z();
-      object_marker.color = make_color(0.78, 0.58, 0.32, 0.72);
-      markers.markers.push_back(object_marker);
-
-      MarkerMsg uncertainty_marker;
-      initialize_marker(
-        &uncertainty_marker,
-        time,
-        frame_id,
-        "jenga_pose_prior_bounds",
-        2,
-        MarkerMsg::LINE_LIST);
-      const Eigen::Vector3d uncertainty_size_m =
-        object_prior.geometry.primitive_size_m +
-        2.0 * object_prior.position_std_m.cwiseAbs();
-      uncertainty_marker.scale.x = 0.002;
-      uncertainty_marker.color = make_color(1.0, 0.86, 0.22, 0.8);
-      append_box_edges(
-        object_prior.initial_pose_world,
-        uncertainty_size_m,
-        &uncertainty_marker);
-      markers.markers.push_back(uncertainty_marker);
-
-      object_debug_pose_world = object_prior.initial_pose_world;
-      object_debug_size_m = object_prior.geometry.primitive_size_m;
-      have_object_debug_pose = true;
-
-      const auto & object_belief = robust_grasp_mpc_state_->object_belief();
-      Eigen::Isometry3d object_belief_pose = Eigen::Isometry3d::Identity();
-      const Eigen::Vector3d belief_size_m =
-        is_positive_finite_box_size(object_belief.geometry.primitive_size_m) ?
-        object_belief.geometry.primitive_size_m :
-        object_prior.geometry.primitive_size_m;
-      if (
-        representative_object_belief_pose(object_belief, &object_belief_pose) &&
-        is_positive_finite_box_size(belief_size_m))
-      {
-        MarkerMsg belief_marker;
-        initialize_marker(
-          &belief_marker,
-          time,
-          frame_id,
-          "jenga_object_belief",
-          3,
-          MarkerMsg::CUBE);
-        belief_marker.pose = make_pose(object_belief_pose);
-        belief_marker.scale.x = belief_size_m.x();
-        belief_marker.scale.y = belief_size_m.y();
-        belief_marker.scale.z = belief_size_m.z();
-        belief_marker.color = make_color(0.12, 0.86, 0.68, 0.58);
-        markers.markers.push_back(belief_marker);
-
-        object_debug_pose_world = object_belief_pose;
-        object_debug_size_m = belief_size_m;
-        have_object_debug_pose = true;
-      }
-    }
-  }
-
-  pinocchio::Data current_data(model);
-  bool have_current_fk = false;
-  try {
-    pinocchio::forwardKinematics(model, current_data, state.q);
-    pinocchio::updateFramePlacements(model, current_data);
-    have_current_fk = true;
-  } catch (const std::exception &) {
-    // Debug markers must not turn a valid control update into a failed tick.
-    have_current_fk = false;
-  }
-
-  if (have_current_fk) {
-    int grid_marker_id = 0;
-    int force_marker_id = 0;
-    double tactile_hemisphere_diameter_m = 0.0;
-    if (robust_grasp_mpc_state_ != nullptr) {
-      const double radius_m =
-        robust_grasp_mpc_state_->config().policy.cost.object_support.hemisphere_radius_m;
-      if (std::isfinite(radius_m) && radius_m > 0.0) {
-        tactile_hemisphere_diameter_m = 2.0 * radius_m;
-      }
-    }
-    const auto & tactile_sensors = state.tactile_sensors;
-    for (std::size_t sensor_index = 0; sensor_index < tactile_sensors.size(); ++sensor_index) {
-      const auto & tactile = tactile_sensors[sensor_index];
-      std::string tactile_frame = tactile.frame_name;
-      if (tactile_frame.empty() && sensor_index < kTactileFrameNames.size()) {
-        tactile_frame = tactile_frame_name(sensor_index);
-      }
-      pinocchio::SE3 sensor_pose_world;
-      if (!get_frame_placement(model, current_data, tactile_frame, &sensor_pose_world)) {
-        continue;
-      }
-      const Eigen::Vector3d normal_world =
-        sensor_pose_world.rotation() * Eigen::Vector3d::UnitZ();
-
-      for (const auto & hemisphere : tactile.hemispheres) {
-        const Eigen::Vector3d hemisphere_center_world_m =
-          sensor_pose_world.act(tactile_hemisphere_center_sensor_m(hemisphere));
-        if (tactile_hemisphere_diameter_m > 0.0) {
-          const auto hemisphere_color =
-            hemisphere.contact ? make_color(0.12, 0.95, 0.26, 0.72) :
-            make_color(0.72, 0.76, 0.80, 0.34);
-          append_sphere_marker(
-            &markers,
-            time,
-            frame_id,
-            "tactile_hemispheres",
-            grid_marker_id++,
-            hemisphere_center_world_m,
-            tactile_hemisphere_diameter_m,
-            hemisphere_color);
-        }
-
-        if (!hemisphere.contact) {
-          continue;
-        }
-        const double force_n =
-          std::isfinite(hemisphere.normal_force_n) ? std::max(0.0, hemisphere.normal_force_n) : 0.0;
-        const Eigen::Vector3d contact_point_world_m =
-          sensor_pose_world.act(tactile_contact_point_sensor_m(hemisphere));
-        const double arrow_length_m = 0.012 + std::min(force_n, 5.0) * 0.004;
-        append_arrow_marker(
-          &markers,
-          time,
-          frame_id,
-          "measured_contact_force",
-          force_marker_id++,
-          contact_point_world_m,
-          contact_point_world_m + arrow_length_m * normal_world,
-          0.0022,
-          0.006,
-          make_color(1.0, 0.24, 0.08, 0.9));
-      }
-    }
-  }
-
-  if (robust_mpc_active && robust_mpc_status != nullptr && have_current_fk && have_live_disturbance_markers) {
-    const auto & status = *robust_mpc_status;
-    const auto & object_prior = robust_grasp_mpc_state_->config().object_prior;
-    Eigen::Isometry3d disturbance_base_pose_world = object_debug_pose_world;
-    Eigen::Vector3d disturbance_block_size_m = object_debug_size_m;
-    bool have_disturbance_base_pose =
-      have_object_debug_pose &&
-      object_debug_pose_world.matrix().allFinite() &&
-      is_positive_finite_box_size(object_debug_size_m);
-    if (
-      mppi_core::IsValidObjectPrior(object_prior) &&
-      mppi_core::HasObjectPrior(object_prior) &&
-      is_positive_finite_box_size(object_prior.geometry.primitive_size_m) &&
-      !status.selected_object_pose_rollout.empty())
-    {
-      MarkerMsg path_marker;
-      initialize_marker(
-        &path_marker,
-        time,
-        frame_id,
-        "jenga_disturbed_rollout_path",
-        0,
-        MarkerMsg::LINE_STRIP);
-      path_marker.scale.x = 0.004;
-      path_marker.color = make_color(0.28, 0.72, 1.0, 0.86);
-      path_marker.points.reserve(status.selected_object_pose_rollout.size());
-
-      for (std::size_t step = 0; step < status.selected_object_pose_rollout.size(); ++step) {
-        const auto & pose = status.selected_object_pose_rollout[step];
-        if (!pose.matrix().allFinite()) {
-          continue;
-        }
-        if (!have_disturbance_base_pose) {
-          disturbance_base_pose_world = pose;
-          disturbance_block_size_m = object_prior.geometry.primitive_size_m;
-          have_disturbance_base_pose = true;
-        }
-        path_marker.points.push_back(make_point(pose.translation()));
-
-        append_box_marker(
-          &markers,
-          time,
-          frame_id,
-          "jenga_disturbed_rollout",
-          static_cast<int>(step),
-          pose,
-          object_prior.geometry.primitive_size_m,
-          make_color(
-            0.18,
-            0.56,
-            1.0,
-            step == 0 ? 0.22 : std::min(0.68, 0.18 + 0.10 * static_cast<double>(step))));
-      }
-
-      if (path_marker.points.size() >= 2U) {
-        markers.markers.push_back(path_marker);
-      }
-    }
-
-    if (have_disturbance_base_pose && is_positive_finite_box_size(disturbance_block_size_m)) {
-      const std::size_t sampled_disturbance_count = std::max(
-        status.sampled_object_linear_disturbances_world_mps.size(),
-        status.sampled_object_angular_disturbances_world_radps.size());
-      for (std::size_t i = 0; i < sampled_disturbance_count; ++i) {
-        Eigen::Vector3d linear_mps = Eigen::Vector3d::Zero();
-        Eigen::Vector3d angular_radps = Eigen::Vector3d::Zero();
-        if (i < status.sampled_object_linear_disturbances_world_mps.size()) {
-          linear_mps =
-            status.sampled_object_linear_disturbances_world_mps[i];
-        }
-        if (i < status.sampled_object_angular_disturbances_world_radps.size()) {
-          angular_radps =
-            status.sampled_object_angular_disturbances_world_radps[i];
-        }
-        if (!linear_mps.allFinite() || !angular_radps.allFinite()) {
-          continue;
-        }
-        append_box_marker(
-          &markers,
-          time,
-          frame_id,
-          "jenga_sampled_disturbed_object",
-          static_cast<int>(i),
-          disturbed_object_pose_preview(
-            disturbance_base_pose_world,
-            linear_mps,
-            angular_radps,
-            kDisturbancePosePreviewS),
-          disturbance_block_size_m,
-          make_color(1.0, 0.56, 0.08, 0.08));
-      }
-
-      const Eigen::Vector3d current_linear_mps =
-        status.selected_object_linear_disturbance_world_mps;
-      const Eigen::Vector3d current_angular_radps =
-        status.selected_object_angular_disturbance_world_radps;
-      const bool have_current_disturbance =
-        (current_linear_mps.allFinite() && current_linear_mps.norm() > 1.0e-8) ||
-        (current_angular_radps.allFinite() && current_angular_radps.norm() > 1.0e-8);
-      if (have_current_disturbance) {
-        append_box_marker(
-          &markers,
-          time,
-          frame_id,
-          "jenga_selected_disturbed_object",
-          0,
-          disturbed_object_pose_preview(
-            disturbance_base_pose_world,
-            current_linear_mps.allFinite() ? current_linear_mps : Eigen::Vector3d::Zero(),
-            current_angular_radps.allFinite() ? current_angular_radps : Eigen::Vector3d::Zero(),
-            kDisturbancePosePreviewS),
-          disturbance_block_size_m,
-          make_color(0.92, 0.18, 1.0, 0.46));
-      }
-    }
-
-    const double rollout_dt = robust_grasp_mpc_state_->config().policy.rollout.dt;
-    if (
-      std::isfinite(rollout_dt) &&
-      rollout_dt > 0.0 &&
-      status.selected_qddot.size() == static_cast<Eigen::Index>(model.nv) &&
-      status.selected_qddot.allFinite())
-    {
-      Eigen::VectorXd tangent = state.qdot * rollout_dt;
-      tangent.noalias() += 0.5 * rollout_dt * rollout_dt * status.selected_qddot;
-
-      try {
-        const Eigen::VectorXd q_next = pinocchio::integrate(model, state.q, tangent);
-        if (q_next.size() == static_cast<Eigen::Index>(model.nq) && q_next.allFinite()) {
-          pinocchio::Data next_data(model);
-          pinocchio::forwardKinematics(model, next_data, q_next);
-          pinocchio::updateFramePlacements(model, next_data);
-
-          const std::array<std::string, 2> rollout_frames{
-            std::string(
-              plato_robot_system::task::kThumbIndexFrameB.data(),
-              plato_robot_system::task::kThumbIndexFrameB.size()),
-            std::string(
-              plato_robot_system::task::kThumbIndexFrameA.data(),
-              plato_robot_system::task::kThumbIndexFrameA.size())};
-          const std::array<std_msgs::msg::ColorRGBA, 2> rollout_colors{
-            make_color(0.12, 0.60, 1.0, 0.9),
-            make_color(0.0, 0.95, 0.95, 0.9)};
-
-          for (std::size_t i = 0; i < rollout_frames.size(); ++i) {
-            pinocchio::SE3 current_pose;
-            pinocchio::SE3 next_pose;
-            if (
-              !get_frame_placement(model, current_data, rollout_frames[i], &current_pose) ||
-              !get_frame_placement(model, next_data, rollout_frames[i], &next_pose))
-            {
-              continue;
-            }
-            append_arrow_marker(
-              &markers,
-              time,
-              frame_id,
-              "selected_rollout_tactile_frame_motion",
-              static_cast<int>(i),
-              current_pose.translation(),
-              next_pose.translation(),
-              0.0028,
-              0.007,
-              rollout_colors[i]);
-          }
-        }
-      } catch (const std::exception &) {
-        // Skip rollout arrows if Pinocchio cannot integrate this debug candidate.
-      }
-    }
-  }
-
-  robust_grasp_debug_marker_pub_->publish(markers);
-}
-
 void PlatoRosController::request_state_callback(
   std::shared_ptr<RequestStateSrv::Request> request,
   std::shared_ptr<RequestStateSrv::Response> response)
@@ -1689,13 +959,34 @@ void PlatoRosController::request_state_callback(
     return;
   }
 
-  pending_requested_state_id_.store(effective_state_id);
+  const bool route_through_initialize =
+    effective_state_it->second->name() ==
+    aristo_controller::state_machines::GraspReadyState::kName;
+  if (route_through_initialize) {
+    const auto initialize_id =
+      fsm_handler->FindStateIdByName(
+        aristo_controller::state_machines::InitializeState::kName);
+    if (!initialize_id || *initialize_id != initialize_state_id_) {
+      response->success = false;
+      response->message = "initialize state is not registered";
+      return;
+    }
+  }
+  const auto encoded_state_request =
+    (static_cast<std::int64_t>(effective_state_id) << 1) |
+    static_cast<std::int64_t>(route_through_initialize);
+  pending_state_request_.store(encoded_state_request);
+
   response->success = true;
   response->message = "accepted request for state_id " +
     std::to_string(effective_state_id) + " (" + effective_state_it->second->name() + ")";
   if (effective_state_id != requested_state_id) {
     response->message += "; redirected from state_id " +
       std::to_string(requested_state_id) + " (" + requested_state_it->second->name() + ")";
+  }
+  if (route_through_initialize) {
+    response->message += "; will enter state_id " +
+      std::to_string(initialize_state_id_) + " (initialize) first";
   }
 
   RCLCPP_INFO(
@@ -1709,16 +1000,78 @@ void PlatoRosController::request_state_callback(
 
 void PlatoRosController::apply_pending_state_request()
 {
-  const auto requested_state_id = pending_requested_state_id_.exchange(-1);
-  if (requested_state_id < 0) {
+  const auto encoded_state_request = pending_state_request_.exchange(-1);
+  if (encoded_state_request < 0) {
     return;
   }
 
-  if (!control_architecture_.RequestState(requested_state_id)) {
+  const auto requested_state_id = static_cast<plato_robot_system::StateId>(
+    encoded_state_request >> 1);
+  const bool route_through_initialize = (encoded_state_request & 1) != 0;
+  auto state_id_to_apply = requested_state_id;
+  if (route_through_initialize) {
+    deferred_state_after_initialize_id_ = requested_state_id;
+    state_id_to_apply = initialize_state_id_;
+    waiting_for_initialize_before_requested_state_ = true;
+    initialize_request_start_time_ = std::chrono::steady_clock::now();
+  } else {
+    deferred_state_after_initialize_id_ = -1;
+    waiting_for_initialize_before_requested_state_ = false;
+  }
+
+  if (!control_architecture_.RequestState(state_id_to_apply)) {
+    waiting_for_initialize_before_requested_state_ = false;
+    deferred_state_after_initialize_id_ = -1;
     RCLCPP_ERROR(
       get_node()->get_logger(),
       "Queued FSM state request id %d was rejected by ControlArchitecture",
-      requested_state_id);
+      state_id_to_apply);
+  }
+}
+
+void PlatoRosController::advance_state_request_sequence()
+{
+  if (!waiting_for_initialize_before_requested_state_) {
+    return;
+  }
+
+  if (deferred_state_after_initialize_id_ < 0) {
+    waiting_for_initialize_before_requested_state_ = false;
+    return;
+  }
+
+  const auto * fsm_handler = control_architecture_.fsmHandler();
+  const auto * active_state = fsm_handler->GetCurrentState();
+  if (
+    active_state == nullptr || active_state->id() != initialize_state_id_ ||
+    active_state->elapsed_time() < initialize_state_duration_sec_)
+  {
+    return;
+  }
+
+  const double time_since_request_sec = std::chrono::duration<double>(
+    std::chrono::steady_clock::now() - initialize_request_start_time_).count();
+  if (time_since_request_sec < initialize_state_duration_sec_) {
+    return;
+  }
+
+  const auto completed_state_id = deferred_state_after_initialize_id_;
+  if (completed_state_id >= 0) {
+    deferred_state_after_initialize_id_ = -1;
+    waiting_for_initialize_before_requested_state_ = false;
+    if (control_architecture_.RequestState(completed_state_id)) {
+      RCLCPP_INFO(
+        get_node()->get_logger(),
+        "Initialize state %d completed; continuing queued request to state %d",
+        initialize_state_id_,
+        completed_state_id);
+    } else {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "Initialize state %d completed, but queued request to state %d was rejected",
+        initialize_state_id_,
+        completed_state_id);
+    }
   }
 }
 
@@ -1749,6 +1102,8 @@ bool PlatoRosController::configure_from_control_config(
         joint_names_.size());
       return false;
     }
+    initialize_state_id_ = aristo_config.initialize.id;
+    initialize_state_duration_sec_ = aristo_config.initialize.duration_sec;
 
     const auto urdf_start = std::chrono::steady_clock::now();
     RCLCPP_INFO(get_node()->get_logger(), "Control config stage: loading robot model");
@@ -1841,24 +1196,6 @@ bool PlatoRosController::configure_from_control_config(
     grasp_force->ConfigureLifecycle(aristo_config.grasp_force.lifecycle);
     grasp_force_state_ = grasp_force.get();
     architecture.RegisterState(std::move(grasp_force));
-
-    const auto robust_start = std::chrono::steady_clock::now();
-    RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring robust_grasp_mpc");
-    auto robust_grasp_mpc =
-      std::make_unique<aristo_controller::state_machines::RobustGraspMpcState>(
-        aristo_config.robust_grasp_mpc.id,
-        &robot);
-    if (!robust_grasp_mpc->ConfigureTask(aristo_config.robust_grasp_mpc.state)) {
-      RCLCPP_ERROR(get_node()->get_logger(), "Failed to configure robust_grasp_mpc task");
-      return false;
-    }
-    robust_grasp_mpc->ConfigureLifecycle(aristo_config.robust_grasp_mpc.lifecycle);
-    robust_grasp_mpc_state_ = robust_grasp_mpc.get();
-    architecture.RegisterState(std::move(robust_grasp_mpc));
-    RCLCPP_INFO(
-      get_node()->get_logger(),
-      "Control config stage: configured robust_grasp_mpc in %.3f ms",
-      elapsed_ms(robust_start));
 
     RCLCPP_INFO(get_node()->get_logger(), "Control config stage: configuring initialize");
     auto initialize = std::make_unique<aristo_controller::state_machines::InitializeState>(

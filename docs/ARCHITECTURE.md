@@ -4,8 +4,8 @@
 
 `PLATO_ROS` is a ROS 2 Humble workspace source tree for the PLATO/Aristo robot
 hand stack. It contains message contracts, ros2_control hardware plugins,
-joint-space controllers, bringup launch files, teleoperation helpers, object
-state estimation, and a ROS-free MPPI core for contact-local grasp planning.
+joint-space controllers, bringup launch files, teleoperation helpers, contact
+estimation, and tactile grasp-force feedback.
 
 The repository is used for:
 
@@ -36,8 +36,7 @@ The repository is used for:
 | `plato_utils/` | Shared C++ utilities: PID, interpolation, watchdog, YAML helpers, joint state ordering, and joint-position storage. |
 | `plato_teleop/` | Python teleop nodes for SpaceMouse, grasp-task keyboard commands, and conversion helpers. |
 | `maestro_teleop/` | C++ teleoperation conversion utilities for Maestro input streams. |
-| `plato_state_estimator/` | Object/contact state estimator using tactile messages and PID force logic. |
-| `mppi_core/` | ROS-free C++ MPPI optimizer, contact/tactile rollout, config parsing, and tests. |
+| `plato_state_estimator/` | Contact estimator and slip-aware grasp-force reference generator. |
 | `plato_foxglove/` | Foxglove visualization scripts and configs. |
 | `docs/` | Agent-readable repository harness, hardware runbooks, firmware notes, and images. |
 
@@ -68,15 +67,6 @@ joint_states + motion/task topics
 -> ros2_control hardware write path
 ```
 
-MPPI flow:
-
-```text
-q_meas/qdot_meas/tau_meas + tactile_meas sensor vector
--> mppi_core qddot_sol sampling, GraspState rollout, and stability cost
--> RobotCommand hybrid impedance packet with q_cmd/qdot_cmd/tau_cmd/kp/kd
--> downstream controller or integration layer
-```
-
 ## Core Boundaries
 
 - `plato_interfaces` owns ROS message and service contracts. Changing a message
@@ -90,8 +80,6 @@ q_meas/qdot_meas/tau_meas + tactile_meas sensor vector
   and linkage constants belong in the hardware package config, not in bringup.
 - `can_hardware_common` should stay generic. Do not add PLATO, Aristo, or
   turntable constants to the shared layer.
-- `mppi_core` is intentionally ROS-free. Keep ROS message conversion and launch
-  wiring outside it.
 - `docs/ NAMING.md` is intentionally excluded from this harness pass; do not
   edit it unless a task explicitly targets naming.
 
@@ -154,8 +142,5 @@ Safe validation path for risky changes:
 - `docs/frimware/plato2/README.md`
 - `installation.md`
 - `cli_commands.md`
-- `mppi_core/MPPI.md`
-- `mppi_core/docs/grasp_state_mppi.md`
-- `mppi_core/docs/file_structure.md`
 - `controllers/parallel_grasp_controller/COMMAND_EXAMPLES.md`
 - `hardware_interface/plato_hardware_interface/plan.md`

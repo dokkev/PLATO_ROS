@@ -2,7 +2,7 @@
 
 This is the entry map for agents working in `PLATO_ROS`, a ROS 2 package
 collection for PLATO/Aristo hands, CAN hardware interfaces, controllers,
-teleoperation, state estimation, and MPPI grasp planning.
+teleoperation, contact estimation, and tactile grasp-force feedback.
 
 Read first:
 
@@ -15,9 +15,6 @@ Useful deeper runbooks:
 
 - `docs/motor/usbcan_setup.md`
 - `docs/frimware/plato2/README.md`
-- `mppi_core/MPPI.md`
-- `mppi_core/docs/grasp_state_mppi.md`
-- `mppi_core/docs/file_structure.md`
 - `installation.md`
 - `cli_commands.md`
 

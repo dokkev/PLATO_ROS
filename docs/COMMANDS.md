@@ -68,7 +68,6 @@ colcon build --symlink-install --packages-up-to joint_impedance_controller
 colcon build --symlink-install --packages-up-to plato_hardware_interface
 colcon build --symlink-install --packages-up-to aristo_hardware_interface
 colcon build --symlink-install --packages-up-to plato_grasp_controller
-colcon build --symlink-install --packages-up-to mppi_core
 ```
 
 ## Test
@@ -90,7 +89,6 @@ colcon test --packages-select plato_grasp_controller
 colcon test --packages-select plato_hardware_interface
 colcon test --packages-select aristo_hardware_interface
 colcon test --packages-select turntable_hardware_interface
-colcon test --packages-select mppi_core
 colcon test-result --verbose
 ```
 
@@ -103,7 +101,6 @@ Useful package/test mapping:
 | `plato_hardware_interface` | `plato_protocol_test` |
 | `aristo_hardware_interface` | `aristo_protocol_test` |
 | `turntable_hardware_interface` | `min_jerk_traj_test` |
-| `mppi_core` | `test_mppi_core` |
 
 ## Lint Or Static Checks
 
@@ -139,6 +136,20 @@ cd ~/workspace/plato_ws
 source install/setup.bash
 ros2 launch aristo_bringup aristo_hardware.launch.py gui:=true fake_hardware:=false zeroing:=false
 ```
+
+The default Aristo bringup loads the Aristo state-machine controller. It starts
+in initialize state `0`; request poke state `1` or grasp-ready/open state `3`
+through the controller service:
+
+```bash
+ros2 service call /plato2/aristo_controller/request_state plato_interfaces/srv/RequestState "{state_id: 1}"
+ros2 service call /plato2/aristo_controller/request_state plato_interfaces/srv/RequestState "{state_id: 3}"
+```
+
+Requests for state `3` first route through initialize state `0` and wait for its
+configured motion duration. State `3` then moves the thumb to its target first,
+completes the rest of the grasp-ready pose, and transitions to grasp teleop
+state `4`, which starts with `u = 1.0` (fully open).
 
 Aristo fake hardware:
 

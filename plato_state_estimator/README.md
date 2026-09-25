@@ -16,9 +16,9 @@ It uses two tactile sensors to publish:
 - shear displacement diagnostics,
 - a slip diagnostic state.
 
-Task-level decisions such as closing, releasing, mode transitions, fallback
-motion, MPPI, or whole-body control belong in the controller/state-machine
-layer. This node only reports a safe reference and diagnostics.
+Task-level decisions such as closing, releasing, mode transitions, and fallback
+motion belong in the controller/state-machine layer. This node only reports a
+safe force reference and diagnostics.
 
 ### Subscribed Topics
 

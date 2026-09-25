@@ -15,7 +15,6 @@
   <depend>controller_interface</depend>
   <depend>geometry_msgs</depend>
   <depend>hardware_interface</depend>
-  <depend>mppi_core</depend>
   <depend>pinocchio</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
@@ -25,7 +24,6 @@
   <depend>plato_robot_system</depend>
   <depend>sdr_grasp_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>visualization_msgs</depend>
 
   <exec_depend>controller_manager</exec_depend>
 

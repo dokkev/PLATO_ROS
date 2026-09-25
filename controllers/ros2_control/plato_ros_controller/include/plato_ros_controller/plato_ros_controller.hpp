@@ -5,6 +5,8 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -27,14 +29,12 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
 
 namespace aristo_controller::state_machines
 {
 class GraspForceState;
 class GraspTeleopState;
 class JointTeleopState;
-class RobustGraspMpcState;
 }  // namespace aristo_controller::state_machines
 
 namespace plato_ros_controller
@@ -76,7 +76,6 @@ private:
   using GraspForceReferenceMsg = std_msgs::msg::Float64;
   using GraspForceReferenceValidMsg = std_msgs::msg::Bool;
   using JointTeleopMsg = std_msgs::msg::Float64MultiArray;
-  using MarkerArrayMsg = visualization_msgs::msg::MarkerArray;
   struct GraspTeleopCommand
   {
     double u{0.0};
@@ -113,11 +112,11 @@ private:
   void publish_controller_state(
     const rclcpp::Time & time,
     const plato_robot_system::RobotCommand & command);
-  void publish_robust_grasp_debug_markers(const rclcpp::Time & time) const;
   void request_state_callback(
     std::shared_ptr<RequestStateSrv::Request> request,
     std::shared_ptr<RequestStateSrv::Response> response);
   void apply_pending_state_request();
+  void advance_state_request_sequence();
   bool configure_from_control_config(
     plato_robot_system::ControlArchitecture & architecture,
     plato_robot_system::RobotSystem & robot);
@@ -140,10 +139,7 @@ private:
   std::string grasp_force_reference_topic_;
   std::string grasp_force_reference_valid_topic_;
   std::string control_config_yaml_path_;
-  std::string robust_grasp_debug_marker_topic_;
-  std::string robust_grasp_debug_frame_id_;
   bool fixed_thumb_{false};
-  bool publish_robust_grasp_debug_markers_{true};
 
   std::vector<double> positions_;
   std::vector<double> velocities_;
@@ -178,8 +174,12 @@ private:
   aristo_controller::state_machines::JointTeleopState * joint_teleop_state_{nullptr};
   aristo_controller::state_machines::GraspTeleopState * grasp_teleop_state_{nullptr};
   aristo_controller::state_machines::GraspForceState * grasp_force_state_{nullptr};
-  aristo_controller::state_machines::RobustGraspMpcState * robust_grasp_mpc_state_{nullptr};
-  std::atomic<plato_robot_system::StateId> pending_requested_state_id_{-1};
+  std::atomic<std::int64_t> pending_state_request_{-1};
+  plato_robot_system::StateId deferred_state_after_initialize_id_{-1};
+  plato_robot_system::StateId initialize_state_id_{-1};
+  double initialize_state_duration_sec_{0.0};
+  bool waiting_for_initialize_before_requested_state_{false};
+  std::chrono::steady_clock::time_point initialize_request_start_time_{};
   std::atomic<double> grasp_force_reference_n_{0.0};
   std::atomic<bool> grasp_force_reference_valid_{false};
 
@@ -191,9 +191,6 @@ private:
 
   rclcpp::Publisher<plato_interfaces::msg::ImpedanceControllerState>::SharedPtr
     controller_state_pub_;
-  rclcpp::Publisher<MarkerArrayMsg>::SharedPtr robust_grasp_debug_marker_pub_;
-  mutable double last_robust_grasp_debug_marker_pub_time_s_{-1.0e100};
-  mutable bool last_debug_publish_had_live_disturbance_markers_{false};
   rclcpp::Service<RequestStateSrv>::SharedPtr request_state_srv_;
   std::vector<rclcpp::Subscription<TactileMsg>::SharedPtr> tactile_subs_;
   rclcpp::Subscription<JointTeleopMsg>::SharedPtr joint_teleop_command_sub_;

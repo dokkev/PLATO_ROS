@@ -74,13 +74,14 @@ state_machine:
     - id: 4
       name: grasp_teleop
       stay_here: true
-      # Change this to grasp_force to use tactile force feedback instead of robust MPC.
+      # Contact-gated handoff to tactile force feedback.
       next_state: grasp_force
       params:
         # Command: [u], [u, phi], or [u, phi, f]
         # u: 0 closed, 0.5 ready/parallel, 1 open
         # phi: 0 extended, 0.5 centered, 1 flexed
         # f: optional desired normal force [N]
+        default_u: 1.0  # Start fully open.
         default_desired_force_n: 15.0
         shared_grasp_control: true
         shared_control_requires_u_below_threshold: true
@@ -92,12 +93,6 @@ state_machine:
           force_exit_u_threshold: 0.75
           debug_print_contact_states: false
           debug_print_contact_interval_s: 0.25
-
-    - id: 8
-      name: robust_grasp_mpc
-      stay_here: true
-      next_state: grasp_teleop
-      params_file: robust_mpc_param.yaml
 
     - id: 6
       name: grasp_force

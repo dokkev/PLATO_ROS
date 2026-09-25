@@ -19,7 +19,7 @@ def generate_launch_description():
     rviz_config_path = LaunchConfiguration("rviz_config_path")
     controller_manager_name = LaunchConfiguration("controller_manager_name")
     joint_state_broadcaster_name = LaunchConfiguration("joint_state_broadcaster_name")
-    joint_impedance_controller_name = LaunchConfiguration("joint_impedance_controller_name")
+    aristo_controller_name = LaunchConfiguration("aristo_controller_name")
     actuator_config_yaml_path = LaunchConfiguration("actuator_config_yaml_path")
     publish_world_pose = LaunchConfiguration("publish_world_pose")
     world_frame = LaunchConfiguration("world_frame")
@@ -48,7 +48,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "controller_config_path",
             default_value=PathJoinSubstitution(
-                [FindPackageShare("aristo_bringup"), "config", "ros2_controllers.yaml"]
+                [FindPackageShare("aristo_bringup"), "config", "plato_ros_controllers.yaml"]
             ),
             description="Absolute path to the ros2_control controller manager parameters YAML.",
         ),
@@ -70,9 +70,9 @@ def generate_launch_description():
             description="Joint state broadcaster controller name.",
         ),
         DeclareLaunchArgument(
-            "joint_impedance_controller_name",
-            default_value="joint_impedance_controller",
-            description="Joint impedance controller name.",
+            "aristo_controller_name",
+            default_value="aristo_controller",
+            description="Aristo state-machine controller name.",
         ),
         DeclareLaunchArgument(
             "actuator_config_yaml_path",
@@ -185,10 +185,16 @@ def generate_launch_description():
         output="screen",
     )
 
-    joint_impedance_controller_spawner = Node(
+    aristo_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[joint_impedance_controller_name, "--controller-manager", controller_manager_path],
+        arguments=[
+            aristo_controller_name,
+            "--controller-manager",
+            controller_manager_path,
+            "--service-call-timeout",
+            "60.0",
+        ],
         namespace=plato_ns,
         output="screen",
     )
@@ -196,10 +202,10 @@ def generate_launch_description():
     start_rviz_after_jsb = RegisterEventHandler(
         OnProcessExit(target_action=joint_state_broadcaster_spawner, on_exit=[rviz])
     )
-    start_impedance_after_jsb = RegisterEventHandler(
+    start_aristo_controller_after_jsb = RegisterEventHandler(
         OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
-            on_exit=[joint_impedance_controller_spawner],
+            on_exit=[aristo_controller_spawner],
         )
     )
     return LaunchDescription(
@@ -211,7 +217,7 @@ def generate_launch_description():
             tf_merger,
             index_fingertip_pose_pub,
             joint_state_broadcaster_spawner,
-            start_impedance_after_jsb,
+            start_aristo_controller_after_jsb,
             start_rviz_after_jsb,
         ]
     )

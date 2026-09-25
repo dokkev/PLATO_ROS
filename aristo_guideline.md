@@ -19,7 +19,7 @@ ros2 launch aristo_bringup aristo_hardware.launch.py
 Zero fingers during hardware activation:
 
 ```bash
-ros2 launch aristo_bringup aristo_hardware.launch.py zeroing:=true gui:=false
+ros2 launch aristo_bringup aristo_hardware.launch.py zeroing:=true
 ```
 
 Use `zeroing:=true` only when the fingers are physically in the zero pose. No

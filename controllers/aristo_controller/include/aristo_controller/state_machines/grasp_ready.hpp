@@ -37,6 +37,9 @@ private:
   double duration_sec_{2.0};
   Eigen::VectorXd target_jpos_;
   mutable plato_robot_system::task::JointTask joint_task_;
+  mutable plato_robot_system::task::JointTask index_open_task_;
+  mutable plato_robot_system::task::JointTask remaining_task_;
+  bool staged_trajectory_{false};
 };
 
 }  // namespace aristo_controller::state_machines

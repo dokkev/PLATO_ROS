@@ -151,5 +151,4 @@ sudo pkill slcand
   launching hardware nodes.
 - Do not send arbitrary frames on a live robot bus.
 - Prefer `candump` observation before enabling actuators.
-- Keep hardware launch commands in `docs/COMMANDS.md` and operator command
-  examples in `cli_commands.md`.
+- Keep operator command examples in [`docs/cli_commands.md`](../cli_commands.md).

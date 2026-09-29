@@ -99,7 +99,7 @@ sudo apt install libeigen3-dev
 
 There are two types of motors used: Steadywin GIM3505-8 and Dynamixel XM430-W350-T. Each GIM3505 has an on-axis motor driver which communicates via CAN. OpenRB150 and Aruino CAN Shield communicate via CAN and convert commands and motor information to TTL which dynamixel motors use. Each motor has two unique CAN IDs to identify them in context of TX and RX. The CAN IDs for each motor follows:
 
-![alt text](docs/img/motor_number.png)
+![alt text](img/motor_number.png)
 
 **Motor CAN ID:**
 - MOTOR1: 0x0a (10)
@@ -112,6 +112,5 @@ There are two types of motors used: Steadywin GIM3505-8 and Dynamixel XM430-W350
 - MOTOR8: 0x11 (17)
 
 TX ID and RX ID for each motor is same
-
 
 

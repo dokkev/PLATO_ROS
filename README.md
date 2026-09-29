@@ -68,9 +68,10 @@ packages it uses.
 
 ## Setup and further documentation
 
-- [Installation and platform notes](installation.md)
-- [Build, test, and run commands](docs/COMMANDS.md)
-- [Repository architecture and package boundaries](docs/ARCHITECTURE.md)
+- [Installation and platform notes](docs/installation.md)
+- [CLI topic and service examples](docs/cli_commands.md)
+- [ARISTO quick launch guide](docs/aristo_guideline.md)
+- [Turntable quick launch guide](docs/turntable_guideline.md)
 - [MPPI package overview](mppi_core/README.md)
 - [MPPI rollout and command contract](mppi_core/docs/grasp_state_mppi.md)
 - [Object-belief ownership and semantics](mppi_core/docs/object_belief.md)

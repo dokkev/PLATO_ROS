@@ -73,7 +73,8 @@ URDF or mesh handles can be scored only when primitive dimensions are provided.
 ### Consequences
 
 - Touch-time object belief is now contact-consistent instead of display-only.
-- The rollout still does not predict object pose or object contact dynamics.
+- Disturbance-aware rollout paths can step pose hypotheses using sampled object
+  disturbances, but do not simulate object dynamics or contact response.
 - Future work can replace the sampler with an optimizer without changing the
   `VirtualObjectBelief` state contract.
 
@@ -106,17 +107,19 @@ state behind a display-only artifact.
 Add optional object prior and virtual object belief types to `mppi_core`.
 `GraspObservation` may carry `ObjectPrior` and `VirtualObjectBelief`, and
 `GraspState` now carries `VirtualObjectBelief`. Empty object fields remain valid
-so the tactile-only rollout path still works. Rollout propagation preserves the
-belief without inventing object motion yet. Initial rollout states use valid
-measured `q_meas/qdot_meas` when available, while command generation can still
-integrate from the current reference.
+so the tactile-only rollout path still works. Rollout propagation carries the
+pose hypotheses and can apply configured sampled object disturbances; it does
+not simulate object dynamics. Initial rollout states use valid measured
+`q_meas/qdot_meas` when available, while command generation can still integrate
+from the current reference.
 
 ### Consequences
 
 - Object-aware rollout work now has a real state slot for object particles,
   geometry handles, and observation priors.
-- Tactile-only transition remains the fallback until object-contact transition
-  and costs are implemented.
+- Tactile-only transition remains supported. The object-aware path also
+  evaluates geometric support costs against the pose hypotheses; it does not
+  add physical object-contact dynamics.
 - Visualization should consume state/belief from rollout, not fabricate object
   support independently of the planner.
 
@@ -226,6 +229,9 @@ Positive:
   observation-time correction experiments.
 - The `/grasp` include directory no longer acts as a catch-all for robot,
   tactile, contact, and rollout code.
+
+The later 2026-06-11 object-belief decision below extends the current
+`GraspState` with a `VirtualObjectBelief` value that may be empty.
 
 Trade-offs:
 

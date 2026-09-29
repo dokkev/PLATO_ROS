@@ -1,6 +1,30 @@
 # PLATO State Estimator
 
-This package contains small sensing helpers for PLATO/Aristo experiments.
+This package contains ROS-side tactile observation helpers for PLATO/Aristo
+experiments. Object-belief algorithms are implemented in `mppi_core`; this
+package supplies the ROS observation and configured-prior wrapper.
+
+## Tactile Object-Prior Estimator
+
+The executable `object_prior_estimator_node` subscribes to joint-state and
+tactile topics, combines contact observations with a configured object geometry
+and pose prior, and calls `mppi_core::ObjectPriorEstimator`. By default it
+publishes a representative object pose, sampled particle poses, status, and
+visualization markers. Its launch file and defaults are
+`launch/object_prior_estimator.launch.py` and
+`config/object_prior_estimator.yaml`.
+
+The estimator's algorithmic types and belief particles live under
+`mppi_core/{include,src}/object/`. The ROS node publishes standard pose,
+particle, status, and marker messages; it does not publish a ROS
+`VirtualObjectBelief` message or directly feed the MPPI core. An application
+adapter is required to pass the estimated C++ belief into `GraspObservation`.
+See [`mppi_core/docs/object_belief.md`](../mppi_core/docs/object_belief.md) for
+the ownership and data flow.
+
+This is different from the compatibility executable
+`object_state_estimator_node` below, which runs the reference grasp-force
+generator and is not a full object-state estimator.
 
 ## Reference Grasp Force Generator
 

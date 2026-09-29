@@ -2,11 +2,14 @@
 
 ## State definitions
 
-The MPPI prediction target is `GraspState`:
+The MPPI prediction state is `GraspState`:
 
 ```text
-GraspState = RobotState + vector<TactileState>
+GraspState = RobotState + vector<TactileState> + VirtualObjectBelief
 ```
+
+`GraspState` stores `VirtualObjectBelief` as a value; an empty belief means
+object-aware evaluation is not active for that state.
 
 The rollout equation is:
 
@@ -85,12 +88,36 @@ struct GraspState {
   RobotState robot;
   std::vector<TactileState, Eigen::aligned_allocator<TactileState>>
       tactile_sensors;
+  VirtualObjectBelief object_belief;
 };
 ```
 
 Runtime code should not hard-code production fields for a fixed pair of tactile
 sensors. The current PLATO setup may provide two sensors, but rollout, cost, and
 adapter-facing code should treat them as an ordered per-sensor vector.
+
+## Object prior and belief
+
+The object-belief implementation is primarily in
+`mppi_core/{include,src}/object/`. It estimates weighted object-pose particles
+from an `ObjectPrior`, measured joint configuration, and tactile contact
+observations. The particles represent plausible object-pose scenarios for
+geometric grasp/contact evaluation. They are not a general object-pose tracker
+or simulated rigid-body object trajectories.
+
+The ROS-facing joint/tactile observation and object-prior wrapper is
+`plato_state_estimator/object_prior_estimator_node.cpp`. It calls the
+ROS-free `mppi_core::ObjectPriorEstimator` and publishes a representative pose,
+particle poses, status, and visualization markers. The separate compatibility
+executable `object_state_estimator_node` runs a reference grasp-force generator;
+it is not the object-prior estimator. See
+[`object_belief.md`](object_belief.md) for the data path and ownership details.
+
+`mppi_core` accepts an object prior/belief through `GraspObservation`, resolves
+the starting `VirtualObjectBelief`, carries its pose scenarios in `GraspState`,
+and evaluates geometric object support during rollout costs. Connecting the
+ROS node's outputs to an MPPI observation requires an application adapter; the
+repository does not provide that message adapter.
 
 ## Action definition
 

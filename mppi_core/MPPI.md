@@ -1,12 +1,18 @@
-# MPPI Direction: Disturbance-Sampled GraspState Control
+# MPPI: GraspState Control and Disturbance-Aware Policies
 
 ## 1. Core Idea
 
-This package implements a **disturbance-sampled GraspState-predictive MPPI controller** for tactile contact manipulation.
+`mppi_core` contains GraspState-predictive MPPI and robust grasp-policy
+implementations for tactile contact manipulation. The generic
+`MPPIOptimizer` samples action sequences; the continuous-qddot and robust-policy
+paths also evaluate sampled tactile/contact and object disturbances. The
+underlying rollout state and action contracts are shared, but these entry
+points should not be read as one ROS-integrated controller.
 
-The controller is **not** designed to predict exact future contact force.
+The package is **not** designed to predict exact future contact force.
 
-Instead, it samples possible future grasp outcomes under tactile/contact disturbances and chooses actions that keep the grasp stable.
+The disturbance-aware policy paths sample possible future grasp outcomes under
+tactile/contact disturbances and choose actions that keep the grasp stable.
 
 The central question is not:
 
@@ -72,22 +78,29 @@ T^s_k   = TactileState for tactile sensor s
 B^obj_k = optional virtual object belief
 ```
 
-The rollout predicts:
+`GraspState` stores `VirtualObjectBelief` as a value; an empty belief means
+object-aware evaluation is not active for that state.
+
+The deterministic rollout predicts:
 
 ```txt
-G_{k+1} = f_G(G_k, u_k, w_k)
+G_{k+1} = f_G(G_k, u_k)
 ```
 
 where:
 
 ```txt
 u_k = qddot_sol,k
-w_k = sampled tactile/contact/object disturbance
 ```
 
-So the rollout is not a single deterministic future.
+Disturbance-aware policy paths evaluate the state transition across sampled
+disturbances, written as `G_{k+1} = f_G(G_k, u_k, w_k)`. These scenario samples
+do not turn the rollout into a rigid-body object or contact simulator.
 
-For each candidate action sequence, MPPI should eventually evaluate multiple possible disturbance futures:
+For a disturbance-aware policy, evaluation includes multiple possible futures.
+
+For each candidate action sequence, the disturbance-aware policy evaluates
+multiple possible disturbance futures:
 
 ```txt
 action sample i:
@@ -512,8 +525,10 @@ CVaR / worst-fraction:
   J_i = mean of worst p% disturbance rollout costs
 ```
 
-The initial implementation may use deterministic rollout.
-The next robustness implementation should add disturbance samples and aggregate cost across those disturbance samples.
+The continuous-qddot and robust-grasp policy paths already evaluate sampled
+disturbance rollouts and aggregate their costs. The default
+`GraspStateRolloutModel` remains a deterministic transition for a fixed input;
+disturbance scenarios are handled by the policy paths around that model.
 
 ---
 
@@ -739,9 +754,9 @@ normal forces, not exact future force prediction.
 
 ---
 
-## 16. Current Implementation Priorities
+## 16. Current Implementation Shape
 
-The current priority is to stabilize the architecture:
+The current code is organized around these contracts:
 
 ```txt
 1. GraspState = RobotState + vector<TactileState> + optional VirtualObjectBelief
@@ -755,14 +770,10 @@ The current priority is to stabilize the architecture:
 9. Command builder = separate from rollout
 ```
 
-After this architecture is stable, add:
-
-```txt
-1. disturbance sampling in tactile transition
-2. robust cost aggregation across disturbance samples
-3. optional observation-time residual correction
-4. richer object disturbance sampling, visualization, and hardware tuning
-```
+The package also contains disturbance-aware continuous-qddot and robust-grasp
+policy paths. They evaluate sampled contact/object scenarios and aggregate
+their costs; this is separate from the deterministic default
+`GraspStateRolloutModel` transition described above.
 
 Do not turn the controller into an object pose tracker or multi-sensor residual
 force solver while adding the object-aware rollout pieces.
@@ -771,7 +782,7 @@ force solver while adding the object-aware rollout pieces.
 
 ## 17. Non-Goals
 
-This controller is not:
+These implementations are not:
 
 ```txt
 a full rigid-body contact simulator
@@ -784,7 +795,6 @@ a driver impedance simulator
 It is:
 
 ```txt
-a disturbance-sampled GraspState-predictive MPPI controller
-that samples possible future tactile/contact outcomes
+a grasp-state planner that evaluates contact and object-pose scenarios
 and chooses actions that preserve or improve grasp stability.
 ```

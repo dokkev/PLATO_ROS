@@ -1043,7 +1043,7 @@
           ["Inherits", "RolloutModelBase"],
           ["Config", "GraspStateRolloutConfig"],
           ["Transition", "StepTactileState with TactileTransitionConfig"],
-          ["Step output", "GraspState = RobotState + predicted TactileState"]
+          ["Step output", "GraspState = RobotState + predicted TactileState[] + VirtualObjectBelief (empty if unused)"]
         ],
         sources: [
           ["include/mppi_core/rollout/grasp_state_rollout_model.hpp", "../include/mppi_core/rollout/grasp_state_rollout_model.hpp"],

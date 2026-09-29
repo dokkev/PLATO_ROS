@@ -36,7 +36,7 @@ The repository is used for:
 | `plato_utils/` | Shared C++ utilities: PID, interpolation, watchdog, YAML helpers, joint state ordering, and joint-position storage. |
 | `plato_teleop/` | Python teleop nodes for SpaceMouse, grasp-task keyboard commands, and conversion helpers. |
 | `maestro_teleop/` | C++ teleoperation conversion utilities for Maestro input streams. |
-| `plato_state_estimator/` | Object/contact state estimator using tactile messages and PID force logic. |
+| `plato_state_estimator/` | Tactile reference grasp-force generator and ROS wrapper for object-prior particle estimation/visualization; object-belief algorithms are in `mppi_core`. |
 | `mppi_core/` | ROS-free C++ MPPI optimizer, contact/tactile rollout, config parsing, and tests. |
 | `plato_foxglove/` | Foxglove visualization scripts and configs. |
 | `docs/` | Agent-readable repository harness, hardware runbooks, firmware notes, and images. |
@@ -71,11 +71,18 @@ joint_states + motion/task topics
 MPPI flow:
 
 ```text
-q_meas/qdot_meas/tau_meas + tactile_meas sensor vector
--> mppi_core qddot_sol sampling, GraspState rollout, and stability cost
--> RobotCommand hybrid impedance packet with q_cmd/qdot_cmd/tau_cmd/kp/kd
--> downstream controller or integration layer
+joint/tactile observations + configured object pose prior
+-> plato_state_estimator object-prior wrapper -> representative pose / particles
+-> application adapter -> mppi_core::GraspObservation / GraspState
+-> qddot_sol action sequences, grasp-state rollout, and contact/support cost
+-> RobotCommand
+-> application adapter -> joint-space controller
 ```
+
+The flow shows the intended data contract, not a complete ROS runtime
+integration: `mppi_core` has no ROS dependencies, and this repository does not
+include adapters between the estimator's pose topics, `VirtualObjectBelief`,
+`RobotCommand`, and controller command messages.
 
 ## Core Boundaries
 

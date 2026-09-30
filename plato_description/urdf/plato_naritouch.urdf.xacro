@@ -3,6 +3,8 @@
 
   <xacro:arg name="fake_hardware" default="false"/>
   <xacro:arg name="zeroing" default="false"/>
+  <xacro:arg name="can_backend" default="pcan"/>
+  <xacro:arg name="socketcan_interface" default="can0"/>
 
   <xacro:include filename="xacro/plato_naritouch_description.xacro"/>
   <xacro:include filename="ros2_control/plato.ros2_control.xacro"/>
@@ -11,6 +13,8 @@
   <xacro:plato_ros2_control
     name="plato_ros2_control"
     fake_hardware="$(arg fake_hardware)"
-    zeroing="$(arg zeroing)"/>
+    zeroing="$(arg zeroing)"
+    can_backend="$(arg can_backend)"
+    socketcan_interface="$(arg socketcan_interface)"/>
 
 </robot>

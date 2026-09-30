@@ -14,6 +14,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     fake_hardware = LaunchConfiguration("fake_hardware")
     zeroing = LaunchConfiguration("zeroing")
+    can_backend = LaunchConfiguration("can_backend")
+    socketcan_interface = LaunchConfiguration("socketcan_interface")
     robot_description_xacro_path = LaunchConfiguration("robot_description_xacro_path")
     controller_config_path = LaunchConfiguration("controller_config_path")
     rviz_config_path = LaunchConfiguration("rviz_config_path")
@@ -37,6 +39,16 @@ def generate_launch_description():
             "zeroing",
             default_value="false",
             description="Run one-shot embedded actuator zeroing during activation.",
+        ),
+        DeclareLaunchArgument(
+            "can_backend",
+            default_value="pcan",
+            description="CAN transport backend: pcan or socketcan.",
+        ),
+        DeclareLaunchArgument(
+            "socketcan_interface",
+            default_value="can0",
+            description="Linux SocketCAN interface used when can_backend is socketcan.",
         ),
         DeclareLaunchArgument(
             "robot_description_xacro_path",
@@ -105,6 +117,12 @@ def generate_launch_description():
             " ",
             "zeroing:=",
             zeroing,
+            " ",
+            "can_backend:=",
+            can_backend,
+            " ",
+            "socketcan_interface:=",
+            socketcan_interface,
             " ",
             "actuator_config_yaml_path:=",
             actuator_config_yaml_path,

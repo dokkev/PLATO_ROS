@@ -83,7 +83,8 @@ std::vector<float> extract_position_offsets(
 // ════════════════════════════════════════════════════════════════════════════
 
 Hand::Hand(PlatoHandConfig config)
-: frame_executor_(transport_, logger()),
+: transport_(config.can_bus_config),
+  frame_executor_(transport_, logger()),
   transmission_(config.linkage_config, build_joint_effort_limits(config.actuator_configs)),
   state_helper_(transmission_),
   actuator_offset_yaml_path_(std::move(config.actuator_offset_yaml_path)),

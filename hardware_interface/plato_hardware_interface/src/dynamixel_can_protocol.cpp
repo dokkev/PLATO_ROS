@@ -1,5 +1,6 @@
 #include "plato_hardware_interface/dynamixel_can_protocol.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 
@@ -9,6 +10,15 @@ namespace plato_hardware_interface::dynamixel_can_protocol
 {
 namespace
 {
+
+constexpr float kPositionRawMaximum = 65535.0f;
+constexpr float kPackedStateRawMaximum = 4095.0f;
+constexpr float kPositionMinimumRad = -12.5f;
+constexpr float kPositionRangeRad = 25.0f;
+constexpr float kVelocityMinimumRpm = -65.0f;
+constexpr float kVelocityRangeRpm = 130.0f;
+constexpr float kRadiansPerRevolution = 2.0f * 3.14159265358979323846f;
+constexpr float kSecondsPerMinute = 60.0f;
 
 TPCANMsg make_standard_frame(uint32_t can_id, uint8_t len)
 {
@@ -106,6 +116,50 @@ std::optional<Response> decode_response(const TPCANMsg & frame)
 std::optional<Response> decode_lifecycle_response(const TPCANMsg & frame)
 {
   return decode_response(frame);
+}
+
+std::optional<StateFeedback> decode_state_feedback(
+  const TPCANMsg & frame,
+  float torque_constant,
+  float gear_ratio)
+{
+  const auto response = decode_response(frame);
+  if (
+    !response || response->command != Command::kSetPosition ||
+    frame.LEN < kStateResponseLength)
+  {
+    return std::nullopt;
+  }
+
+  const float torque_range = 450.0f * torque_constant * gear_ratio;
+  if (!std::isfinite(torque_range) || torque_range <= 0.0f) {
+    return std::nullopt;
+  }
+
+  const uint16_t position_raw =
+    static_cast<uint16_t>(frame.DATA[3]) |
+    (static_cast<uint16_t>(frame.DATA[4]) << 8);
+  const uint16_t velocity_raw =
+    (static_cast<uint16_t>(frame.DATA[5]) << 4) |
+    ((static_cast<uint16_t>(frame.DATA[6]) >> 4) & 0x0FU);
+  const uint16_t torque_raw =
+    (static_cast<uint16_t>(frame.DATA[6] & 0x0FU) << 8) |
+    static_cast<uint16_t>(frame.DATA[7]);
+
+  const float position =
+    static_cast<float>(position_raw) * kPositionRangeRad / kPositionRawMaximum +
+    kPositionMinimumRad;
+  const float velocity_rpm =
+    static_cast<float>(velocity_raw) * kVelocityRangeRpm / kPackedStateRawMaximum +
+    kVelocityMinimumRpm;
+  const float torque =
+    static_cast<float>(torque_raw) * torque_range / kPackedStateRawMaximum -
+    (225.0f * torque_constant * gear_ratio);
+
+  return StateFeedback{
+    position,
+    velocity_rpm * kRadiansPerRevolution / kSecondsPerMinute,
+    torque};
 }
 
 bool is_success(Result result)

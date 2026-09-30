@@ -6,14 +6,31 @@
 #include <chrono>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
-#include "can_hardware_common/pcan_interface.hpp"
+#include "can_hardware_common/can_interface.hpp"
 
 namespace can_hardware_common
 {
+
+enum class CanBackend
+{
+  kPcan,
+  kSocketCan
+};
+
+struct CanBusConfig
+{
+  CanBackend backend = CanBackend::kPcan;
+  std::string socketcan_interface = "can0";
+};
+
+CanBusConfig parse_can_bus_config(
+  const std::string & backend,
+  const std::string & socketcan_interface = "can0");
 
 class CanBus
 {
@@ -42,7 +59,8 @@ public:
     uint32_t receive_status = 0;
   };
 
-  CanBus() = default;
+  CanBus();
+  explicit CanBus(CanBusConfig config);
   ~CanBus();
 
   CanBus(const CanBus &) = delete;
@@ -83,7 +101,7 @@ public:
 private:
   static constexpr std::size_t kMaxRxPerPoll = 30U;
 
-  pcan_interface::PCANInterface channel_;
+  std::unique_ptr<CanInterface> channel_;
   std::vector<RxObserver> rx_observers_;
 
   mutable std::mutex tx_mutex_;

@@ -35,7 +35,9 @@ public:
     mit_can_protocol::MitLimits active_limits{};
   };
 
-  explicit Hand(std::vector<aristo_actuator::Config> actuator_configs);
+  explicit Hand(
+    std::vector<aristo_actuator::Config> actuator_configs,
+    can_hardware_common::CanBusConfig can_bus_config = {});
   Hand(const Hand &) = delete;
   Hand & operator=(const Hand &) = delete;
   Hand(Hand &&) = delete;

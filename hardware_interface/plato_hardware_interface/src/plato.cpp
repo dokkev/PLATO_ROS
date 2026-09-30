@@ -45,6 +45,18 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
     }
   }
 
+  std::string can_backend = "pcan";
+  const auto can_backend_it = info_.hardware_parameters.find("can_backend");
+  if (can_backend_it != info_.hardware_parameters.end()) {
+    can_backend = can_backend_it->second;
+  }
+
+  std::string socketcan_interface = "can0";
+  const auto socketcan_interface_it = info_.hardware_parameters.find("socketcan_interface");
+  if (socketcan_interface_it != info_.hardware_parameters.end()) {
+    socketcan_interface = socketcan_interface_it->second;
+  }
+
   std::string actuator_offset_yaml_path_override;
   const auto actuator_offset_path_it = info_.hardware_parameters.find("actuator_offset_yaml_path");
   if (actuator_offset_path_it != info_.hardware_parameters.end()) {
@@ -85,6 +97,8 @@ hardware_interface::CallbackReturn PlatoHardware::on_init(const hardware_interfa
 
   try {
     auto hand_config = plato_hand::load_default_plato_hand_config();
+    hand_config.can_bus_config = can_hardware_common::parse_can_bus_config(
+      can_backend, socketcan_interface);
     if (!actuator_offset_yaml_path_override.empty()) {
       hand_config.actuator_offset_yaml_path = actuator_offset_yaml_path_override;
     }

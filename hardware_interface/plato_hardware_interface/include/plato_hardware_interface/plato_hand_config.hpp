@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "can_hardware_common/can_bus.hpp"
 #include "plato_hardware_interface/actuator.hpp"
 #include "plato_hardware_interface/five_bar_linkage.hpp"
 
@@ -19,6 +20,7 @@ struct PlatoHandConfig
   std::chrono::microseconds direct_tx_inter_frame_gap{std::chrono::microseconds(100)};
   double servo_stiffness_scale{0.0};
   bool disable_on_destruction{true};
+  can_hardware_common::CanBusConfig can_bus_config{};
 };
 
 }  // namespace plato_hand

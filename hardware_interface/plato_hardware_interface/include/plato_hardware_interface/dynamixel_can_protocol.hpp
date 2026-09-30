@@ -32,9 +32,17 @@ struct Response
   Result result = Result::kFailure;
 };
 
+struct StateFeedback
+{
+  float position = 0.0f;
+  float velocity = 0.0f;
+  float torque = 0.0f;
+};
+
 constexpr uint8_t kLifecycleCommandLength = 2;
 constexpr uint8_t kLifecycleResponseLength = 3;
 constexpr uint8_t kPositionCommandLength = 8;
+constexpr uint8_t kStateResponseLength = 8;
 
 // Command frame:
 //   DATA[0] = Command
@@ -45,6 +53,10 @@ constexpr uint8_t kPositionCommandLength = 8;
 //   DATA[0] = echoed Command
 //   DATA[1] = Dynamixel servo/channel ID
 //   DATA[2] = Result
+//   For POSITION_CONTROL responses, DATA[3..7] contains packed state feedback.
+//   DATA[3..4] = uint16 position, mapped from [-12.5, 12.5] rad.
+//   DATA[5..6] = 12-bit velocity, mapped from [-65, 65] RPM.
+//   DATA[6..7] = 12-bit torque, mapped using torque_constant and gear_ratio.
 //
 // Position command payload:
 //   DATA[2..5] = float32 goal position, little-endian, radians
@@ -59,6 +71,10 @@ TPCANMsg make_position_command(
 
 std::optional<Response> decode_response(const TPCANMsg & frame);
 std::optional<Response> decode_lifecycle_response(const TPCANMsg & frame);
+std::optional<StateFeedback> decode_state_feedback(
+  const TPCANMsg & frame,
+  float torque_constant,
+  float gear_ratio);
 
 bool is_success(Result result);
 const char * command_name(Command command);

@@ -9,6 +9,8 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     plato_ns = LaunchConfiguration("plato_ns")
     zeroing = LaunchConfiguration("zeroing")
+    can_backend = LaunchConfiguration("can_backend")
+    socketcan_interface = LaunchConfiguration("socketcan_interface")
 
     robot_description_content = Command(
         [
@@ -18,6 +20,12 @@ def generate_launch_description():
             " ",
             "zeroing:=",
             zeroing,
+            " ",
+            "can_backend:=",
+            can_backend,
+            " ",
+            "socketcan_interface:=",
+            socketcan_interface,
         ]
     )
     robot_description = {"robot_description": robot_description_content}
@@ -102,6 +110,16 @@ def generate_launch_description():
             "zeroing",
             default_value="false",
             description="Set current actuator positions as software zero after the first full feedback snapshot.",
+        ),
+        DeclareLaunchArgument(
+            "can_backend",
+            default_value="pcan",
+            description="CAN transport backend: pcan or socketcan.",
+        ),
+        DeclareLaunchArgument(
+            "socketcan_interface",
+            default_value="can0",
+            description="Linux SocketCAN interface used when can_backend is socketcan.",
         ),
     ]
 

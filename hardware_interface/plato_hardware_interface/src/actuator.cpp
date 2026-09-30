@@ -198,13 +198,38 @@ bool Actuator::process_dynamixel_bridge_message_(const TPCANMsg & msg)
 
   const bool success =
     plato_hardware_interface::dynamixel_can_protocol::is_success(response->result);
+  can_hardware_common::DecodedFeedback decoded;
+
   if (response->command == plato_hardware_interface::dynamixel_can_protocol::Command::kEnable) {
-    motor_enabled_ = success;
+    decoded.motor_enabled = success;
   } else if (
     response->command == plato_hardware_interface::dynamixel_can_protocol::Command::kDisable &&
     success)
   {
-    motor_enabled_ = false;
+    decoded.motor_enabled = false;
+  } else if (
+    response->command == plato_hardware_interface::dynamixel_can_protocol::Command::kSetPosition)
+  {
+    const auto state = plato_hardware_interface::dynamixel_can_protocol::decode_state_feedback(
+      msg, static_config_.torque_constant, static_config_.gear_ratio);
+    if (state) {
+      decoded.has_state = true;
+      decoded.motor_position = state->position;
+      decoded.state.position = map_motor_to_joint_frame_(state->position, true);
+      decoded.state.velocity = map_motor_to_joint_frame_(state->velocity);
+      decoded.state.torque = map_motor_to_joint_frame_(state->torque);
+    }
+
+    if (
+      response->result ==
+      plato_hardware_interface::dynamixel_can_protocol::Result::kMotorDisabled)
+    {
+      decoded.motor_enabled = false;
+    }
+  }
+
+  if (decoded.has_state || decoded.motor_enabled.has_value()) {
+    apply_decoded_feedback_(decoded);
   }
 
   return true;

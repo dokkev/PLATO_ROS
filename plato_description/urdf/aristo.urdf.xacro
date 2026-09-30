@@ -4,13 +4,15 @@
   <xacro:arg name="fake_hardware" default="false"/>
   <xacro:arg name="zeroing" default="false"/>
   <xacro:arg name="actuator_config_yaml_path" default=""/>
+  <xacro:arg name="can_backend" default="pcan"/>
+  <xacro:arg name="socketcan_interface" default="can0"/>
 
   <!-- Root link for TF tree -->
   <link name="base_link"/>
 
   <!-- Includes -->
-    <xacro:include filename="$(find plato_description)/urdf/xacro/aristo_description.xacro"/>
-    <xacro:include filename="$(find plato_description)/urdf/ros2_control/aristo.ros2_control.xacro"/>
+    <xacro:include filename="xacro/aristo_description.xacro"/>
+    <xacro:include filename="ros2_control/aristo.ros2_control.xacro"/>
 
 
   <!-- Instantiate geometry/tree and ros2_control -->
@@ -19,6 +21,8 @@
     name="aristo_ros2_control"
 	    fake_hardware="$(arg fake_hardware)"
 	    zeroing="$(arg zeroing)"
-	    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"/>
+	    actuator_config_yaml_path="$(arg actuator_config_yaml_path)"
+	    can_backend="$(arg can_backend)"
+	    socketcan_interface="$(arg socketcan_interface)"/>
 
 </robot>

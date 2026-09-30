@@ -159,6 +159,18 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
     }
   }
 
+  std::string can_backend = "pcan";
+  const auto can_backend_it = info_.hardware_parameters.find("can_backend");
+  if (can_backend_it != info_.hardware_parameters.end()) {
+    can_backend = can_backend_it->second;
+  }
+
+  std::string socketcan_interface = "can0";
+  const auto socketcan_interface_it = info_.hardware_parameters.find("socketcan_interface");
+  if (socketcan_interface_it != info_.hardware_parameters.end()) {
+    socketcan_interface = socketcan_interface_it->second;
+  }
+
   std::string actuator_config_yaml_path_override;
   const auto actuator_config_path_it =
     info_.hardware_parameters.find("actuator_config_yaml_path");
@@ -170,7 +182,9 @@ hardware_interface::CallbackReturn AristoHardware::on_init(const hardware_interf
     auto actuator_configs = actuator_config_yaml_path_override.empty() ?
       aristo_actuator::load_aristo_actuator_configs() :
       aristo_actuator::load_aristo_actuator_configs(actuator_config_yaml_path_override);
-    hand_ = std::make_unique<aristo_hand::Hand>(std::move(actuator_configs));
+    hand_ = std::make_unique<aristo_hand::Hand>(
+      std::move(actuator_configs),
+      can_hardware_common::parse_can_bus_config(can_backend, socketcan_interface));
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       rclcpp::get_logger("AristoHardware"),

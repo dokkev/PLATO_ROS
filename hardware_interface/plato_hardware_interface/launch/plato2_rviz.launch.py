@@ -19,12 +19,24 @@ def generate_launch_description():
             "plato_ns",
             default_value="plato2",
             description="Namespace for Plato2 hand",
-        )
+        ),
+        DeclareLaunchArgument(
+            "can_backend",
+            default_value="pcan",
+            description="CAN transport backend: pcan or socketcan.",
+        ),
+        DeclareLaunchArgument(
+            "socketcan_interface",
+            default_value="can0",
+            description="Linux SocketCAN interface used when can_backend is socketcan.",
+        ),
     ]
 
     # Launch Arguments
     rviz = LaunchConfiguration("rviz")
     plato_ns = LaunchConfiguration("plato_ns")
+    can_backend = LaunchConfiguration("can_backend")
+    socketcan_interface = LaunchConfiguration("socketcan_interface")
 
     # Include the hardware launch file
     pkg_plato2_hardware = FindPackageShare("plato_hardware_interface")
@@ -32,7 +44,12 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [pkg_plato2_hardware, '/launch/plato2_hardware.launch.py']
         ),
-        launch_arguments={'plato_ns': plato_ns, 'rviz': 'false'}.items()
+        launch_arguments={
+            'plato_ns': plato_ns,
+            'rviz': 'false',
+            'can_backend': can_backend,
+            'socketcan_interface': socketcan_interface,
+        }.items()
     )
 
     # RViz configuration

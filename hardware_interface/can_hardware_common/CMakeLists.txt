@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} SHARED
   src/can_bus.cpp
   src/can_frame_executor.cpp
   src/pcan_interface.cpp
+  src/socketcan_interface.cpp
 )
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)

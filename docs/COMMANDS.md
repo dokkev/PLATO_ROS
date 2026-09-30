@@ -129,6 +129,14 @@ source install/setup.bash
 ros2 launch plato_bringup plato_hardware.launch.py rviz:=true zeroing:=false
 ```
 
+The CAN backend defaults to PCAN. For a Linux SocketCAN adapter, bring up the
+interface first, then select it at launch:
+
+```bash
+ros2 launch plato_bringup plato_hardware.launch.py \
+  can_backend:=socketcan socketcan_interface:=can0
+```
+
 Aristo bringup:
 
 ```bash
@@ -136,6 +144,9 @@ cd ~/workspace/plato_ws
 source install/setup.bash
 ros2 launch aristo_bringup aristo_hardware.launch.py gui:=true fake_hardware:=false zeroing:=false
 ```
+
+Use the same `can_backend:=socketcan socketcan_interface:=can0` arguments for
+Aristo when using SocketCAN.
 
 The default Aristo bringup loads the Aristo state-machine controller. It starts
 in initialize state `0`; request poke state `1` or grasp-ready/open state `3`

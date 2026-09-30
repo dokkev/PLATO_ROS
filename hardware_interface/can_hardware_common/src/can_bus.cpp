@@ -1,8 +1,16 @@
 #include "can_hardware_common/can_bus.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <exception>
+#include <memory>
+#include <stdexcept>
 #include <thread>
+#include <utility>
+
+#include "can_hardware_common/pcan_interface.hpp"
+#include "can_hardware_common/socketcan_interface.hpp"
 
 namespace can_hardware_common
 {
@@ -17,7 +25,55 @@ std::string hex_u32(uint32_t value)
   return buffer;
 }
 
+std::string lowercase(std::string value)
+{
+  std::transform(
+    value.begin(), value.end(), value.begin(),
+    [](unsigned char character) {return static_cast<char>(std::tolower(character));});
+  return value;
+}
+
 }  // namespace
+
+CanBusConfig parse_can_bus_config(
+  const std::string & backend,
+  const std::string & socketcan_interface)
+{
+  const auto normalized_backend = lowercase(backend);
+  CanBusConfig config;
+  if (normalized_backend == "pcan") {
+    config.backend = CanBackend::kPcan;
+  } else if (normalized_backend == "socketcan") {
+    config.backend = CanBackend::kSocketCan;
+  } else {
+    throw std::invalid_argument(
+            "can_backend must be either 'pcan' or 'socketcan', got '" + backend + "'");
+  }
+
+  if (config.backend == CanBackend::kSocketCan && socketcan_interface.empty()) {
+    throw std::invalid_argument("socketcan_interface must not be empty");
+  }
+  config.socketcan_interface = socketcan_interface;
+  return config;
+}
+
+CanBus::CanBus()
+: CanBus(CanBusConfig{})
+{
+}
+
+CanBus::CanBus(CanBusConfig config)
+{
+  switch (config.backend) {
+    case CanBackend::kPcan:
+      channel_ = std::make_unique<pcan_interface::PCANInterface>();
+      break;
+    case CanBackend::kSocketCan:
+      channel_ = std::make_unique<socketcan_interface::SocketCANInterface>(
+        std::move(config.socketcan_interface));
+      break;
+  }
+}
 
 CanBus::~CanBus() = default;
 
@@ -44,7 +100,7 @@ CanBus::RxPollResult CanBus::poll_rx()
     };
 
   for (std::size_t index = 0; index < kMaxRxPerPoll; ++index) {
-    const TPCANStatus status = channel_.read(rx_frame);
+    const TPCANStatus status = channel_->read(rx_frame);
     if (status == PCAN_ERROR_OK) {
       dispatch_rx(rx_frame);
       ++result.processed_frames;
@@ -113,7 +169,7 @@ CanBus::RxPollResult CanBus::read_frames_until(
 
     TPCANMsg rx_frame{};
     const auto timeout = std::chrono::duration_cast<std::chrono::microseconds>(deadline - now);
-    const TPCANStatus status = channel_.read_with_timeout(rx_frame, timeout);
+    const TPCANStatus status = channel_->read_with_timeout(rx_frame, timeout);
     if (status != PCAN_ERROR_OK) {
       result.status = status;
       return result;
@@ -149,7 +205,7 @@ TPCANStatus CanBus::send_tx_frame(const TPCANMsg & tx_frame)
     return PCAN_ERROR_QXMTFULL;
   }
 
-  const TPCANStatus status = channel_.write(tx_frame);
+  const TPCANStatus status = channel_->write(tx_frame);
   if (status == PCAN_ERROR_OK) {
     last_tx_time_ = now;
   }
@@ -197,12 +253,12 @@ bool CanBus::is_nonfatal_read_status(TPCANStatus status)
 CanBus::BusDiagnostics CanBus::get_diagnostics()
 {
   BusDiagnostics diagnostics;
-  diagnostics.bus_status = channel_.get_bus_status();
-  (void)channel_.get_value(
+  diagnostics.bus_status = channel_->get_bus_status();
+  (void)channel_->get_value(
     PCAN_CHANNEL_CONDITION,
     &diagnostics.channel_condition,
     sizeof(diagnostics.channel_condition));
-  (void)channel_.get_value(
+  (void)channel_->get_value(
     PCAN_RECEIVE_STATUS,
     &diagnostics.receive_status,
     sizeof(diagnostics.receive_status));

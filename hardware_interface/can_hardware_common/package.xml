@@ -3,7 +3,7 @@
 <package format="3">
   <name>can_hardware_common</name>
   <version>0.0.0</version>
-  <description>Transport-centered CAN utilities: PCAN transport, pacing, and shared frame/time types.</description>
+  <description>Transport-centered CAN utilities: PCAN and SocketCAN transports, pacing, and shared frame/time types.</description>
   <maintainer email="dongho@utexas.edu">dk</maintainer>
   <license>TODO: License declaration</license>
 

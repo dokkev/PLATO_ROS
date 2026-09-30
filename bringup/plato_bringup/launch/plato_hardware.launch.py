@@ -13,6 +13,8 @@ def generate_launch_description():
     plato_ns = LaunchConfiguration("plato_ns")
     use_sim_time = LaunchConfiguration("use_sim_time")
     zeroing = LaunchConfiguration("zeroing")
+    can_backend = LaunchConfiguration("can_backend")
+    socketcan_interface = LaunchConfiguration("socketcan_interface")
     robot_description_xacro_path = LaunchConfiguration("robot_description_xacro_path")
     controller_config_path = LaunchConfiguration("controller_config_path")
     rviz_config_path = LaunchConfiguration("rviz_config_path")
@@ -28,6 +30,16 @@ def generate_launch_description():
             "zeroing",
             default_value="false",
             description="Set current actuator positions as software zero after the first full feedback snapshot.",
+        ),
+        DeclareLaunchArgument(
+            "can_backend",
+            default_value="pcan",
+            description="CAN transport backend: pcan or socketcan.",
+        ),
+        DeclareLaunchArgument(
+            "socketcan_interface",
+            default_value="can0",
+            description="Linux SocketCAN interface used when can_backend is socketcan.",
         ),
         DeclareLaunchArgument(
             "robot_description_xacro_path",
@@ -75,6 +87,12 @@ def generate_launch_description():
             " ",
             "zeroing:=",
             zeroing,
+            " ",
+            "can_backend:=",
+            can_backend,
+            " ",
+            "socketcan_interface:=",
+            socketcan_interface,
         ]
     )
     robot_description = {

@@ -97,8 +97,11 @@ void accumulate_poll_result(
 }
 }  // namespace
 
-Hand::Hand(std::vector<aristo_actuator::Config> actuator_configs)
-: actuator_configs_(std::move(actuator_configs))
+Hand::Hand(
+  std::vector<aristo_actuator::Config> actuator_configs,
+  can_hardware_common::CanBusConfig can_bus_config)
+: transport_(std::move(can_bus_config)),
+  actuator_configs_(std::move(actuator_configs))
 {
   if (actuator_configs_.size() != kNumActuators) {
     throw std::invalid_argument(

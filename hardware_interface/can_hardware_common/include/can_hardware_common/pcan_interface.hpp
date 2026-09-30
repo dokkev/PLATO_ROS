@@ -8,10 +8,12 @@
 #include <mutex>
 #include <string>
 
+#include "can_hardware_common/can_interface.hpp"
+
 namespace pcan_interface
 {
 
-class PCANInterface
+class PCANInterface final : public can_hardware_common::CanInterface
 {
 public:
   PCANInterface();
@@ -22,11 +24,16 @@ public:
   PCANInterface(PCANInterface &&) = delete;
   PCANInterface & operator=(PCANInterface &&) = delete;
 
-  TPCANStatus write(const TPCANMsg & tx_frame);
-  TPCANStatus read(TPCANMsg & rx_frame, TPCANTimestamp * timestamp = nullptr);
-  TPCANStatus read_with_timeout(TPCANMsg & rx_frame, std::chrono::microseconds timeout);
-  TPCANStatus get_bus_status();
-  TPCANStatus get_value(TPCANParameter parameter, void * buffer, uint32_t buffer_length);
+  TPCANStatus write(const TPCANMsg & tx_frame) override;
+  TPCANStatus read(TPCANMsg & rx_frame, TPCANTimestamp * timestamp = nullptr) override;
+  TPCANStatus read_with_timeout(
+    TPCANMsg & rx_frame,
+    std::chrono::microseconds timeout) override;
+  TPCANStatus get_bus_status() override;
+  TPCANStatus get_value(
+    TPCANParameter parameter,
+    void * buffer,
+    uint32_t buffer_length) override;
 
   static std::string format_error(TPCANStatus status);
 

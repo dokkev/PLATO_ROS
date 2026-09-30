@@ -13,6 +13,10 @@ publishes a representative object pose, sampled particle poses, status, and
 visualization markers. Its launch file and defaults are
 `launch/object_prior_estimator.launch.py` and
 `config/object_prior_estimator.yaml`.
+Updates require recent joint and tactile messages whose receipt times and
+nonzero source timestamps are within the configured `max_input_age_s` and
+`max_input_skew_s` bounds. Published estimate headers use the oldest valid
+source timestamp when all inputs provide one.
 
 The estimator's algorithmic types and belief particles live under
 `mppi_core/{include,src}/object/`. The ROS node publishes standard pose,

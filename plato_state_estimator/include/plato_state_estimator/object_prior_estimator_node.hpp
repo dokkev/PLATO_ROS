@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -39,6 +40,7 @@ private:
   bool loadRobotModel();
   bool buildTactileContexts();
   bool buildJointConfiguration(Eigen::VectorXd * q);
+  bool haveFreshSynchronizedInputs(rclcpp::Time * observation_stamp) const;
 
   mppi_core::ObjectPrior loadObjectPriorFromParameters();
   mppi_core::ObjectPriorEstimatorConfig loadEstimatorConfigFromParameters();
@@ -50,7 +52,8 @@ private:
   void publishEstimate(
     const mppi_core::ObjectBeliefInitializationResult & result,
     const std::vector<mppi_core::TactileState,
-    Eigen::aligned_allocator<mppi_core::TactileState>> & tactile_sensors);
+    Eigen::aligned_allocator<mppi_core::TactileState>> & tactile_sensors,
+    const rclcpp::Time & stamp);
   void publishMarkers(
     const mppi_core::ObjectBeliefInitializationResult & result,
     const std::vector<mppi_core::TactileState,
@@ -79,6 +82,8 @@ private:
   std::vector<double> tactile_normal_axis_signs_;
 
   double update_rate_{100.0};
+  double max_input_age_s_{0.2};
+  double max_input_skew_s_{0.05};
   double cop_scale_m_{1.0e-3};
   double hemisphere_radius_m_{0.003};
   double hemisphere_contact_threshold_n_{0.1};
@@ -103,6 +108,10 @@ private:
   std::vector<rclcpp::Subscription<TactileMsg>::SharedPtr> tactile_subs_;
   sensor_msgs::msg::JointState::SharedPtr latest_joint_state_;
   std::vector<TactileMsg::SharedPtr> latest_tactile_;
+  std::chrono::steady_clock::time_point latest_joint_state_receive_time_{};
+  std::vector<std::chrono::steady_clock::time_point> latest_tactile_receive_times_;
+  bool has_joint_state_receive_time_{false};
+  std::vector<bool> has_tactile_receive_times_;
 
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr object_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particle_poses_pub_;

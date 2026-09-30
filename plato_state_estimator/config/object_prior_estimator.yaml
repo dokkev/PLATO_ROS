@@ -3,6 +3,9 @@
 object_prior_estimator:
   ros__parameters:
     update_rate: 100.0
+    # Reject old inputs and joint/tactile snapshots that are too far apart.
+    max_input_age_s: 0.2
+    max_input_skew_s: 0.05
     world_frame: base_link
 
     joint_state_topic: /plato2/joint_states

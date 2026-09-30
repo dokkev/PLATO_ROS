@@ -446,10 +446,10 @@ bool RepresentativeObjectBeliefPose(const VirtualObjectBelief& belief,
         !particle.pose_world.matrix().allFinite()) {
       continue;
     }
-    const double weight =
-        std::isfinite(particle.weight) && particle.weight > 0.0
-            ? particle.weight
-            : 1.0;
+    if (particle.weight <= 0.0) {
+      continue;
+    }
+    const double weight = particle.weight;
     weighted_translation += weight * particle.pose_world.translation();
     weight_sum += weight;
     if (weight > orientation_weight) {

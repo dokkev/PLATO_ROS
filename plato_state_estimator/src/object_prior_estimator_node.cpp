@@ -246,6 +246,17 @@ ObjectPriorEstimatorNode::ObjectPriorEstimatorNode()
 : Node("object_prior_estimator")
 {
   update_rate_ = this->declare_parameter<double>("update_rate", update_rate_);
+  max_input_age_s_ = this->declare_parameter<double>(
+    "max_input_age_s", max_input_age_s_);
+  max_input_skew_s_ = this->declare_parameter<double>(
+    "max_input_skew_s", max_input_skew_s_);
+  if (!std::isfinite(max_input_age_s_) || max_input_age_s_ <= 0.0) {
+    max_input_age_s_ = 0.2;
+  }
+  if (!std::isfinite(max_input_skew_s_) || max_input_skew_s_ <= 0.0) {
+    max_input_skew_s_ = 0.05;
+  }
+  max_input_skew_s_ = std::min(max_input_skew_s_, max_input_age_s_);
   world_frame_ = this->declare_parameter<std::string>("world_frame", world_frame_);
   robot_description_ = this->declare_parameter<std::string>("robot_description", "");
   robot_description_path_ =
@@ -321,6 +332,8 @@ ObjectPriorEstimatorNode::ObjectPriorEstimatorNode()
     std::bind(&ObjectPriorEstimatorNode::jointStateCallback, this, std::placeholders::_1));
 
   latest_tactile_.resize(tactile_topics_.size());
+  latest_tactile_receive_times_.resize(tactile_topics_.size());
+  has_tactile_receive_times_.assign(tactile_topics_.size(), false);
   tactile_subs_.reserve(tactile_topics_.size());
   for (std::size_t i = 0; i < tactile_topics_.size(); ++i) {
     tactile_subs_.push_back(
@@ -575,6 +588,8 @@ ObjectPriorEstimatorNode::makeHemisphereGeometry()
 void ObjectPriorEstimatorNode::jointStateCallback(
   sensor_msgs::msg::JointState::SharedPtr msg)
 {
+  latest_joint_state_receive_time_ = std::chrono::steady_clock::now();
+  has_joint_state_receive_time_ = true;
   latest_joint_state_ = std::move(msg);
 }
 
@@ -585,7 +600,89 @@ void ObjectPriorEstimatorNode::tactileCallback(
   if (index >= latest_tactile_.size()) {
     return;
   }
+  latest_tactile_receive_times_[index] = std::chrono::steady_clock::now();
+  has_tactile_receive_times_[index] = true;
   latest_tactile_[index] = std::move(msg);
+}
+
+bool ObjectPriorEstimatorNode::haveFreshSynchronizedInputs(
+  rclcpp::Time * observation_stamp) const
+{
+  if (observation_stamp == nullptr || !latest_joint_state_ ||
+    !has_joint_state_receive_time_ || latest_tactile_.empty())
+  {
+    return false;
+  }
+
+  const auto now_steady = std::chrono::steady_clock::now();
+  const auto max_age = std::chrono::duration<double>(max_input_age_s_);
+  auto oldest_receive_time = std::chrono::steady_clock::time_point::max();
+  auto newest_receive_time = std::chrono::steady_clock::time_point::min();
+  const auto include_receive_time = [&](
+    const std::chrono::steady_clock::time_point & receive_time) {
+      const auto age = now_steady - receive_time;
+      if (age < std::chrono::steady_clock::duration::zero() || age > max_age) {
+        return false;
+      }
+      oldest_receive_time = std::min(oldest_receive_time, receive_time);
+      newest_receive_time = std::max(newest_receive_time, receive_time);
+      return true;
+    };
+
+  if (!include_receive_time(latest_joint_state_receive_time_)) {
+    return false;
+  }
+  for (std::size_t i = 0; i < latest_tactile_.size(); ++i) {
+    if (!latest_tactile_[i] || !has_tactile_receive_times_[i] ||
+      !include_receive_time(latest_tactile_receive_times_[i]))
+    {
+      return false;
+    }
+  }
+  if (std::chrono::duration<double>(newest_receive_time - oldest_receive_time) >
+    std::chrono::duration<double>(max_input_skew_s_))
+  {
+    return false;
+  }
+
+  const rclcpp::Time now_ros = this->now();
+  double oldest_stamp_sec = std::numeric_limits<double>::infinity();
+  double newest_stamp_sec = -std::numeric_limits<double>::infinity();
+  builtin_interfaces::msg::Time oldest_header_stamp;
+  bool all_inputs_stamped = true;
+  const auto include_header_stamp = [&](
+    const builtin_interfaces::msg::Time & header_stamp) {
+      const double stamp_sec = StampSeconds(header_stamp);
+      if (!std::isfinite(stamp_sec) || stamp_sec <= 0.0) {
+        all_inputs_stamped = false;
+        return true;
+      }
+
+      const double age_sec = now_ros.seconds() - stamp_sec;
+      if (age_sec > max_input_age_s_ || age_sec < -max_input_skew_s_) {
+        return false;
+      }
+      if (stamp_sec < oldest_stamp_sec) {
+        oldest_stamp_sec = stamp_sec;
+        oldest_header_stamp = header_stamp;
+      }
+      newest_stamp_sec = std::max(newest_stamp_sec, stamp_sec);
+      return newest_stamp_sec - oldest_stamp_sec <= max_input_skew_s_;
+    };
+
+  if (!include_header_stamp(latest_joint_state_->header.stamp)) {
+    return false;
+  }
+  for (const auto & tactile_msg : latest_tactile_) {
+    if (!include_header_stamp(tactile_msg->header.stamp)) {
+      return false;
+    }
+  }
+
+  *observation_stamp = all_inputs_stamped
+    ? rclcpp::Time(oldest_header_stamp)
+    : now_ros;
+  return true;
 }
 
 bool ObjectPriorEstimatorNode::buildJointConfiguration(Eigen::VectorXd * q)
@@ -668,13 +765,14 @@ void ObjectPriorEstimatorNode::updateTimerCallback()
       "Object prior estimator waiting for valid model and object prior");
     return;
   }
-  if (!latest_joint_state_) {
+  rclcpp::Time observation_stamp = this->now();
+  if (!haveFreshSynchronizedInputs(&observation_stamp)) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(),
+      *this->get_clock(),
+      5000,
+      "Object prior estimator waiting for fresh, synchronized joint/tactile inputs");
     return;
-  }
-  for (const auto & tactile_msg : latest_tactile_) {
-    if (!tactile_msg) {
-      return;
-    }
   }
 
   Eigen::VectorXd q_meas;
@@ -691,16 +789,15 @@ void ObjectPriorEstimatorNode::updateTimerCallback()
 
   const auto result =
     estimator_.Update(q_meas, tactile_sensors, tactile_contexts_);
-  publishEstimate(result, tactile_sensors);
+  publishEstimate(result, tactile_sensors, observation_stamp);
 }
 
 void ObjectPriorEstimatorNode::publishEstimate(
   const mppi_core::ObjectBeliefInitializationResult & result,
   const std::vector<mppi_core::TactileState,
-  Eigen::aligned_allocator<mppi_core::TactileState>> & tactile_sensors)
+  Eigen::aligned_allocator<mppi_core::TactileState>> & tactile_sensors,
+  const rclcpp::Time & stamp)
 {
-  const auto stamp = this->now();
-
   std::size_t active_sensor_count = 0;
   std::size_t active_hemisphere_count = 0;
   for (const auto & tactile : tactile_sensors) {

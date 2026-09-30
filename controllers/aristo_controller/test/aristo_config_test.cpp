@@ -101,7 +101,7 @@ TEST(AristoConfigTest, LoadsDefaultYamlWithUnifiedGraspTaskConfig)
   ASSERT_EQ(grasp_task.q_ready.size(), config.num_joints);
   EXPECT_TRUE(grasp_task.q_ready.isApprox(expected_grasp_ready_target));
   EXPECT_FALSE(grasp_task.force_feedback_enabled);
-  EXPECT_DOUBLE_EQ(grasp_task.lpf_alpha, 0.2);
+  EXPECT_DOUBLE_EQ(grasp_task.lpf_alpha, 0.05);
   EXPECT_DOUBLE_EQ(grasp_task.force_exit_u_threshold, 0.75);
   EXPECT_FALSE(grasp_task.debug_print_contact_states);
   EXPECT_DOUBLE_EQ(grasp_task.debug_print_contact_interval_s, 0.25);

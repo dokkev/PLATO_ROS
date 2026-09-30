@@ -1,6 +1,5 @@
 ## Software Installation
 
-
 ### PCAN Installation
 
 #### 1. Install PCAN Driver
@@ -76,17 +75,35 @@ sudo modprobe pcan
 
 ### ROS 2 Installation
 
-This package uses ros `humble` distribution with Ubuntu 22.04. To install, follow the instructions on the [ROS 2 Humble Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
+This package supports ROS 2 Jazzy with Ubuntu 24.04 and ROS 2 Humble with
+Ubuntu 22.04. Follow the [ROS 2 Jazzy Installation Guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
+or the [ROS 2 Humble Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
 
-#### ROS 2 Depedencies
+#### ROS 2 Dependencies
 
-TODO: Use Rosdep to install dependencies
-TODO: Add a build check for ROS 2
+Install the dependencies declared by this checkout with `rosdep` from the
+workspace root. For ROS 2 Jazzy on Ubuntu 24.04:
 
+```bash
+cd ~/workspaces/plato_ws
+source /opt/ros/jazzy/setup.bash
+
+# Run once per machine if rosdep has not been initialized yet.
+if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+  sudo rosdep init
+fi
+
+rosdep update
+rosdep install --from-paths src/PLATO_ROS --ignore-src --rosdistro jazzy -r -y
 ```
-sudo apt install ros-humble-hardware-interface ros-humble-can-msgs ros-humble-xacro ros-humble-joint-state-publisher-gui ros-humble-controller-manager ros-humble-joint-state-broadcaster ros-humble-position-controllers
 
-```
+For ROS 2 Humble on Ubuntu 22.04, source `/opt/ros/humble/setup.bash` and
+replace `jazzy` with `humble` in the `rosdep install` command.
+
+`rosdep` installs ROS/system dependencies but does not build the workspace or
+install PEAK's proprietary PCAN-Basic API. The PCAN-Basic prerequisite is
+described above and is still required by the current shared CAN library,
+including when the runtime backend is SocketCAN.
 
 #### Eigen Installation
 We use Eigen3 for matrix operations. Install [Eigen3](https://eigen.tuxfamily.org/dox/GettingStarted.html)with you preferred method.
@@ -112,6 +129,3 @@ There are two types of motors used: Steadywin GIM3505-8 and Dynamixel XM430-W350
 - MOTOR8: 0x11 (17)
 
 TX ID and RX ID for each motor is same
-
-
-

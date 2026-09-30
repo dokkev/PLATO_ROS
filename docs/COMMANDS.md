@@ -11,16 +11,16 @@ This repository is the `src/PLATO_ROS` subtree of that workspace.
 ## Environment
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash  # or /opt/ros/humble/setup.bash
 source ~/workspace/plato_ws/install/setup.bash
 ```
 
-Use the local Python environment expected by ROS 2 Humble. Install dependencies
-with rosdep when the machine has network/package-manager access:
+This repository supports ROS 2 Jazzy and Humble. Install dependencies with
+rosdep when the machine has network/package-manager access:
 
 ```bash
 cd ~/workspace/plato_ws
-rosdep install --from-paths src --ignore-src -r -y
+rosdep install --from-paths src/PLATO_ROS --ignore-src --rosdistro jazzy -r -y
 ```
 
 Hardware work may also require SocketCAN/PCAN setup from

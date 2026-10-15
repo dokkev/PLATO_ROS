@@ -45,7 +45,7 @@ Each array must contain eight values, ordered `joint1` through `joint8`, as in
 
 Read the joint names and current positions first:
 
-```bash
+```
 ros2 topic echo --once /plato2/joint_states
 ```
 
@@ -53,7 +53,7 @@ Publish once with all five arrays. Replace `P1`–`P8`, `K1`–`K8`, and `D1`–
 with numeric values chosen for the current pose and controller tuning before
 running the command:
 
-```bash
+```
 ros2 topic pub --once \
   /plato2/joint_impedance_controller/commands \
   plato_interfaces/msg/ImpedanceCommands \
